@@ -1,0 +1,41 @@
+<!-- templates/tela_inicial.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Página Inicial - Módulo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; padding-top:50px; }
+    .main-container { max-width:800px; margin:0 auto; padding:30px; background:#fff; border-radius:10px; }
+    .btn-main { width:100%; padding:20px; margin-bottom:20px; font-size:1.1rem; background-color:#0d6efd; color:white; border:none; text-align:left; }
+    .btn-admin { background-color:#0dcaf0; color:#000; }
+  </style>
+</head>
+<body>
+  <div class="container main-container">
+    <div class="d-flex justify-content-between align-items-center">
+      <h2>Módulo de Análise de Contas</h2>
+      <div>
+        <small>Logado como: <strong>{{ user['email'] }}</strong></small><br>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary mt-2">Sair</a>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <a href="{{ url_for('instrucoes') }}" class="btn btn-main">Iniciar nova análise</a>
+      <a href="#" class="btn btn-main">Prosseguir análise</a>
+      <a href="#" class="btn btn-main">Orçamento anual</a>
+    </div>
+
+    {% if user['tipo_usuario'] == 'Agente Público' %}
+      <div class="mt-4 p-3 border-top">
+        <h5>Opções do Administrador</h5>
+        <a href="#" class="btn btn-main btn-admin">Modelos de texto</a>
+        <a href="#" class="btn btn-main btn-admin">Listas suspensas</a>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!-- templates/login.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Login - Módulo de Análise</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .login-container { max-width: 400px; margin: 100px auto; padding: 20px; background: #fff; border-radius: 8px; }
+    .btn-login { background-color: #0d6efd; width:100%; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="login-container">
+      <h2 class="text-center text-primary">Módulo de Análise de Contas</h2>
+      <p class="text-muted text-center">Faça login para continuar</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{cat}}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      <form method="post" action="{{ url_for('login') }}">
+        <div class="mb-3">
+          <label for="username" class="form-label">Usuário (e-mail)</label>
+          <input type="email" class="form-control" id="username" name="username" required>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Senha</label>
+          <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-login">Entrar</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
