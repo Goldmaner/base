@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtualenv
+venv/
+.env/
+
+# SQLite DB e arquivos de journal
+meu_banco.db
+meu_banco.db-shm
+meu_banco.db-wal
+
+# Excel / exports / uploads temporários
+*.xlsx
+*.xls
+
+# Editor / OS
+.vscode/
+Thumbs.db
+.DS_Store

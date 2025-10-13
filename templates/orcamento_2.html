@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orçamento - Preenchimento</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+  /* permitir rolagem horizontal sem limitar a largura da tabela; ocupa 95% da viewport */
+  .table-wrapper{ overflow-x: auto; width: 95vw; max-width: 100%; margin: 0 auto; }
+  /* largura mínima aumentada para cada coluna de mês */
+  #tabelaOrc2 th.month-th, #tabelaOrc2 td.month-td { min-width: 140px; }
+  /* largura mínima maior para colunas de rubrica e categoria (podem ter muitos caracteres) */
+  #tabelaOrc2 th.col-rubrica, #tabelaOrc2 td.col-rubrica { min-width: 200px; }
+  #tabelaOrc2 th.col-categoria, #tabelaOrc2 td.col-categoria { min-width: 260px; }
+  /* permitir que inputs de mês fiquem com largura mínima adequada */
+  .month-name { min-width: 120px; }
+  /* aumentar a altura das linhas e inputs para melhor legibilidade */
+  #tabelaOrc2 td, #tabelaOrc2 th { padding: .75rem .5rem; }
+  #tabelaOrc2 .form-control { height: calc(1.8em + .75rem); padding: .375rem .5rem; }
+  /* resizer handle */
+  #tabelaOrc2 th { position: relative; }
+  .col-resizer { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; z-index: 20; }
+  .col-resizer:hover { background: rgba(0,0,0,0.03); }
+  </style>
+</head>
+<body class="p-4">
+  <div class="container">
+    <h2 id="pageTitle">Preenchimento do Orçamento Anual ou Proposta Orçamentária</h2>
+    <h5 id="termoSub" class="text-muted">{{ numero_termo }} &nbsp; <small class="text-muted">Previsto: {{ total_previsto if total_previsto is defined else 'R$ 0,00' }}</small></h5>
+
+    <div class="mt-3 d-flex gap-2 align-items-center">
+      <a class="btn btn-light btn-sm" href="{{ url_for('orcamento') }}">&larr; Voltar</a>
+      <div class="input-group input-group-sm w-auto">
+        <span class="input-group-text">Adicionar meses</span>
+        <input id="numCols" type="number" class="form-control" min="1" value="1" style="width:80px">
+      </div>
+      <button id="addMonthsBtn" class="btn btn-secondary btn-sm">Adicionar</button>
+      <!-- Import Excel -->
+      <div class="input-group input-group-sm ms-2">
+        <input id="excelFileInput" type="file" accept=".xlsx,.xls" class="form-control">
+        <button id="importExcelBtn" class="btn btn-outline-primary">Importar Excel</button>
+        <button id="downloadTemplateBtn" class="btn btn-outline-secondary ms-1">Modelo de Importação</button>
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <div class="table-wrapper">
+      <table class="table table-sm table-bordered" id="tabelaOrc2">
+        <thead class="table-light">
+          <tr>
+            <th class="col-rubrica">Rubrica<span class="col-resizer"></span></th>
+            <th>Quantidade</th>
+            <th class="col-categoria">Categoria de Despesa<span class="col-resizer"></span></th>
+            <!-- month headers -->
+            <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 1"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
+            <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 2"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
+            <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 3"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody id="bodyOrc2">
+          {% for i in range(20) %}
+          <tr>
+            <td class="col-rubrica">
+              <select class="form-select form-select-sm" name="rubrica">
+                <option value="">Selecione...</option>
+                <option>Pessoal</option>
+                <option>Materiais</option>
+                <option>Administrativas</option>
+                <option>Serviços de Terceiros</option>
+                <option>Outras Despesas</option>
+                <option>Imobilizado</option>
+                <option>Implantação</option>
+              </select>
+            </td>
+            <td><input type="text" class="form-control form-control-sm quantidade" value="1"></td>
+            <td class="col-categoria"><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I"></td>
+            <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
+            <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
+            <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
+            <td><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="table-secondary">
+            <td colspan="3" class="text-end"><strong>Total</strong></td>
+            <!-- totals for month columns will be injected -->
+            <td class="col-total month-td">0,00</td>
+            <td class="col-total month-td">0,00</td>
+            <td class="col-total month-td">0,00</td>
+            <td><strong id="grandTotal">0,00</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button id="addLinha" class="btn btn-secondary btn-sm">Adicionar Linha</button>
+        <button id="salvarOrc2" class="btn btn-primary ms-auto">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- SheetJS para leitura de Excel no cliente -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script>
+    // util: criar header de mês com botão remover
+    function makeMonthHeader(name){
+      const th = document.createElement('th');
+      th.className = 'month-th';
+      const div = document.createElement('div');
+      div.className = 'd-flex gap-1';
+      const inp = document.createElement('input'); inp.className = 'form-control form-control-sm month-name'; inp.value = name;
+      const btn = document.createElement('button'); btn.type='button'; btn.className='btn btn-sm btn-outline-danger remove-month'; btn.textContent='✕';
+      div.appendChild(inp); div.appendChild(btn); th.appendChild(div);
+      btn.onclick = function(){ removeMonthByTh(th); };
+      // adicionar resizer ao th
+      const res = document.createElement('span'); res.className = 'col-resizer'; th.appendChild(res);
+      makeResizable(th);
+      return th;
+    }
+
+    // centraliza a lógica de remoção de um mês a partir do elemento <th>
+    function removeMonthByTh(th){
+      if (!th) return;
+      const thead = document.querySelector('#tabelaOrc2 thead tr');
+      const currentMonths = thead.querySelectorAll('.month-th').length;
+      if (currentMonths <= 1){
+        // não permite remover a última coluna de mês
+        alert('Deve permanecer pelo menos 1 mês.');
+        return;
+      }
+      const ths = Array.from(thead.querySelectorAll('.month-th'));
+      const idx = ths.indexOf(th);
+      if (idx >= 0){
+        // remover a célula correspondente em cada linha
+        document.querySelectorAll('#bodyOrc2 tr').forEach(tr => {
+          const cells = tr.querySelectorAll('td');
+          const cellIdx = 3 + idx; // 0:rubrica,1:quant,2:categoria -> meses começam em 3
+          if (cells[cellIdx]) cells[cellIdx].remove();
+        });
+        // remover total correspondente
+        const foot = document.querySelectorAll('#tabelaOrc2 tfoot .col-total');
+        if (foot[idx]) foot[idx].remove();
+        th.remove();
+        recalcTotals();
+      }
+    }
+
+    // adicionar meses N de uma vez
+    document.getElementById('addMonthsBtn').addEventListener('click', function(){
+      const n = parseInt(document.getElementById('numCols').value,10) || 0; if (n<=0) return;
+      const thead = document.querySelector('#tabelaOrc2 thead tr'); const currentMonths = thead.querySelectorAll('.month-th').length;
+      for (let k=0;k<n;k++){ const idx = currentMonths + k + 1; const th = makeMonthHeader('Mês ' + idx); thead.insertBefore(th, thead.lastElementChild); }
+  // inserir inputs em cada linha
+  document.querySelectorAll('#bodyOrc2 tr').forEach(tr => { for (let k=0;k<n;k++){ const td = document.createElement('td'); td.className = 'month-td'; td.innerHTML = `<input type="text" class="form-control form-control-sm valor" placeholder="0,00">`; tr.insertBefore(td, tr.lastElementChild); }});
+      // adicionar tfoot colunas
+      const tfootRow = document.querySelector('#tabelaOrc2 tfoot tr'); for (let k=0;k<n;k++){ const td = document.createElement('td'); td.className='col-total'; td.textContent='0,00'; tfootRow.insertBefore(td, tfootRow.lastElementChild); }
+    });
+
+    // ligar os botões de remoção já existentes no HTML inicial
+    document.querySelectorAll('#tabelaOrc2 thead .remove-month').forEach(btn => {
+      btn.addEventListener('click', function(){
+        const th = btn.closest('.month-th');
+        removeMonthByTh(th);
+      });
+    });
+
+    // --- Redimensionamento de colunas (drag) ---
+    function makeResizable(th){
+      const resizer = th.querySelector('.col-resizer');
+      if (!resizer) return;
+      let startX, startWidth, colIndex;
+      resizer.addEventListener('mousedown', initDrag);
+
+      function initDrag(e){
+        e.preventDefault();
+        startX = e.clientX;
+        const table = document.getElementById('tabelaOrc2');
+        const ths = Array.from(table.querySelectorAll('thead tr th'));
+        colIndex = ths.indexOf(th);
+        startWidth = th.offsetWidth;
+        document.addEventListener('mousemove', doDrag);
+        document.addEventListener('mouseup', stopDrag);
+      }
+
+      function doDrag(e){
+        const diff = e.clientX - startX;
+        const newWidth = Math.max(40, startWidth + diff);
+        // aplicar largura em px ao th e à todas as células correspondentes
+        const table = document.getElementById('tabelaOrc2');
+        const ths = Array.from(table.querySelectorAll('thead tr th'));
+        if (ths[colIndex]) ths[colIndex].style.width = newWidth + 'px';
+        // aplicar nas tds
+        table.querySelectorAll('tbody tr').forEach(tr => {
+          const cells = tr.querySelectorAll('td'); if (cells[colIndex]) cells[colIndex].style.width = newWidth + 'px';
+        });
+        // aplicar ao tfoot
+        const footCells = table.querySelectorAll('tfoot tr td'); if (footCells[colIndex]) footCells[colIndex].style.width = newWidth + 'px';
+      }
+
+      function stopDrag(){
+        document.removeEventListener('mousemove', doDrag);
+        document.removeEventListener('mouseup', stopDrag);
+      }
+    }
+
+    // inicializar redimensionáveis nos headers existentes
+    document.querySelectorAll('#tabelaOrc2 thead tr th').forEach(th => makeResizable(th));
+
+    // ---------- Importar Excel (cliente) ----------
+    document.getElementById('importExcelBtn').addEventListener('click', function(){
+      const f = document.getElementById('excelFileInput').files[0];
+      if (!f){ alert('Selecione um arquivo Excel (.xlsx ou .xls)'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e){
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array'});
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(ws, {defval: ''});
+        // json é array de objetos com chaves baseadas no header
+        importFromJson(json);
+      };
+      reader.readAsArrayBuffer(f);
+    });
+
+    // gerar e baixar modelo de importação
+    document.getElementById('downloadTemplateBtn').addEventListener('click', function(){
+      const headers = ['Rubrica','Quantidade','Categoria de Despesa','Mês 1','Mês 2','Mês 3'];
+      const ws = XLSX.utils.aoa_to_sheet([headers]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Modelo');
+      XLSX.writeFile(wb, 'modelo_importacao_orcamento.xlsx');
+    });
+
+    // mapeia colunas do excel para rubrica, quantidade, categoria e meses (qualquer coluna restante é considerado mês)
+    function importFromJson(rows){
+      if (!rows || rows.length === 0){ alert('Planilha vazia'); return; }
+      // filtrar linhas vazias (todas as células vazias) para não contar linhas em branco
+      const filtered = rows.filter(r => Object.values(r).some(v => String(v).trim() !== ''));
+      if (filtered.length === 0){ alert('Planilha não contém linhas preenchidas'); return; }
+
+      // detect keys a partir da primeira linha não vazia
+      const keys = Object.keys(filtered[0]);
+      // heurística: procurar colunas com nomes parecidos
+      let colRubrica = keys.find(k => /rubri|descr|rubrica/i.test(k)) || keys.find(k => /descricao/i.test(k)) || keys[0];
+      let colQuantidade = keys.find(k => /quant/i.test(k)) || keys.find(k => /qtd|qty/i.test(k)) || null;
+      let colCategoria = keys.find(k => /categoria|cat/i.test(k)) || keys.find(k => /tipo/i.test(k)) || null;
+      // meses: as demais colunas que não sejam rubrica/quantidade/categoria
+      const monthCols = keys.filter(k => k !== colRubrica && k !== colQuantidade && k !== colCategoria);
+
+      // ajustar número de meses na tabela para igualar monthCols.length (adicionar/remover em bloco)
+      const currentMonths = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
+      const needMonths = monthCols.length;
+      if (needMonths > currentMonths){
+        document.getElementById('numCols').value = needMonths - currentMonths;
+        document.getElementById('addMonthsBtn').click();
+      } else if (needMonths < currentMonths){
+        const thead = document.querySelector('#tabelaOrc2 thead tr');
+        // remover do final até restarem needMonths
+        const ths = thead.querySelectorAll('.month-th');
+        for (let i = ths.length - 1; i >= needMonths; i--) {
+          removeMonthByTh(ths[i]);
+        }
+      }
+
+      // ajustar número de linhas em bloco: manter exatamente filtered.length
+      const tbody = document.getElementById('bodyOrc2');
+      let currentRows = tbody.querySelectorAll('tr').length;
+      const needRows = filtered.length;
+      if (currentRows > needRows){
+        // remover linhas extras do final
+        for (let i = currentRows - 1; i >= needRows; i--){
+          const row = tbody.children[i]; if (row) tbody.removeChild(row);
+        }
+      } else if (currentRows < needRows){
+        // adicionar linhas necessárias
+        for (let i = currentRows; i < needRows; i++){ document.getElementById('addLinha').click(); }
+      }
+
+      // preencher os dados nas linhas agora que o DOM está preparado
+      const allRows = tbody.querySelectorAll('tr');
+      allRows.forEach((tr, i) => {
+        const data = filtered[i];
+        if (!data) return;
+        // preencher rubrica
+        const r = data[colRubrica] || '';
+        const select = tr.querySelector('select[name="rubrica"]');
+        if (select){
+          const opt = Array.from(select.options).find(o => (o.text || '').toLowerCase().includes(String(r).toLowerCase()));
+          if (opt) select.value = opt.value; else select.value = '';
+        }
+        // quantidade: '-' => 0
+        if (colQuantidade){
+          let q = data[colQuantidade]; if (String(q).trim() === '-') q = 0; tr.querySelector('.quantidade').value = q;
+        }
+        // categoria
+        if (colCategoria){ tr.querySelector('.categoria').value = data[colCategoria] || ''; }
+        // meses
+        const valorInputs = tr.querySelectorAll('input.valor');
+        monthCols.forEach((mc, idx) => {
+          const v = data[mc];
+          if (valorInputs[idx]) valorInputs[idx].value = (v === undefined || v === null) ? '' : String(v);
+        });
+      });
+
+      recalcTotals();
+      alert('Importação concluída: ' + filtered.length + ' linhas e ' + monthCols.length + ' meses detectados.');
+    }
+
+    // adicionar linha
+    document.getElementById('addLinha').addEventListener('click', function(){
+      const tbody = document.getElementById('bodyOrc2'); const tr = document.createElement('tr');
+      // número de meses atual
+      const monthCount = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
+      let cols = `
+        <td>
+          <select class="form-select form-select-sm" name="rubrica">
+            <option value="">Selecione...</option>
+            <option>Pessoal</option>
+            <option>Materiais</option>
+            <option>Administrativas</option>
+            <option>Serviços de Terceiros</option>
+            <option>Outras Despesas</option>
+            <option>Imobilizado</option>
+            <option>Implantação</option>
+          </select>
+        </td>
+        <td><input type="text" class="form-control form-control-sm quantidade" value="1"></td>
+        <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I"></td>`;
+  for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
+      cols += `<td><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
+      tr.innerHTML = cols; tbody.appendChild(tr); recalcTotals();
+    });
+
+    // remover linha
+    document.getElementById('bodyOrc2').addEventListener('click', function(e){ if (e.target && e.target.classList.contains('remover')){ e.target.closest('tr').remove(); recalcTotals(); }});
+
+    // salvar: coleta a tabela, normaliza valores e envia para o backend
+    document.getElementById('salvarOrc2').addEventListener('click', function(){
+      const numeroTermo = '{{ numero_termo|e }}';
+      const monthNames = Array.from(document.querySelectorAll('.month-name')).map(n => n.value || 'Mês');
+      const rows = document.querySelectorAll('#bodyOrc2 tr');
+      const despesas = [];
+      rows.forEach((tr) => {
+        const selectRub = tr.querySelector('select[name="rubrica"]');
+        const rubrica = selectRub ? selectRub.value : '';
+        const qInp = tr.querySelector('.quantidade');
+        const quantidade = qInp ? (qInp.value === '-' ? null : qInp.value) : null;
+        const categoria = tr.querySelector('.categoria') ? tr.querySelector('.categoria').value : '';
+        if (!rubrica) return;
+        const valores_por_mes = {};
+        tr.querySelectorAll('input.valor').forEach((inp, idx) => {
+          const raw = inp.value && inp.value.trim();
+          if (!raw) return;
+          // normalizar: aceitar formatos 1.234,56 ou 1234.56
+          const normalized = String(raw).replace(/\./g,'').replace(',', '.').replace('R$', '').trim();
+          const num = parseFloat(normalized);
+          if (!isNaN(num) && num !== 0) {
+            // enviar como string com ponto decimal — backend aceita com ',' e 'R$' também
+            valores_por_mes[idx+1] = num.toString();
+          } else if (normalized === '-' ) {
+            // ignorar
+          } else if (!isNaN(num) && num === 0) {
+            // include zeros explicitly
+            valores_por_mes[idx+1] = '0';
+          }
+        });
+        if (Object.keys(valores_por_mes).length > 0) despesas.push({rubrica, quantidade, categoria_despesa: categoria, valores_por_mes});
+      });
+      if (despesas.length === 0) { alert('Preencha pelo menos uma despesa com valores'); return; }
+
+      // enviar para /api/despesa
+      fetch('/api/despesa', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({numero_termo: numeroTermo, despesas, month_names: monthNames})
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.warning){
+          if (confirm(data.message + '\nDeseja prosseguir e salvar mesmo assim?')){
+            // forçar com confirmar
+            fetch('/api/despesa/confirmar',{
+              method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({numero_termo: numeroTermo, despesas, month_names: monthNames})
+            }).then(r=>r.json()).then(d=>{
+              if (d.message) alert(d.message);
+              else if (d.error) alert('Erro: ' + d.error);
+              location.href = '/orcamento';
+            }).catch(e=>{ alert('Erro ao confirmar. Veja console.'); console.error(e); });
+          }
+        } else {
+          if (data.message) alert(data.message);
+          else if (data.error) alert('Erro: ' + data.error);
+          location.href = '/orcamento';
+        }
+      }).catch(e=>{ alert('Erro ao salvar. Veja console.'); console.error(e); });
+    });
+
+    // recalcular totais por coluna e total geral
+    function recalcTotals(){
+      const thead = document.querySelector('#tabelaOrc2 thead tr');
+      const monthCount = thead.querySelectorAll('.month-th').length;
+      const totals = Array.from({length: monthCount}, ()=>0);
+      document.querySelectorAll('#bodyOrc2 tr').forEach(tr => {
+        const vals = Array.from(tr.querySelectorAll('input.valor')).map(i=>parseFloat(i.value.replace(/\./g,'').replace(',','.'))||0);
+        for (let j=0;j<monthCount;j++) totals[j] += (vals[j]||0);
+      });
+      // preencher tfoot
+      const foot = document.querySelector('#tabelaOrc2 tfoot tr');
+      // limpar col-totals exceto o last cell
+      const colTotals = foot.querySelectorAll('.col-total');
+      for (let j=0;j<colTotals.length;j++){
+        colTotals[j].textContent = (totals[j]||0).toLocaleString('pt-BR', {minimumFractionDigits:2});
+      }
+      const grand = totals.reduce((a,b)=>a+b,0);
+      document.getElementById('grandTotal').textContent = grand.toLocaleString('pt-BR', {minimumFractionDigits:2});
+    }
+
+    // escutar mudanças nos inputs de valor para recalcular
+    document.addEventListener('input', function(e){ if (e.target && e.target.classList && e.target.classList.contains('valor')) recalcTotals(); });
+
+    // carregar dados existentes do termo ao inicializar
+    function carregarDadosExistentes(){
+      const numeroTermo = '{{ numero_termo|e }}';
+      fetch(`/api/despesas/${encodeURIComponent(numeroTermo)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          console.warn('Erro ao carregar despesas:', data.error);
+          return;
+        }
+        
+        const despesas = data.despesas || [];
+        if (despesas.length === 0) {
+          console.log('Nenhuma despesa encontrada para este termo');
+          return;
+        }
+        
+        // Determinar quantos meses precisamos baseado nos dados
+        let maxMes = 0;
+        despesas.forEach(d => {
+          Object.keys(d.valores_por_mes || {}).forEach(mes => {
+            maxMes = Math.max(maxMes, parseInt(mes));
+          });
+        });
+        
+        // Ajustar número de colunas de meses se necessário
+        const currentMonths = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
+        if (maxMes > currentMonths) {
+          document.getElementById('numCols').value = maxMes - currentMonths;
+          document.getElementById('addMonthsBtn').click();
+        }
+        
+        // Ajustar número de linhas se necessário
+        const tbody = document.getElementById('bodyOrc2');
+        const currentRows = tbody.querySelectorAll('tr').length;
+        const needRows = despesas.length;
+        
+        if (currentRows > needRows) {
+          // Remover linhas extras do final
+          for (let i = currentRows - 1; i >= needRows; i--) {
+            const row = tbody.children[i];
+            if (row) tbody.removeChild(row);
+          }
+        } else if (currentRows < needRows) {
+          // Adicionar linhas necessárias
+          for (let i = currentRows; i < needRows; i++) {
+            document.getElementById('addLinha').click();
+          }
+        }
+        
+        // Preencher os dados nas linhas
+        const rows = tbody.querySelectorAll('tr');
+        despesas.forEach((despesa, index) => {
+          if (index >= rows.length) return;
+          
+          const tr = rows[index];
+          
+          // Rubrica
+          const selectRub = tr.querySelector('select[name="rubrica"]');
+          if (selectRub) {
+            selectRub.value = despesa.rubrica || '';
+          }
+          
+          // Quantidade
+          const qInp = tr.querySelector('.quantidade');
+          if (qInp) {
+            qInp.value = despesa.quantidade || '1';
+          }
+          
+          // Categoria
+          const catInp = tr.querySelector('.categoria');
+          if (catInp) {
+            catInp.value = despesa.categoria_despesa || '';
+          }
+          
+          // Valores por mês
+          const valorInputs = tr.querySelectorAll('input.valor');
+          valorInputs.forEach((inp, mesIndex) => {
+            const mesNum = mesIndex + 1;
+            const valor = despesa.valores_por_mes?.[mesNum.toString()];
+            if (valor !== undefined) {
+              // Formatar como moeda brasileira
+              inp.value = valor.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+            }
+          });
+        });
+        
+        // Recalcular totais após carregar dados
+        recalcTotals();
+        console.log(`Carregadas ${despesas.length} despesas para ${numeroTermo}`);
+      })
+      .catch(e => {
+        console.error('Erro ao carregar dados:', e);
+      });
+    }
+
+    // inicial
+    recalcTotals();
+    carregarDadosExistentes();
+  </script>
+</body>
+</html>
+

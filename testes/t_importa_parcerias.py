@@ -3,6 +3,10 @@ import sqlite3
 import pandas as pd
 import re
 from pathlib import Path
+from decimal import Decimal, getcontext
+
+# Configurar precisão alta para decimal
+getcontext().prec = 50
 
 CSV_PATH = Path("parcerias.csv")
 DB_PATH = Path(r"c:\Users\d843702\OneDrive - rede.sp\Área de Trabalho\FAF\FAF\meu_banco.db")
@@ -37,6 +41,7 @@ mapping = {
     "Data de Início": "inicio",
     "Data de Encerramento": "final",
     "Vigência em Meses": "vigencia_meses",
+    "Meses": "meses",
     "Total do Projeto": "total_previsto",
     "Valor Repassado": "total_pago",
     "Conta Específica Prevista": "conta",
@@ -60,6 +65,41 @@ def only_digits(val):
     s = str(val).strip()
     if s == "":
         return None
+    s = re.sub(r'\D', '', s)
+    return s or None
+
+def parse_long_number(val):
+    """
+    Trata números longos que podem estar em notação científica (ex: 6,0742E+15)
+    Converte para string de dígitos sem formatação científica.
+    Usa Decimal para manter precisão total.
+    """
+    if val is None:
+        return None
+    s = str(val).strip()
+    if s == "":
+        return None
+    
+    # Se contém E+ ou e+ (notação científica)
+    if 'E+' in s.upper() or 'e+' in s:
+        try:
+            # Normalizar separador decimal e usar Decimal para precisão total
+            s = s.replace(',', '.')
+            num = Decimal(s)
+            return str(int(num))
+        except:
+            # Se falhar, tentar extrair apenas dígitos
+            return re.sub(r'\D', '', s) or None
+    
+    # Se contém ponto decimal, remover parte decimal
+    if '.' in s:
+        try:
+            num = float(s)
+            return f"{num:.0f}"
+        except:
+            pass
+    
+    # Caso normal: extrair apenas dígitos
     s = re.sub(r'\D', '', s)
     return s or None
 
@@ -130,18 +170,19 @@ def parse_boolean(val):
 
 # --- 4) Aplicar conversões nas colunas presentes
 conversions = {
-    "cnpj": only_digits,
+    "cnpj": parse_long_number,  # mudança: usar parse_long_number para CNPJ
     "inicio": parse_date_general,
     "final": parse_date_general,
     "vigencia_meses": parse_int,
+    "meses": parse_int,
     "total_previsto": parse_number_br,
     "total_pago": parse_number_br,
     "conta": parse_number_br,
     "transicao": parse_boolean,
-    "sei_celeb": parse_number_br,
-    "sei_pc": parse_number_br,
-    "sei_plano": parse_number_br,
-    "sei_orcamento": parse_number_br,
+    "sei_celeb": parse_long_number,  # mudança: usar parse_long_number para SEI
+    "sei_pc": parse_long_number,     # mudança: usar parse_long_number para SEI
+    "sei_plano": parse_long_number,  # mudança: usar parse_long_number para SEI
+    "sei_orcamento": parse_long_number,  # mudança: usar parse_long_number para SEI
     "contrapartida": parse_boolean
 }
 
@@ -167,15 +208,16 @@ CREATE TABLE IF NOT EXISTS Parcerias (
     cnpj TEXT,
     inicio DATE,
     final DATE,
+    meses INTEGER,
     total_previsto REAL,
     total_pago REAL,
     conta REAL,
     transicao INTEGER,
-    sei_celeb REAL,
-    sei_pc REAL,
+    sei_celeb TEXT,
+    sei_pc TEXT,
     endereco TEXT,
-    sei_plano REAL,
-    sei_orcamento REAL,
+    sei_plano TEXT,
+    sei_orcamento TEXT,
     contrapartida INTEGER
 );
 """
@@ -183,21 +225,20 @@ CREATE TABLE IF NOT EXISTS Parcerias (
 conn = sqlite3.connect(DB_PATH)
 cur = conn.cursor()
 
-# Limpar tabela existente e começar do zero
-cur.execute("DROP TABLE IF EXISTS Parcerias")
-conn.commit()
-
+# Criar tabela se não existir (preservando dados existentes)
 cur.execute(create_sql)
 
 # --- 6) Preparar INSERT com as colunas realmente presentes
 table_cols = ["numero_termo","osc","projeto","tipo_termo","portaria","cnpj","inicio","final",
-              "total_previsto","total_pago","conta","transicao","sei_celeb","sei_pc",
+              "meses","total_previsto","total_pago","conta","transicao","sei_celeb","sei_pc",
               "endereco","sei_plano","sei_orcamento","contrapartida"]
 
 present_cols = [c for c in table_cols if c in df.columns]
 placeholders = ",".join("?" for _ in present_cols)
 col_list_sql = ",".join(present_cols)
-insert_sql = f"INSERT OR IGNORE INTO Parcerias ({col_list_sql}) VALUES ({placeholders})"
+# Construir SQL de upsert: INSERT ... ON CONFLICT(numero_termo) DO UPDATE SET col=COALESCE(excluded.col, Parcerias.col)
+update_assignments = ", ".join([f"{c}=COALESCE(excluded.{c}, Parcerias.{c})" for c in present_cols if c != 'numero_termo'])
+insert_sql = f"INSERT INTO Parcerias ({col_list_sql}) VALUES ({placeholders}) ON CONFLICT(numero_termo) DO UPDATE SET {update_assignments}"
 
 # Adicione isso antes do loop de inserção
 cur.execute("SELECT COUNT(*) FROM Parcerias")
@@ -213,22 +254,13 @@ for _, row in df.iterrows():
     vals = [None if (isinstance(v, float) and pd.isna(v)) else v for v in vals]
     try:
         # Primeiro, vamos verificar se já existe
-        cur.execute("SELECT COUNT(*) FROM Parcerias WHERE numero_termo = ?", (vals[0],))
-        exists = cur.fetchone()[0] > 0
-        
-        if exists:
-            print(f"Registro já existe: {vals[0]}")
-            continue
-            
-        # Tentar inserir
+        # Executar upsert (inserir ou atualizar)
         try:
             cur.execute(insert_sql, vals)
-            if cur.rowcount == 1:
-                inserted += 1
-            else:
-                print(f"Falha ao inserir (possível violação NOT NULL). Valores:", vals)
+            # sqlite3 doesn't set rowcount reliably for INSERT ON CONFLICT; we'll consider it inserted/updated
+            inserted += 1
         except sqlite3.IntegrityError as e:
-            print(f"Erro de integridade ao inserir {vals[0]}: {e}")
+            print(f"Erro de integridade ao processar {vals[0]}: {e}")
             print("Valores:", vals)
             errors.append((row.get("numero_termo"), str(e)))
         except Exception as e:

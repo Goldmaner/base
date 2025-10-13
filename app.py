@@ -1,14 +1,40 @@
 # app.py
-from flask import Flask, g, render_template, request, redirect, url_for, session, flash
+from flask import Flask, g, render_template, request, redirect, url_for, session, flash, jsonify
 import sqlite3
 from werkzeug.security import check_password_hash
 from functools import wraps
+from datetime import datetime
 
 DB = "meu_banco.db"
 SECRET_KEY = "troque_isso_por_uma_chave_aleatoria_e_secreta_em_producao"
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+
+def format_sei(sei_number):
+    """
+    Formata número SEI no padrão: 6074.2022/0008210-7
+    Entrada: 6074202200082107 -> Saída: 6074.2022/0008210-7
+    """
+    if not sei_number:
+        return '-'
+    
+    sei_str = str(sei_number).strip()
+    if len(sei_str) < 16:
+        return sei_str  # retorna como está se for menor que 16 dígitos
+    
+    # Formato: XXXX.XXXX/XXXXXXX-X
+    parte1 = sei_str[:4]    # 6074
+    parte2 = sei_str[4:8]   # 2022
+    parte3 = sei_str[8:15]  # 0008210
+    parte4 = sei_str[15]    # 7
+    
+    return f"{parte1}.{parte2}/{parte3}-{parte4}"
+
+# Registrar o filtro no Jinja2
+@app.template_filter('format_sei')
+def format_sei_filter(sei_number):
+    return format_sei(sei_number)
 
 def get_db():
     if "db" not in g:
@@ -73,6 +99,80 @@ def logout():
     session.clear()
     flash("Você saiu.", "info")
     return redirect(url_for("login"))
+
+@app.route("/orcamento", methods=["GET"])
+@login_required
+def orcamento():
+    db = get_db()
+    
+    # Query principal: Parcerias LEFT JOIN Parcerias_Despesas para somar valores preenchidos
+    # Filtrar convênios e acordos de cooperação conforme solicitado
+    cur = db.execute("""
+        SELECT 
+            p.numero_termo,
+            p.tipo_termo,
+            p.meses,
+            p.sei_celeb,
+            p.total_previsto,
+            COALESCE(SUM(pd.valor), 0) as total_preenchido
+        FROM Parcerias p
+        LEFT JOIN Parcerias_Despesas pd ON p.numero_termo = pd.numero_termo
+        WHERE p.tipo_termo NOT IN ('Convênio de Cooperação', 'Convênio', 'Convênio - Passivo', 'Acordo de Cooperação')
+        GROUP BY p.numero_termo, p.tipo_termo, p.meses, p.sei_celeb, p.total_previsto
+        ORDER BY p.numero_termo
+    """)
+    parcerias = cur.fetchall()
+    
+    # Calcular estatísticas de status
+    total_parcerias = len(parcerias)
+    nao_feito = 0
+    feito_corretamente = 0
+    feito_incorretamente = 0
+    
+    for parceria in parcerias:
+        total_previsto = float(parceria["total_previsto"] or 0)
+        total_preenchido = float(parceria["total_preenchido"] or 0)
+        
+        if total_preenchido == 0:
+            nao_feito += 1
+        elif abs(total_preenchido - total_previsto) < 0.01:  # tolerância para igualdade
+            feito_corretamente += 1
+        else:
+            feito_incorretamente += 1
+    
+    # Calcular percentuais
+    estatisticas = {
+        'feito_corretamente': {
+            'quantidade': feito_corretamente,
+            'percentual': (feito_corretamente / total_parcerias * 100) if total_parcerias > 0 else 0
+        },
+        'nao_feito': {
+            'quantidade': nao_feito,
+            'percentual': (nao_feito / total_parcerias * 100) if total_parcerias > 0 else 0
+        },
+        'feito_incorretamente': {
+            'quantidade': feito_incorretamente,
+            'percentual': (feito_incorretamente / total_parcerias * 100) if total_parcerias > 0 else 0
+        }
+    }
+    
+    return render_template("orcamento_1.html", parcerias=parcerias, estatisticas=estatisticas)
+
+
+@app.route('/orcamento/editar/<path:numero_termo>')
+@login_required
+def orcamento_editar(numero_termo):
+    # Buscar total_previsto para exibir no subtítulo
+    db = get_db()
+    cur = db.execute("SELECT total_previsto FROM Parcerias WHERE numero_termo = ?", (numero_termo,))
+    row = cur.fetchone()
+    try:
+        total_previsto_val = float(row['total_previsto']) if row and row['total_previsto'] is not None else 0.0
+    except Exception:
+        total_previsto_val = 0.0
+    # formatar em pt-BR: R$ 1.234.567,89
+    formatted_total = 'R$ ' + f"{total_previsto_val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    return render_template('orcamento_2.html', numero_termo=numero_termo, total_previsto=formatted_total, total_previsto_val=total_previsto_val)
 
 @app.route("/instrucoes", methods=["GET"])
 @login_required
@@ -139,6 +239,262 @@ def criar_instrucao():
     except Exception as e:
         print(f"Erro inesperado: {e}")  # Debug
         return {"error": f"Erro inesperado: {str(e)}"}, 500
+
+
+@app.route('/api/termo/<numero_termo>', methods=['GET'])
+def get_termo_info(numero_termo):
+    """Retorna informações do termo para o modal de orçamento."""
+    try:
+        # Checar autenticação manualmente para não retornar HTML de login
+        if 'user_id' not in session:
+            return jsonify({'error': 'Unauthorized'}), 401
+        print(f"DEBUG: Buscando termo: {numero_termo}")
+        db = get_db()
+        cur = db.execute("""
+            SELECT numero_termo, inicio, final, total_previsto, meses
+            FROM Parcerias 
+            WHERE numero_termo = ?
+        """, (numero_termo,))
+        termo = cur.fetchone()
+        
+        print(f"DEBUG: Termo encontrado: {termo}")
+        
+        if not termo:
+            print(f"DEBUG: Termo {numero_termo} não encontrado")
+            return jsonify({"error": "Termo não encontrado"}), 404
+        
+        # Usar a coluna meses quando disponível, caso contrário tentar calcular pelas datas
+        meses = None
+        if termo and termo['meses'] is not None:
+            try:
+                meses = int(termo['meses'])
+            except (ValueError, TypeError):
+                meses = None
+        if meses is None:
+            # Calcular número de meses baseado nas datas
+            meses = 12  # valor padrão
+            try:
+                if termo["inicio"] and termo["final"]:
+                    inicio = datetime.strptime(termo["inicio"], "%Y-%m-%d")
+                    final = datetime.strptime(termo["final"], "%Y-%m-%d")
+                    # Calcular diferença em meses
+                    meses = (final.year - inicio.year) * 12 + (final.month - inicio.month) + 1
+                    print(f"DEBUG: Calculado {meses} meses entre {termo['inicio']} e {termo['final']}")
+            except (ValueError, TypeError) as e:
+                print(f"Erro ao calcular meses: {e}")
+        
+        resultado = {
+            "numero_termo": termo["numero_termo"],
+            "inicio": termo["inicio"],
+            "final": termo["final"],
+            "total_previsto": float(termo["total_previsto"]) if termo["total_previsto"] else 0.0,
+            "meses": max(1, meses)  # pelo menos 1 mês
+        }
+        
+        print(f"DEBUG: Retornando: {resultado}")
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro no endpoint get_termo_info: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Erro interno: {str(e)}"}), 500
+
+@app.route('/api/despesa', methods=['POST'])
+@login_required
+def criar_despesa():
+    """Endpoint para inserir múltiplas despesas de um termo.
+    Espera JSON com: numero_termo, despesas (array com rubrica, quantidade, categoria_despesa, valores_por_mes)
+    """
+    try:
+        data = request.get_json()
+        numero_termo = data.get('numero_termo')
+        despesas = data.get('despesas', [])
+        
+        if not numero_termo or not despesas:
+            return {"error": "numero_termo e despesas são obrigatórios"}, 400
+
+        db = get_db()
+        db.execute("PRAGMA foreign_keys = ON")
+        
+        # Verificar se o termo existe
+        cur = db.execute("SELECT total_previsto FROM Parcerias WHERE numero_termo = ?", (numero_termo,))
+        termo = cur.fetchone()
+        if not termo:
+            return {"error": "Termo não encontrado"}, 404
+            
+        total_previsto = float(termo["total_previsto"] or 0)
+        
+        # Calcular total inserido
+        total_inserido = 0
+        registros_para_inserir = []
+        
+        for despesa in despesas:
+            rubrica = despesa.get('rubrica')
+            quantidade = despesa.get('quantidade')
+            categoria = despesa.get('categoria_despesa', '')
+            valores_por_mes = despesa.get('valores_por_mes', {})
+            
+            if not rubrica:
+                continue
+                
+            # Processar cada mês
+            for mes_str, valor_str in valores_por_mes.items():
+                if not valor_str or str(valor_str).strip() == '' or str(valor_str).strip() == '-':
+                    continue
+                    
+                try:
+                    mes = int(mes_str)
+                    valor = float(str(valor_str).replace(',', '.').replace('R$', '').replace(' ', ''))
+                    total_inserido += valor
+                    
+                    registros_para_inserir.append({
+                        'numero_termo': numero_termo,
+                        'rubrica': rubrica,
+                        'quantidade': quantidade if quantidade != '-' else None,
+                        'categoria_despesa': categoria,
+                        'valor': valor,
+                        'mes': mes
+                    })
+                except (ValueError, TypeError):
+                    continue
+        
+        # Verificar se total bate com previsto (permitir diferença de até R$ 0.01)
+        diferenca = abs(total_inserido - total_previsto)
+        if diferenca > 0.01:
+            return {
+                "warning": True,
+                "message": f"Total inserido (R$ {total_inserido:.2f}) diferente do previsto (R$ {total_previsto:.2f}). Diferença: R$ {diferenca:.2f}",
+                "total_inserido": total_inserido,
+                "total_previsto": total_previsto,
+                "registros": len(registros_para_inserir)
+            }
+
+        # Se chegou aqui, os totais batem dentro da tolerância: substituir (deletar+inserir)
+        try:
+            db.execute("DELETE FROM Parcerias_Despesas WHERE numero_termo = ?", (numero_termo,))
+            for registro in registros_para_inserir:
+                db.execute("""
+                    INSERT INTO Parcerias_Despesas 
+                    (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    registro['numero_termo'],
+                    registro['rubrica'], 
+                    registro['quantidade'],
+                    registro['categoria_despesa'],
+                    registro['valor'],
+                    registro['mes']
+                ))
+            db.commit()
+            return {
+                "message": f"Inseridas {len(registros_para_inserir)} despesas com sucesso",
+                "total_inserido": total_inserido,
+                "registros": len(registros_para_inserir)
+            }, 201
+        except sqlite3.Error as e:
+            return {"error": f"Erro ao inserir despesas: {str(e)}"}, 500
+        
+    except sqlite3.IntegrityError as e:
+        return {"error": f"Erro de integridade: {str(e)}"}, 400
+    except sqlite3.Error as e:
+        return {"error": f"Erro SQLite: {str(e)}"}, 500
+    except Exception as e:
+        return {"error": f"Erro inesperado: {str(e)}"}, 500
+
+@app.route('/api/despesas/<path:numero_termo>', methods=['GET'])
+@login_required
+def get_despesas_termo(numero_termo):
+    """Retorna todas as despesas de um termo específico agrupadas por rubrica/categoria."""
+    try:
+        db = get_db()
+        cur = db.execute("""
+            SELECT rubrica, quantidade, categoria_despesa, mes, valor 
+            FROM Parcerias_Despesas 
+            WHERE numero_termo = ? 
+            ORDER BY rubrica, categoria_despesa, mes
+        """, (numero_termo,))
+        despesas_raw = cur.fetchall()
+        
+        if not despesas_raw:
+            return {"despesas": []}, 200
+        
+        # Agrupar por rubrica + categoria para formar as linhas da tabela
+        despesas_agrupadas = {}
+        for row in despesas_raw:
+            key = f"{row['rubrica']}|{row['categoria_despesa']}|{row['quantidade'] or 1}"
+            if key not in despesas_agrupadas:
+                despesas_agrupadas[key] = {
+                    'rubrica': row['rubrica'],
+                    'quantidade': row['quantidade'] or 1,
+                    'categoria_despesa': row['categoria_despesa'],
+                    'valores_por_mes': {}
+                }
+            despesas_agrupadas[key]['valores_por_mes'][str(row['mes'])] = float(row['valor'])
+        
+        # Converter para lista
+        despesas = list(despesas_agrupadas.values())
+        
+        return {"despesas": despesas}, 200
+        
+    except Exception as e:
+        return {"error": f"Erro ao carregar despesas: {str(e)}"}, 500
+
+@app.route('/api/despesa/confirmar', methods=['POST'])
+@login_required
+def confirmar_despesa():
+    """Confirma inserção mesmo com diferença no total."""
+    try:
+        data = request.get_json()
+        numero_termo = data.get('numero_termo')
+        despesas = data.get('despesas', [])
+        
+        if not numero_termo or not despesas:
+            return {"error": "numero_termo e despesas são obrigatórios"}, 400
+
+        db = get_db()
+        db.execute("PRAGMA foreign_keys = ON")
+        
+        registros_inseridos = 0
+
+        # Antes de inserir, deletar registros existentes para substituir
+        try:
+            db.execute("DELETE FROM Parcerias_Despesas WHERE numero_termo = ?", (numero_termo,))
+        except sqlite3.Error as e:
+            return {"error": f"Erro ao limpar despesas antigas: {str(e)}"}, 500
+
+        for despesa in despesas:
+            rubrica = despesa.get('rubrica')
+            quantidade = despesa.get('quantidade')
+            categoria = despesa.get('categoria_despesa', '')
+            valores_por_mes = despesa.get('valores_por_mes', {})
+
+            if not rubrica:
+                continue
+
+            for mes_str, valor_str in valores_por_mes.items():
+                if not valor_str or str(valor_str).strip() == '' or str(valor_str).strip() == '-':
+                    continue
+
+                try:
+                    mes = int(mes_str)
+                    valor = float(str(valor_str).replace(',', '.').replace('R$', '').replace(' ', ''))
+
+                    db.execute("""
+                        INSERT INTO Parcerias_Despesas 
+                        (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (numero_termo, rubrica, quantidade if quantidade != '-' else None, categoria, valor, mes))
+
+                    registros_inseridos += 1
+                except (ValueError, TypeError):
+                    continue
+
+        db.commit()
+        return {"message": f"Inseridas {registros_inseridos} despesas com sucesso"}, 201
+        
+    except Exception as e:
+        return {"error": f"Erro: {str(e)}"}, 500
 
 if __name__ == "__main__":
     app.run(debug=True)
