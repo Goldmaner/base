@@ -28,9 +28,25 @@
   <div class="container">
     <h2 id="pageTitle">Preenchimento do Orçamento Anual ou Proposta Orçamentária</h2>
     <h5 id="termoSub" class="text-muted">{{ numero_termo }} &nbsp; <small class="text-muted">Previsto: {{ total_previsto if total_previsto is defined else 'R$ 0,00' }}</small></h5>
+    
+    <!-- Dropdown Aditivo -->
+    <div class="mt-2 mb-3">
+      <label for="aditivoSelect" class="form-label fw-bold">Aditivo:</label>
+      <select id="aditivoSelect" class="form-select form-select-sm w-auto d-inline-block ms-2" style="width: 200px !important;">
+        {% if aditivos %}
+          {% for ad in aditivos %}
+            <option value="{{ ad }}" {% if ad == 0 %}selected{% endif %}>
+              {% if ad == 0 %}Base{% else %}Aditivo {{ ad }}{% endif %}
+            </option>
+          {% endfor %}
+        {% else %}
+          <option value="0" selected>Base</option>
+        {% endif %}
+      </select>
+    </div>
 
     <div class="mt-3 d-flex gap-2 align-items-center">
-      <a class="btn btn-light btn-sm" href="{{ url_for('orcamento') }}">&larr; Voltar</a>
+      <a class="btn btn-light btn-sm" href="{{ url_for('orcamento.listar') }}">&larr; Voltar</a>
       <div class="input-group input-group-sm w-auto">
         <span class="input-group-text">Adicionar meses</span>
         <input id="numCols" type="number" class="form-control" min="1" value="1" style="width:80px">
@@ -75,7 +91,11 @@
               </select>
             </td>
             <td><input type="text" class="form-control form-control-sm quantidade" value="1"></td>
-            <td class="col-categoria"><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I"></td>
+            <td class="col-categoria">
+              <input type="text" class="form-control form-control-sm categoria" 
+                     placeholder="Ex: Gerente de Serviço I" 
+                     list="categoriasDisponiveis">
+            </td>
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
@@ -95,6 +115,11 @@
         </tfoot>
       </table>
       </div>
+      
+      <!-- Datalist para categorias disponíveis -->
+      <datalist id="categoriasDisponiveis">
+        <!-- Será preenchido via JavaScript -->
+      </datalist>
 
       <div class="d-flex gap-2">
         <button id="addLinha" class="btn btn-secondary btn-sm">Adicionar Linha</button>
@@ -331,7 +356,7 @@
           </select>
         </td>
         <td><input type="text" class="form-control form-control-sm quantidade" value="1"></td>
-        <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I"></td>`;
+        <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I" list="categoriasDisponiveis"></td>`;
   for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
       cols += `<td><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
       tr.innerHTML = cols; tbody.appendChild(tr); recalcTotals();
@@ -374,11 +399,14 @@
       });
       if (despesas.length === 0) { alert('Preencha pelo menos uma despesa com valores'); return; }
 
+      // obter aditivo selecionado
+      const aditivoSelecionado = parseInt(document.getElementById('aditivoSelect').value) || 0;
+
       // enviar para /api/despesa
       fetch('/api/despesa', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({numero_termo: numeroTermo, despesas, month_names: monthNames})
+        body: JSON.stringify({numero_termo: numeroTermo, despesas, month_names: monthNames, aditivo: aditivoSelecionado})
       })
       .then(r => r.json())
       .then(data => {
@@ -386,7 +414,7 @@
           if (confirm(data.message + '\nDeseja prosseguir e salvar mesmo assim?')){
             // forçar com confirmar
             fetch('/api/despesa/confirmar',{
-              method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({numero_termo: numeroTermo, despesas, month_names: monthNames})
+              method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({numero_termo: numeroTermo, despesas, month_names: monthNames, aditivo: aditivoSelecionado})
             }).then(r=>r.json()).then(d=>{
               if (d.message) alert(d.message);
               else if (d.error) alert('Erro: ' + d.error);
@@ -427,7 +455,8 @@
     // carregar dados existentes do termo ao inicializar
     function carregarDadosExistentes(){
       const numeroTermo = '{{ numero_termo|e }}';
-      fetch(`/api/despesas/${encodeURIComponent(numeroTermo)}`)
+      const aditivoSelecionado = document.getElementById('aditivoSelect').value || '0';
+      fetch(`/api/despesas/${encodeURIComponent(numeroTermo)}?aditivo=${aditivoSelecionado}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) {
@@ -520,9 +549,76 @@
       });
     }
 
+    // Carregar categorias disponíveis do banco de dados
+    function carregarCategorias() {
+      fetch('/api/categorias')
+        .then(r => r.json())
+        .then(data => {
+          if (data.categorias) {
+            const datalist = document.getElementById('categoriasDisponiveis');
+            datalist.innerHTML = '';
+            data.categorias.forEach(cat => {
+              const option = document.createElement('option');
+              option.value = cat;
+              datalist.appendChild(option);
+            });
+          }
+        })
+        .catch(e => console.error('Erro ao carregar categorias:', e));
+    }
+
+    // Auto-preencher rubrica quando categoria for selecionada
+    function configurarAutoPreenchemento() {
+      const tbody = document.getElementById('bodyOrc2');
+      
+      // Usar delegação de eventos para inputs de categoria
+      tbody.addEventListener('change', function(e) {
+        if (e.target.classList.contains('categoria')) {
+          const categoria = e.target.value.trim();
+          if (categoria) {
+            // Buscar rubrica sugerida
+            fetch(`/api/rubrica-sugerida/${encodeURIComponent(categoria)}`)
+              .then(r => r.json())
+              .then(data => {
+                if (data.rubrica) {
+                  // Encontrar o select de rubrica na mesma linha
+                  const linha = e.target.closest('tr');
+                  const selectRubrica = linha.querySelector('select[name="rubrica"]');
+                  if (selectRubrica) {
+                    // Verificar se a rubrica existe nas opções
+                    const opcoes = Array.from(selectRubrica.options);
+                    const opcaoEncontrada = opcoes.find(opt => opt.value === data.rubrica);
+                    if (opcaoEncontrada) {
+                      selectRubrica.value = data.rubrica;
+                    }
+                  }
+                }
+              })
+              .catch(e => console.error('Erro ao buscar rubrica sugerida:', e));
+          }
+        }
+      });
+    }
+
     // inicial
     recalcTotals();
+    carregarCategorias();
+    configurarAutoPreenchemento();
     carregarDadosExistentes();
+    
+    // Adicionar listener para mudança de aditivo
+    document.getElementById('aditivoSelect').addEventListener('change', function() {
+      // Limpar tabela antes de recarregar
+      const tbody = document.getElementById('bodyOrc2');
+      const rows = tbody.querySelectorAll('tr');
+      rows.forEach(row => {
+        // Limpar valores dos inputs
+        row.querySelectorAll('input').forEach(input => input.value = '');
+        row.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
+      });
+      // Recarregar dados do aditivo selecionado
+      carregarDadosExistentes();
+    });
   </script>
 </body>
 </html>

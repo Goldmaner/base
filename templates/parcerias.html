@@ -1,0 +1,178 @@
+<!-- templates/parcerias.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Parcerias - Módulo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f8f9fa; padding: 20px; }
+    .header-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .filter-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .table-container { background: #fff; padding: 20px; border-radius: 8px; overflow-x: auto; }
+    .table { font-size: 0.9rem; }
+    .table th { background-color: #0d6efd; color: white; white-space: nowrap; }
+    .btn-action { padding: 5px 15px; }
+    .sei-formatted { font-family: 'Courier New', monospace; }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2>Parcerias</h2>
+          <p class="text-muted mb-0">Visualização e gerenciamento de todas as parcerias</p>
+        </div>
+        <div>
+          <a href="{{ url_for('parcerias.nova') }}" class="btn btn-success me-2">
+            <i class="bi bi-plus-circle"></i> Adicionar Parceria
+          </a>
+          <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seção de Filtros -->
+    <div class="filter-section">
+      <form method="get" action="{{ url_for('parcerias.listar') }}">
+        <div class="row mb-3">
+          <div class="col-md-12">
+            <h5><i class="bi bi-funnel"></i> Filtros</h5>
+          </div>
+        </div>
+        
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label for="filtro_termo" class="form-label">Número do Termo</label>
+            <input type="text" class="form-control" id="filtro_termo" name="filtro_termo" 
+                   value="{{ filtro_termo or '' }}" placeholder="Ex: TCL/001/2024">
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_osc" class="form-label">OSC</label>
+            <input type="text" class="form-control" id="filtro_osc" name="filtro_osc" 
+                   value="{{ filtro_osc or '' }}" placeholder="Nome da OSC">
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_projeto" class="form-label">Projeto</label>
+            <input type="text" class="form-control" id="filtro_projeto" name="filtro_projeto" 
+                   value="{{ filtro_projeto or '' }}" placeholder="Nome do projeto">
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_tipo_termo" class="form-label">Tipo de Termo</label>
+            <select class="form-select" id="filtro_tipo_termo" name="filtro_tipo_termo">
+              <option value="">-- Todos --</option>
+              {% for tipo in tipos_contrato %}
+                <option value="{{ tipo }}" {% if filtro_tipo_termo == tipo %}selected{% endif %}>{{ tipo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-12">
+            <h6><i class="bi bi-search"></i> Pesquisa por Processo SEI</h6>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label for="busca_sei_celeb" class="form-label">SEI de Celebração</label>
+            <input type="text" class="form-control" id="busca_sei_celeb" name="busca_sei_celeb" 
+                   value="{{ busca_sei_celeb or '' }}" placeholder="Ex: 6074.2024/0001234-5">
+          </div>
+          <div class="col-md-6">
+            <label for="busca_sei_pc" class="form-label">SEI de Pagamento/PC</label>
+            <input type="text" class="form-control" id="busca_sei_pc" name="busca_sei_pc" 
+                   value="{{ busca_sei_pc or '' }}" placeholder="Ex: 6074.2024/0005678-9">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-12">
+            <label for="limite" class="form-label">Mostrar somente</label>
+            <select class="form-select" id="limite" name="limite" style="width: 200px;">
+              <option value="10" {% if limite == '10' %}selected{% endif %}>10 linhas</option>
+              <option value="50" {% if limite == '50' %}selected{% endif %}>50 linhas</option>
+              <option value="100" {% if limite == '100' %}selected{% endif %}>100 linhas</option>
+              <option value="1000" {% if limite == '1000' %}selected{% endif %}>1000 linhas</option>
+              <option value="todas" {% if limite == 'todas' %}selected{% endif %}>Todas</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-search"></i> Aplicar Filtros
+            </button>
+            <a href="{{ url_for('parcerias.listar') }}" class="btn btn-secondary">
+              <i class="bi bi-x-circle"></i> Limpar Filtros
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tabela de Parcerias -->
+    <div class="table-container">
+      {% if parcerias %}
+        <table class="table table-hover table-bordered">
+          <thead>
+            <tr>
+              <th class="text-center">Número do Termo</th>
+              <th class="text-center">OSC</th>
+              <th class="text-center">Projeto</th>
+              <th class="text-center">Tipo de Termo</th>
+              <th class="text-center">Data de Início</th>
+              <th class="text-center">Data de Término</th>
+              <th class="text-center">Meses do Projeto</th>
+              <th class="text-center">Total Valor Previsto</th>
+              <th class="text-center">Total Valor Pago</th>
+              <th class="text-center">SEI de Celebração</th>
+              <th class="text-center">SEI de Pagamento</th>
+              <th class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for parceria in parcerias %}
+              <tr>
+                <td class="text-center"><strong>{{ parceria.numero_termo }}</strong></td>
+                <td>{{ parceria.osc or '-' }}</td>
+                <td>{{ parceria.projeto or '-' }}</td>
+                <td class="text-center">{{ parceria.tipo_termo or '-' }}</td>
+                <td class="text-center">{{ parceria.inicio.strftime('%d/%m/%Y') if parceria.inicio else '-' }}</td>
+                <td class="text-center">{{ parceria.final.strftime('%d/%m/%Y') if parceria.final else '-' }}</td>
+                <td class="text-center">{{ parceria.meses if parceria.meses is not none else '-' }}</td>
+                <td class="text-end">R$ {{ parceria.total_previsto|format_brl }}</td>
+                <td class="text-end">R$ {{ parceria.total_pago|format_brl }}</td>
+                <td class="text-center sei-formatted">{{ parceria.sei_celeb or '-' }}</td>
+                <td class="text-center sei-formatted">{{ parceria.sei_pc or '-' }}</td>
+                <td class="text-center">
+                  <a class="btn btn-warning btn-action" href="{{ url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
+                    <i class="bi bi-pencil"></i> Modificar
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="mt-3">
+          <p class="text-muted">Total de parcerias: <strong>{{ parcerias|length }}</strong></p>
+        </div>
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Nenhuma parceria encontrada no sistema.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

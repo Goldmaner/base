@@ -71,6 +71,9 @@
             justify-content: center;
             font-size: 12px;
         }
+        .filter-indicator.filter-active {
+            display: flex;
+        }
     </style>
 </head>
 <body>
@@ -79,61 +82,100 @@
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1>Orçamento Anual</h1>
-                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Voltar
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('orcamento.dicionario_despesas') }}" class="btn btn-info">
+                            <i class="bi bi-book"></i> Ver Dicionário de Despesas
+                        </a>
+                        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Estatísticas -->
                 <div class="row mb-4">
                     <div class="col-md-4">
-                        <div class="card border-success status-card" id="cardFeitoCorreto" onclick="filtrarPorStatus('correto')" style="position: relative;">
+                        <div class="card border-success status-card {% if filtro_status == 'correto' %}active{% endif %}" id="cardFeitoCorreto" onclick="filtrarPorStatus('correto')" style="position: relative;">
                             <div class="card-body">
                                 <h5 class="card-title text-success">Feito Corretamente</h5>
                                 <h3 class="text-success">{{ estatisticas.feito_corretamente.quantidade }}</h3>
                                 <p class="card-text">{{ "%.2f"|format(estatisticas.feito_corretamente.percentual) }}%</p>
-                                <div class="filter-indicator" id="indicadorCorreto">✓</div>
+                                <div class="filter-indicator {% if filtro_status == 'correto' %}filter-active{% endif %}" id="indicadorCorreto">✓</div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card border-warning status-card" id="cardNaoFeito" onclick="filtrarPorStatus('nao_feito')" style="position: relative;">
+                        <div class="card border-warning status-card {% if filtro_status == 'nao_feito' %}active{% endif %}" id="cardNaoFeito" onclick="filtrarPorStatus('nao_feito')" style="position: relative;">
                             <div class="card-body">
                                 <h5 class="card-title text-warning">Não Feito</h5>
                                 <h3 class="text-warning">{{ estatisticas.nao_feito.quantidade }}</h3>
                                 <p class="card-text">{{ "%.2f"|format(estatisticas.nao_feito.percentual) }}%</p>
-                                <div class="filter-indicator" id="indicadorNaoFeito">✓</div>
+                                <div class="filter-indicator {% if filtro_status == 'nao_feito' %}filter-active{% endif %}" id="indicadorNaoFeito">✓</div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card border-danger status-card" id="cardFeitoIncorreto" onclick="filtrarPorStatus('incorreto')" style="position: relative;">
+                        <div class="card border-danger status-card {% if filtro_status == 'incorreto' %}active{% endif %}" id="cardFeitoIncorreto" onclick="filtrarPorStatus('incorreto')" style="position: relative;">
                             <div class="card-body">
                                 <h5 class="card-title text-danger">Feito Incorretamente</h5>
                                 <h3 class="text-danger">{{ estatisticas.feito_incorretamente.quantidade }}</h3>
                                 <p class="card-text">{{ "%.2f"|format(estatisticas.feito_incorretamente.percentual) }}%</p>
-                                <div class="filter-indicator" id="indicadorIncorreto">✓</div>
+                                <div class="filter-indicator {% if filtro_status == 'incorreto' %}filter-active{% endif %}" id="indicadorIncorreto">✓</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Indicador de filtro ativo -->
+                {% if filtro_status %}
+                <div class="alert alert-info alert-dismissible fade show d-flex align-items-center" role="alert">
+                    <i class="bi bi-funnel-fill me-2"></i>
+                    <strong>Filtro ativo:</strong>&nbsp;
+                    {% if filtro_status == 'correto' %}
+                        Mostrando apenas termos <strong>Feitos Corretamente</strong>
+                    {% elif filtro_status == 'nao_feito' %}
+                        Mostrando apenas termos <strong>Não Feitos</strong>
+                    {% elif filtro_status == 'incorreto' %}
+                        Mostrando apenas termos <strong>Feitos Incorretamente</strong>
+                    {% endif %}
+                    <a href="{{ url_for('orcamento.listar', limite=limite, filtro_termo=filtro_termo) }}" class="btn btn-sm btn-outline-secondary ms-auto">
+                        <i class="bi bi-x"></i> Remover filtro
+                    </a>
+                </div>
+                {% endif %}
+
                 <!-- Filtros -->
                 <div class="filter-section">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label for="filtroTermo" class="form-label">Filtrar por Número do Termo</label>
-                            <input type="text" class="form-control" id="filtroTermo" placeholder="Digite o número do termo...">
+                    <form method="get" action="{{ url_for('orcamento.listar') }}">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="filtro_termo" class="form-label">Filtrar por Número do Termo</label>
+                                <input type="text" class="form-control" id="filtro_termo" name="filtro_termo" 
+                                       value="{{ filtro_termo or '' }}" placeholder="Digite o número do termo...">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="limite" class="form-label">Mostrar somente</label>
+                                <select class="form-select" id="limite" name="limite">
+                                  <option value="10" {% if limite == '10' %}selected{% endif %}>10 linhas</option>
+                                  <option value="50" {% if limite == '50' %}selected{% endif %}>50 linhas</option>
+                                  <option value="100" {% if limite == '100' %}selected{% endif %}>100 linhas</option>
+                                  <option value="1000" {% if limite == '1000' %}selected{% endif %}>1000 linhas</option>
+                                  <option value="todas" {% if limite == 'todas' %}selected{% endif %}>Todas</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary me-2">
+                                    <i class="bi bi-search"></i> Aplicar Filtros
+                                </button>
+                                <a href="{{ url_for('orcamento.listar') }}" class="btn btn-secondary me-2">
+                                    <i class="bi bi-x-circle"></i> Limpar Filtros
+                                </a>
+                                <button type="button" class="btn btn-success" onclick="exportarDados()">
+                                    <i class="bi bi-download"></i> Exportar
+                                </button>
+                            </div>
                         </div>
-                        <div class="col-md-6 d-flex align-items-end">
-                            <button type="button" class="btn btn-secondary me-2" onclick="limparFiltros()">
-                                <i class="bi bi-x-circle"></i> Limpar Filtros
-                            </button>
-                            <button type="button" class="btn btn-primary" onclick="exportarDados()">
-                                <i class="bi bi-download"></i> Exportar
-                            </button>
-                        </div>
-                    </div>
+                    </form>
                 </div>
 
                 <!-- Tabela Principal -->
@@ -173,17 +215,17 @@
                             <tr class="linha-parceria" data-termo="{{ parceria.numero_termo }}">
                                 <td class="text-center">{{ parceria.numero_termo }}</td>
                                 <td>{{ parceria.tipo_termo or '-' }}</td>
-                                <td class="sei-formatted">{{ parceria.sei_celeb|format_sei }}</td>
-                                <td class="text-end">R$ {{ "%.2f"|format(parceria.total_previsto or 0) }}</td>
-                                <td class="text-end">R$ {{ "%.2f"|format(parceria.total_preenchido or 0) }}</td>
+                                <td class="sei-formatted">{{ parceria.sei_celeb or '-' }}</td>
+                                <td class="text-end">R$ {{ parceria.total_previsto|format_brl }}</td>
+                                <td class="text-end">R$ {{ parceria.total_preenchido|format_brl }}</td>
                                 <td class="text-center">{{ parceria.meses if parceria.meses is not none else '-' }}</td>
                                 <td>
                                     {% if parceria.total_preenchido == 0 %}
-                                        <a class="btn btn-success btn-action" href="{{ url_for('orcamento_editar', numero_termo=parceria.numero_termo) }}">
+                                        <a class="btn btn-success btn-action" href="{{ url_for('orcamento.editar', numero_termo=parceria.numero_termo) }}">
                                             <i class="bi bi-plus-circle"></i> Preencher
                                         </a>
                                     {% else %}
-                                        <a class="btn btn-warning btn-action" href="{{ url_for('orcamento_editar', numero_termo=parceria.numero_termo) }}">
+                                        <a class="btn btn-warning btn-action" href="{{ url_for('orcamento.editar', numero_termo=parceria.numero_termo) }}">
                                             <i class="bi bi-pencil"></i> Modificar
                                         </a>
                                     {% endif %}
@@ -266,103 +308,20 @@
 
         // Função para filtrar por status
         function filtrarPorStatus(tipo) {
-            const cards = document.querySelectorAll('.status-card');
-            const indicadores = document.querySelectorAll('.filter-indicator');
+            // Construir URL com parâmetros (filtro via backend)
+            const urlParams = new URLSearchParams(window.location.search);
             
             // Se o mesmo filtro for clicado novamente, remove o filtro
-            if (filtroStatusAtivo === tipo) {
-                filtroStatusAtivo = null;
-                // Remove indicadores visuais
-                cards.forEach(card => card.classList.remove('active'));
-                indicadores.forEach(ind => ind.style.display = 'none');
-                // Mostra todas as linhas
-                document.querySelectorAll('.linha-parceria').forEach(linha => {
-                    linha.style.display = '';
-                });
-                return;
+            const filtroAtual = urlParams.get('status');
+            if (filtroAtual === tipo) {
+                urlParams.delete('status');
+            } else {
+                urlParams.set('status', tipo);
             }
             
-            filtroStatusAtivo = tipo;
-            
-            // Remove indicadores anteriores
-            cards.forEach(card => card.classList.remove('active'));
-            indicadores.forEach(ind => ind.style.display = 'none');
-            
-            // Ativa o indicador do filtro selecionado
-            if (tipo === 'correto') {
-                document.getElementById('cardFeitoCorreto').classList.add('active');
-                document.getElementById('indicadorCorreto').style.display = 'flex';
-            } else if (tipo === 'nao_feito') {
-                document.getElementById('cardNaoFeito').classList.add('active');
-                document.getElementById('indicadorNaoFeito').style.display = 'flex';
-            } else if (tipo === 'incorreto') {
-                document.getElementById('cardFeitoIncorreto').classList.add('active');
-                document.getElementById('indicadorIncorreto').style.display = 'flex';
-            }
-            
-            // Filtrar linhas
-            document.querySelectorAll('.linha-parceria').forEach(linha => {
-                const totalPrevisto = parseFloat(linha.cells[3].textContent.replace(/[R$\s.,]/g, '')) || 0;
-                const totalPreenchido = parseFloat(linha.cells[4].textContent.replace(/[R$\s.,]/g, '')) || 0;
-                
-                let passaFiltroStatus = false;
-                
-                if (tipo === 'correto') {
-                    // Feito corretamente: totais iguais (tolerância 0.01)
-                    passaFiltroStatus = totalPreenchido > 0 && valoresIguais(totalPreenchido, totalPrevisto);
-                } else if (tipo === 'nao_feito') {
-                    // Não feito: total preenchido = 0
-                    passaFiltroStatus = totalPreenchido === 0;
-                } else if (tipo === 'incorreto') {
-                    // Feito incorretamente: total preenchido > 0 mas diferente do previsto
-                    passaFiltroStatus = totalPreenchido > 0 && !valoresIguais(totalPreenchido, totalPrevisto);
-                }
-                
-                // Verificar se também passa no filtro de termo (se ativo)
-                let passaFiltroTermo = true;
-                const filtroTermo = document.getElementById('filtroTermo').value.toLowerCase();
-                if (filtroTermo) {
-                    const termo = linha.dataset.termo.toLowerCase();
-                    passaFiltroTermo = termo.includes(filtroTermo);
-                }
-                
-                // Mostrar linha apenas se passa em ambos os filtros
-                linha.style.display = (passaFiltroStatus && passaFiltroTermo) ? '' : 'none';
-            });
+            // Redirecionar para a mesma página com o novo filtro
+            window.location.href = '{{ url_for("orcamento.listar") }}?' + urlParams.toString();
         }
-
-        // Filtro por termo
-        document.getElementById('filtroTermo').addEventListener('input', function() {
-            const filtro = this.value.toLowerCase();
-            const linhas = document.querySelectorAll('.linha-parceria');
-            
-            linhas.forEach(linha => {
-                const termo = linha.dataset.termo.toLowerCase();
-                const passaFiltroTermo = termo.includes(filtro);
-                
-                // Verificar se também passa no filtro de status (se ativo)
-                let passaFiltroStatus = true;
-                if (filtroStatusAtivo) {
-                    const totalPrevisto = parseFloat(linha.cells[3].textContent.replace(/[R$\s.,]/g, '')) || 0;
-                    const totalPreenchido = parseFloat(linha.cells[4].textContent.replace(/[R$\s.,]/g, '')) || 0;
-                    
-                    if (filtroStatusAtivo === 'correto') {
-                        passaFiltroStatus = totalPreenchido > 0 && valoresIguais(totalPreenchido, totalPrevisto);
-                    } else if (filtroStatusAtivo === 'nao_feito') {
-                        passaFiltroStatus = totalPreenchido === 0;
-                    } else if (filtroStatusAtivo === 'incorreto') {
-                        passaFiltroStatus = totalPreenchido > 0 && !valoresIguais(totalPreenchido, totalPrevisto);
-                    }
-                }
-                
-                // Mostrar linha apenas se passa em ambos os filtros
-                if (passaFiltroTermo && passaFiltroStatus) {
-                    linha.style.display = '';
-                } else {
-                    linha.style.display = 'none';
-                }
-            });
-        });
 
         // Ordenação da tabela
         function ordenarTabela(coluna) {
@@ -415,6 +374,14 @@
             document.querySelectorAll('.linha-parceria').forEach(linha => {
                 linha.style.display = '';
             });
+        }
+
+        // Atualizar limite de linhas
+        function atualizarLimite() {
+            const limite = document.getElementById('limite').value;
+            const url = new URL(window.location);
+            url.searchParams.set('limite', limite);
+            window.location = url.toString();
         }
 
         // Abrir modal para preencher/modificar

@@ -1,0 +1,464 @@
+<!-- templates/parcerias_form.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Formulário de Parceria - Módulo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f8f9fa; padding: 20px; }
+    .header-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .form-container { background: #fff; padding: 30px; border-radius: 8px; }
+    .form-label { font-weight: 600; }
+    .section-title { 
+      background-color: #e9ecef; 
+      padding: 10px 15px; 
+      margin: 20px -30px 20px -30px; 
+      font-weight: bold; 
+      color: #495057;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2>{{ 'Nova Parceria' if not parceria else 'Formulário Completo da Parceria' }}</h2>
+          {% if parceria %}
+            <p class="text-muted mb-0">Termo: <strong>{{ parceria.numero_termo }}</strong></p>
+          {% endif %}
+        </div>
+        <div>
+          <a href="{{ url_for('parcerias.listar') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="form-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{cat}} alert-dismissible fade show" role="alert">
+              {{ msg }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="post" action="{{ url_for('parcerias.nova') if not parceria else url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
+        
+        <!-- Seção: Identificação -->
+        <div class="section-title">IDENTIFICAÇÃO DO TERMO</div>
+        
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="numero_termo" class="form-label">Número do Termo</label>
+            <input type="text" class="form-control" id="numero_termo" name="numero_termo" 
+                   value="{{ parceria.numero_termo if parceria else '' }}" 
+                   {{ 'readonly disabled' if parceria else 'required' }}>
+          </div>
+          <div class="col-md-6">
+            <label for="tipo_termo" class="form-label">Tipo de Termo</label>
+            <select class="form-select" id="tipo_termo" name="tipo_termo">
+              <option value="">-- Selecione --</option>
+              {% for tipo in tipos_contrato %}
+                <option value="{{ tipo }}" {% if parceria and parceria.tipo_termo == tipo %}selected{% endif %}>{{ tipo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="portaria" class="form-label">Portaria</label>
+            <select class="form-select" id="portaria" name="portaria">
+              <option value="">-- Selecione --</option>
+              {% for leg in legislacoes %}
+                <option value="{{ leg }}" {% if parceria and parceria.portaria == leg %}selected{% endif %}>{{ leg }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Seção: Organização e Projeto -->
+        <div class="section-title">ORGANIZAÇÃO E PROJETO</div>
+
+        <div class="row mb-3">
+          <div class="col-md-8">
+            <label for="osc" class="form-label">OSC (Organização da Sociedade Civil)</label>
+            <input type="text" class="form-control" id="osc" name="osc" 
+                   value="{{ parceria.osc or '' }}" 
+                   list="osc-list"
+                   autocomplete="off">
+            <datalist id="osc-list">
+              <!-- Opções carregadas via JavaScript -->
+            </datalist>
+          </div>
+          <div class="col-md-4">
+            <label for="cnpj" class="form-label">CNPJ da OSC</label>
+            <input type="text" class="form-control" id="cnpj" name="cnpj" 
+                   value="{{ parceria.cnpj or '' }}"
+                   placeholder="Preenchido automaticamente">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="projeto" class="form-label">Projeto</label>
+          <input type="text" class="form-control" id="projeto" name="projeto" 
+                 value="{{ parceria.projeto or '' }}">
+        </div>
+
+        <div class="mb-3">
+          <label for="endereco" class="form-label">Endereço do Projeto</label>
+          <textarea class="form-control" id="endereco" name="endereco" rows="2">{{ parceria.endereco or '' }}</textarea>
+        </div>
+
+        <!-- Seção: Período e Valores -->
+        <div class="section-title">PERÍODO E VALORES</div>
+
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <label for="inicio" class="form-label">Data de Início</label>
+            <input type="date" class="form-control" id="inicio" name="inicio" 
+                   value="{{ parceria.inicio.strftime('%Y-%m-%d') if parceria.inicio else '' }}">
+          </div>
+          <div class="col-md-4">
+            <label for="final" class="form-label">Data de Término</label>
+            <input type="date" class="form-control" id="final" name="final" 
+                   value="{{ parceria.final.strftime('%Y-%m-%d') if parceria.final else '' }}">
+          </div>
+          <div class="col-md-4">
+            <label for="meses" class="form-label">Meses do Projeto</label>
+            <input type="number" class="form-control" id="meses" name="meses" 
+                   value="{{ parceria.meses if parceria.meses is not none else '' }}"
+                   readonly style="background-color: #e9ecef;">
+            <small class="text-muted">Calculado automaticamente</small>
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="total_previsto" class="form-label">Total Valor Previsto (R$)</label>
+            <input type="number" step="0.01" class="form-control" id="total_previsto" name="total_previsto" 
+                   value="{{ parceria.total_previsto if parceria.total_previsto is not none else '' }}">
+          </div>
+          <div class="col-md-6">
+            <label for="total_pago" class="form-label">Total Valor Pago (R$)</label>
+            <input type="number" step="0.01" class="form-control" id="total_pago" name="total_pago" 
+                   value="{{ parceria.total_pago if parceria.total_pago is not none else '' }}">
+          </div>
+        </div>
+
+        <!-- Seção: Dados Bancários e Características -->
+        <div class="section-title">DADOS BANCÁRIOS E CARACTERÍSTICAS</div>
+
+        <div class="mb-3">
+          <label for="conta" class="form-label">Conta Específica do Projeto</label>
+          <input type="text" class="form-control" id="conta" name="conta" 
+                 value="{{ parceria.conta or '' }}">
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="transicao" name="transicao" 
+                     {% if parceria.transicao %}checked{% endif %}>
+              <label class="form-check-label" for="transicao">
+                É transição de Portaria?
+              </label>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="contrapartida" name="contrapartida" 
+                     {% if parceria.contrapartida %}checked{% endif %}>
+              <label class="form-check-label" for="contrapartida">
+                Tem contrapartida?
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção: Processos SEI -->
+        <div class="section-title">PROCESSOS SEI</div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="sei_celeb" class="form-label">SEI de Celebração</label>
+            <input type="text" class="form-control" id="sei_celeb" name="sei_celeb" 
+                   value="{{ parceria.sei_celeb or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label for="sei_pc" class="form-label">SEI de Pagamento e Prestação de Contas</label>
+            <input type="text" class="form-control" id="sei_pc" name="sei_pc" 
+                   value="{{ parceria.sei_pc or '' }}">
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="sei_plano" class="form-label">SEI do Plano de Trabalho</label>
+            <input type="text" class="form-control" id="sei_plano" name="sei_plano" 
+                   value="{{ parceria.sei_plano or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label for="sei_orcamento" class="form-label">SEI do Orçamento Anual</label>
+            <input type="text" class="form-control" id="sei_orcamento" name="sei_orcamento" 
+                   value="{{ parceria.sei_orcamento or '' }}">
+          </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+          <a href="{{ url_for('parcerias.listar') }}" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Salvar Alterações
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    // ========== VARIÁVEIS GLOBAIS ==========
+    const formId = 'parceriaForm_' + (document.getElementById('numero_termo').value || 'nova');
+    let autosaveTimeout;
+    let lastSaved = Date.now();
+    let oscData = {}; // Mapeamento OSC -> CNPJ
+    let siglaMapping = {}; // Mapeamento sigla -> tipo de termo
+
+    // ========== 1. CARREGAR DADOS DAS APIs ==========
+    async function carregarDados() {
+      try {
+        // Carregar OSCs
+        const oscResponse = await fetch('/parcerias/api/oscs');
+        oscData = await oscResponse.json();
+        
+        // Preencher datalist
+        const datalist = document.getElementById('osc-list');
+        Object.keys(oscData).forEach(osc => {
+          const option = document.createElement('option');
+          option.value = osc;
+          datalist.appendChild(option);
+        });
+
+        // Carregar mapeamento de siglas
+        const siglaResponse = await fetch('/parcerias/api/sigla-tipo-termo');
+        siglaMapping = await siglaResponse.json();
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+      }
+    }
+
+    // ========== 2. RECONHECIMENTO AUTOMÁTICO DE TIPO DE TERMO ==========
+    document.getElementById('numero_termo').addEventListener('input', function(e) {
+      const numeroTermo = e.target.value.trim().toUpperCase();
+      
+      if (numeroTermo.length >= 3) {
+        const sigla = numeroTermo.substring(0, 3);
+        
+        if (siglaMapping[sigla]) {
+          const tipoSelect = document.getElementById('tipo_termo');
+          const opcoes = Array.from(tipoSelect.options);
+          
+          // Encontrar e selecionar a opção correspondente
+          const opcaoCorreta = opcoes.find(opt => opt.value === siglaMapping[sigla]);
+          if (opcaoCorreta) {
+            tipoSelect.value = opcaoCorreta.value;
+            
+            // Feedback visual
+            tipoSelect.style.borderColor = '#28a745';
+            setTimeout(() => {
+              tipoSelect.style.borderColor = '';
+            }, 1000);
+          }
+        }
+      }
+    });
+
+    // ========== 3. PREENCHIMENTO AUTOMÁTICO DE CNPJ ==========
+    document.getElementById('osc').addEventListener('change', function(e) {
+      const oscSelecionada = e.target.value;
+      
+      if (oscData[oscSelecionada]) {
+        const cnpjField = document.getElementById('cnpj');
+        cnpjField.value = oscData[oscSelecionada];
+        
+        // Feedback visual
+        cnpjField.style.borderColor = '#28a745';
+        setTimeout(() => {
+          cnpjField.style.borderColor = '';
+        }, 1000);
+      }
+    });
+
+    // ========== 4. CÁLCULO AUTOMÁTICO DE MESES ==========
+    function calcularMeses() {
+      const inicioInput = document.getElementById('inicio');
+      const finalInput = document.getElementById('final');
+      const mesesInput = document.getElementById('meses');
+      
+      if (inicioInput.value && finalInput.value) {
+        const dataInicio = new Date(inicioInput.value + 'T00:00:00');
+        const dataFinal = new Date(finalInput.value + 'T00:00:00');
+        
+        if (dataFinal >= dataInicio) {
+          // Calcular diferença em meses
+          let meses = (dataFinal.getFullYear() - dataInicio.getFullYear()) * 12;
+          meses += dataFinal.getMonth() - dataInicio.getMonth();
+          
+          // Se o dia final é maior ou igual ao dia inicial, conta o mês completo
+          if (dataFinal.getDate() >= dataInicio.getDate()) {
+            meses += 1;
+          }
+          
+          mesesInput.value = meses;
+          
+          // Feedback visual
+          mesesInput.style.borderColor = '#28a745';
+          setTimeout(() => {
+            mesesInput.style.borderColor = '';
+          }, 1000);
+        } else {
+          mesesInput.value = '';
+          alert('A data de término deve ser posterior à data de início.');
+        }
+      }
+    }
+
+    document.getElementById('inicio').addEventListener('change', calcularMeses);
+    document.getElementById('final').addEventListener('change', calcularMeses);
+
+    // ========== 5. AUTOSAVE (código anterior mantido) ==========
+    window.addEventListener('DOMContentLoaded', function() {
+      // Carregar dados das APIs primeiro
+      carregarDados();
+      
+      const savedData = localStorage.getItem(formId);
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        const confirmRestore = confirm('Dados não salvos foram encontrados. Deseja restaurá-los?');
+        
+        if (confirmRestore) {
+          // Restaurar todos os campos
+          Object.keys(data).forEach(key => {
+            const field = document.getElementById(key);
+            if (field) {
+              if (field.type === 'checkbox') {
+                field.checked = data[key];
+              } else {
+                field.value = data[key];
+              }
+            }
+          });
+          
+          // Mostrar mensagem
+          const alertDiv = document.createElement('div');
+          alertDiv.className = 'alert alert-info alert-dismissible fade show';
+          alertDiv.innerHTML = `
+            <i class="bi bi-info-circle"></i> Dados restaurados do autosave (${new Date(data._timestamp).toLocaleString()})
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          `;
+          document.querySelector('.form-container').insertBefore(alertDiv, document.querySelector('form'));
+        } else {
+          localStorage.removeItem(formId);
+        }
+      }
+    });
+
+    // Salvar dados automaticamente
+    function autosaveForm() {
+      const formData = {};
+      const form = document.querySelector('form');
+      const inputs = form.querySelectorAll('input, select, textarea');
+      
+      inputs.forEach(input => {
+        if (input.id && !input.disabled) {
+          if (input.type === 'checkbox') {
+            formData[input.id] = input.checked;
+          } else {
+            formData[input.id] = input.value;
+          }
+        }
+      });
+      
+      formData._timestamp = Date.now();
+      localStorage.setItem(formId, JSON.stringify(formData));
+      lastSaved = Date.now();
+      
+      // Mostrar indicador de salvamento
+      showSaveIndicator();
+    }
+
+    // Indicador visual de autosave
+    function showSaveIndicator() {
+      let indicator = document.getElementById('saveIndicator');
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'saveIndicator';
+        indicator.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 10px 20px; border-radius: 5px; z-index: 9999; display: none;';
+        indicator.innerHTML = '<i class="bi bi-check-circle"></i> Salvo automaticamente';
+        document.body.appendChild(indicator);
+      }
+      
+      indicator.style.display = 'block';
+      setTimeout(() => {
+        indicator.style.display = 'none';
+      }, 2000);
+    }
+
+    // Observar mudanças no formulário
+    document.querySelectorAll('input, select, textarea').forEach(element => {
+      element.addEventListener('input', function() {
+        // Cancelar timeout anterior
+        clearTimeout(autosaveTimeout);
+        
+        // Criar novo timeout de 60 segundos
+        autosaveTimeout = setTimeout(autosaveForm, 60000);
+      });
+      
+      // Salvar imediatamente ao sair do campo (blur)
+      element.addEventListener('blur', function() {
+        if (Date.now() - lastSaved > 5000) { // Só salvar se passou mais de 5 segundos
+          autosaveForm();
+        }
+      });
+    });
+
+    // Limpar autosave ao submeter o formulário
+    document.querySelector('form').addEventListener('submit', function() {
+      localStorage.removeItem(formId);
+    });
+
+    // Salvar periodicamente a cada 2 minutos
+    setInterval(function() {
+      const form = document.querySelector('form');
+      const inputs = form.querySelectorAll('input, select, textarea');
+      let hasContent = false;
+      
+      inputs.forEach(input => {
+        if (input.value && !input.disabled) {
+          hasContent = true;
+        }
+      });
+      
+      if (hasContent) {
+        autosaveForm();
+      }
+    }, 120000); // 2 minutos
+  </script>
+</body>
+</html>

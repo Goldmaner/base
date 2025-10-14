@@ -19,14 +19,15 @@
       <h2>Módulo de Análise de Contas</h2>
       <div>
         <small>Logado como: <strong>{{ user['email'] }}</strong></small><br>
-        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary mt-2">Sair</a>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-secondary mt-2">Sair</a>
       </div>
     </div>
 
     <div class="mt-4">
-      <a href="{{ url_for('instrucoes') }}" class="btn btn-main">Iniciar nova análise</a>
+      <a href="{{ url_for('instrucoes.listar_view') }}" class="btn btn-main">Iniciar nova análise</a>
       <a href="#" class="btn btn-main">Prosseguir análise</a>
-      <a href="{{ url_for('orcamento') }}" class="btn btn-main">Orçamento anual</a>
+      <a href="{{ url_for('orcamento.listar') }}" class="btn btn-main">Orçamento anual</a>
+      <a href="{{ url_for('parcerias.listar') }}" class="btn btn-main">Parcerias</a>
     </div>
 
     {% if user['tipo_usuario'] == 'Agente Público' %}
