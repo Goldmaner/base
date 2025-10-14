@@ -1,12 +1,21 @@
 # app.py
 from flask import Flask, g, render_template, request, redirect, url_for, session, flash, jsonify
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from werkzeug.security import check_password_hash
 from functools import wraps
 from datetime import datetime
 
-DB = "meu_banco.db"
-SECRET_KEY = "troque_isso_por_uma_chave_aleatoria_e_secreta_em_producao"
+# Configuração do banco PostgreSQL
+DB_CONFIG = {
+    'host': 'localhost',
+    'port': '5432',
+    'database': 'projeto_parcerias',
+    'user': 'postgres',
+    'password': 'Coração01'
+}
+
+SECRET_KEY = 'seu_secret_key_aqui'  # Substitua por uma chave secreta segura
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -38,9 +47,14 @@ def format_sei_filter(sei_number):
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB)
-        g.db.row_factory = sqlite3.Row
+        g.db = psycopg2.connect(**DB_CONFIG)
+        g.db.autocommit = False  # Para controlar transações manualmente
     return g.db
+
+def get_cursor():
+    """Retorna um cursor que funciona como dictionary (similar ao sqlite3.Row)"""
+    db = get_db()
+    return db.cursor(cursor_factory=RealDictCursor)
 
 @app.teardown_appcontext
 def close_db(e=None):
@@ -60,9 +74,10 @@ def login_required(f):
 @login_required
 def index():
     # Buscar dados do usuário para exibir nome / tipo
-    db = get_db()
-    cur = db.execute("SELECT id, email, tipo_usuario, data_criacao FROM usuarios WHERE id = ?", (session["user_id"],))
+    cur = get_cursor()
+    cur.execute("SELECT id, email, tipo_usuario, data_criacao FROM usuarios WHERE id = %s", (session["user_id"],))
     user = cur.fetchone()
+    cur.close()
     return render_template("tela_inicial.html", user=user)
 
 @app.route("/login", methods=["GET", "POST"])
@@ -71,9 +86,10 @@ def login():
         email_input = request.form["username"].strip().lower()
         senha_input = request.form["password"]
 
-        db = get_db()
-        cur = db.execute("SELECT id, email, senha, tipo_usuario FROM usuarios WHERE email = ?", (email_input,))
+        cur = get_cursor()
+        cur.execute("SELECT id, email, senha, tipo_usuario FROM usuarios WHERE email = %s", (email_input,))
         user = cur.fetchone()
+        cur.close()
         if user is None:
             flash("Usuário não encontrado.", "danger")
             return redirect(url_for("login"))
@@ -103,11 +119,11 @@ def logout():
 @app.route("/orcamento", methods=["GET"])
 @login_required
 def orcamento():
-    db = get_db()
+    cur = get_cursor()
     
     # Query principal: Parcerias LEFT JOIN Parcerias_Despesas para somar valores preenchidos
     # Filtrar convênios e acordos de cooperação conforme solicitado
-    cur = db.execute("""
+    cur.execute("""
         SELECT 
             p.numero_termo,
             p.tipo_termo,
@@ -122,6 +138,7 @@ def orcamento():
         ORDER BY p.numero_termo
     """)
     parcerias = cur.fetchall()
+    cur.close()
     
     # Calcular estatísticas de status
     total_parcerias = len(parcerias)
@@ -163,9 +180,10 @@ def orcamento():
 @login_required
 def orcamento_editar(numero_termo):
     # Buscar total_previsto para exibir no subtítulo
-    db = get_db()
-    cur = db.execute("SELECT total_previsto FROM Parcerias WHERE numero_termo = ?", (numero_termo,))
+    cur = get_cursor()
+    cur.execute("SELECT total_previsto FROM Parcerias WHERE numero_termo = %s", (numero_termo,))
     row = cur.fetchone()
+    cur.close()
     try:
         total_previsto_val = float(row['total_previsto']) if row and row['total_previsto'] is not None else 0.0
     except Exception:
@@ -177,18 +195,20 @@ def orcamento_editar(numero_termo):
 @app.route("/instrucoes", methods=["GET"])
 @login_required
 def instrucoes():
-    db = get_db()
+    cur = get_cursor()
     # Buscar todas as instruções ordenadas pela data de criação
-    cur = db.execute("SELECT * FROM Instrucoes ORDER BY data_criacao DESC")
+    cur.execute("SELECT * FROM Instrucoes ORDER BY data_criacao DESC")
     instrucoes = cur.fetchall()
+    cur.close()
     return render_template("instrucoes.html", instrucoes=instrucoes)
 
 @app.route("/api/instrucoes", methods=["GET"])
 @login_required
 def listar_instrucoes():
-    db = get_db()
-    cur = db.execute("SELECT * FROM Instrucoes ORDER BY data_criacao DESC")
+    cur = get_cursor()
+    cur.execute("SELECT * FROM Instrucoes ORDER BY data_criacao DESC")
     instrucoes = cur.fetchall()
+    cur.close()
     # Converter para lista de dicionários para JSON
     return [dict(row) for row in instrucoes]
 
@@ -197,10 +217,12 @@ def listar_instrucoes():
 def deletar_instrucao(id):
     try:
         db = get_db()
-        db.execute("DELETE FROM Instrucoes WHERE id = ?", (id,))
+        cur = get_cursor()
+        cur.execute("DELETE FROM Instrucoes WHERE id = %s", (id,))
         db.commit()
+        cur.close()
         return {"message": "Instrução excluída com sucesso"}, 200
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         return {"error": f"Erro ao excluir instrução: {str(e)}"}, 500
 
 @app.route("/api/instrucoes", methods=["POST"])
@@ -222,19 +244,22 @@ def criar_instrucao():
             return {"error": "Título e texto são obrigatórios"}, 400
             
         db = get_db()
+        cur = get_cursor()
         try:
-            db.execute(
-                "INSERT INTO Instrucoes (titulo, texto, categoria) VALUES (?, ?, ?)",
+            cur.execute(
+                "INSERT INTO Instrucoes (titulo, texto, categoria) VALUES (%s, %s, %s)",
                 (titulo, texto, categoria)
             )
             db.commit()
-        except sqlite3.Error as e:
+        except psycopg2.Error as e:
             print(f"Erro SQL: {e}")  # Debug
+            cur.close()
             raise
         
+        cur.close()
         return {"message": "Instrução salva com sucesso"}, 201
-    except sqlite3.Error as e:
-        print(f"Erro SQLite: {e}")  # Debug
+    except psycopg2.Error as e:
+        print(f"Erro PostgreSQL: {e}")  # Debug
         return {"error": f"Erro ao salvar no banco de dados: {str(e)}"}, 500
     except Exception as e:
         print(f"Erro inesperado: {e}")  # Debug
@@ -249,13 +274,14 @@ def get_termo_info(numero_termo):
         if 'user_id' not in session:
             return jsonify({'error': 'Unauthorized'}), 401
         print(f"DEBUG: Buscando termo: {numero_termo}")
-        db = get_db()
-        cur = db.execute("""
+        cur = get_cursor()
+        cur.execute("""
             SELECT numero_termo, inicio, final, total_previsto, meses
             FROM Parcerias 
-            WHERE numero_termo = ?
+            WHERE numero_termo = %s
         """, (numero_termo,))
         termo = cur.fetchone()
+        cur.close()
         
         print(f"DEBUG: Termo encontrado: {termo}")
         
@@ -314,11 +340,10 @@ def criar_despesa():
         if not numero_termo or not despesas:
             return {"error": "numero_termo e despesas são obrigatórios"}, 400
 
-        db = get_db()
-        db.execute("PRAGMA foreign_keys = ON")
+        cur = get_cursor()
         
         # Verificar se o termo existe
-        cur = db.execute("SELECT total_previsto FROM Parcerias WHERE numero_termo = ?", (numero_termo,))
+        cur.execute("SELECT total_previsto FROM Parcerias WHERE numero_termo = %s", (numero_termo,))
         termo = cur.fetchone()
         if not termo:
             return {"error": "Termo não encontrado"}, 404
@@ -372,12 +397,13 @@ def criar_despesa():
 
         # Se chegou aqui, os totais batem dentro da tolerância: substituir (deletar+inserir)
         try:
-            db.execute("DELETE FROM Parcerias_Despesas WHERE numero_termo = ?", (numero_termo,))
+            db = get_db()
+            cur.execute("DELETE FROM Parcerias_Despesas WHERE numero_termo = %s", (numero_termo,))
             for registro in registros_para_inserir:
-                db.execute("""
+                cur.execute("""
                     INSERT INTO Parcerias_Despesas 
                     (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """, (
                     registro['numero_termo'],
                     registro['rubrica'], 
@@ -387,18 +413,33 @@ def criar_despesa():
                     registro['mes']
                 ))
             db.commit()
+            cur.close()
             return {
                 "message": f"Inseridas {len(registros_para_inserir)} despesas com sucesso",
                 "total_inserido": total_inserido,
                 "registros": len(registros_para_inserir)
             }, 201
-        except sqlite3.Error as e:
-            return {"error": f"Erro ao inserir despesas: {str(e)}"}, 500
+        except psycopg2.IntegrityError as e:
+            cur.close()
+            db.rollback()
+            if "parcerias_despesas_numero_termo_fkey" in str(e):
+                return {"error": f"Termo '{numero_termo}' não encontrado na base de dados. Verifique se o número do termo está correto."}, 400
+            elif "duplicate key" in str(e):
+                return {"error": "Registro duplicado encontrado. Verifique se os dados já não foram inseridos anteriormente."}, 400
+            else:
+                return {"error": f"Erro de integridade dos dados: {str(e)}"}, 400
+        except psycopg2.Error as e:
+            cur.close()
+            db.rollback()
+            return {"error": f"Erro no banco de dados: {str(e)}"}, 500
         
-    except sqlite3.IntegrityError as e:
-        return {"error": f"Erro de integridade: {str(e)}"}, 400
-    except sqlite3.Error as e:
-        return {"error": f"Erro SQLite: {str(e)}"}, 500
+    except psycopg2.IntegrityError as e:
+        if "parcerias_despesas_numero_termo_fkey" in str(e):
+            return {"error": f"Termo '{numero_termo}' não encontrado na base de dados. Verifique se o número do termo está correto."}, 400
+        else:
+            return {"error": f"Erro de integridade: {str(e)}"}, 400
+    except psycopg2.Error as e:
+        return {"error": f"Erro PostgreSQL: {str(e)}"}, 500
     except Exception as e:
         return {"error": f"Erro inesperado: {str(e)}"}, 500
 
@@ -407,14 +448,15 @@ def criar_despesa():
 def get_despesas_termo(numero_termo):
     """Retorna todas as despesas de um termo específico agrupadas por rubrica/categoria."""
     try:
-        db = get_db()
-        cur = db.execute("""
+        cur = get_cursor()
+        cur.execute("""
             SELECT rubrica, quantidade, categoria_despesa, mes, valor 
             FROM Parcerias_Despesas 
-            WHERE numero_termo = ? 
+            WHERE numero_termo = %s 
             ORDER BY rubrica, categoria_despesa, mes
         """, (numero_termo,))
         despesas_raw = cur.fetchall()
+        cur.close()
         
         if not despesas_raw:
             return {"despesas": []}, 200
@@ -453,14 +495,15 @@ def confirmar_despesa():
             return {"error": "numero_termo e despesas são obrigatórios"}, 400
 
         db = get_db()
-        db.execute("PRAGMA foreign_keys = ON")
+        cur = get_cursor()
         
         registros_inseridos = 0
 
         # Antes de inserir, deletar registros existentes para substituir
         try:
-            db.execute("DELETE FROM Parcerias_Despesas WHERE numero_termo = ?", (numero_termo,))
-        except sqlite3.Error as e:
+            cur.execute("DELETE FROM Parcerias_Despesas WHERE numero_termo = %s", (numero_termo,))
+        except psycopg2.Error as e:
+            cur.close()
             return {"error": f"Erro ao limpar despesas antigas: {str(e)}"}, 500
 
         for despesa in despesas:
@@ -480,10 +523,10 @@ def confirmar_despesa():
                     mes = int(mes_str)
                     valor = float(str(valor_str).replace(',', '.').replace('R$', '').replace(' ', ''))
 
-                    db.execute("""
+                    cur.execute("""
                         INSERT INTO Parcerias_Despesas 
                         (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                     """, (numero_termo, rubrica, quantidade if quantidade != '-' else None, categoria, valor, mes))
 
                     registros_inseridos += 1
@@ -491,8 +534,26 @@ def confirmar_despesa():
                     continue
 
         db.commit()
+        cur.close()
         return {"message": f"Inseridas {registros_inseridos} despesas com sucesso"}, 201
         
+    except psycopg2.IntegrityError as e:
+        if 'conn' in locals():
+            db.rollback()
+        if 'cur' in locals():
+            cur.close()
+        if "parcerias_despesas_numero_termo_fkey" in str(e):
+            return {"error": f"Termo '{numero_termo}' não encontrado na base de dados. Verifique se o número do termo está correto."}, 400
+        elif "duplicate key" in str(e):
+            return {"error": "Registro duplicado encontrado. Verifique se os dados já não foram inseridos anteriormente."}, 400
+        else:
+            return {"error": f"Erro de integridade dos dados: {str(e)}"}, 400
+    except psycopg2.Error as e:
+        if 'conn' in locals():
+            db.rollback()
+        if 'cur' in locals():
+            cur.close()
+        return {"error": f"Erro no banco de dados: {str(e)}"}, 500
     except Exception as e:
         return {"error": f"Erro: {str(e)}"}, 500
 
