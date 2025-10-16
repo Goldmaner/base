@@ -134,7 +134,9 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 <td><span class="badge bg-secondary">{{ cat.rubrica_comum or 'N/A' }}</span></td>
 <td class="text-center"><span class="badge bg-info">{{ cat.total_ocorrencias }}</span></td>
 <td class="text-center">
-    <span class="badge bg-success cursor-pointer" onclick="verTermos('{{ cat.categoria_despesa }}', {{ cat.total_termos }})" title="Clique para ver os termos" style="cursor: pointer;">
+    <span class="badge bg-success cursor-pointer" 
+        onclick="verTermos({{ cat.categoria_despesa|tojson }}, {{ cat.total_termos }})" 
+        title="Clique para ver os termos" style="cursor: pointer;">
         <i class="bi bi-list-ul"></i> {{ cat.total_termos }}
     </span>
 </td>

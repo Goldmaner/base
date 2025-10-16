@@ -76,18 +76,6 @@
           </div>
         </div>
 
-        <div class="row mb-3">
-          <div class="col-md-6">
-            <label for="portaria" class="form-label">Portaria</label>
-            <select class="form-select" id="portaria" name="portaria">
-              <option value="">-- Selecione --</option>
-              {% for leg in legislacoes %}
-                <option value="{{ leg }}" {% if parceria and parceria.portaria == leg %}selected{% endif %}>{{ leg }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-
         <!-- Seção: Organização e Projeto -->
         <div class="section-title">ORGANIZAÇÃO E PROJETO</div>
 
@@ -147,13 +135,17 @@
         <div class="row mb-3">
           <div class="col-md-6">
             <label for="total_previsto" class="form-label">Total Valor Previsto (R$)</label>
-            <input type="number" step="0.01" class="form-control" id="total_previsto" name="total_previsto" 
-                   value="{{ parceria.total_previsto if parceria.total_previsto is not none else '' }}">
+            <input type="text" class="form-control valor-monetario" id="total_previsto" name="total_previsto" 
+                   value="{{ '{:,.2f}'.format(parceria.total_previsto).replace(',', 'X').replace('.', ',').replace('X', '.') if parceria and parceria.total_previsto is not none else '' }}"
+                   placeholder="0,00">
+            <input type="hidden" id="total_previsto_hidden" name="total_previsto_hidden">
           </div>
           <div class="col-md-6">
             <label for="total_pago" class="form-label">Total Valor Pago (R$)</label>
-            <input type="number" step="0.01" class="form-control" id="total_pago" name="total_pago" 
-                   value="{{ parceria.total_pago if parceria.total_pago is not none else '' }}">
+            <input type="text" class="form-control valor-monetario" id="total_pago" name="total_pago" 
+                   value="{{ '{:,.2f}'.format(parceria.total_pago).replace(',', 'X').replace('.', ',').replace('X', '.') if parceria and parceria.total_pago is not none else '0,00' }}"
+                   placeholder="0,00">
+            <input type="hidden" id="total_pago_hidden" name="total_pago_hidden" value="0">
           </div>
         </div>
 
@@ -213,6 +205,28 @@
             <label for="sei_orcamento" class="form-label">SEI do Orçamento Anual</label>
             <input type="text" class="form-control" id="sei_orcamento" name="sei_orcamento" 
                    value="{{ parceria.sei_orcamento or '' }}">
+          </div>
+        </div>
+
+        <!-- Seção: Leis Aplicáveis -->
+        <div class="section-title">LEIS APLICÁVEIS</div>
+
+        <div class="row mb-3">
+          <div class="col-md-12">
+            <label for="portaria" class="form-label">
+              Portaria/Legislação
+              <small class="text-muted">(preenchimento automático baseado no tipo de termo e data de início)</small>
+            </label>
+            <select class="form-select" id="portaria" name="portaria">
+              <option value="">-- Selecione --</option>
+              {% for leg in legislacoes %}
+                <option value="{{ leg }}" {% if parceria and parceria.portaria == leg %}selected{% endif %}>{{ leg }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              <i class="bi bi-info-circle"></i> 
+              A portaria é selecionada automaticamente ao informar o número do termo e a data de início.
+            </div>
           </div>
         </div>
 
@@ -333,14 +347,131 @@
             mesesInput.style.borderColor = '';
           }, 1000);
         } else {
+          // Apenas limpa o campo, sem alertar
           mesesInput.value = '';
-          alert('A data de término deve ser posterior à data de início.');
         }
       }
     }
 
     document.getElementById('inicio').addEventListener('change', calcularMeses);
     document.getElementById('final').addEventListener('change', calcularMeses);
+
+    // ========== 4.5. SELEÇÃO AUTOMÁTICA DE PORTARIA ==========
+    async function detectarPortaria() {
+      const inicioInput = document.getElementById('inicio');
+      const numeroTermoInput = document.getElementById('numero_termo');
+      const portariaSelect = document.getElementById('portaria');
+      const transicaoCheckbox = document.getElementById('transicao');
+      const finalInput = document.getElementById('final');
+      
+      const dataInicio = inicioInput.value;
+      const numeroTermo = numeroTermoInput.value;
+      const dataFinal = finalInput.value;
+      
+      if (!dataInicio || !numeroTermo) {
+        return; // Precisa dos dois dados
+      }
+      
+      try {
+        // Buscar portaria automaticamente
+        const response = await fetch('/api/portaria-automatica', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            data_inicio: dataInicio,
+            numero_termo: numeroTermo
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.portaria) {
+          // Selecionar a portaria no dropdown
+          const opcoes = Array.from(portariaSelect.options);
+          const opcaoCorreta = opcoes.find(opt => opt.value === data.portaria);
+          
+          if (opcaoCorreta) {
+            portariaSelect.value = opcaoCorreta.value;
+            
+            // Feedback visual
+            portariaSelect.style.borderColor = '#28a745';
+            setTimeout(() => {
+              portariaSelect.style.borderColor = '';
+            }, 2000);
+          }
+        }
+        
+        // Verificar transição se tiver data final
+        if (dataFinal && dataInicio) {
+          verificarTransicao(dataInicio, dataFinal, numeroTermo);
+        }
+        
+      } catch (error) {
+        console.error('Erro ao detectar portaria:', error);
+      }
+    }
+    
+    async function verificarTransicao(dataInicio, dataFinal, numeroTermo) {
+      const transicaoCheckbox = document.getElementById('transicao');
+      
+      // Regras de transição:
+      // Portaria nº 140/SMDHC/2019 (até 31/12/2023) para Portaria nº 90/SMDHC/2023 (a partir de 01/01/2024)
+      // Portaria nº 121/SMDHC/2019 (até 31/12/2023) para Portaria nº 21/SMDHC/2023 (a partir de 01/03/2023)
+      
+      const inicio = new Date(dataInicio);
+      const final = new Date(dataFinal);
+      
+      const transicao140para090_inicio = new Date('2017-10-01');
+      const transicao140para090_fim = new Date('2023-12-31');
+      const transicao140para090_nova = new Date('2024-01-01');
+      
+      const transicao121para021_inicio = new Date('2017-10-01');
+      const transicao121para021_fim = new Date('2023-12-31');
+      const transicao121para021_nova = new Date('2023-03-01');
+      
+      let ehTransicao = false;
+      
+      // Verifica se atravessa a mudança 140 -> 090
+      if (inicio >= transicao140para090_inicio && inicio <= transicao140para090_fim && 
+          final >= transicao140para090_nova) {
+        const numeroTermoUpper = numeroTermo.toUpperCase();
+        if (numeroTermoUpper.includes('FUMCAD') || numeroTermoUpper.includes('FMID')) {
+          ehTransicao = true;
+        }
+      }
+      
+      // Verifica se atravessa a mudança 121 -> 021
+      if (inicio >= transicao121para021_inicio && inicio <= transicao121para021_fim && 
+          final >= transicao121para021_nova) {
+        const numeroTermoUpper = numeroTermo.toUpperCase();
+        if (!numeroTermoUpper.includes('FUMCAD') && !numeroTermoUpper.includes('FMID')) {
+          ehTransicao = true;
+        }
+      }
+      
+      if (ehTransicao) {
+        transicaoCheckbox.checked = true;
+        // Feedback visual
+        const transicaoLabel = document.querySelector('label[for="transicao"]');
+        transicaoLabel.style.color = '#ffc107';
+        transicaoLabel.innerHTML = '<i class="bi bi-exclamation-triangle"></i> É transição de Portaria?';
+        setTimeout(() => {
+          transicaoLabel.style.color = '';
+          transicaoLabel.textContent = 'É transição de Portaria?';
+        }, 5000);
+      }
+    }
+    
+    // Chamar detecção ao alterar campos relevantes
+    document.getElementById('inicio').addEventListener('change', detectarPortaria);
+    document.getElementById('numero_termo').addEventListener('blur', detectarPortaria);
+    document.getElementById('final').addEventListener('change', function() {
+      const dataInicio = document.getElementById('inicio').value;
+      const numeroTermo = document.getElementById('numero_termo').value;
+      if (dataInicio && numeroTermo && this.value) {
+        verificarTransicao(dataInicio, this.value, numeroTermo);
+      }
+    });
 
     // ========== 5. AUTOSAVE (código anterior mantido) ==========
     window.addEventListener('DOMContentLoaded', function() {
@@ -439,8 +570,88 @@
     });
 
     // Limpar autosave ao submeter o formulário
-    document.querySelector('form').addEventListener('submit', function() {
+    document.querySelector('form').addEventListener('submit', function(e) {
+      // Validar datas antes de submeter
+      const inicioInput = document.getElementById('inicio');
+      const finalInput = document.getElementById('final');
+      
+      if (inicioInput.value && finalInput.value) {
+        const dataInicio = new Date(inicioInput.value + 'T00:00:00');
+        const dataFinal = new Date(finalInput.value + 'T00:00:00');
+        
+        if (dataFinal < dataInicio) {
+          e.preventDefault();
+          alert('❌ Erro: A data de término não pode ser anterior à data de início!');
+          finalInput.focus();
+          return false;
+        }
+      }
+      
+      // Converter valores monetários formatados para números antes de enviar
+      document.querySelectorAll('.valor-monetario').forEach(input => {
+        const hiddenInput = document.getElementById(input.id + '_hidden');
+        if (hiddenInput) {
+          const valorNumerico = converterParaNumero(input.value);
+          hiddenInput.value = valorNumerico;
+        }
+      });
+      
       localStorage.removeItem(formId);
+    });
+
+    // ========== 6. FORMATAÇÃO MONETÁRIA ==========
+    function formatarMoeda(valor) {
+      // Remove tudo que não é número
+      valor = valor.replace(/\D/g, '');
+      
+      // Converte para centavos
+      valor = (parseInt(valor) / 100).toFixed(2);
+      
+      // Formata com separadores brasileiros
+      valor = valor.replace('.', ',');
+      valor = valor.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      
+      return valor;
+    }
+
+    function converterParaNumero(valorFormatado) {
+      if (!valorFormatado) return '0';
+      // Remove pontos de milhar e substitui vírgula por ponto
+      return valorFormatado.replace(/\./g, '').replace(',', '.');
+    }
+
+    // Aplicar formatação monetária aos campos
+    document.querySelectorAll('.valor-monetario').forEach(input => {
+      // Formatação ao digitar
+      input.addEventListener('input', function(e) {
+        let valor = e.target.value;
+        e.target.value = formatarMoeda(valor);
+        
+        // Atualizar campo hidden
+        const hiddenInput = document.getElementById(e.target.id + '_hidden');
+        if (hiddenInput) {
+          hiddenInput.value = converterParaNumero(e.target.value);
+        }
+      });
+      
+      // Formatação ao sair do campo
+      input.addEventListener('blur', function(e) {
+        if (!e.target.value || e.target.value === '') {
+          if (e.target.id === 'total_pago') {
+            e.target.value = '0,00';
+            const hiddenInput = document.getElementById(e.target.id + '_hidden');
+            if (hiddenInput) {
+              hiddenInput.value = '0';
+            }
+          }
+        }
+      });
+      
+      // Inicializar campo hidden com valor inicial
+      const hiddenInput = document.getElementById(input.id + '_hidden');
+      if (hiddenInput) {
+        hiddenInput.value = converterParaNumero(input.value) || '0';
+      }
     });
 
     // Salvar periodicamente a cada 2 minutos

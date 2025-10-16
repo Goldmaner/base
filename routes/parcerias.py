@@ -144,8 +144,8 @@ def nova():
                 request.form.get('inicio') or None,
                 request.form.get('final') or None,
                 request.form.get('meses') or None,
-                request.form.get('total_previsto') or None,
-                request.form.get('total_pago') or None,
+                request.form.get('total_previsto_hidden') or request.form.get('total_previsto') or None,
+                request.form.get('total_pago_hidden') or request.form.get('total_pago') or 0,
                 request.form.get('conta'),
                 1 if request.form.get('transicao') == 'on' else 0,
                 request.form.get('sei_celeb'),
@@ -158,7 +158,7 @@ def nova():
             
             conn.commit()
             flash("Parceria criada com sucesso!", "success")
-            return redirect(url_for('parcerias.listar'))
+            return redirect(url_for('parcerias.nova'))  # Redireciona para nova parceria em vez da listagem
             
         except Exception as e:
             if conn:
@@ -234,8 +234,8 @@ def editar(numero_termo):
                 request.form.get('inicio') or None,
                 request.form.get('final') or None,
                 request.form.get('meses') or None,
-                request.form.get('total_previsto') or None,
-                request.form.get('total_pago') or None,
+                request.form.get('total_previsto_hidden') or request.form.get('total_previsto') or None,
+                request.form.get('total_pago_hidden') or request.form.get('total_pago') or 0,
                 request.form.get('conta'),
                 1 if request.form.get('transicao') == 'on' else 0,  # checkbox como integer
                 request.form.get('sei_celeb'),

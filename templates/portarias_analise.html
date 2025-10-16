@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Portarias e Legislações</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; padding: 20px; }
+        .header-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-container { background: #fff; padding: 30px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .table-container { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-editar { opacity: 0; transition: opacity 0.2s; }
+        tr:hover .btn-editar { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Cabeçalho -->
+        <div class="header-section">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-file-earmark-text"></i> Gerenciar Portarias e Legislações</h2>
+                    <p class="text-muted mb-0">Configure as legislações que regem os termos de parceria</p>
+                </div>
+                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+        </div>
+
+        <!-- Mensagens Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for cat, msg in messages %}
+                    <div class="alert alert-{{cat}} alert-dismissible fade show" role="alert">
+                        {{ msg }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Formulário de Nova/Edição -->
+        <div class="form-container">
+            <h4><i class="bi bi-plus-circle"></i> Adicionar/Editar Legislação</h4>
+            <form method="post" id="formLegislacao">
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <label for="lei" class="form-label">Nome da Lei/Portaria</label>
+                        <input type="text" class="form-control" id="lei" name="lei" required 
+                               placeholder="Ex: Portaria nº 090/SMDHC/2023">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="inicio" class="form-label">Data de Início</label>
+                        <input type="date" class="form-control" id="inicio" name="inicio">
+                        <small class="text-muted">Quando a legislação entrou em vigor</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="termino" class="form-label">Data de Término</label>
+                        <input type="date" class="form-control" id="termino" name="termino">
+                        <small class="text-muted">Quando a legislação perdeu vigência (deixe vazio se ainda vigente)</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="vigencia" class="form-label">Vigência</label>
+                        <input type="text" class="form-control" id="vigencia" readonly style="background-color: #e9ecef;">
+                        <small class="text-muted">Calculado automaticamente</small>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> <strong>Nota:</strong> As regras de termo (TCV, TFM, TCL) e coordenação (FUMCAD, FMID) 
+                    são aplicadas automaticamente no formulário de parcerias com base nas datas e no nome da legislação.
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-secondary me-2" onclick="limparFormulario()">
+                        <i class="bi bi-x-circle"></i> Limpar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Salvar Legislação
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tabela de Legislações -->
+        <div class="table-container">
+            <h4><i class="bi bi-table"></i> Legislações Cadastradas</h4>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 40%">Lei/Portaria</th>
+                            <th style="width: 15%" class="text-center">Início</th>
+                            <th style="width: 15%" class="text-center">Término</th>
+                            <th style="width: 20%" class="text-center">Vigência</th>
+                            <th style="width: 10%" class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if legislacoes %}
+                            {% for leg in legislacoes %}
+                            <tr>
+                                <td><strong>{{ leg[0] }}</strong></td>
+                                <td class="text-center">
+                                    {% if leg[1] %}
+                                        {{ leg[1].strftime('%d/%m/%Y') }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if leg[2] %}
+                                        {{ leg[2].strftime('%d/%m/%Y') }}
+                                    {% else %}
+                                        <span class="badge bg-success">Vigente</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if leg[1] and leg[2] %}
+                                        {% set dias = (leg[2] - leg[1]).days %}
+                                        {% set anos = (dias / 365.25) | int %}
+                                        {% set meses = ((dias % 365.25) / 30.44) | int %}
+                                        {{ anos }}a {{ meses }}m
+                                    {% elif leg[1] %}
+                                        <span class="text-muted">Em vigor</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-warning btn-editar" 
+                                            onclick="editarLegislacao('{{ leg[0] }}', '{{ leg[1].strftime('%Y-%m-%d') if leg[1] else '' }}', '{{ leg[2].strftime('%Y-%m-%d') if leg[2] else '' }}')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    Nenhuma legislação cadastrada. Adicione a primeira acima!
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Calcular vigência automaticamente
+        function calcularVigencia() {
+            const inicioInput = document.getElementById('inicio');
+            const terminoInput = document.getElementById('termino');
+            const vigenciaInput = document.getElementById('vigencia');
+            
+            if (inicioInput.value && terminoInput.value) {
+                const dataInicio = new Date(inicioInput.value);
+                const dataTermino = new Date(terminoInput.value);
+                
+                const diffTime = Math.abs(dataTermino - dataInicio);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                const anos = Math.floor(diffDays / 365.25);
+                const meses = Math.floor((diffDays % 365.25) / 30.44);
+                
+                vigenciaInput.value = `${anos} ano(s) e ${meses} mês(es)`;
+            } else if (inicioInput.value) {
+                vigenciaInput.value = 'Em vigor';
+            } else {
+                vigenciaInput.value = '';
+            }
+        }
+
+        document.getElementById('inicio').addEventListener('change', calcularVigencia);
+        document.getElementById('termino').addEventListener('change', calcularVigencia);
+
+        // Editar legislação
+        function editarLegislacao(lei, inicio, termino) {
+            document.getElementById('lei').value = lei;
+            document.getElementById('inicio').value = inicio;
+            document.getElementById('termino').value = termino;
+            
+            calcularVigencia();
+            
+            // Scroll para o formulário
+            document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth' });
+            
+            // Feedback visual
+            const form = document.getElementById('formLegislacao');
+            form.style.borderLeft = '4px solid #ffc107';
+            setTimeout(() => {
+                form.style.borderLeft = '';
+            }, 2000);
+        }
+
+        // Limpar formulário
+        function limparFormulario() {
+            document.getElementById('formLegislacao').reset();
+            document.getElementById('vigencia').value = '';
+        }
+    </script>
+</body>
+</html>
