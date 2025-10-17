@@ -83,6 +83,9 @@
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1>Orçamento Anual</h1>
                     <div class="d-flex gap-2">
+                        <button class="btn btn-success" onclick="exportarCSV()">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+                        </button>
                         <a href="{{ url_for('orcamento.dicionario_despesas') }}" class="btn btn-info">
                             <i class="bi bi-book"></i> Ver Dicionário de Despesas
                         </a>
@@ -666,6 +669,24 @@
         // Exportar dados (placeholder)
         function exportarDados() {
             alert('Funcionalidade de exportação será implementada em breve');
+        }
+
+        // Exportar para CSV
+        function exportarCSV() {
+            // Mostrar indicador de carregamento
+            const btnExportar = event.target.closest('button');
+            const textoOriginal = btnExportar.innerHTML;
+            btnExportar.disabled = true;
+            btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Exportando...';
+            
+            // Fazer requisição para a API de exportação
+            window.location.href = '{{ url_for("orcamento.exportar_csv") }}';
+            
+            // Restaurar botão após um tempo
+            setTimeout(() => {
+                btnExportar.disabled = false;
+                btnExportar.innerHTML = textoOriginal;
+            }, 2000);
         }
     </script>
 </body>

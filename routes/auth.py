@@ -214,3 +214,48 @@ def excluir_usuario(user_id):
     except Exception as e:
         get_db().rollback()
         return jsonify({"erro": str(e)}), 500
+
+
+@auth_bp.route("/api/usuarios/<int:user_id>/resetar-senha", methods=["PUT"])
+@login_required
+def resetar_senha(user_id):
+    """
+    API para resetar senha de usuário (apenas para Agente Público)
+    """
+    # Verificar se é Agente Público
+    if session.get("tipo_usuario") != "Agente Público":
+        return jsonify({"erro": "Acesso negado"}), 403
+    
+    try:
+        data = request.get_json()
+        nova_senha = data.get("nova_senha", "").strip()
+        
+        # Validações
+        if not nova_senha:
+            return jsonify({"erro": "Nova senha é obrigatória"}), 400
+        
+        if len(nova_senha) < 4:
+            return jsonify({"erro": "Senha muito curta. Mínimo 4 caracteres"}), 400
+        
+        # Gerar hash da nova senha
+        senha_hash = generate_password_hash(nova_senha)
+        
+        # Atualizar no banco
+        cur = get_cursor()
+        cur.execute("""
+            UPDATE usuarios 
+            SET senha = %s 
+            WHERE id = %s
+        """, (senha_hash, user_id))
+        
+        if cur.rowcount == 0:
+            cur.close()
+            return jsonify({"erro": "Usuário não encontrado"}), 404
+        
+        get_db().commit()
+        cur.close()
+        
+        return jsonify({"mensagem": "Senha resetada com sucesso"}), 200
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({"erro": str(e)}), 500

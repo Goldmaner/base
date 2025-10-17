@@ -2,9 +2,12 @@
 Blueprint de orçamento (listagem e edição)
 """
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, Response, jsonify
 from db import get_cursor
 from utils import login_required
+import csv
+from io import StringIO
+from datetime import datetime
 
 orcamento_bp = Blueprint('orcamento', __name__, url_prefix='/orcamento')
 
@@ -428,5 +431,80 @@ def termos_por_categoria(categoria):
         
     except psycopg2.Error as e:
         return jsonify({"error": f"Erro no banco de dados: {str(e)}"}), 500
+
+
+@orcamento_bp.route("/exportar-csv", methods=["GET"])
+@login_required
+def exportar_csv():
+    """
+    Exporta TODAS as parcerias para CSV com suas informações de orçamento
+    """
+    try:
+        cur = get_cursor()
+        
+        # Query para buscar TODAS as parcerias (sem limite)
+        query = """
+            SELECT 
+                p.numero_termo,
+                p.tipo_termo,
+                p.sei_celeb,
+                p.total_previsto,
+                COALESCE(SUM(pd.valor), 0) as total_preenchido,
+                p.meses
+            FROM Parcerias p
+            LEFT JOIN Parcerias_Despesas pd ON p.numero_termo = pd.numero_termo
+            WHERE p.tipo_termo NOT IN ('Convênio de Cooperação', 'Convênio', 'Convênio - Passivo', 'Acordo de Cooperação')
+            GROUP BY p.numero_termo, p.tipo_termo, p.sei_celeb, p.total_previsto, p.meses
+            ORDER BY p.numero_termo
+        """
+        
+        cur.execute(query)
+        parcerias = cur.fetchall()
+        cur.close()
+        
+        # Criar arquivo CSV em memória
+        output = StringIO()
+        writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+        
+        # Cabeçalho do CSV
+        writer.writerow([
+            'Número do Termo',
+            'Tipo de Contrato',
+            'SEI Celebração',
+            'Total Previsto',
+            'Total Preenchido',
+            'Meses'
+        ])
+        
+        # Escrever dados
+        for parceria in parcerias:
+            total_previsto = float(parceria['total_previsto'] or 0)
+            total_preenchido = float(parceria['total_preenchido'] or 0)
+            
+            writer.writerow([
+                parceria['numero_termo'],
+                parceria['tipo_termo'] or '-',
+                parceria['sei_celeb'] or '-',
+                f"R$ {total_previsto:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                f"R$ {total_preenchido:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                parceria['meses'] if parceria['meses'] is not None else '-'
+            ])
+        
+        # Preparar resposta
+        output.seek(0)
+        data_atual = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'orcamento_parcerias_{data_atual}.csv'
+        
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+    except Exception as e:
+        return f"Erro ao exportar CSV: {str(e)}", 500
     except Exception as e:
         return jsonify({"error": f"Erro: {str(e)}"}), 500

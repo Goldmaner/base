@@ -158,10 +158,13 @@
           html += `<td><span class="badge ${user.tipo_usuario === 'Agente Público' ? 'bg-primary' : 'bg-secondary'}">${user.tipo_usuario}</span></td>`;
           html += `<td>${new Date(user.data_criacao).toLocaleDateString('pt-BR')}</td>`;
           html += `<td class="text-center">
-            <button class="btn btn-sm btn-warning" onclick="editarUsuario(${user.id}, '${user.email}', '${user.tipo_usuario}')">
+            <button class="btn btn-sm btn-info me-1" onclick="resetarSenha(${user.id}, '${user.email}')" title="Resetar Senha">
+              <i class="bi bi-key"></i>
+            </button>
+            <button class="btn btn-sm btn-warning me-1" onclick="editarUsuario(${user.id}, '${user.email}', '${user.tipo_usuario}')" title="Editar Tipo">
               <i class="bi bi-pencil"></i>
             </button>
-            <button class="btn btn-sm btn-danger" onclick="excluirUsuario(${user.id}, '${user.email}')">
+            <button class="btn btn-sm btn-danger" onclick="excluirUsuario(${user.id}, '${user.email}')" title="Excluir">
               <i class="bi bi-trash"></i>
             </button>
           </td>`;
@@ -254,6 +257,39 @@
       } catch (error) {
         console.error('Erro ao excluir usuário:', error);
         alert('Erro ao excluir usuário.');
+      }
+    }
+
+    async function resetarSenha(id, email) {
+      const novaSenha = prompt(`Resetar senha do usuário "${email}".\n\nDigite a nova senha:`, '');
+      
+      if (novaSenha === null || novaSenha.trim() === '') {
+        return;
+      }
+      
+      if (novaSenha.length < 4) {
+        alert('Senha muito curta! Mínimo 4 caracteres.');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/usuarios/${id}/resetar-senha`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nova_senha: novaSenha })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          alert(`Senha resetada com sucesso!\n\nE-mail: ${email}\nNova Senha: ${novaSenha}\n\nAnote a senha, ela não será exibida novamente!`);
+          carregarUsuarios();
+        } else {
+          alert('Erro: ' + result.erro);
+        }
+      } catch (error) {
+        console.error('Erro ao resetar senha:', error);
+        alert('Erro ao resetar senha.');
       }
     }
   </script>
