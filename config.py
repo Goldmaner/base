@@ -2,17 +2,15 @@
 Configurações da aplicação Flask
 """
 
-# Configuração do banco PostgreSQL
+import os
+
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': '5432',
-    'database': 'projeto_parcerias',
-    'user': 'postgres',
-    'password': 'Coração01'
+    'host': os.environ.get('PGHOST'),
+    'port': os.environ.get('PGPORT', '5432'),
+    'database': os.environ.get('PGDATABASE'),
+    'user': os.environ.get('PGUSER'),
+    'password': os.environ.get('PGPASSWORD')
 }
 
-# Chave secreta para sessões
-SECRET_KEY = 'seu_secret_key_aqui'  # TODO: Alterar para uma chave segura em produção
-
-# Configurações do Flask
-DEBUG = False
+SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-padrao')
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
