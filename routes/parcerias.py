@@ -466,13 +466,19 @@ def exportar_csv():
         return f"Erro ao exportar CSV: {str(e)}", 500
 
 
-@parcerias_bp.route("/<numero_termo>/exportar-pdf", methods=["GET"])
+@parcerias_bp.route("/exportar-pdf", methods=["GET"])
 @login_required
-def exportar_pdf(numero_termo):
+def exportar_pdf():
     """
     Exporta uma parceria específica para PDF
     """
     try:
+        # Obter número do termo da query string
+        numero_termo = request.args.get('numero_termo', '').strip()
+        
+        if not numero_termo:
+            return "Número do termo não informado", 400
+        
         cur = get_cursor()
         
         # Query para buscar a parceria

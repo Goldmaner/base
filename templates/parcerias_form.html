@@ -689,8 +689,8 @@
       btnExportar.disabled = true;
       btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Gerando PDF...';
       
-      // Fazer requisição para a API de exportação
-      window.location.href = `/parcerias/${encodeURIComponent(numeroTermo)}/exportar-pdf`;
+      // Fazer requisição para a API de exportação usando query string
+      window.location.href = `/parcerias/exportar-pdf?numero_termo=${encodeURIComponent(numeroTermo)}`;
       
       // Restaurar botão após um tempo
       setTimeout(() => {
