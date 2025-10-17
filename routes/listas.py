@@ -48,7 +48,15 @@ def index():
     """
     Página principal de gerenciamento de listas
     """
-    return render_template('listas.html', tabelas=TABELAS_CONFIG)
+    try:
+        print("[DEBUG] Acessando rota /listas")
+        print(f"[DEBUG] Tabelas config: {list(TABELAS_CONFIG.keys())}")
+        return render_template('listas.html', tabelas=TABELAS_CONFIG)
+    except Exception as e:
+        print(f"[ERRO] Erro ao renderizar listas.html: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return f"Erro: {str(e)}", 500
 
 
 @listas_bp.route("/api/dados/<tabela>", methods=["GET"])
