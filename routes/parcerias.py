@@ -383,9 +383,8 @@ def exportar_csv():
                 cnpj,
                 projeto,
                 portaria,
-                coordenacao,
-                data_inicio,
-                data_termino,
+                inicio,
+                final,
                 meses,
                 total_previsto,
                 sei_celeb,
@@ -436,9 +435,8 @@ def exportar_csv():
                 parceria['cnpj'] or '-',
                 parceria['projeto'] or '-',
                 parceria['portaria'] or '-',
-                parceria['coordenacao'] or '-',
-                parceria['data_inicio'].strftime('%d/%m/%Y') if parceria['data_inicio'] else '-',
-                parceria['data_termino'].strftime('%d/%m/%Y') if parceria['data_termino'] else '-',
+                parceria['inicio'].strftime('%d/%m/%Y') if parceria['inicio'] else '-',
+                parceria['final'].strftime('%d/%m/%Y') if parceria['final'] else '-',
                 parceria['meses'] if parceria['meses'] is not None else '-',
                 f"R$ {total_previsto:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
                 parceria['sei_celeb'] or '-',
@@ -490,9 +488,8 @@ def exportar_pdf():
                 cnpj,
                 projeto,
                 portaria,
-                coordenacao,
-                data_inicio,
-                data_termino,
+                inicio,
+                final,
                 meses,
                 total_previsto,
                 sei_celeb,
@@ -555,8 +552,8 @@ def exportar_pdf():
         
         # Preparar dados
         total_previsto = float(parceria['total_previsto'] or 0)
-        data_inicio_fmt = parceria['data_inicio'].strftime('%d/%m/%Y') if parceria['data_inicio'] else '-'
-        data_termino_fmt = parceria['data_termino'].strftime('%d/%m/%Y') if parceria['data_termino'] else '-'
+        data_inicio_fmt = parceria['inicio'].strftime('%d/%m/%Y') if parceria['inicio'] else '-'
+        data_termino_fmt = parceria['final'].strftime('%d/%m/%Y') if parceria['final'] else '-'
         total_previsto_fmt = f"R$ {total_previsto:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         
         # Dados da parceria em formato de tabela
@@ -567,7 +564,6 @@ def exportar_pdf():
             ['CNPJ:', parceria['cnpj'] or '-'],
             ['Projeto:', parceria['projeto'] or '-'],
             ['Portaria:', parceria['portaria'] or '-'],
-            ['Coordenação:', parceria['coordenacao'] or '-'],
             ['Data de Início:', data_inicio_fmt],
             ['Data de Término:', data_termino_fmt],
             ['Meses:', str(parceria['meses']) if parceria['meses'] is not None else '-'],
