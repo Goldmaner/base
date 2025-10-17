@@ -15,4 +15,4 @@ DB_CONFIG = {
 SECRET_KEY = 'seu_secret_key_aqui'  # TODO: Alterar para uma chave segura em produção
 
 # Configurações do Flask
-DEBUG = True
+DEBUG = False
