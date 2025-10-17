@@ -16,6 +16,7 @@ from routes.orcamento import orcamento_bp
 from routes.instrucoes import instrucoes_bp
 from routes.despesas import despesas_bp
 from routes.parcerias import parcerias_bp
+from routes.listas import listas_bp
 
 
 def create_app():
@@ -58,6 +59,7 @@ def create_app():
     app.register_blueprint(instrucoes_bp)
     app.register_blueprint(despesas_bp)
     app.register_blueprint(parcerias_bp)
+    app.register_blueprint(listas_bp)
     
     return app
 
