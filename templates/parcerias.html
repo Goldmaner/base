@@ -28,6 +28,9 @@
           <p class="text-muted mb-0">Visualização e gerenciamento de todas as parcerias</p>
         </div>
         <div>
+          <button class="btn btn-success me-2" onclick="exportarCSV()">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+          </button>
           <a href="{{ url_for('parcerias.nova') }}" class="btn btn-success me-2">
             <i class="bi bi-plus-circle"></i> Adicionar Parceria
           </a>
@@ -174,5 +177,23 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function exportarCSV() {
+      // Mostrar indicador de carregamento
+      const btnExportar = event.target.closest('button');
+      const textoOriginal = btnExportar.innerHTML;
+      btnExportar.disabled = true;
+      btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Exportando...';
+      
+      // Fazer requisição para a API de exportação
+      window.location.href = '{{ url_for("parcerias.exportar_csv") }}';
+      
+      // Restaurar botão após um tempo
+      setTimeout(() => {
+        btnExportar.disabled = false;
+        btnExportar.innerHTML = textoOriginal;
+      }, 2000);
+    }
+  </script>
 </body>
 </html>

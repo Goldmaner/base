@@ -232,6 +232,9 @@
 
         <!-- Botões de Ação -->
         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+          <button type="button" class="btn btn-danger" onclick="exportarPDF()">
+            <i class="bi bi-file-pdf"></i> Exportar PDF
+          </button>
           <a href="{{ url_for('parcerias.listar') }}" class="btn btn-secondary">
             <i class="bi bi-x-circle"></i> Cancelar
           </a>
@@ -670,6 +673,31 @@
         autosaveForm();
       }
     }, 120000); // 2 minutos
+
+    // Exportar para PDF
+    function exportarPDF() {
+      const numeroTermo = '{{ parceria.numero_termo if parceria else "" }}';
+      
+      if (!numeroTermo) {
+        alert('Salve a parceria primeiro antes de exportar para PDF.');
+        return;
+      }
+      
+      // Mostrar indicador de carregamento
+      const btnExportar = event.target.closest('button');
+      const textoOriginal = btnExportar.innerHTML;
+      btnExportar.disabled = true;
+      btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Gerando PDF...';
+      
+      // Fazer requisição para a API de exportação
+      window.location.href = `/parcerias/${encodeURIComponent(numeroTermo)}/exportar-pdf`;
+      
+      // Restaurar botão após um tempo
+      setTimeout(() => {
+        btnExportar.disabled = false;
+        btnExportar.innerHTML = textoOriginal;
+      }, 2000);
+    }
   </script>
 </body>
 </html>

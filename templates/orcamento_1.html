@@ -170,12 +170,9 @@
                                 <button type="submit" class="btn btn-primary me-2">
                                     <i class="bi bi-search"></i> Aplicar Filtros
                                 </button>
-                                <a href="{{ url_for('orcamento.listar') }}" class="btn btn-secondary me-2">
+                                <a href="{{ url_for('orcamento.listar') }}" class="btn btn-secondary">
                                     <i class="bi bi-x-circle"></i> Limpar Filtros
                                 </a>
-                                <button type="button" class="btn btn-success" onclick="exportarDados()">
-                                    <i class="bi bi-download"></i> Exportar
-                                </button>
                             </div>
                         </div>
                     </form>
@@ -664,11 +661,6 @@
                 console.error('Erro:', error);
                 alert('Erro ao salvar orçamento');
             });
-        }
-
-        // Exportar dados (placeholder)
-        function exportarDados() {
-            alert('Funcionalidade de exportação será implementada em breve');
         }
 
         // Exportar para CSV

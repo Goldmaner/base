@@ -2,9 +2,19 @@
 Blueprint de parcerias (listagem e formulário)
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
 from db import get_cursor, get_db
 from utils import login_required
+import csv
+from io import StringIO, BytesIO
+from datetime import datetime
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 parcerias_bp = Blueprint('parcerias', __name__, url_prefix='/parcerias')
 
@@ -353,3 +363,256 @@ def api_sigla_tipo_termo():
             mapeamento[row['sigla'].upper()] = row['informacao']
     
     return jsonify(mapeamento)
+
+
+@parcerias_bp.route("/exportar-csv", methods=["GET"])
+@login_required
+def exportar_csv():
+    """
+    Exporta TODAS as parcerias para CSV
+    """
+    try:
+        cur = get_cursor()
+        
+        # Query para buscar TODAS as parcerias
+        query = """
+            SELECT 
+                numero_termo,
+                tipo_termo,
+                osc,
+                cnpj,
+                projeto,
+                portaria,
+                coordenacao,
+                data_inicio,
+                data_termino,
+                meses,
+                total_previsto,
+                sei_celeb,
+                sei_pc,
+                sei_plano,
+                sei_orcamento,
+                transicao
+            FROM Parcerias
+            ORDER BY numero_termo
+        """
+        
+        cur.execute(query)
+        parcerias = cur.fetchall()
+        cur.close()
+        
+        # Criar arquivo CSV em memória
+        output = StringIO()
+        writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+        
+        # Cabeçalho do CSV
+        writer.writerow([
+            'Número do Termo',
+            'Tipo de Termo',
+            'OSC',
+            'CNPJ',
+            'Projeto',
+            'Portaria',
+            'Coordenação',
+            'Data Início',
+            'Data Término',
+            'Meses',
+            'Total Previsto',
+            'SEI Celebração',
+            'SEI P&C',
+            'SEI Plano',
+            'SEI Orçamento',
+            'Transição'
+        ])
+        
+        # Escrever dados
+        for parceria in parcerias:
+            total_previsto = float(parceria['total_previsto'] or 0)
+            
+            writer.writerow([
+                parceria['numero_termo'],
+                parceria['tipo_termo'] or '-',
+                parceria['osc'] or '-',
+                parceria['cnpj'] or '-',
+                parceria['projeto'] or '-',
+                parceria['portaria'] or '-',
+                parceria['coordenacao'] or '-',
+                parceria['data_inicio'].strftime('%d/%m/%Y') if parceria['data_inicio'] else '-',
+                parceria['data_termino'].strftime('%d/%m/%Y') if parceria['data_termino'] else '-',
+                parceria['meses'] if parceria['meses'] is not None else '-',
+                f"R$ {total_previsto:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                parceria['sei_celeb'] or '-',
+                parceria['sei_pc'] or '-',
+                parceria['sei_plano'] or '-',
+                parceria['sei_orcamento'] or '-',
+                'Sim' if parceria['transicao'] else 'Não'
+            ])
+        
+        # Preparar resposta
+        output.seek(0)
+        data_atual = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'parcerias_{data_atual}.csv'
+        
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+    except Exception as e:
+        return f"Erro ao exportar CSV: {str(e)}", 500
+
+
+@parcerias_bp.route("/<numero_termo>/exportar-pdf", methods=["GET"])
+@login_required
+def exportar_pdf(numero_termo):
+    """
+    Exporta uma parceria específica para PDF
+    """
+    try:
+        cur = get_cursor()
+        
+        # Query para buscar a parceria
+        query = """
+            SELECT 
+                numero_termo,
+                tipo_termo,
+                osc,
+                cnpj,
+                projeto,
+                portaria,
+                coordenacao,
+                data_inicio,
+                data_termino,
+                meses,
+                total_previsto,
+                sei_celeb,
+                sei_pc,
+                sei_plano,
+                sei_orcamento,
+                transicao
+            FROM Parcerias
+            WHERE numero_termo = %s
+        """
+        
+        cur.execute(query, (numero_termo,))
+        parceria = cur.fetchone()
+        cur.close()
+        
+        if not parceria:
+            return "Parceria não encontrada", 404
+        
+        # Criar PDF em memória
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                               rightMargin=2*cm, leftMargin=2*cm,
+                               topMargin=2*cm, bottomMargin=2*cm)
+        
+        # Container para os elementos do PDF
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Estilo personalizado para o título
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor=colors.HexColor('#1a73e8'),
+            spaceAfter=30,
+            alignment=1  # Centralizado
+        )
+        
+        # Estilo para labels
+        label_style = ParagraphStyle(
+            'Label',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#666666'),
+            spaceAfter=2
+        )
+        
+        # Estilo para valores
+        value_style = ParagraphStyle(
+            'Value',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=12
+        )
+        
+        # Título
+        titulo = Paragraph(f"Parceria - {parceria['numero_termo']}", title_style)
+        elements.append(titulo)
+        elements.append(Spacer(1, 0.5*cm))
+        
+        # Preparar dados
+        total_previsto = float(parceria['total_previsto'] or 0)
+        data_inicio_fmt = parceria['data_inicio'].strftime('%d/%m/%Y') if parceria['data_inicio'] else '-'
+        data_termino_fmt = parceria['data_termino'].strftime('%d/%m/%Y') if parceria['data_termino'] else '-'
+        total_previsto_fmt = f"R$ {total_previsto:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        
+        # Dados da parceria em formato de tabela
+        dados = [
+            ['Número do Termo:', parceria['numero_termo']],
+            ['Tipo de Termo:', parceria['tipo_termo'] or '-'],
+            ['OSC:', parceria['osc'] or '-'],
+            ['CNPJ:', parceria['cnpj'] or '-'],
+            ['Projeto:', parceria['projeto'] or '-'],
+            ['Portaria:', parceria['portaria'] or '-'],
+            ['Coordenação:', parceria['coordenacao'] or '-'],
+            ['Data de Início:', data_inicio_fmt],
+            ['Data de Término:', data_termino_fmt],
+            ['Meses:', str(parceria['meses']) if parceria['meses'] is not None else '-'],
+            ['Total Previsto:', total_previsto_fmt],
+            ['SEI Celebração:', parceria['sei_celeb'] or '-'],
+            ['SEI P&C:', parceria['sei_pc'] or '-'],
+            ['SEI Plano:', parceria['sei_plano'] or '-'],
+            ['SEI Orçamento:', parceria['sei_orcamento'] or '-'],
+            ['Transição:', 'Sim' if parceria['transicao'] else 'Não']
+        ]
+        
+        # Criar tabela
+        tabela = Table(dados, colWidths=[5*cm, 12*cm])
+        tabela.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#333333')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        
+        elements.append(tabela)
+        elements.append(Spacer(1, 1*cm))
+        
+        # Rodapé
+        data_geracao = datetime.now().strftime('%d/%m/%Y às %H:%M')
+        rodape = Paragraph(f"<i>Documento gerado em {data_geracao}</i>", 
+                          ParagraphStyle('Footer', parent=styles['Normal'], 
+                                       fontSize=8, textColor=colors.grey))
+        elements.append(rodape)
+        
+        # Gerar PDF
+        doc.build(elements)
+        
+        # Preparar resposta
+        buffer.seek(0)
+        filename = f'parceria_{numero_termo.replace("/", "-")}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        
+        return Response(
+            buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}',
+                'Content-Type': 'application/pdf'
+            }
+        )
+        
+    except Exception as e:
+        return f"Erro ao gerar PDF: {str(e)}", 500
