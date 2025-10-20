@@ -5,7 +5,7 @@ Blueprint de despesas e APIs relacionadas a orçamento
 from flask import Blueprint, request, jsonify, session
 from datetime import datetime
 import psycopg2
-from db import get_db, get_cursor
+from db import get_db, get_cursor, execute_dual, get_cursor_local, get_cursor_railway
 from utils import login_required
 
 despesas_bp = Blueprint('despesas', __name__, url_prefix='/api')
@@ -102,7 +102,7 @@ def criar_despesa():
             
         total_previsto = float(termo["total_previsto"] or 0)
         
-        # Calcular total inserido
+        # Calcular total inserido (soma de TODAS as despesas de TODOS os meses)
         total_inserido = 0
         registros_para_inserir = []
         
@@ -122,7 +122,16 @@ def criar_despesa():
                     
                 try:
                     mes = int(mes_str)
-                    valor = float(str(valor_str).replace(',', '.').replace('R$', '').replace(' ', ''))
+                    # Limpar e converter o valor (pode vir formatado como "52.499,56" ou "52499.56")
+                    valor_limpo = str(valor_str).replace('R$', '').replace(' ', '').strip()
+                    # Se tiver ponto E vírgula, é formato BR (1.234,56)
+                    if '.' in valor_limpo and ',' in valor_limpo:
+                        valor_limpo = valor_limpo.replace('.', '').replace(',', '.')
+                    # Se tiver apenas vírgula, trocar por ponto
+                    elif ',' in valor_limpo:
+                        valor_limpo = valor_limpo.replace(',', '.')
+                    
+                    valor = float(valor_limpo)
                     total_inserido += valor
                     
                     registros_para_inserir.append({
@@ -134,7 +143,8 @@ def criar_despesa():
                         'mes': mes,
                         'aditivo': aditivo
                     })
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    print(f"[ERRO] Falha ao converter valor '{valor_str}' para float: {e}")
                     continue
         
         # Verificar se total bate com previsto (permitir diferença de até R$ 0.01)
@@ -150,14 +160,19 @@ def criar_despesa():
 
         # Se chegou aqui, os totais batem dentro da tolerância: substituir (deletar+inserir)
         try:
-            db = get_db()
-            cur.execute("DELETE FROM Parcerias_Despesas WHERE numero_termo = %s AND COALESCE(aditivo, 0) = %s", (numero_termo, aditivo))
+            # Deletar despesas antigas do aditivo em ambos os bancos
+            delete_query = "DELETE FROM Parcerias_Despesas WHERE numero_termo = %s AND COALESCE(aditivo, 0) = %s"
+            execute_dual(delete_query, (numero_termo, aditivo))
+            
+            # Inserir novas despesas em ambos os bancos
+            insert_query = """
+                INSERT INTO Parcerias_Despesas 
+                (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes, aditivo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            
             for registro in registros_para_inserir:
-                cur.execute("""
-                    INSERT INTO Parcerias_Despesas 
-                    (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes, aditivo)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (
+                execute_dual(insert_query, (
                     registro['numero_termo'],
                     registro['rubrica'], 
                     registro['quantidade'],
@@ -166,34 +181,15 @@ def criar_despesa():
                     registro['mes'],
                     registro['aditivo']
                 ))
-            db.commit()
-            cur.close()
+            
             return {
                 "message": f"Inseridas {len(registros_para_inserir)} despesas com sucesso",
                 "total_inserido": total_inserido,
                 "registros": len(registros_para_inserir)
             }, 201
-        except psycopg2.IntegrityError as e:
-            cur.close()
-            db.rollback()
-            if "parcerias_despesas_numero_termo_fkey" in str(e):
-                return {"error": f"Termo '{numero_termo}' não encontrado na base de dados. Verifique se o número do termo está correto."}, 400
-            elif "duplicate key" in str(e):
-                return {"error": "Registro duplicado encontrado. Verifique se os dados já não foram inseridos anteriormente."}, 400
-            else:
-                return {"error": f"Erro de integridade dos dados: {str(e)}"}, 400
-        except psycopg2.Error as e:
-            cur.close()
-            db.rollback()
-            return {"error": f"Erro no banco de dados: {str(e)}"}, 500
+        except Exception as e:
+            return {"error": f"Erro ao inserir despesas: {str(e)}"}, 500
         
-    except psycopg2.IntegrityError as e:
-        if "parcerias_despesas_numero_termo_fkey" in str(e):
-            return {"error": f"Termo '{numero_termo}' não encontrado na base de dados. Verifique se o número do termo está correto."}, 400
-        else:
-            return {"error": f"Erro de integridade: {str(e)}"}, 400
-    except psycopg2.Error as e:
-        return {"error": f"Erro PostgreSQL: {str(e)}"}, 500
     except Exception as e:
         return {"error": f"Erro inesperado: {str(e)}"}, 500
 
@@ -263,17 +259,18 @@ def confirmar_despesa():
         if not numero_termo or not despesas:
             return {"error": "numero_termo e despesas são obrigatórios"}, 400
 
-        db = get_db()
-        cur = get_cursor()
-        
         registros_inseridos = 0
 
         # Antes de inserir, deletar registros existentes do mesmo aditivo para substituir
-        try:
-            cur.execute("DELETE FROM Parcerias_Despesas WHERE numero_termo = %s AND COALESCE(aditivo, 0) = %s", (numero_termo, aditivo))
-        except psycopg2.Error as e:
-            cur.close()
-            return {"error": f"Erro ao limpar despesas antigas: {str(e)}"}, 500
+        delete_query = "DELETE FROM Parcerias_Despesas WHERE numero_termo = %s AND COALESCE(aditivo, 0) = %s"
+        execute_dual(delete_query, (numero_termo, aditivo))
+
+        # Inserir despesas em ambos os bancos
+        insert_query = """
+            INSERT INTO Parcerias_Despesas 
+            (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes, aditivo)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
 
         for despesa in despesas:
             rubrica = despesa.get('rubrica')
@@ -290,39 +287,31 @@ def confirmar_despesa():
 
                 try:
                     mes = int(mes_str)
-                    valor = float(str(valor_str).replace(',', '.').replace('R$', '').replace(' ', ''))
+                    # Limpar e converter o valor
+                    valor_limpo = str(valor_str).replace('R$', '').replace(' ', '').strip()
+                    if '.' in valor_limpo and ',' in valor_limpo:
+                        valor_limpo = valor_limpo.replace('.', '').replace(',', '.')
+                    elif ',' in valor_limpo:
+                        valor_limpo = valor_limpo.replace(',', '.')
+                    
+                    valor = float(valor_limpo)
 
-                    cur.execute("""
-                        INSERT INTO Parcerias_Despesas 
-                        (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes, aditivo)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (numero_termo, rubrica, quantidade if quantidade != '-' else None, categoria, valor, mes, aditivo))
+                    execute_dual(insert_query, (
+                        numero_termo, 
+                        rubrica, 
+                        quantidade if quantidade != '-' else None, 
+                        categoria, 
+                        valor, 
+                        mes, 
+                        aditivo
+                    ))
 
                     registros_inseridos += 1
                 except (ValueError, TypeError):
                     continue
 
-        db.commit()
-        cur.close()
         return {"message": f"Inseridas {registros_inseridos} despesas com sucesso"}, 201
         
-    except psycopg2.IntegrityError as e:
-        if 'db' in locals():
-            db.rollback()
-        if 'cur' in locals():
-            cur.close()
-        if "parcerias_despesas_numero_termo_fkey" in str(e):
-            return {"error": f"Termo '{numero_termo}' não encontrado na base de dados. Verifique se o número do termo está correto."}, 400
-        elif "duplicate key" in str(e):
-            return {"error": "Registro duplicado encontrado. Verifique se os dados já não foram inseridos anteriormente."}, 400
-        else:
-            return {"error": f"Erro de integridade dos dados: {str(e)}"}, 400
-    except psycopg2.Error as e:
-        if 'db' in locals():
-            db.rollback()
-        if 'cur' in locals():
-            cur.close()
-        return {"error": f"Erro no banco de dados: {str(e)}"}, 500
     except Exception as e:
         return {"error": f"Erro: {str(e)}"}, 500
 

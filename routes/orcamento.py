@@ -262,8 +262,7 @@ def atualizar_categoria():
     Atualiza em massa uma categoria de despesa no banco de dados
     """
     from flask import request, jsonify
-    from db import get_db
-    import psycopg2
+    from db import execute_dual
     
     try:
         data = request.get_json()
@@ -276,29 +275,22 @@ def atualizar_categoria():
         if not categoria_nova or categoria_nova.strip() == '':
             return jsonify({"error": "Categoria nova não pode estar vazia"}), 400
         
-        db = get_db()
-        cur = db.cursor()
-        
-        # Atualizar todas as ocorrências da categoria antiga para a nova
-        cur.execute("""
+        # Atualizar todas as ocorrências da categoria antiga para a nova em ambos os bancos
+        query = """
             UPDATE Parcerias_Despesas
             SET categoria_despesa = %s
             WHERE categoria_despesa = %s
-        """, (categoria_nova.strip(), categoria_antiga))
+        """
         
-        linhas_afetadas = cur.rowcount
-        db.commit()
-        cur.close()
+        if execute_dual(query, (categoria_nova.strip(), categoria_antiga)):
+            return jsonify({
+                "message": f"Categoria atualizada com sucesso!",
+                "categoria_antiga": categoria_antiga,
+                "categoria_nova": categoria_nova.strip()
+            }), 200
+        else:
+            return jsonify({"error": "Falha ao atualizar categoria em ambos os bancos"}), 500
         
-        return jsonify({
-            "message": f"Categoria atualizada com sucesso! {linhas_afetadas} registros alterados.",
-            "linhas_afetadas": linhas_afetadas
-        }), 200
-        
-    except psycopg2.Error as e:
-        if 'db' in locals():
-            db.rollback()
-        return jsonify({"error": f"Erro no banco de dados: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": f"Erro: {str(e)}"}), 500
 
@@ -385,19 +377,17 @@ def buscar_categorias():
         return jsonify({"error": f"Erro: {str(e)}"}), 500
 
 
-@orcamento_bp.route('/termos-por-categoria/<categoria>', methods=['GET'])
+@orcamento_bp.route('/termos-por-categoria/<path:categoria>', methods=['GET'])
+@login_required
 def termos_por_categoria(categoria):
     """
     API para buscar todos os termos (numero_termo) que usam uma categoria específica.
     Retorna lista de termos com informações adicionais.
     """
     from flask import jsonify
-    from db import get_db
-    import psycopg2.extras
     
     try:
-        db = get_db()
-        cur = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur = get_cursor()
         
         # Buscar termos distintos que usam essa categoria
         cur.execute("""
@@ -429,8 +419,8 @@ def termos_por_categoria(categoria):
             'total_termos': len(resultado)
         }), 200
         
-    except psycopg2.Error as e:
-        return jsonify({"error": f"Erro no banco de dados: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Erro ao buscar termos: {str(e)}"}), 500
 
 
 @orcamento_bp.route("/exportar-csv", methods=["GET"])

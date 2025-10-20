@@ -8,6 +8,11 @@ __pycache__/
 venv/
 .env/
 
+# Environment variables (credentials)
+.env
+.env_teste
+.env.*
+
 # SQLite DB e arquivos de journal
 meu_banco.db
 meu_banco.db-shm

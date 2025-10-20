@@ -6,13 +6,17 @@
   <title>Orçamento - Preenchimento</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-  /* permitir rolagem horizontal sem limitar a largura da tabela; ocupa 95% da viewport */
-  .table-wrapper{ overflow-x: auto; width: 95vw; max-width: 100%; margin: 0 auto; }
+  /* permitir rolagem horizontal sem limitar a largura da tabela; ocupa 100% da viewport */
+  body { margin: 0; padding: 0; }
+  .container { max-width: 100%; padding: 1rem; }
+  .table-wrapper{ overflow-x: auto; width: 100%; max-width: 100%; margin: 0; }
   /* largura mínima aumentada para cada coluna de mês */
   #tabelaOrc2 th.month-th, #tabelaOrc2 td.month-td { min-width: 140px; }
-  /* largura mínima maior para colunas de rubrica e categoria (podem ter muitos caracteres) */
+  /* largura mínima maior para colunas de rubrica e categoria */
   #tabelaOrc2 th.col-rubrica, #tabelaOrc2 td.col-rubrica { min-width: 200px; }
   #tabelaOrc2 th.col-categoria, #tabelaOrc2 td.col-categoria { min-width: 260px; }
+  /* coluna de total da linha */
+  #tabelaOrc2 th.col-total-linha, #tabelaOrc2 td.col-total-linha { min-width: 120px; background-color: #f8f9fa; font-weight: bold; }
   /* permitir que inputs de mês fiquem com largura mínima adequada */
   .month-name { min-width: 120px; }
   /* aumentar a altura das linhas e inputs para melhor legibilidade */
@@ -22,6 +26,8 @@
   #tabelaOrc2 th { position: relative; }
   .col-resizer { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; z-index: 20; }
   .col-resizer:hover { background: rgba(0,0,0,0.03); }
+  /* ocultar colunas de meses */
+  .hide-months .month-th, .hide-months .month-td { display: none !important; }
   </style>
 </head>
 <body class="p-4">
@@ -45,8 +51,11 @@
       </select>
     </div>
 
-    <div class="mt-3 d-flex gap-2 align-items-center">
+    <div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
       <a class="btn btn-light btn-sm" href="{{ url_for('orcamento.listar') }}">&larr; Voltar</a>
+      <button id="toggleMonthsBtn" class="btn btn-outline-secondary btn-sm">
+        <span id="toggleMonthsText">👁️ Ocultar Meses</span>
+      </button>
       <div class="input-group input-group-sm w-auto">
         <span class="input-group-text">Adicionar meses</span>
         <input id="numCols" type="number" class="form-control" min="1" value="1" style="width:80px">
@@ -72,6 +81,7 @@
             <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 1"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
             <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 2"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
             <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 3"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
+            <th class="col-total-linha">Total</th>
             <th>Ação</th>
           </tr>
         </thead>
@@ -99,6 +109,7 @@
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
+            <td class="col-total-linha text-end total-linha">0,00</td>
             <td><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>
           </tr>
           {% endfor %}
@@ -123,7 +134,13 @@
 
       <div class="d-flex gap-2">
         <button id="addLinha" class="btn btn-secondary btn-sm">Adicionar Linha</button>
-        <button id="salvarOrc2" class="btn btn-primary ms-auto">Salvar</button>
+        <button id="limparBtn" class="btn btn-warning btn-sm">🗑️ Limpar Tudo</button>
+        <button id="salvarOrc2" class="btn btn-primary ms-auto">
+          <span id="salvarText">💾 Salvar</span>
+          <span id="salvarSpinner" class="spinner-border spinner-border-sm d-none" role="status">
+            <span class="visually-hidden">Salvando...</span>
+          </span>
+        </button>
       </div>
     </div>
   </div>
@@ -325,15 +342,41 @@
         }
         // categoria
         if (colCategoria){ tr.querySelector('.categoria').value = data[colCategoria] || ''; }
-        // meses
+        // meses - NORMALIZAR VALORES MONETÁRIOS
         const valorInputs = tr.querySelectorAll('input.valor');
         monthCols.forEach((mc, idx) => {
-          const v = data[mc];
-          if (valorInputs[idx]) valorInputs[idx].value = (v === undefined || v === null) ? '' : String(v);
+          let v = data[mc];
+          if (v === undefined || v === null || String(v).trim() === '' || String(v).trim() === '-') {
+            if (valorInputs[idx]) valorInputs[idx].value = '';
+            return;
+          }
+          // Normalizar valor: aceitar 52499.56 (US) ou 52.499,56 (BR)
+          let vStr = String(v).replace(/R\$\s*/g, '').trim();
+          // Se tiver ponto E vírgula, é formato BR (1.234,56) -> remover pontos, trocar vírgula por ponto
+          if (vStr.includes('.') && vStr.includes(',')) {
+            vStr = vStr.replace(/\./g, '').replace(',', '.');
+          } 
+          // Se tiver apenas vírgula, é decimal BR (1234,56) -> trocar vírgula por ponto
+          else if (vStr.includes(',')) {
+            vStr = vStr.replace(',', '.');
+          }
+          // Converter para número e formatar no padrão BR para exibição
+          const num = parseFloat(vStr);
+          if (!isNaN(num) && num !== 0) {
+            // Formatar como BR: 52499.56 -> "52.499,56"
+            const formatted = num.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (valorInputs[idx]) valorInputs[idx].value = formatted;
+          } else {
+            if (valorInputs[idx]) valorInputs[idx].value = num === 0 ? '0' : '';
+          }
         });
       });
 
       recalcTotals();
+      // Log para debug
+      console.log('[IMPORTACAO] Linhas importadas:', filtered.length);
+      console.log('[IMPORTACAO] Meses detectados:', monthCols.length);
+      console.log('[IMPORTACAO] Total calculado:', document.getElementById('grandTotal').textContent);
       alert('Importação concluída: ' + filtered.length + ' linhas e ' + monthCols.length + ' meses detectados.');
     }
 
@@ -429,18 +472,24 @@
       }).catch(e=>{ alert('Erro ao salvar. Veja console.'); console.error(e); });
     });
 
-    // recalcular totais por coluna e total geral
+    // recalcular totais por coluna, total geral E total por linha
     function recalcTotals(){
       const thead = document.querySelector('#tabelaOrc2 thead tr');
       const monthCount = thead.querySelectorAll('.month-th').length;
       const totals = Array.from({length: monthCount}, ()=>0);
       document.querySelectorAll('#bodyOrc2 tr').forEach(tr => {
         const vals = Array.from(tr.querySelectorAll('input.valor')).map(i=>parseFloat(i.value.replace(/\./g,'').replace(',','.'))||0);
+        // Calcular total da linha
+        const totalLinha = vals.reduce((a,b)=>a+b,0);
+        const totalLinhaCell = tr.querySelector('.total-linha');
+        if (totalLinhaCell) {
+          totalLinhaCell.textContent = totalLinha.toLocaleString('pt-BR', {minimumFractionDigits:2});
+        }
+        // Somar para totais por coluna
         for (let j=0;j<monthCount;j++) totals[j] += (vals[j]||0);
       });
       // preencher tfoot
       const foot = document.querySelector('#tabelaOrc2 tfoot tr');
-      // limpar col-totals exceto o last cell
       const colTotals = foot.querySelectorAll('.col-total');
       for (let j=0;j<colTotals.length;j++){
         colTotals[j].textContent = (totals[j]||0).toLocaleString('pt-BR', {minimumFractionDigits:2});
@@ -451,6 +500,67 @@
 
     // escutar mudanças nos inputs de valor para recalcular
     document.addEventListener('input', function(e){ if (e.target && e.target.classList && e.target.classList.contains('valor')) recalcTotals(); });
+
+    // --- NAVEGAÇÃO COM ENTER ---
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('valor')){
+        e.preventDefault();
+        const currentTr = e.target.closest('tr');
+        const currentTd = e.target.closest('td');
+        const allTds = Array.from(currentTr.querySelectorAll('td'));
+        const tdIndex = allTds.indexOf(currentTd);
+        
+        // Próxima linha
+        const nextTr = currentTr.nextElementSibling;
+        if (nextTr && nextTr.tagName === 'TR'){
+          const nextTds = nextTr.querySelectorAll('td');
+          if (nextTds[tdIndex]){
+            const nextInput = nextTds[tdIndex].querySelector('input.valor');
+            if (nextInput) {
+              nextInput.focus();
+              nextInput.select();
+            }
+          }
+        }
+      }
+    });
+
+    // --- BOTÃO OCULTAR/MOSTRAR MESES ---
+    document.getElementById('toggleMonthsBtn').addEventListener('click', function(){
+      const table = document.getElementById('tabelaOrc2');
+      const isHidden = table.classList.contains('hide-months');
+      if (isHidden){
+        table.classList.remove('hide-months');
+        document.getElementById('toggleMonthsText').textContent = '👁️ Ocultar Meses';
+      } else {
+        table.classList.add('hide-months');
+        document.getElementById('toggleMonthsText').textContent = '👁️ Mostrar Meses';
+      }
+    });
+
+    // --- BOTÃO LIMPAR ---
+    document.getElementById('limparBtn').addEventListener('click', function(){
+      const tbody = document.getElementById('bodyOrc2');
+      const hasData = Array.from(tbody.querySelectorAll('input.valor')).some(inp => inp.value.trim() !== '');
+      
+      if (hasData){
+        if (!confirm('Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita.')){
+          return;
+        }
+      }
+      
+      // Limpar todos os inputs
+      tbody.querySelectorAll('input, select').forEach(el => {
+        if (el.classList.contains('quantidade')) {
+          el.value = '1';
+        } else {
+          el.value = '';
+        }
+      });
+      
+      recalcTotals();
+      alert('Dados limpos com sucesso!');
+    });
 
     // carregar dados existentes do termo ao inicializar
     function carregarDadosExistentes(){

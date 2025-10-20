@@ -3,7 +3,7 @@ Blueprint de gerenciamento de listas/tabelas categóricas
 """
 
 from flask import Blueprint, render_template, request, jsonify
-from db import get_cursor
+from db import get_cursor, execute_dual
 from utils import login_required
 
 listas_bp = Blueprint('listas', __name__, url_prefix='/listas')
@@ -125,22 +125,18 @@ def criar_registro(tabela):
         placeholders = ', '.join(['%s'] * len(colunas))
         valores = [dados[col] for col in colunas]
         
-        cur = get_cursor()
         query = f"""
             INSERT INTO {schema}.{tabela} ({', '.join(colunas)})
             VALUES ({placeholders})
-            RETURNING id
         """
-        cur.execute(query, valores)
-        novo_id = cur.fetchone()['id']
-        cur.connection.commit()
-        cur.close()
         
-        return jsonify({
-            'sucesso': True,
-            'id': novo_id,
-            'mensagem': 'Registro criado com sucesso'
-        })
+        if execute_dual(query, valores):
+            return jsonify({
+                'sucesso': True,
+                'mensagem': 'Registro criado com sucesso'
+            })
+        else:
+            return jsonify({'erro': 'Falha ao criar registro em ambos os bancos'}), 500
         
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
@@ -166,20 +162,19 @@ def atualizar_registro(tabela, id):
         valores = [dados.get(col) for col in colunas]
         valores.append(id)
         
-        cur = get_cursor()
         query = f"""
             UPDATE {schema}.{tabela}
             SET {set_clause}
             WHERE id = %s
         """
-        cur.execute(query, valores)
-        cur.connection.commit()
-        cur.close()
         
-        return jsonify({
-            'sucesso': True,
-            'mensagem': 'Registro atualizado com sucesso'
-        })
+        if execute_dual(query, valores):
+            return jsonify({
+                'sucesso': True,
+                'mensagem': 'Registro atualizado com sucesso'
+            })
+        else:
+            return jsonify({'erro': 'Falha ao atualizar registro em ambos os bancos'}), 500
         
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
@@ -198,19 +193,18 @@ def excluir_registro(tabela, id):
         config = TABELAS_CONFIG[tabela]
         schema = config['schema']
         
-        cur = get_cursor()
         query = f"""
             DELETE FROM {schema}.{tabela}
             WHERE id = %s
         """
-        cur.execute(query, (id,))
-        cur.connection.commit()
-        cur.close()
         
-        return jsonify({
-            'sucesso': True,
-            'mensagem': 'Registro excluído com sucesso'
-        })
+        if execute_dual(query, (id,)):
+            return jsonify({
+                'sucesso': True,
+                'mensagem': 'Registro excluído com sucesso'
+            })
+        else:
+            return jsonify({'erro': 'Falha ao excluir registro em ambos os bancos'}), 500
         
     except Exception as e:
         return jsonify({'erro': str(e)}), 500

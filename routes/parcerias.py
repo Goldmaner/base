@@ -3,7 +3,7 @@ Blueprint de parcerias (listagem e formulário)
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
-from db import get_cursor, get_db
+from db import get_cursor, get_db, execute_dual
 from utils import login_required
 import csv
 from io import StringIO, BytesIO
@@ -123,19 +123,8 @@ def nova():
     Criar nova parceria
     """
     if request.method == "POST":
-        conn = None
-        cur = None
         try:
-            conn = get_db()
-            # Garantir que não há transação pendente com erro
-            try:
-                conn.rollback()
-            except:
-                pass
-            
-            cur = conn.cursor()
-            
-            cur.execute("""
+            query = """
                 INSERT INTO Parcerias (
                     numero_termo, osc, projeto, tipo_termo, portaria, cnpj,
                     inicio, final, meses, total_previsto, total_pago, conta,
@@ -144,7 +133,9 @@ def nova():
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
-            """, (
+            """
+            
+            params = (
                 request.form.get('numero_termo'),
                 request.form.get('osc'),
                 request.form.get('projeto'),
@@ -164,20 +155,16 @@ def nova():
                 request.form.get('sei_plano'),
                 request.form.get('sei_orcamento'),
                 1 if request.form.get('contrapartida') == 'on' else 0
-            ))
+            )
             
-            conn.commit()
-            flash("Parceria criada com sucesso!", "success")
-            return redirect(url_for('parcerias.nova'))  # Redireciona para nova parceria em vez da listagem
+            if execute_dual(query, params):
+                flash("Parceria criada com sucesso!", "success")
+                return redirect(url_for('parcerias.nova'))
+            else:
+                flash("Erro ao criar parceria em ambos os bancos de dados!", "danger")
             
         except Exception as e:
-            if conn:
-                conn.rollback()
             flash(f"Erro ao criar parceria: {str(e)}", "danger")
-            
-        finally:
-            if cur:
-                cur.close()
     
     # GET - retornar formulário vazio
     # Buscar dados dos dropdowns
@@ -202,19 +189,8 @@ def editar(numero_termo):
     """
     if request.method == "POST":
         # Atualizar os dados da parceria
-        conn = None
-        cur = None
         try:
-            conn = get_db()
-            # Garantir que não há transação pendente com erro
-            try:
-                conn.rollback()
-            except:
-                pass
-            
-            cur = conn.cursor()
-            
-            cur.execute("""
+            query = """
                 UPDATE Parcerias SET
                     osc = %s,
                     projeto = %s,
@@ -235,7 +211,9 @@ def editar(numero_termo):
                     sei_orcamento = %s,
                     contrapartida = %s
                 WHERE numero_termo = %s
-            """, (
+            """
+            
+            params = (
                 request.form.get('osc'),
                 request.form.get('projeto'),
                 request.form.get('tipo_termo'),
@@ -255,20 +233,16 @@ def editar(numero_termo):
                 request.form.get('sei_orcamento'),
                 1 if request.form.get('contrapartida') == 'on' else 0,  # checkbox como integer
                 numero_termo
-            ))
+            )
             
-            conn.commit()
-            flash("Parceria atualizada com sucesso!", "success")
-            return redirect(url_for('parcerias.listar'))
+            if execute_dual(query, params):
+                flash("Parceria atualizada com sucesso!", "success")
+                return redirect(url_for('parcerias.listar'))
+            else:
+                flash("Erro ao atualizar parceria em ambos os bancos de dados!", "danger")
             
         except Exception as e:
-            if conn:
-                conn.rollback()  # Desfazer transação em caso de erro
             flash(f"Erro ao atualizar parceria: {str(e)}", "danger")
-            
-        finally:
-            if cur:
-                cur.close()
     
     # GET - buscar dados da parceria
     cur = get_cursor()
