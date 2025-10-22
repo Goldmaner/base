@@ -33,7 +33,13 @@
 <body class="p-4">
   <div class="container">
     <h2 id="pageTitle">Preenchimento do Orçamento Anual ou Proposta Orçamentária</h2>
-    <h5 id="termoSub" class="text-muted">{{ numero_termo }} &nbsp; <small class="text-muted">Previsto: {{ total_previsto if total_previsto is defined else 'R$ 0,00' }}</small></h5>
+    <h5 id="termoSub" class="text-muted">
+      {{ numero_termo }} 
+      {% if sei_celeb %}
+        &nbsp;|&nbsp;<span class="badge bg-info text-dark">SEI: {{ sei_celeb }}</span>
+      {% endif %}
+      &nbsp;<small class="text-muted">Previsto: {{ total_previsto if total_previsto is defined else 'R$ 0,00' }}</small>
+    </h5>
     
     <!-- Dropdown Aditivo -->
     <div class="mt-2 mb-3">
@@ -81,6 +87,7 @@
             <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 1"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
             <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 2"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
             <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 3"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
+            <th class="month-th"><div class="d-flex gap-1"><input class="form-control form-control-sm month-name" value="Mês 4"><button type="button" class="btn btn-sm btn-outline-danger remove-month">✕</button></div><span class="col-resizer"></span></th>
             <th class="col-total-linha">Total</th>
             <th>Ação</th>
           </tr>
@@ -109,6 +116,7 @@
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
+            <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="col-total-linha text-end total-linha">0,00</td>
             <td><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>
           </tr>
@@ -121,7 +129,9 @@
             <td class="col-total month-td">0,00</td>
             <td class="col-total month-td">0,00</td>
             <td class="col-total month-td">0,00</td>
+            <td class="col-total month-td">0,00</td>
             <td><strong id="grandTotal">0,00</strong></td>
+            <td></td>
           </tr>
         </tfoot>
       </table>
@@ -141,6 +151,18 @@
             <span class="visually-hidden">Salvando...</span>
           </span>
         </button>
+      </div>
+      
+      <!-- Barra de progresso do salvamento -->
+      <div id="progressContainer" class="mt-3 d-none">
+        <div class="progress" style="height: 25px;">
+          <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+               role="progressbar" style="width: 0%;" 
+               aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            <span id="progressText">0%</span>
+          </div>
+        </div>
+        <small id="progressStatus" class="text-muted d-block mt-1">Preparando dados...</small>
       </div>
     </div>
   </div>
@@ -196,11 +218,18 @@
     document.getElementById('addMonthsBtn').addEventListener('click', function(){
       const n = parseInt(document.getElementById('numCols').value,10) || 0; if (n<=0) return;
       const thead = document.querySelector('#tabelaOrc2 thead tr'); const currentMonths = thead.querySelectorAll('.month-th').length;
-      for (let k=0;k<n;k++){ const idx = currentMonths + k + 1; const th = makeMonthHeader('Mês ' + idx); thead.insertBefore(th, thead.lastElementChild); }
-  // inserir inputs em cada linha
-  document.querySelectorAll('#bodyOrc2 tr').forEach(tr => { for (let k=0;k<n;k++){ const td = document.createElement('td'); td.className = 'month-td'; td.innerHTML = `<input type="text" class="form-control form-control-sm valor" placeholder="0,00">`; tr.insertBefore(td, tr.lastElementChild); }});
-      // adicionar tfoot colunas
-      const tfootRow = document.querySelector('#tabelaOrc2 tfoot tr'); for (let k=0;k<n;k++){ const td = document.createElement('td'); td.className='col-total'; td.textContent='0,00'; tfootRow.insertBefore(td, tfootRow.lastElementChild); }
+      // Inserir antes da coluna Total (penúltima posição, pois última é Ação)
+      const totalTh = thead.querySelector('.col-total-linha');
+      for (let k=0;k<n;k++){ const idx = currentMonths + k + 1; const th = makeMonthHeader('Mês ' + idx); thead.insertBefore(th, totalTh); }
+  // inserir inputs em cada linha (antes da coluna Total)
+  document.querySelectorAll('#bodyOrc2 tr').forEach(tr => { 
+    const totalTd = tr.querySelector('.col-total-linha');
+    for (let k=0;k<n;k++){ const td = document.createElement('td'); td.className = 'month-td'; td.innerHTML = `<input type="text" class="form-control form-control-sm valor" placeholder="0,00">`; tr.insertBefore(td, totalTd); }
+  });
+      // adicionar tfoot colunas (antes da coluna do grandTotal)
+      const tfootRow = document.querySelector('#tabelaOrc2 tfoot tr'); 
+      const grandTotalTd = document.getElementById('grandTotal').parentElement;
+      for (let k=0;k<n;k++){ const td = document.createElement('td'); td.className='col-total month-td'; td.textContent='0,00'; tfootRow.insertBefore(td, grandTotalTd); }
     });
 
     // ligar os botões de remoção já existentes no HTML inicial
@@ -401,6 +430,7 @@
         <td><input type="text" class="form-control form-control-sm quantidade" value="1"></td>
         <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I" list="categoriasDisponiveis"></td>`;
   for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
+      cols += `<td class="col-total-linha text-end total-linha">0,00</td>`;
       cols += `<td><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
       tr.innerHTML = cols; tbody.appendChild(tr); recalcTotals();
     });
@@ -410,6 +440,30 @@
 
     // salvar: coleta a tabela, normaliza valores e envia para o backend
     document.getElementById('salvarOrc2').addEventListener('click', function(){
+      // Mostrar spinner, desabilitar botão e mostrar barra de progresso
+      const btnSalvar = document.getElementById('salvarOrc2');
+      const salvarText = document.getElementById('salvarText');
+      const salvarSpinner = document.getElementById('salvarSpinner');
+      const progressContainer = document.getElementById('progressContainer');
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      const progressStatus = document.getElementById('progressStatus');
+      
+      salvarText.classList.add('d-none');
+      salvarSpinner.classList.remove('d-none');
+      btnSalvar.disabled = true;
+      progressContainer.classList.remove('d-none');
+      
+      // Função para atualizar progresso
+      function updateProgress(percent, status) {
+        progressBar.style.width = percent + '%';
+        progressBar.setAttribute('aria-valuenow', percent);
+        progressText.textContent = Math.round(percent) + '%';
+        progressStatus.textContent = status;
+      }
+      
+      updateProgress(10, 'Coletando dados da tabela...');
+      
       const numeroTermo = '{{ numero_termo|e }}';
       const monthNames = Array.from(document.querySelectorAll('.month-name')).map(n => n.value || 'Mês');
       const rows = document.querySelectorAll('#bodyOrc2 tr');
@@ -440,11 +494,24 @@
         });
         if (Object.keys(valores_por_mes).length > 0) despesas.push({rubrica, quantidade, categoria_despesa: categoria, valores_por_mes});
       });
-      if (despesas.length === 0) { alert('Preencha pelo menos uma despesa com valores'); return; }
+      
+      updateProgress(30, 'Validando dados...');
+      
+      if (despesas.length === 0) { 
+        // Restaurar botão e ocultar progresso
+        salvarText.classList.remove('d-none');
+        salvarSpinner.classList.add('d-none');
+        btnSalvar.disabled = false;
+        progressContainer.classList.add('d-none');
+        alert('Preencha pelo menos uma despesa com valores'); 
+        return; 
+      }
 
       // obter aditivo selecionado
       const aditivoSelecionado = parseInt(document.getElementById('aditivoSelect').value) || 0;
 
+      updateProgress(50, `Enviando ${despesas.length} despesas para o servidor...`);
+      
       // enviar para /api/despesa
       fetch('/api/despesa', {
         method: 'POST',
@@ -453,23 +520,60 @@
       })
       .then(r => r.json())
       .then(data => {
+        updateProgress(80, 'Processando resposta do servidor...');
+        
         if (data.warning){
+          // Restaurar botão e ocultar progresso para permitir confirmação
+          salvarText.classList.remove('d-none');
+          salvarSpinner.classList.add('d-none');
+          btnSalvar.disabled = false;
+          progressContainer.classList.add('d-none');
+          
           if (confirm(data.message + '\nDeseja prosseguir e salvar mesmo assim?')){
+            // Mostrar spinner e progresso novamente
+            salvarText.classList.add('d-none');
+            salvarSpinner.classList.remove('d-none');
+            btnSalvar.disabled = true;
+            progressContainer.classList.remove('d-none');
+            updateProgress(60, 'Confirmando salvamento...');
+            
             // forçar com confirmar
             fetch('/api/despesa/confirmar',{
               method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({numero_termo: numeroTermo, despesas, month_names: monthNames, aditivo: aditivoSelecionado})
             }).then(r=>r.json()).then(d=>{
-              if (d.message) alert(d.message);
-              else if (d.error) alert('Erro: ' + d.error);
-              location.href = '/orcamento';
-            }).catch(e=>{ alert('Erro ao confirmar. Veja console.'); console.error(e); });
+              updateProgress(100, 'Salvamento concluído!');
+              setTimeout(() => {
+                if (d.message) alert(d.message);
+                else if (d.error) alert('Erro: ' + d.error);
+                location.href = '/orcamento';
+              }, 500);
+            }).catch(e=>{ 
+              // Restaurar botão e ocultar progresso em caso de erro
+              salvarText.classList.remove('d-none');
+              salvarSpinner.classList.add('d-none');
+              btnSalvar.disabled = false;
+              progressContainer.classList.add('d-none');
+              alert('Erro ao confirmar. Veja console.'); 
+              console.error(e); 
+            });
           }
         } else {
-          if (data.message) alert(data.message);
-          else if (data.error) alert('Erro: ' + data.error);
-          location.href = '/orcamento';
+          updateProgress(100, 'Salvamento concluído com sucesso!');
+          setTimeout(() => {
+            if (data.message) alert(data.message);
+            else if (data.error) alert('Erro: ' + data.error);
+            location.href = '/orcamento';
+          }, 500);
         }
-      }).catch(e=>{ alert('Erro ao salvar. Veja console.'); console.error(e); });
+      }).catch(e=>{ 
+        // Restaurar botão e ocultar progresso em caso de erro
+        salvarText.classList.remove('d-none');
+        salvarSpinner.classList.add('d-none');
+        btnSalvar.disabled = false;
+        progressContainer.classList.add('d-none');
+        alert('Erro ao salvar. Veja console.'); 
+        console.error(e); 
+      });
     });
 
     // recalcular totais por coluna, total geral E total por linha
@@ -503,7 +607,10 @@
 
     // --- NAVEGAÇÃO COM ENTER ---
     document.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('valor')){
+      if (e.key === 'Enter' && e.target.classList && 
+          (e.target.classList.contains('valor') || 
+           e.target.classList.contains('quantidade') || 
+           e.target.classList.contains('categoria'))){
         e.preventDefault();
         const currentTr = e.target.closest('tr');
         const currentTd = e.target.closest('td');
@@ -515,7 +622,16 @@
         if (nextTr && nextTr.tagName === 'TR'){
           const nextTds = nextTr.querySelectorAll('td');
           if (nextTds[tdIndex]){
-            const nextInput = nextTds[tdIndex].querySelector('input.valor');
+            // Tentar encontrar input do mesmo tipo
+            let nextInput = null;
+            if (e.target.classList.contains('valor')) {
+              nextInput = nextTds[tdIndex].querySelector('input.valor');
+            } else if (e.target.classList.contains('quantidade')) {
+              nextInput = nextTds[tdIndex].querySelector('input.quantidade');
+            } else if (e.target.classList.contains('categoria')) {
+              nextInput = nextTds[tdIndex].querySelector('input.categoria');
+            }
+            
             if (nextInput) {
               nextInput.focus();
               nextInput.select();
@@ -543,23 +659,28 @@
       const tbody = document.getElementById('bodyOrc2');
       const hasData = Array.from(tbody.querySelectorAll('input.valor')).some(inp => inp.value.trim() !== '');
       
-      if (hasData){
-        if (!confirm('Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita.')){
+      if (hasData) {
+        if (!confirm('⚠️ Tem certeza que deseja limpar todos os campos do formulário?\n\nIsso apenas resetará a interface, os dados salvos no banco de dados NÃO serão afetados.')) {
           return;
         }
       }
       
-      // Limpar todos os inputs
+      // Limpar todos os campos da interface
       tbody.querySelectorAll('input, select').forEach(el => {
         if (el.classList.contains('quantidade')) {
           el.value = '1';
+        } else if (el.tagName === 'SELECT') {
+          el.selectedIndex = 0;
         } else {
           el.value = '';
         }
       });
       
+      // Recalcular totais (que ficarão zerados)
       recalcTotals();
-      alert('Dados limpos com sucesso!');
+      
+      // Mensagem de confirmação
+      alert('✅ Formulário limpo com sucesso!\n\nPara ver os dados salvos novamente, recarregue a página.');
     });
 
     // carregar dados existentes do termo ao inicializar

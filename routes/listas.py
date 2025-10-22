@@ -3,7 +3,7 @@ Blueprint de gerenciamento de listas/tabelas categóricas
 """
 
 from flask import Blueprint, render_template, request, jsonify
-from db import get_cursor, execute_dual
+from db import get_cursor, execute_query
 from utils import login_required
 
 listas_bp = Blueprint('listas', __name__, url_prefix='/listas')
@@ -84,6 +84,14 @@ def obter_dados(tabela):
         dados = cur.fetchall()
         cur.close()
         
+        # DEBUG: Verificar duplicação
+        print(f"[DEBUG] Tabela {tabela}: {len(dados)} registros retornados")
+        ids = [row['id'] for row in dados]
+        print(f"[DEBUG] IDs únicos: {len(set(ids))}")
+        if len(ids) != len(set(ids)):
+            print(f"[ALERTA] DUPLICAÇÃO DETECTADA em {tabela}!")
+            print(f"[DEBUG] IDs duplicados: {[i for i in ids if ids.count(i) > 1]}")
+        
         # Converter para lista de dicionários
         resultado = []
         for row in dados:
@@ -130,13 +138,13 @@ def criar_registro(tabela):
             VALUES ({placeholders})
         """
         
-        if execute_dual(query, valores):
+        if execute_query(query, valores):
             return jsonify({
                 'sucesso': True,
                 'mensagem': 'Registro criado com sucesso'
             })
         else:
-            return jsonify({'erro': 'Falha ao criar registro em ambos os bancos'}), 500
+            return jsonify({'erro': 'Falha ao criar registro no banco'}), 500
         
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
@@ -168,13 +176,13 @@ def atualizar_registro(tabela, id):
             WHERE id = %s
         """
         
-        if execute_dual(query, valores):
+        if execute_query(query, valores):
             return jsonify({
                 'sucesso': True,
                 'mensagem': 'Registro atualizado com sucesso'
             })
         else:
-            return jsonify({'erro': 'Falha ao atualizar registro em ambos os bancos'}), 500
+            return jsonify({'erro': 'Falha ao atualizar registro no banco'}), 500
         
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
@@ -198,13 +206,13 @@ def excluir_registro(tabela, id):
             WHERE id = %s
         """
         
-        if execute_dual(query, (id,)):
+        if execute_query(query, (id,)):
             return jsonify({
                 'sucesso': True,
                 'mensagem': 'Registro excluído com sucesso'
             })
         else:
-            return jsonify({'erro': 'Falha ao excluir registro em ambos os bancos'}), 500
+            return jsonify({'erro': 'Falha ao excluir registro no banco'}), 500
         
     except Exception as e:
         return jsonify({'erro': str(e)}), 500

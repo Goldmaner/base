@@ -3,7 +3,7 @@ Blueprint de parcerias (listagem e formulário)
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
-from db import get_cursor, get_db, execute_dual
+from db import get_cursor, get_db, execute_query
 from utils import login_required
 import csv
 from io import StringIO, BytesIO
@@ -46,8 +46,16 @@ def listar():
     cur = get_cursor()
     
     # Buscar tipos de contrato para o dropdown de filtro
-    cur.execute("SELECT informacao FROM c_tipo_contrato ORDER BY informacao")
-    tipos_contrato = [row['informacao'] for row in cur.fetchall()]
+    cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
+    tipos_contrato_raw = cur.fetchall()
+    tipos_contrato = [row['informacao'] for row in tipos_contrato_raw]
+    
+    # DEBUG: Verificar duplicação
+    print(f"[DEBUG] Total de tipos_contrato retornados: {len(tipos_contrato)}")
+    print(f"[DEBUG] Tipos únicos: {len(set(tipos_contrato))}")
+    if len(tipos_contrato) != len(set(tipos_contrato)):
+        print(f"[ALERTA] DUPLICAÇÃO DETECTADA em c_tipo_contrato!")
+        print(f"[DEBUG] Tipos com duplicação: {[t for t in tipos_contrato if tipos_contrato.count(t) > 1]}")
     
     # Construir query dinamicamente com filtros
     query = """
@@ -104,6 +112,15 @@ def listar():
     parcerias = cur.fetchall()
     cur.close()
     
+    # DEBUG: Verificar duplicação de parcerias
+    print(f"[DEBUG] Total de parcerias retornadas: {len(parcerias)}")
+    termos = [p['numero_termo'] for p in parcerias]
+    print(f"[DEBUG] Termos únicos: {len(set(termos))}")
+    if len(termos) != len(set(termos)):
+        print(f"[ALERTA] DUPLICAÇÃO DETECTADA em Parcerias!")
+        duplicados = [t for t in termos if termos.count(t) > 1]
+        print(f"[DEBUG] Termos duplicados: {set(duplicados)}")
+    
     return render_template("parcerias.html", 
                          parcerias=parcerias,
                          tipos_contrato=tipos_contrato,
@@ -157,11 +174,11 @@ def nova():
                 1 if request.form.get('contrapartida') == 'on' else 0
             )
             
-            if execute_dual(query, params):
+            if execute_query(query, params):
                 flash("Parceria criada com sucesso!", "success")
                 return redirect(url_for('parcerias.nova'))
             else:
-                flash("Erro ao criar parceria em ambos os bancos de dados!", "danger")
+                flash("Erro ao criar parceria no banco de dados!", "danger")
             
         except Exception as e:
             flash(f"Erro ao criar parceria: {str(e)}", "danger")
@@ -235,11 +252,11 @@ def editar(numero_termo):
                 numero_termo
             )
             
-            if execute_dual(query, params):
+            if execute_query(query, params):
                 flash("Parceria atualizada com sucesso!", "success")
                 return redirect(url_for('parcerias.listar'))
             else:
-                flash("Erro ao atualizar parceria em ambos os bancos de dados!", "danger")
+                flash("Erro ao atualizar parceria no banco de dados!", "danger")
             
         except Exception as e:
             flash(f"Erro ao atualizar parceria: {str(e)}", "danger")

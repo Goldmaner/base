@@ -154,14 +154,17 @@ def editar(numero_termo):
     """
     cur = get_cursor()
     
-    # Buscar total_previsto para exibir no subtítulo
-    cur.execute("SELECT total_previsto FROM Parcerias WHERE numero_termo = %s", (numero_termo,))
+    # Buscar total_previsto e sei_celeb para exibir no subtítulo
+    cur.execute("SELECT total_previsto, sei_celeb FROM Parcerias WHERE numero_termo = %s", (numero_termo,))
     row = cur.fetchone()
     
     try:
         total_previsto_val = float(row['total_previsto']) if row and row['total_previsto'] is not None else 0.0
     except Exception:
         total_previsto_val = 0.0
+    
+    # Obter SEI de celebração
+    sei_celeb = row['sei_celeb'] if row and row.get('sei_celeb') else None
     
     # formatar em pt-BR: R$ 1.234.567,89
     formatted_total = 'R$ ' + f"{total_previsto_val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -186,6 +189,7 @@ def editar(numero_termo):
                          numero_termo=numero_termo, 
                          total_previsto=formatted_total, 
                          total_previsto_val=total_previsto_val,
+                         sei_celeb=sei_celeb,
                          aditivos=aditivos)
 
 
@@ -262,7 +266,7 @@ def atualizar_categoria():
     Atualiza em massa uma categoria de despesa no banco de dados
     """
     from flask import request, jsonify
-    from db import execute_dual
+    from db import execute_query
     
     try:
         data = request.get_json()
@@ -275,14 +279,14 @@ def atualizar_categoria():
         if not categoria_nova or categoria_nova.strip() == '':
             return jsonify({"error": "Categoria nova não pode estar vazia"}), 400
         
-        # Atualizar todas as ocorrências da categoria antiga para a nova em ambos os bancos
+        # Atualizar todas as ocorrências da categoria antiga para a nova
         query = """
             UPDATE Parcerias_Despesas
             SET categoria_despesa = %s
             WHERE categoria_despesa = %s
         """
         
-        if execute_dual(query, (categoria_nova.strip(), categoria_antiga)):
+        if execute_query(query, (categoria_nova.strip(), categoria_antiga)):
             return jsonify({
                 "message": f"Categoria atualizada com sucesso!",
                 "categoria_antiga": categoria_antiga,

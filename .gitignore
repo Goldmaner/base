@@ -12,6 +12,8 @@ venv/
 .env
 .env_teste
 .env.*
+# Mas permitir .env.example (template sem credenciais)
+!.env.example
 
 # SQLite DB e arquivos de journal
 meu_banco.db
