@@ -32,7 +32,7 @@ else:
 
 # Verificar dados atuais
 print("\n=== Dados atuais da tabela ===")
-cur.execute("SELECT * FROM c_tipo_contrato ORDER BY id")
+cur.execute("SELECT * FROM categoricas.c_tipo_contrato ORDER BY id")
 rows = cur.fetchall()
 for row in rows:
     print(f"ID: {row['id']}, Informação: {row['informacao']}, Sigla: {row.get('sigla', 'N/A')}")
@@ -50,7 +50,7 @@ mapeamento = {
 
 for informacao, sigla in mapeamento.items():
     cur.execute("""
-        UPDATE c_tipo_contrato 
+        UPDATE categoricas.c_tipo_contrato 
         SET sigla = %s 
         WHERE informacao = %s
     """, (sigla, informacao))
@@ -63,7 +63,7 @@ conn.commit()
 
 # Verificar resultado final
 print("\n=== Dados finais da tabela ===")
-cur.execute("SELECT * FROM c_tipo_contrato ORDER BY sigla")
+cur.execute("SELECT * FROM categoricas.c_tipo_contrato ORDER BY sigla")
 rows = cur.fetchall()
 for row in rows:
     print(f"Sigla: {row.get('sigla', 'N/A'):5s} -> {row['informacao']}")

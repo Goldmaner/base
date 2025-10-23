@@ -38,9 +38,14 @@
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <h5 class="mb-0" id="tituloTabela"></h5>
-          <button class="btn btn-success" onclick="abrirModalCriar()">
-            <i class="bi bi-plus-circle"></i> Adicionar
-          </button>
+          <div>
+            <button class="btn btn-warning me-2" onclick="limparFiltros()" id="btnLimparFiltros" style="display: none;">
+              <i class="bi bi-x-circle"></i> Limpar Filtros
+            </button>
+            <button class="btn btn-success" onclick="abrirModalCriar()">
+              <i class="bi bi-plus-circle"></i> Adicionar
+            </button>
+          </div>
         </div>
         <div class="card-body">
           <div class="table-responsive">
@@ -49,6 +54,7 @@
                 <tr id="cabecalhoTabela"></tr>
               </thead>
               <tbody id="corpoTabela"></tbody>
+              <tfoot id="rodapeTabela" class="table-secondary"></tfoot>
             </table>
           </div>
         </div>
@@ -116,11 +122,44 @@
         const cabecalho = document.getElementById('cabecalhoTabela');
         cabecalho.innerHTML = '';
         
-        // Adicionar colunas
+        // Adicionar colunas editáveis
         for (const col of configAtual.colunas_editaveis) {
           const th = document.createElement('th');
           th.textContent = configAtual.labels[col];
+          
+          // Adicionar filtro se a coluna estiver na lista de filtros
+          if (configAtual.colunas_filtro && configAtual.colunas_filtro.includes(col)) {
+            const filterIcon = document.createElement('i');
+            filterIcon.className = 'bi bi-funnel ms-2';
+            filterIcon.style.cursor = 'pointer';
+            filterIcon.onclick = () => filtrarColuna(col);
+            th.appendChild(filterIcon);
+          }
+          
           cabecalho.appendChild(th);
+        }
+        
+        // Adicionar colunas calculadas (não editáveis)
+        if (configAtual.colunas_calculadas) {
+          for (const col of configAtual.colunas_calculadas) {
+            const th = document.createElement('th');
+            th.textContent = configAtual.labels[col];
+            
+            // Adicionar ícones de ordenação para total_pareceres
+            if (col === 'total_pareceres') {
+              th.style.cursor = 'pointer';
+              th.setAttribute('data-ordem', 'desc'); // Ordem inicial: descendente
+              
+              const sortIcon = document.createElement('i');
+              sortIcon.className = 'bi bi-sort-down ms-2';
+              sortIcon.id = 'iconOrdem';
+              th.appendChild(sortIcon);
+              
+              th.onclick = () => ordenarPorPareceres();
+            }
+            
+            cabecalho.appendChild(th);
+          }
         }
         
         // Coluna de ações
@@ -136,11 +175,25 @@
         for (const registro of dados) {
           const tr = document.createElement('tr');
           
-          // Adicionar dados
+          // Adicionar dados editáveis
           for (const col of configAtual.colunas_editaveis) {
             const td = document.createElement('td');
             td.textContent = registro[col] || '-';
+            td.setAttribute('data-col', col);
             tr.appendChild(td);
+          }
+          
+          // Adicionar dados calculados (não editáveis)
+          if (configAtual.colunas_calculadas) {
+            for (const col of configAtual.colunas_calculadas) {
+              const td = document.createElement('td');
+              td.textContent = registro[col] !== undefined ? registro[col] : '-';
+              td.setAttribute('data-col', col);
+              // Destaque visual para colunas calculadas
+              td.style.backgroundColor = '#f8f9fa';
+              td.style.fontWeight = 'bold';
+              tr.appendChild(td);
+            }
           }
 
           // Adicionar ações
@@ -157,6 +210,9 @@
 
           corpo.appendChild(tr);
         }
+        
+        // Adicionar rodapé com soma (se for pessoa_gestora)
+        atualizarRodape();
 
         // Mostrar área de conteúdo
         document.getElementById('areaConteudo').style.display = 'block';
@@ -184,16 +240,72 @@
         label.textContent = configAtual.labels[col];
         
         let input;
-        if (col === 'descricao') {
+        
+        // Verificar se é um campo select_dinamico (lista de sugestões)
+        if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'select_dinamico') {
+          // Criar input com datalist para sugestões (permite digitação livre)
+          input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control';
+          input.setAttribute('list', `datalist_${col}`);
+          
+          // Criar datalist com as opções
+          const datalist = document.createElement('datalist');
+          datalist.id = `datalist_${col}`;
+          
+          const opcoes = configAtual.tipos_campo[`opcoes_${col}`] || [];
+          for (const opcao of opcoes) {
+            const opt = document.createElement('option');
+            opt.value = opcao;
+            datalist.appendChild(opt);
+          }
+          
+          div.appendChild(label);
+          div.appendChild(input);
+          div.appendChild(datalist);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'select') {
+          // Select tradicional (dropdown restritivo)
+          input = document.createElement('select');
+          input.className = 'form-select';
+          
+          // Adicionar opção vazia
+          const opcaoVazia = document.createElement('option');
+          opcaoVazia.value = '';
+          opcaoVazia.textContent = '-- Selecione --';
+          input.appendChild(opcaoVazia);
+          
+          // Adicionar opções do dropdown
+          const opcoes = configAtual.tipos_campo[`opcoes_${col}`] || [];
+          for (const opcao of opcoes) {
+            const opt = document.createElement('option');
+            opt.value = opcao;
+            opt.textContent = opcao;
+            input.appendChild(opt);
+          }
+          
+          div.appendChild(label);
+          div.appendChild(input);
+        } else if (col === 'descricao') {
           input = document.createElement('textarea');
           input.rows = 3;
+          input.className = 'form-control';
+          
+          div.appendChild(label);
+          div.appendChild(input);
         } else {
           input = document.createElement('input');
           input.type = 'text';
+          input.className = 'form-control';
+          
+          div.appendChild(label);
+          div.appendChild(input);
         }
-        input.className = 'form-control';
+        
         input.id = `campo_${col}`;
-        input.required = true;
+        // E-mail, número RF e setor não são obrigatórios
+        if (col !== 'email_pg' && col !== 'numero_rf' && col !== 'setor') {
+          input.required = true;
+        }
         
         div.appendChild(label);
         div.appendChild(input);
@@ -220,20 +332,78 @@
         label.textContent = configAtual.labels[col];
         
         let input;
-        if (col === 'descricao') {
+        
+        // Verificar se é um campo select_dinamico (lista de sugestões)
+        if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'select_dinamico') {
+          // Criar input com datalist para sugestões (permite digitação livre)
+          input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control';
+          input.setAttribute('list', `datalist_${col}`);
+          input.value = registro[col] || '';
+          
+          // Criar datalist com as opções
+          const datalist = document.createElement('datalist');
+          datalist.id = `datalist_${col}`;
+          
+          const opcoes = configAtual.tipos_campo[`opcoes_${col}`] || [];
+          for (const opcao of opcoes) {
+            const opt = document.createElement('option');
+            opt.value = opcao;
+            datalist.appendChild(opt);
+          }
+          
+          div.appendChild(label);
+          div.appendChild(input);
+          div.appendChild(datalist);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'select') {
+          // Select tradicional (dropdown restritivo)
+          input = document.createElement('select');
+          input.className = 'form-select';
+          
+          // Adicionar opção vazia
+          const opcaoVazia = document.createElement('option');
+          opcaoVazia.value = '';
+          opcaoVazia.textContent = '-- Selecione --';
+          input.appendChild(opcaoVazia);
+          
+          // Adicionar opções do dropdown
+          const opcoes = configAtual.tipos_campo[`opcoes_${col}`] || [];
+          for (const opcao of opcoes) {
+            const opt = document.createElement('option');
+            opt.value = opcao;
+            opt.textContent = opcao;
+            input.appendChild(opt);
+          }
+          
+          input.value = registro[col] || '';
+          
+          div.appendChild(label);
+          div.appendChild(input);
+        } else if (col === 'descricao') {
           input = document.createElement('textarea');
           input.rows = 3;
+          input.className = 'form-control';
+          input.value = registro[col] || '';
+          
+          div.appendChild(label);
+          div.appendChild(input);
         } else {
           input = document.createElement('input');
           input.type = 'text';
+          input.className = 'form-control';
+          input.value = registro[col] || '';
+          
+          div.appendChild(label);
+          div.appendChild(input);
         }
-        input.className = 'form-control';
-        input.id = `campo_${col}`;
-        input.value = registro[col] || '';
-        input.required = true;
         
-        div.appendChild(label);
-        div.appendChild(input);
+        input.id = `campo_${col}`;
+        // E-mail, número RF e setor não são obrigatórios
+        if (col !== 'email_pg' && col !== 'numero_rf' && col !== 'setor') {
+          input.required = true;
+        }
+        
         camposDiv.appendChild(div);
       }
 
@@ -245,11 +415,33 @@
       const dados = {};
       for (const col of configAtual.colunas_editaveis) {
         const input = document.getElementById(`campo_${col}`);
-        if (!input.value.trim()) {
+        // E-mail, número RF e setor não são obrigatórios
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor'];
+        if (!input.value.trim() && !camposOpcionais.includes(col)) {
           alert(`O campo ${configAtual.labels[col]} é obrigatório`);
           return;
         }
         dados[col] = input.value.trim();
+      }
+      
+      // Validação especial: RF não pode ser duplicado (exceto se vazio)
+      if (tabelaAtual === 'c_pessoa_gestora' && dados.numero_rf && dados.numero_rf !== '') {
+        // Buscar todos os dados atuais
+        const response = await fetch(`/listas/api/dados/${tabelaAtual}`);
+        const data = await response.json();
+        
+        for (const registro of data.dados) {
+          // Ignorar o próprio registro quando estiver editando
+          if (registroEditando && registro.id === registroEditando.id) {
+            continue;
+          }
+          
+          // Verificar duplicação
+          if (registro.numero_rf && registro.numero_rf === dados.numero_rf) {
+            alert(`O R.F. "${dados.numero_rf}" já está cadastrado para "${registro.nome_pg}". Por favor, use um R.F. diferente.`);
+            return;
+          }
+        }
       }
 
       try {
@@ -316,6 +508,225 @@
         console.error('Erro ao excluir:', error);
         alert('Erro ao excluir registro');
       }
+    }
+
+    function filtrarColuna(coluna) {
+      // Se for coluna de status, mostrar opções específicas
+      if (coluna === 'status_pg') {
+        const opcoes = configAtual.tipos_campo.opcoes_status_pg || ['Ativo', 'Inativo', 'Desconhecido'];
+        let opcoesHtml = '<option value="">Todos</option>';
+        
+        for (const opcao of opcoes) {
+          opcoesHtml += `<option value="${opcao}">${opcao}</option>`;
+        }
+        
+        const filtro = prompt(`Escolha o status:\n\nDigite:\n- "Ativo" para Ativos\n- "Inativo" para Inativos\n- "Desconhecido" para Desconhecidos\n- Deixe vazio para mostrar todos`);
+        
+        if (filtro === null) return; // Cancelou
+        
+        aplicarFiltro(coluna, filtro, true); // true = filtro exato
+      } else {
+        // Para outras colunas, filtro por texto parcial
+        const filtro = prompt(`Filtrar por ${configAtual.labels[coluna]}:\n(Deixe vazio para mostrar todos)`);
+        if (filtro === null) return; // Cancelou
+        
+        aplicarFiltro(coluna, filtro, false); // false = filtro parcial
+      }
+    }
+    
+    function aplicarFiltro(coluna, filtro, exato = false) {
+      const tbody = document.getElementById('corpoTabela');
+      const linhas = tbody.getElementsByTagName('tr');
+      
+      for (let linha of linhas) {
+        const celulas = linha.getElementsByTagName('td');
+        let encontrou = false;
+        
+        for (let celula of celulas) {
+          if (celula.getAttribute('data-col') === coluna) {
+            const texto = celula.textContent.trim();
+            const filtroTrim = filtro.trim();
+            
+            if (filtroTrim === '') {
+              encontrou = true;
+            } else if (exato) {
+              // Filtro exato (case-insensitive)
+              encontrou = texto.toLowerCase() === filtroTrim.toLowerCase();
+            } else {
+              // Filtro parcial (case-insensitive)
+              encontrou = texto.toLowerCase().includes(filtroTrim.toLowerCase());
+            }
+            break;
+          }
+        }
+        
+        linha.style.display = encontrou ? '' : 'none';
+      }
+      
+      // Mostrar botão de limpar filtros
+      document.getElementById('btnLimparFiltros').style.display = 'inline-block';
+      
+      // Atualizar soma do rodapé
+      atualizarRodape();
+    }
+    
+    function limparFiltros() {
+      const tbody = document.getElementById('corpoTabela');
+      const linhas = tbody.getElementsByTagName('tr');
+      
+      for (let linha of linhas) {
+        linha.style.display = '';
+      }
+      
+      // Esconder botão de limpar filtros
+      document.getElementById('btnLimparFiltros').style.display = 'none';
+      
+      // Atualizar soma do rodapé
+      atualizarRodape();
+    }
+    
+    function atualizarRodape() {
+      const rodape = document.getElementById('rodapeTabela');
+      rodape.innerHTML = '';
+      
+      // Só mostrar rodapé se for pessoa_gestora e tiver coluna de pareceres
+      if (tabelaAtual !== 'c_pessoa_gestora' || !configAtual.colunas_calculadas || !configAtual.colunas_calculadas.includes('total_pareceres')) {
+        return;
+      }
+      
+      const tr = document.createElement('tr');
+      
+      // Contar gestores visíveis
+      const tbody = document.getElementById('corpoTabela');
+      const linhas = tbody.getElementsByTagName('tr');
+      let totalGestores = 0;
+      
+      for (let linha of linhas) {
+        if (linha.style.display !== 'none') {
+          totalGestores++;
+        }
+      }
+      
+      // Preencher células vazias até a coluna de nome_pg
+      const totalColunas = configAtual.colunas_editaveis.length;
+      const indiceNome = configAtual.colunas_editaveis.indexOf('nome_pg');
+      
+      for (let i = 0; i < indiceNome; i++) {
+        const td = document.createElement('td');
+        tr.appendChild(td);
+      }
+      
+      // Célula com contagem de gestores (na coluna nome_pg)
+      const tdContagem = document.createElement('td');
+      tdContagem.textContent = `Total: ${totalGestores} gestor${totalGestores !== 1 ? 'es' : ''}`;
+      tdContagem.style.fontWeight = 'bold';
+      tdContagem.style.fontStyle = 'italic';
+      tdContagem.style.color = '#0d6efd';
+      tr.appendChild(tdContagem);
+      
+      // Preencher células vazias entre nome_pg e total_pareceres
+      for (let i = indiceNome + 1; i < totalColunas - 1; i++) {
+        const td = document.createElement('td');
+        tr.appendChild(td);
+      }
+      
+      // Célula com label "TOTAL:"
+      const tdLabel = document.createElement('td');
+      tdLabel.textContent = 'TOTAL:';
+      tdLabel.style.fontWeight = 'bold';
+      tdLabel.style.textAlign = 'right';
+      tr.appendChild(tdLabel);
+      
+      // Célula com a soma
+      const tdSoma = document.createElement('td');
+      let soma = 0;
+      
+      // Somar apenas linhas visíveis
+      for (let linha of linhas) {
+        if (linha.style.display !== 'none') {
+          const celulas = linha.getElementsByTagName('td');
+          for (let celula of celulas) {
+            if (celula.getAttribute('data-col') === 'total_pareceres') {
+              const valor = parseInt(celula.textContent) || 0;
+              soma += valor;
+              break;
+            }
+          }
+        }
+      }
+      
+      tdSoma.textContent = soma;
+      tdSoma.style.fontWeight = 'bold';
+      tdSoma.style.fontSize = '1.1em';
+      tdSoma.style.backgroundColor = '#d4edda';
+      tr.appendChild(tdSoma);
+      
+      // Célula de ações (vazia)
+      const tdAcoes = document.createElement('td');
+      tr.appendChild(tdAcoes);
+      
+      rodape.appendChild(tr);
+    }
+    
+    function ordenarPorPareceres() {
+      const tbody = document.getElementById('corpoTabela');
+      const linhas = Array.from(tbody.getElementsByTagName('tr'));
+      
+      // Obter ordem atual do cabeçalho
+      const thPareceres = document.querySelector('th[data-ordem]');
+      const ordemAtual = thPareceres.getAttribute('data-ordem');
+      const novaOrdem = ordemAtual === 'desc' ? 'asc' : 'desc';
+      
+      // Filtrar apenas linhas visíveis para ordenar
+      const linhasVisiveis = linhas.filter(linha => linha.style.display !== 'none');
+      const linhasOcultas = linhas.filter(linha => linha.style.display === 'none');
+      
+      // Ordenar linhas visíveis
+      linhasVisiveis.sort((a, b) => {
+        let valorA = 0;
+        let valorB = 0;
+        
+        // Encontrar célula total_pareceres
+        const celulasA = a.getElementsByTagName('td');
+        const celulasB = b.getElementsByTagName('td');
+        
+        for (let celula of celulasA) {
+          if (celula.getAttribute('data-col') === 'total_pareceres') {
+            valorA = parseInt(celula.textContent) || 0;
+            break;
+          }
+        }
+        
+        for (let celula of celulasB) {
+          if (celula.getAttribute('data-col') === 'total_pareceres') {
+            valorB = parseInt(celula.textContent) || 0;
+            break;
+          }
+        }
+        
+        if (novaOrdem === 'desc') {
+          return valorB - valorA;
+        } else {
+          return valorA - valorB;
+        }
+      });
+      
+      // Limpar tbody e reinserir linhas ordenadas, seguidas pelas ocultas
+      tbody.innerHTML = '';
+      linhasVisiveis.forEach(linha => tbody.appendChild(linha));
+      linhasOcultas.forEach(linha => tbody.appendChild(linha));
+      
+      // Atualizar ícone e atributo de ordem
+      thPareceres.setAttribute('data-ordem', novaOrdem);
+      const icone = document.getElementById('iconOrdem');
+      if (novaOrdem === 'desc') {
+        icone.className = 'bi bi-sort-down ms-2';
+      } else {
+        icone.className = 'bi bi-sort-up ms-2';
+      }
+      
+      // Atualizar rodapé (não muda valores, mas garante consistência visual)
+      atualizarRodape();
     }
   </script>
 </body>

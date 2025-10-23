@@ -39,13 +39,13 @@ def gerenciar_portarias():
             termino = request.form.get('termino') or None
             
             # Verificar se já existe
-            cur.execute("SELECT lei FROM c_legislacao WHERE lei = %s", (lei,))
+            cur.execute("SELECT lei FROM categoricas.c_legislacao WHERE lei = %s", (lei,))
             existe = cur.fetchone()
             
             if existe:
                 # Atualizar
                 cur.execute("""
-                    UPDATE c_legislacao 
+                    UPDATE categoricas.c_legislacao 
                     SET inicio = %s, termino = %s
                     WHERE lei = %s
                 """, (inicio, termino, lei))
@@ -53,7 +53,7 @@ def gerenciar_portarias():
             else:
                 # Inserir
                 cur.execute("""
-                    INSERT INTO c_legislacao (lei, inicio, termino)
+                    INSERT INTO categoricas.c_legislacao (lei, inicio, termino)
                     VALUES (%s, %s, %s)
                 """, (lei, inicio, termino))
                 flash(f"Legislação '{lei}' criada com sucesso!", "success")
@@ -68,7 +68,7 @@ def gerenciar_portarias():
     # GET - Buscar todas as legislações
     cur.execute("""
         SELECT lei, inicio, termino
-        FROM c_legislacao 
+        FROM categoricas.c_legislacao 
         ORDER BY inicio DESC NULLS LAST, lei
     """)
     legislacoes = cur.fetchall()
@@ -110,7 +110,7 @@ def portaria_automatica():
             {
                 'lei': 'Portaria nº 006/2008/SF-SEMPLA',
                 'inicio': '2008-08-12',
-                'termino': '2012-03-21',
+                'termino': '2012-09-30',
                 'regra_termo': ['TCV'],
                 'regra_coordenacao': []
             },

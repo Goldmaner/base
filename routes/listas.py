@@ -21,9 +21,24 @@ TABELAS_CONFIG = {
     'c_pessoa_gestora': {
         'nome': 'Pessoas Gestoras',
         'schema': 'categoricas',
-        'colunas_editaveis': ['nome_pg', 'setor'],
-        'labels': {'nome_pg': 'Nome', 'setor': 'Setor'},
-        'ordem': 'nome_pg'
+        'colunas_editaveis': ['nome_pg', 'setor', 'numero_rf', 'status_pg', 'email_pg'],
+        'colunas_calculadas': ['total_pareceres'],
+        'labels': {
+            'nome_pg': 'Nome', 
+            'setor': 'Setor', 
+            'numero_rf': 'Número do R.F.', 
+            'status_pg': 'Status', 
+            'email_pg': 'E-mail',
+            'total_pareceres': 'Total de Pareceres'
+        },
+        'colunas_filtro': ['nome_pg', 'setor', 'numero_rf', 'status_pg'],
+        'ordem': 'nome_pg',
+        'tipos_campo': {
+            'setor': 'select_dinamico',
+            'query_setor': 'SELECT DISTINCT setor FROM categoricas.c_pessoa_gestora WHERE setor IS NOT NULL ORDER BY setor',
+            'status_pg': 'select',
+            'opcoes_status_pg': ['Ativo', 'Inativo', 'Desconhecido']
+        }
     },
     'c_responsabilidade_analise': {
         'nome': 'Responsabilidades de Análise',
@@ -100,9 +115,41 @@ def obter_dados(tabela):
                 item[col] = row[col]
             resultado.append(item)
         
+        # Se for pessoa_gestora, adicionar contagem de pareceres
+        if tabela == 'c_pessoa_gestora':
+            cur = get_cursor()
+            for item in resultado:
+                cur.execute("""
+                    SELECT COUNT(*) as total
+                    FROM parcerias_analises
+                    WHERE responsavel_pg = %s
+                """, (item['nome_pg'],))
+                contagem = cur.fetchone()
+                item['total_pareceres'] = contagem['total'] if contagem else 0
+            cur.close()
+        
+        # Buscar opções dinâmicas para selects
+        import copy
+        config_com_opcoes = copy.deepcopy(config)
+        if 'tipos_campo' in config_com_opcoes:
+            # Criar lista de itens antes de iterar para evitar modificação durante iteração
+            items_list = list(config_com_opcoes['tipos_campo'].items())
+            for campo, tipo in items_list:
+                if tipo == 'select_dinamico':
+                    query_key = f'query_{campo}'
+                    if query_key in config_com_opcoes['tipos_campo']:
+                        cur = get_cursor()
+                        cur.execute(config_com_opcoes['tipos_campo'][query_key])
+                        opcoes_raw = cur.fetchall()
+                        cur.close()
+                        
+                        # Extrair valores da primeira coluna
+                        opcoes = [list(row.values())[0] for row in opcoes_raw if list(row.values())[0]]
+                        config_com_opcoes['tipos_campo'][f'opcoes_{campo}'] = opcoes
+        
         return jsonify({
             'dados': resultado,
-            'config': config
+            'config': config_com_opcoes
         })
         
     except Exception as e:
@@ -164,6 +211,16 @@ def atualizar_registro(tabela, id):
         schema = config['schema']
         dados = request.json
         
+        # Se for pessoa_gestora e o nome mudou, precisamos atualizar Parcerias também
+        nome_antigo = None
+        if tabela == 'c_pessoa_gestora' and 'nome_pg' in dados:
+            cur = get_cursor()
+            cur.execute(f"SELECT nome_pg FROM {schema}.{tabela} WHERE id = %s", (id,))
+            resultado = cur.fetchone()
+            if resultado:
+                nome_antigo = resultado['nome_pg']
+            cur.close()
+        
         # Montar query de atualização apenas com campos editáveis
         colunas = config['colunas_editaveis']
         set_clause = ', '.join([f"{col} = %s" for col in colunas])
@@ -177,6 +234,16 @@ def atualizar_registro(tabela, id):
         """
         
         if execute_query(query, valores):
+            # Se alterou nome da pessoa gestora, atualizar também na tabela parcerias_analises
+            if tabela == 'c_pessoa_gestora' and nome_antigo and nome_antigo != dados.get('nome_pg'):
+                query_parcerias = """
+                    UPDATE parcerias_analises
+                    SET responsavel_pg = %s
+                    WHERE responsavel_pg = %s
+                """
+                resultado_update = execute_query(query_parcerias, (dados.get('nome_pg'), nome_antigo))
+                print(f"[INFO] Atualizado responsavel_pg de '{nome_antigo}' para '{dados.get('nome_pg')}' em parcerias_analises")
+            
             return jsonify({
                 'sucesso': True,
                 'mensagem': 'Registro atualizado com sucesso'

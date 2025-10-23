@@ -16,7 +16,7 @@ for table in tables:
 
 print("\n=== c_tipo_contrato structure ===")
 try:
-    cur.execute("SELECT * FROM c_tipo_contrato LIMIT 5")
+    cur.execute("SELECT * FROM categoricas.c_tipo_contrato LIMIT 5")
     rows = cur.fetchall()
     if rows:
         print("Columns:", rows[0].keys())
@@ -27,7 +27,7 @@ except Exception as e:
 
 print("\n=== c_legislacao structure ===")
 try:
-    cur.execute("SELECT * FROM c_legislacao LIMIT 5")
+    cur.execute("SELECT * FROM categoricas.c_legislacao LIMIT 5")
     rows = cur.fetchall()
     if rows:
         print("Columns:", rows[0].keys())

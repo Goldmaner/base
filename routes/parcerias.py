@@ -186,9 +186,9 @@ def nova():
     # GET - retornar formulário vazio
     # Buscar dados dos dropdowns
     cur = get_cursor()
-    cur.execute("SELECT informacao FROM c_tipo_contrato ORDER BY informacao")
+    cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
     tipos_contrato = [row['informacao'] for row in cur.fetchall()]
-    cur.execute("SELECT lei FROM c_legislacao ORDER BY lei")
+    cur.execute("SELECT lei FROM categoricas.c_legislacao ORDER BY lei")
     legislacoes = [row['lei'] for row in cur.fetchall()]
     cur.close()
     
@@ -291,9 +291,9 @@ def editar(numero_termo):
     parceria = cur.fetchone()
     
     # Buscar dados dos dropdowns
-    cur.execute("SELECT informacao FROM c_tipo_contrato ORDER BY informacao")
+    cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
     tipos_contrato = [row['informacao'] for row in cur.fetchall()]
-    cur.execute("SELECT lei FROM c_legislacao ORDER BY lei")
+    cur.execute("SELECT lei FROM categoricas.c_legislacao ORDER BY lei")
     legislacoes = [row['lei'] for row in cur.fetchall()]
     cur.close()
     
@@ -343,7 +343,7 @@ def api_sigla_tipo_termo():
     from flask import jsonify
     
     cur = get_cursor()
-    cur.execute("SELECT id, informacao, sigla FROM c_tipo_contrato ORDER BY sigla")
+    cur.execute("SELECT id, informacao, sigla FROM categoricas.c_tipo_contrato ORDER BY sigla")
     tipos = cur.fetchall()
     cur.close()
     
@@ -609,3 +609,56 @@ def exportar_pdf():
         
     except Exception as e:
         return f"Erro ao gerar PDF: {str(e)}", 500
+
+
+@parcerias_bp.route("/conferencia", methods=["GET"])
+@login_required
+def conferencia():
+    """
+    Compara as parcerias do CSV (coluna A) com as do banco (coluna B)
+    e mostra as parcerias não inseridas no sistema
+    """
+    import pandas as pd
+    import os
+    
+    try:
+        # Caminho do CSV gerado pelo script import_conferencia.py
+        csv_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'saida.csv')
+        
+        # Verifica se o arquivo existe
+        if not os.path.exists(csv_path):
+            flash("Arquivo de conferência não encontrado. Execute o script import_conferencia.py primeiro.", "warning")
+            return redirect(url_for('parcerias.listar'))
+        
+        # Lê o CSV
+        df = pd.read_csv(csv_path, sep=';', encoding='utf-8-sig')
+        
+        # Extrai as colunas
+        termos_planilha = df['Planilha'].dropna().tolist()
+        termos_database = df['Database'].dropna().tolist()
+        
+        # Converte para sets para facilitar a comparação
+        set_planilha = set(termos_planilha)
+        set_database = set(termos_database)
+        
+        # Encontra os termos que estão na planilha mas NÃO estão no banco
+        termos_nao_inseridos = sorted(set_planilha - set_database)
+        
+        # Estatísticas
+        total_planilha = len(set_planilha)
+        total_database = len(set_database)
+        total_nao_inseridos = len(termos_nao_inseridos)
+        total_inseridos = len(set_planilha & set_database)
+        
+        return render_template(
+            'temp_conferencia.html',
+            termos_nao_inseridos=termos_nao_inseridos,
+            total_planilha=total_planilha,
+            total_database=total_database,
+            total_nao_inseridos=total_nao_inseridos,
+            total_inseridos=total_inseridos
+        )
+        
+    except Exception as e:
+        flash(f"Erro ao processar conferência: {str(e)}", "danger")
+        return redirect(url_for('parcerias.listar'))

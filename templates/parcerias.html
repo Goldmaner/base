@@ -28,6 +28,9 @@
           <p class="text-muted mb-0">Visualização e gerenciamento de todas as parcerias</p>
         </div>
         <div>
+          <a href="{{ url_for('parcerias.conferencia') }}" class="btn btn-warning me-2" title="Comparar parcerias do banco externo com o sistema">
+            <i class="bi bi-clipboard-check"></i> Conferir Parcerias
+          </a>
           <button class="btn btn-success me-2" onclick="exportarCSV()">
             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
           </button>
