@@ -107,7 +107,7 @@
                 <option>Implantação</option>
               </select>
             </td>
-            <td><input type="text" class="form-control form-control-sm quantidade" value="1"></td>
+            <td><input type="text" class="form-control form-control-sm quantidade" value="0"></td>
             <td class="col-categoria">
               <input type="text" class="form-control form-control-sm categoria" 
                      placeholder="Ex: Gerente de Serviço I" 
@@ -427,7 +427,7 @@
             <option>Implantação</option>
           </select>
         </td>
-        <td><input type="text" class="form-control form-control-sm quantidade" value="1"></td>
+        <td><input type="text" class="form-control form-control-sm quantidade" value="0"></td>
         <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I" list="categoriasDisponiveis"></td>`;
   for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
       cols += `<td class="col-total-linha text-end total-linha">0,00</td>`;
@@ -440,6 +440,32 @@
 
     // salvar: coleta a tabela, normaliza valores e envia para o backend
     document.getElementById('salvarOrc2').addEventListener('click', function(){
+      // VALIDAÇÃO: Verificar se todas as linhas com dados têm rubrica selecionada
+      const todasLinhas = document.querySelectorAll('#bodyOrc2 tr');
+      const linhasInvalidas = [];
+      
+      todasLinhas.forEach((tr, index) => {
+        const selectRub = tr.querySelector('select[name="rubrica"]');
+        const rubrica = selectRub ? selectRub.value : '';
+        const categoria = tr.querySelector('.categoria') ? tr.querySelector('.categoria').value.trim() : '';
+        
+        // Verificar se há algum valor preenchido nos meses
+        const temValores = Array.from(tr.querySelectorAll('input.valor')).some(inp => {
+          const val = inp.value.trim();
+          return val !== '' && val !== '0' && val !== '0,00' && val !== '-';
+        });
+        
+        // Se tem valores OU categoria preenchida, mas não tem rubrica, é inválido
+        if ((temValores || categoria !== '') && (rubrica === '' || rubrica === 'Selecione...')) {
+          linhasInvalidas.push(index + 1);
+        }
+      });
+      
+      if (linhasInvalidas.length > 0) {
+        alert(`⚠️ ATENÇÃO: Existem linhas com dados preenchidos mas sem rubrica selecionada!\n\nLinhas: ${linhasInvalidas.join(', ')}\n\nPor favor, selecione a rubrica para todas as linhas preenchidas ou remova os dados dessas linhas.`);
+        return;
+      }
+      
       // Mostrar spinner, desabilitar botão e mostrar barra de progresso
       const btnSalvar = document.getElementById('salvarOrc2');
       const salvarText = document.getElementById('salvarText');
@@ -543,9 +569,17 @@
             }).then(r=>r.json()).then(d=>{
               updateProgress(100, 'Salvamento concluído!');
               setTimeout(() => {
-                if (d.message) alert(d.message);
-                else if (d.error) alert('Erro: ' + d.error);
-                location.href = '/orcamento';
+                // Restaurar botão e ocultar progresso
+                salvarText.classList.remove('d-none');
+                salvarSpinner.classList.add('d-none');
+                btnSalvar.disabled = false;
+                progressContainer.classList.add('d-none');
+                
+                if (d.message) alert('✅ ' + d.message + '\n\nVocê pode continuar editando ou voltar à lista de orçamentos.');
+                else if (d.error) alert('❌ Erro: ' + d.error);
+                
+                // NÃO redirecionar - manter usuário na página
+                // location.href = '/orcamento';
               }, 500);
             }).catch(e=>{ 
               // Restaurar botão e ocultar progresso em caso de erro
@@ -560,9 +594,17 @@
         } else {
           updateProgress(100, 'Salvamento concluído com sucesso!');
           setTimeout(() => {
-            if (data.message) alert(data.message);
-            else if (data.error) alert('Erro: ' + data.error);
-            location.href = '/orcamento';
+            // Restaurar botão e ocultar progresso
+            salvarText.classList.remove('d-none');
+            salvarSpinner.classList.add('d-none');
+            btnSalvar.disabled = false;
+            progressContainer.classList.add('d-none');
+            
+            if (data.message) alert('✅ ' + data.message + '\n\nVocê pode continuar editando ou voltar à lista de orçamentos.');
+            else if (data.error) alert('❌ Erro: ' + data.error);
+            
+            // NÃO redirecionar - manter usuário na página
+            // location.href = '/orcamento';
           }, 500);
         }
       }).catch(e=>{ 
@@ -603,7 +645,31 @@
     }
 
     // escutar mudanças nos inputs de valor para recalcular
-    document.addEventListener('input', function(e){ if (e.target && e.target.classList && e.target.classList.contains('valor')) recalcTotals(); });
+    document.addEventListener('input', function(e){ 
+      if (e.target && e.target.classList && e.target.classList.contains('valor')) {
+        // Verificar se está usando formato americano (ponto como decimal)
+        const valor = e.target.value.trim();
+        // Detectar formato US: tem ponto mas NÃO tem vírgula, e o ponto está nas últimas 3 posições
+        // Exemplos: 500.00, 1234.56, 10.5
+        const temPonto = valor.includes('.');
+        const temVirgula = valor.includes(',');
+        const posicaoPonto = valor.lastIndexOf('.');
+        const comprimento = valor.length;
+        
+        // Formato americano detectado: ponto existe, vírgula não existe, e ponto está a 2 ou 3 chars do final
+        const isFormatoUS = temPonto && !temVirgula && (comprimento - posicaoPonto === 3 || comprimento - posicaoPonto === 2);
+        
+        if (isFormatoUS) {
+          e.target.style.backgroundColor = '#fff3cd'; // Amarelo claro (Bootstrap warning)
+          e.target.title = '⚠️ Formato americano detectado (use vírgula para decimal: 500,00)';
+        } else {
+          e.target.style.backgroundColor = '';
+          e.target.title = '';
+        }
+        
+        recalcTotals();
+      }
+    });
 
     // --- NAVEGAÇÃO COM ENTER ---
     document.addEventListener('keydown', function(e){

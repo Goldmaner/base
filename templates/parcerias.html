@@ -80,6 +80,20 @@
           </div>
         </div>
 
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label for="filtro_status" class="form-label">Status do Termo</label>
+            <select class="form-select" id="filtro_status" name="filtro_status">
+              <option value="">-- Todos --</option>
+              <option value="vigente" {% if filtro_status == 'vigente' %}selected{% endif %}>Vigente</option>
+              <option value="encerrado" {% if filtro_status == 'encerrado' %}selected{% endif %}>Encerrado</option>
+              <option value="nao_iniciado" {% if filtro_status == 'nao_iniciado' %}selected{% endif %}>Não iniciado</option>
+              <option value="rescindido" {% if filtro_status == 'rescindido' %}selected{% endif %}>Rescindido</option>
+              <option value="suspenso" {% if filtro_status == 'suspenso' %}selected{% endif %}>Suspenso</option>
+            </select>
+          </div>
+        </div>
+
         <div class="row mb-3">
           <div class="col-md-12">
             <h6><i class="bi bi-search"></i> Pesquisa por Processo SEI</h6>
@@ -135,6 +149,7 @@
               <th class="text-center">OSC</th>
               <th class="text-center">Projeto</th>
               <th class="text-center">Tipo de Termo</th>
+              <th class="text-center">Status</th>
               <th class="text-center">Data de Início</th>
               <th class="text-center">Data de Término</th>
               <th class="text-center">Meses do Projeto</th>
@@ -152,6 +167,21 @@
                 <td>{{ parceria.osc or '-' }}</td>
                 <td>{{ parceria.projeto or '-' }}</td>
                 <td class="text-center">{{ parceria.tipo_termo or '-' }}</td>
+                <td class="text-center">
+                  {% if parceria.status_calculado %}
+                    <span class="badge 
+                      {% if parceria.status_calculado == 'Vigente' %}bg-success
+                      {% elif parceria.status_calculado == 'Encerrado' %}bg-secondary
+                      {% elif parceria.status_calculado == 'Não iniciado' %}bg-info
+                      {% elif parceria.status_calculado == 'Rescindido' %}bg-danger
+                      {% elif parceria.status_calculado == 'Suspenso' %}bg-warning text-dark
+                      {% else %}bg-light text-dark{% endif %}">
+                      {{ parceria.status_calculado }}
+                    </span>
+                  {% else %}
+                    <span class="badge bg-light text-dark">-</span>
+                  {% endif %}
+                </td>
                 <td class="text-center">{{ parceria.inicio.strftime('%d/%m/%Y') if parceria.inicio else '-' }}</td>
                 <td class="text-center">{{ parceria.final.strftime('%d/%m/%Y') if parceria.final else '-' }}</td>
                 <td class="text-center">{{ parceria.meses if parceria.meses is not none else '-' }}</td>
@@ -168,8 +198,34 @@
             {% endfor %}
           </tbody>
         </table>
-        <div class="mt-3">
-          <p class="text-muted">Total de parcerias: <strong>{{ parcerias|length }}</strong></p>
+        <div class="mt-3 p-3 bg-light rounded">
+          <div class="row">
+            <div class="col-md-6">
+              <h6 class="mb-2"><i class="bi bi-info-circle"></i> Resumo dos Resultados</h6>
+              <p class="mb-1"><strong>Total de termos exibidos:</strong> <span class="badge bg-primary">{{ parcerias|length }}</span></p>
+              {% if total_geral is defined and total_geral != parcerias|length %}
+              <p class="mb-0 text-muted"><small>Total no sistema (sem filtros): {{ total_geral }}</small></p>
+              {% endif %}
+            </div>
+            <div class="col-md-6 text-end">
+              <h6 class="mb-2"><i class="bi bi-bar-chart"></i> Por Status</h6>
+              <div class="d-flex gap-2 justify-content-end flex-wrap">
+                {% if contagem_status %}
+                  {% for status, count in contagem_status.items() %}
+                    <span class="badge 
+                      {% if status == 'Vigente' %}bg-success
+                      {% elif status == 'Encerrado' %}bg-secondary
+                      {% elif status == 'Não iniciado' %}bg-info
+                      {% elif status == 'Rescindido' %}bg-danger
+                      {% elif status == 'Suspenso' %}bg-warning text-dark
+                      {% else %}bg-light text-dark{% endif %}">
+                      {{ status }}: {{ count }}
+                    </span>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </div>
+          </div>
         </div>
       {% else %}
         <div class="alert alert-info">

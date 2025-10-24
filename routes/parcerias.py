@@ -30,6 +30,7 @@ def listar():
     filtro_osc = request.args.get('filtro_osc', '').strip()
     filtro_projeto = request.args.get('filtro_projeto', '').strip()
     filtro_tipo_termo = request.args.get('filtro_tipo_termo', '').strip()
+    filtro_status = request.args.get('filtro_status', '').strip()
     busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
     busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
     
@@ -102,6 +103,23 @@ def listar():
         query += " AND sei_pc ILIKE %s"
         params.append(f"%{busca_sei_pc}%")
     
+    # Filtro de status baseado em datas
+    # Vigente: inicio <= HOJE <= final
+    # Encerrado: final < HOJE
+    # Não iniciado: inicio > HOJE
+    # Rescindido e Suspenso: deixar para depois (não filtrar por enquanto)
+    if filtro_status:
+        if filtro_status == 'vigente':
+            query += " AND inicio <= CURRENT_DATE AND final >= CURRENT_DATE"
+        elif filtro_status == 'encerrado':
+            query += " AND final < CURRENT_DATE"
+        elif filtro_status == 'nao_iniciado':
+            query += " AND inicio > CURRENT_DATE"
+        elif filtro_status in ['rescindido', 'suspenso']:
+            # Por enquanto, não implementado - não retorna nada
+            # No futuro, adicionar coluna de status na tabela
+            query += " AND 1=0"  # Condição falsa para não retornar resultados
+    
     query += " ORDER BY numero_termo"
     
     # Adicionar LIMIT se não for "todas"
@@ -110,6 +128,34 @@ def listar():
     
     cur.execute(query, params)
     parcerias = cur.fetchall()
+    
+    # Calcular status para cada parceria
+    from datetime import date
+    hoje = date.today()
+    contagem_status = {}
+    
+    for parceria in parcerias:
+        status = '-'
+        if parceria['inicio'] and parceria['final']:
+            if parceria['inicio'] <= hoje <= parceria['final']:
+                status = 'Vigente'
+            elif parceria['final'] < hoje:
+                status = 'Encerrado'
+            elif parceria['inicio'] > hoje:
+                status = 'Não iniciado'
+        
+        parceria['status_calculado'] = status
+        
+        # Contagem por status
+        if status in contagem_status:
+            contagem_status[status] += 1
+        else:
+            contagem_status[status] = 1
+    
+    # Obter total geral (sem filtros) para referência
+    cur.execute("SELECT COUNT(*) as total FROM Parcerias")
+    total_geral = cur.fetchone()['total']
+    
     cur.close()
     
     # DEBUG: Verificar duplicação de parcerias
@@ -128,9 +174,12 @@ def listar():
                          filtro_osc=filtro_osc,
                          filtro_projeto=filtro_projeto,
                          filtro_tipo_termo=filtro_tipo_termo,
+                         filtro_status=filtro_status,
                          busca_sei_celeb=busca_sei_celeb,
                          busca_sei_pc=busca_sei_pc,
-                         limite=limite)
+                         limite=limite,
+                         contagem_status=contagem_status,
+                         total_geral=total_geral)
 
 
 @parcerias_bp.route("/nova", methods=["GET", "POST"])
