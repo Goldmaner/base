@@ -49,16 +49,26 @@ def execute_query(query, params=None):
     db = get_db()
     
     if not cur or not db:
-        print(f"[ERRO] Falha ao obter conexão com banco")
+        print(f"[ERRO execute_query] Falha ao obter conexão com banco")
         return False
     
     try:
+        print(f"[DEBUG execute_query] Executando query: {query[:100]}...")
+        print(f"[DEBUG execute_query] Parâmetros (primeiros 5): {params[:5] if params and len(params) > 5 else params}")
+        
         cur.execute(query, params)
+        
+        print(f"[DEBUG execute_query] Query executada, fazendo commit...")
         db.commit()
+        
+        print(f"[DEBUG execute_query] Commit bem-sucedido! Retornando True")
         return True
     except Exception as e:
-        print(f"[ERRO] Falha ao executar query: {e}")
+        print(f"[ERRO execute_query] Falha ao executar query: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         try:
+            print(f"[DEBUG execute_query] Fazendo rollback...")
             db.rollback()
         except:
             pass

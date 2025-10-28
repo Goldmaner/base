@@ -145,17 +145,22 @@
             const th = document.createElement('th');
             th.textContent = configAtual.labels[col];
             
-            // Adicionar ícones de ordenação para total_pareceres
-            if (col === 'total_pareceres') {
+            // Adicionar ícones de ordenação para colunas calculadas
+            if (col === 'total_pareceres' || col === 'total_parcerias') {
               th.style.cursor = 'pointer';
               th.setAttribute('data-ordem', 'desc'); // Ordem inicial: descendente
+              th.setAttribute('data-coluna', col); // Identificar coluna
               
               const sortIcon = document.createElement('i');
               sortIcon.className = 'bi bi-sort-down ms-2';
-              sortIcon.id = 'iconOrdem';
+              sortIcon.id = `iconOrdem_${col}`;
               th.appendChild(sortIcon);
               
-              th.onclick = () => ordenarPorPareceres();
+              if (col === 'total_pareceres') {
+                th.onclick = () => ordenarPorColuna('total_pareceres');
+              } else if (col === 'total_parcerias') {
+                th.onclick = () => ordenarPorColuna('total_parcerias');
+              }
             }
             
             cabecalho.appendChild(th);
@@ -624,22 +629,18 @@
       tdContagem.style.color = '#0d6efd';
       tr.appendChild(tdContagem);
       
-      // Preencher células vazias entre nome_pg e total_pareceres
-      for (let i = indiceNome + 1; i < totalColunas - 1; i++) {
+      // Preencher células vazias entre nome_pg e as colunas calculadas
+      const numColunasEditaveis = configAtual.colunas_editaveis.length;
+      const colunasAteCalculadas = numColunasEditaveis - indiceNome - 1; // Quantas colunas entre nome_pg e as calculadas
+      
+      for (let i = 0; i < colunasAteCalculadas; i++) {
         const td = document.createElement('td');
         tr.appendChild(td);
       }
       
-      // Célula com label "TOTAL:"
-      const tdLabel = document.createElement('td');
-      tdLabel.textContent = 'TOTAL:';
-      tdLabel.style.fontWeight = 'bold';
-      tdLabel.style.textAlign = 'right';
-      tr.appendChild(tdLabel);
-      
-      // Célula com a soma
-      const tdSoma = document.createElement('td');
-      let soma = 0;
+      // Célula com a soma de PARECERES
+      const tdSomaPareceres = document.createElement('td');
+      let somaPareceres = 0;
       
       // Somar apenas linhas visíveis
       for (let linha of linhas) {
@@ -648,18 +649,44 @@
           for (let celula of celulas) {
             if (celula.getAttribute('data-col') === 'total_pareceres') {
               const valor = parseInt(celula.textContent) || 0;
-              soma += valor;
+              somaPareceres += valor;
               break;
             }
           }
         }
       }
       
-      tdSoma.textContent = soma;
-      tdSoma.style.fontWeight = 'bold';
-      tdSoma.style.fontSize = '1.1em';
-      tdSoma.style.backgroundColor = '#d4edda';
-      tr.appendChild(tdSoma);
+      tdSomaPareceres.innerHTML = '<strong>TOTAL:</strong><br>' + somaPareceres;
+      tdSomaPareceres.style.fontWeight = 'bold';
+      tdSomaPareceres.style.fontSize = '1.1em';
+      tdSomaPareceres.style.backgroundColor = '#d4edda';
+      tdSomaPareceres.style.textAlign = 'center';
+      tr.appendChild(tdSomaPareceres);
+      
+      // Célula com a soma de PARCERIAS
+      const tdSomaParcerias = document.createElement('td');
+      let somaParcerias = 0;
+      
+      // Somar apenas linhas visíveis
+      for (let linha of linhas) {
+        if (linha.style.display !== 'none') {
+          const celulas = linha.getElementsByTagName('td');
+          for (let celula of celulas) {
+            if (celula.getAttribute('data-col') === 'total_parcerias') {
+              const valor = parseInt(celula.textContent) || 0;
+              somaParcerias += valor;
+              break;
+            }
+          }
+        }
+      }
+      
+      tdSomaParcerias.innerHTML = '<strong>TOTAL:</strong><br>' + somaParcerias;
+      tdSomaParcerias.style.fontWeight = 'bold';
+      tdSomaParcerias.style.fontSize = '1.1em';
+      tdSomaParcerias.style.backgroundColor = '#cfe2ff';
+      tdSomaParcerias.style.textAlign = 'center';
+      tr.appendChild(tdSomaParcerias);
       
       // Célula de ações (vazia)
       const tdAcoes = document.createElement('td');
@@ -668,13 +695,18 @@
       rodape.appendChild(tr);
     }
     
-    function ordenarPorPareceres() {
+    function ordenarPorColuna(nomeColuna) {
       const tbody = document.getElementById('corpoTabela');
       const linhas = Array.from(tbody.getElementsByTagName('tr'));
       
       // Obter ordem atual do cabeçalho
-      const thPareceres = document.querySelector('th[data-ordem]');
-      const ordemAtual = thPareceres.getAttribute('data-ordem');
+      const thColuna = document.querySelector(`th[data-coluna="${nomeColuna}"]`);
+      if (!thColuna) {
+        console.error(`Cabeçalho não encontrado para coluna: ${nomeColuna}`);
+        return;
+      }
+      
+      const ordemAtual = thColuna.getAttribute('data-ordem');
       const novaOrdem = ordemAtual === 'desc' ? 'asc' : 'desc';
       
       // Filtrar apenas linhas visíveis para ordenar
@@ -686,19 +718,19 @@
         let valorA = 0;
         let valorB = 0;
         
-        // Encontrar célula total_pareceres
+        // Encontrar célula da coluna especificada
         const celulasA = a.getElementsByTagName('td');
         const celulasB = b.getElementsByTagName('td');
         
         for (let celula of celulasA) {
-          if (celula.getAttribute('data-col') === 'total_pareceres') {
+          if (celula.getAttribute('data-col') === nomeColuna) {
             valorA = parseInt(celula.textContent) || 0;
             break;
           }
         }
         
         for (let celula of celulasB) {
-          if (celula.getAttribute('data-col') === 'total_pareceres') {
+          if (celula.getAttribute('data-col') === nomeColuna) {
             valorB = parseInt(celula.textContent) || 0;
             break;
           }
@@ -717,16 +749,23 @@
       linhasOcultas.forEach(linha => tbody.appendChild(linha));
       
       // Atualizar ícone e atributo de ordem
-      thPareceres.setAttribute('data-ordem', novaOrdem);
-      const icone = document.getElementById('iconOrdem');
-      if (novaOrdem === 'desc') {
-        icone.className = 'bi bi-sort-down ms-2';
-      } else {
-        icone.className = 'bi bi-sort-up ms-2';
+      thColuna.setAttribute('data-ordem', novaOrdem);
+      const icone = document.getElementById(`iconOrdem_${nomeColuna}`);
+      if (icone) {
+        if (novaOrdem === 'desc') {
+          icone.className = 'bi bi-sort-down ms-2';
+        } else {
+          icone.className = 'bi bi-sort-up ms-2';
+        }
       }
       
       // Atualizar rodapé (não muda valores, mas garante consistência visual)
       atualizarRodape();
+    }
+    
+    // Manter compatibilidade com nome antigo
+    function ordenarPorPareceres() {
+      ordenarPorColuna('total_pareceres');
     }
   </script>
 </body>

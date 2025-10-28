@@ -27,7 +27,14 @@
     <div class="header-section">
       <div class="d-flex justify-content-between align-items-center">
         <div>
-          <h2>{{ 'Nova Parceria' if not parceria else 'Formulário Completo da Parceria' }}</h2>
+          <h2>
+            {{ 'Nova Parceria' if not parceria else 'Formulário Completo da Parceria' }}
+            {% if parceria and parceria.numero_termo and not parceria.get('osc') %}
+              <span class="badge bg-info ms-2">
+                <i class="bi bi-download"></i> Importação
+              </span>
+            {% endif %}
+          </h2>
           {% if parceria %}
             <p class="text-muted mb-0">Termo: <strong>{{ parceria.numero_termo }}</strong></p>
           {% endif %}
@@ -53,7 +60,34 @@
         {% endif %}
       {% endwith %}
 
-      <form method="post" action="{{ url_for('parcerias.nova') if not parceria else url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
+      <!-- Script para limpar localStorage quando houver sucesso -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            {% if cat == 'success' %}
+              <script>
+                // Limpar TODOS os autosaves de parcerias ao ter sucesso
+                Object.keys(localStorage).forEach(key => {
+                  if (key.startsWith('parceriaForm_')) {
+                    localStorage.removeItem(key);
+                  }
+                });
+              </script>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Alerta de importação -->
+      {% if parceria and parceria.numero_termo and not parceria.get('osc') %}
+      <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <i class="bi bi-info-circle-fill"></i> 
+        <strong>Importação:</strong> O número do termo <strong>{{ parceria.numero_termo }}</strong> foi pré-preenchido. Complete os demais dados para cadastrar a parceria.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('parcerias.nova') if modo_importacao or not parceria else url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
         
         <!-- Seção: Identificação -->
         <div class="section-title">IDENTIFICAÇÃO DO TERMO</div>
@@ -63,14 +97,14 @@
             <label for="numero_termo" class="form-label">Número do Termo</label>
             <input type="text" class="form-control" id="numero_termo" name="numero_termo" 
                    value="{{ parceria.numero_termo if parceria else '' }}" 
-                   {{ 'readonly disabled' if parceria else 'required' }}>
+                   {{ 'readonly' if (parceria and parceria.get('osc')) else 'required' }}>
           </div>
           <div class="col-md-6">
             <label for="tipo_termo" class="form-label">Tipo de Termo</label>
             <select class="form-select" id="tipo_termo" name="tipo_termo">
               <option value="">-- Selecione --</option>
               {% for tipo in tipos_contrato %}
-                <option value="{{ tipo }}" {% if parceria and parceria.tipo_termo == tipo %}selected{% endif %}>{{ tipo }}</option>
+                <option value="{{ tipo }}" {% if parceria and parceria.get('tipo_termo') == tipo %}selected{% endif %}>{{ tipo }}</option>
               {% endfor %}
             </select>
           </div>
@@ -116,17 +150,17 @@
           <div class="col-md-4">
             <label for="inicio" class="form-label">Data de Início</label>
             <input type="date" class="form-control" id="inicio" name="inicio" 
-                   value="{{ parceria.inicio.strftime('%Y-%m-%d') if parceria.inicio else '' }}">
+                   value="{{ parceria.get('inicio', '') if parceria else '' }}">
           </div>
           <div class="col-md-4">
             <label for="final" class="form-label">Data de Término</label>
             <input type="date" class="form-control" id="final" name="final" 
-                   value="{{ parceria.final.strftime('%Y-%m-%d') if parceria.final else '' }}">
+                   value="{{ parceria.get('final', '') if parceria else '' }}">
           </div>
           <div class="col-md-4">
             <label for="meses" class="form-label">Meses do Projeto</label>
             <input type="number" class="form-control" id="meses" name="meses" 
-                   value="{{ parceria.meses if parceria.meses is not none else '' }}"
+                   value="{{ parceria.get('meses', '') if parceria else '' }}"
                    readonly style="background-color: #e9ecef;">
             <small class="text-muted">Calculado automaticamente</small>
           </div>
@@ -136,14 +170,14 @@
           <div class="col-md-6">
             <label for="total_previsto" class="form-label">Total Valor Previsto (R$)</label>
             <input type="text" class="form-control valor-monetario" id="total_previsto" name="total_previsto" 
-                   value="{{ '{:,.2f}'.format(parceria.total_previsto).replace(',', 'X').replace('.', ',').replace('X', '.') if parceria and parceria.total_previsto is not none else '' }}"
+                   value="{{ '{:,.2f}'.format(parceria.get('total_previsto', 0)).replace(',', 'X').replace('.', ',').replace('X', '.') if parceria and parceria.get('total_previsto') else '' }}"
                    placeholder="0,00">
             <input type="hidden" id="total_previsto_hidden" name="total_previsto_hidden">
           </div>
           <div class="col-md-6">
             <label for="total_pago" class="form-label">Total Valor Pago (R$)</label>
             <input type="text" class="form-control valor-monetario" id="total_pago" name="total_pago" 
-                   value="{{ '{:,.2f}'.format(parceria.total_pago).replace(',', 'X').replace('.', ',').replace('X', '.') if parceria and parceria.total_pago is not none else '0,00' }}"
+                   value="{{ '{:,.2f}'.format(parceria.get('total_pago', 0)).replace(',', 'X').replace('.', ',').replace('X', '.') if parceria and parceria.get('total_pago') else '0,00' }}"
                    placeholder="0,00">
             <input type="hidden" id="total_pago_hidden" name="total_pago_hidden" value="0">
           </div>
@@ -162,7 +196,7 @@
           <div class="col-md-6">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="transicao" name="transicao" 
-                     {% if parceria.transicao %}checked{% endif %}>
+                     {% if parceria and parceria.get('transicao') %}checked{% endif %}>
               <label class="form-check-label" for="transicao">
                 É transição de Portaria?
               </label>
@@ -171,7 +205,7 @@
           <div class="col-md-6">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="contrapartida" name="contrapartida" 
-                     {% if parceria.contrapartida %}checked{% endif %}>
+                     {% if parceria and parceria.get('contrapartida') %}checked{% endif %}>
               <label class="form-check-label" for="contrapartida">
                 Tem contrapartida?
               </label>
@@ -220,7 +254,7 @@
             <select class="form-select" id="portaria" name="portaria">
               <option value="">-- Selecione --</option>
               {% for leg in legislacoes %}
-                <option value="{{ leg }}" {% if parceria and parceria.portaria == leg %}selected{% endif %}>{{ leg }}</option>
+                <option value="{{ leg }}" {% if parceria and parceria.get('portaria') == leg %}selected{% endif %}>{{ leg }}</option>
               {% endfor %}
             </select>
             <div class="form-text">
@@ -259,6 +293,25 @@
                    value="{{ rf_pessoa_gestora if rf_pessoa_gestora else '' }}" readonly disabled>
             <div class="form-text">
               <i class="bi bi-lock"></i> Preenchido automaticamente
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkbox de Solicitação de Alteração (aparece apenas se pessoa gestora estiver inativa) -->
+        <div class="row mb-3" id="solicitacao_alteracao_container" style="display: none;">
+          <div class="col-md-12">
+            <div class="alert alert-warning">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="solicitacao_alteracao" name="solicitacao_alteracao" 
+                       {% if parceria and parceria.solicitacao %}checked{% endif %}>
+                <label class="form-check-label" for="solicitacao_alteracao">
+                  <strong><i class="bi bi-exclamation-circle"></i> Foi solicitada alteração da pessoa gestora inativa?</strong>
+                </label>
+                <div class="form-text mt-2">
+                  Marque esta opção se já foi solicitada a substituição desta pessoa gestora inativa.
+                  Esta informação será registrada no histórico da parceria.
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -308,14 +361,45 @@
         // Carregar mapeamento de siglas
         const siglaResponse = await fetch('/parcerias/api/sigla-tipo-termo');
         siglaMapping = await siglaResponse.json();
+        
+        // Executar automações se houver dados pré-preenchidos (importação)
+        executarAutomacoesIniciais();
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
       }
     }
 
+    // ========== 1.1. EXECUTAR AUTOMAÇÕES INICIAIS (IMPORTAÇÃO) ==========
+    function executarAutomacoesIniciais() {
+      // Detectar tipo de termo se número do termo estiver preenchido
+      const numeroTermoInput = document.getElementById('numero_termo');
+      if (numeroTermoInput.value && !document.getElementById('tipo_termo').value) {
+        detectarTipoTermo();
+      }
+      
+      // Preencher CNPJ se OSC estiver preenchida
+      const oscInput = document.getElementById('osc');
+      if (oscInput.value && !document.getElementById('cnpj').value) {
+        preencherCNPJ();
+      }
+      
+      // Calcular meses se datas de início e fim estiverem preenchidas
+      const inicioInput = document.getElementById('inicio');
+      const finalInput = document.getElementById('final');
+      if (inicioInput.value && finalInput.value) {
+        calcularMeses();
+      }
+      
+      // Detectar portaria/legislação automaticamente
+      if (inicioInput.value && numeroTermoInput.value && !document.getElementById('portaria').value) {
+        detectarPortaria();
+      }
+    }
+
     // ========== 2. RECONHECIMENTO AUTOMÁTICO DE TIPO DE TERMO ==========
-    document.getElementById('numero_termo').addEventListener('input', function(e) {
-      const numeroTermo = e.target.value.trim().toUpperCase();
+    function detectarTipoTermo() {
+      const numeroTermoInput = document.getElementById('numero_termo');
+      const numeroTermo = numeroTermoInput.value.trim().toUpperCase();
       
       if (numeroTermo.length >= 3) {
         const sigla = numeroTermo.substring(0, 3);
@@ -337,11 +421,14 @@
           }
         }
       }
-    });
+    }
+
+    document.getElementById('numero_termo').addEventListener('input', detectarTipoTermo);
 
     // ========== 3. PREENCHIMENTO AUTOMÁTICO DE CNPJ ==========
-    document.getElementById('osc').addEventListener('change', function(e) {
-      const oscSelecionada = e.target.value;
+    function preencherCNPJ() {
+      const oscInput = document.getElementById('osc');
+      const oscSelecionada = oscInput.value;
       
       if (oscData[oscSelecionada]) {
         const cnpjField = document.getElementById('cnpj');
@@ -353,16 +440,28 @@
           cnpjField.style.borderColor = '';
         }, 1000);
       }
-    });
+    }
+
+    document.getElementById('osc').addEventListener('change', preencherCNPJ);
 
     // ========== 3.1. PREENCHIMENTO AUTOMÁTICO DE R.F. DA PESSOA GESTORA ==========
     document.getElementById('pessoa_gestora').addEventListener('change', function(e) {
       const selectPG = e.target;
       const selectedOption = selectPG.options[selectPG.selectedIndex];
       const rf = selectedOption.getAttribute('data-rf') || '';
+      const status = selectedOption.getAttribute('data-status') || 'Ativo';
       
       const rfField = document.getElementById('rf_pessoa_gestora');
       rfField.value = rf;
+      
+      // Mostrar/ocultar checkbox de solicitação se pessoa gestora for inativa
+      const solicitacaoContainer = document.getElementById('solicitacao_alteracao_container');
+      if (status !== 'Ativo' && selectPG.value !== '') {
+        solicitacaoContainer.style.display = 'block';
+      } else {
+        solicitacaoContainer.style.display = 'none';
+        document.getElementById('solicitacao_alteracao').checked = false;
+      }
       
       // Feedback visual
       if (rf) {
@@ -370,6 +469,18 @@
         setTimeout(() => {
           rfField.style.borderColor = '';
         }, 1000);
+      }
+    });
+    
+    // Verificar status inicial ao carregar a página
+    window.addEventListener('DOMContentLoaded', function() {
+      const selectPG = document.getElementById('pessoa_gestora');
+      const selectedOption = selectPG.options[selectPG.selectedIndex];
+      const status = selectedOption.getAttribute('data-status') || 'Ativo';
+      const solicitacaoContainer = document.getElementById('solicitacao_alteracao_container');
+      
+      if (status !== 'Ativo' && selectPG.value !== '') {
+        solicitacaoContainer.style.display = 'block';
       }
     });
 
@@ -625,6 +736,15 @@
 
     // Limpar autosave ao submeter o formulário
     document.querySelector('form').addEventListener('submit', function(e) {
+      // DEBUG: Verificar checkbox de solicitação
+      const checkboxSolicitacao = document.getElementById('solicitacao_alteracao');
+      console.log('[DEBUG FORM] Checkbox solicitacao_alteracao existe:', !!checkboxSolicitacao);
+      if (checkboxSolicitacao) {
+        console.log('[DEBUG FORM] Checkbox está marcado:', checkboxSolicitacao.checked);
+        console.log('[DEBUG FORM] Checkbox está visível:', checkboxSolicitacao.offsetParent !== null);
+        console.log('[DEBUG FORM] Container visível:', document.getElementById('solicitacao_alteracao_container').style.display);
+      }
+      
       // Validar datas antes de submeter
       const inicioInput = document.getElementById('inicio');
       const finalInput = document.getElementById('final');

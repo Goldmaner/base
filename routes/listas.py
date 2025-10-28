@@ -22,14 +22,15 @@ TABELAS_CONFIG = {
         'nome': 'Pessoas Gestoras',
         'schema': 'categoricas',
         'colunas_editaveis': ['nome_pg', 'setor', 'numero_rf', 'status_pg', 'email_pg'],
-        'colunas_calculadas': ['total_pareceres'],
+        'colunas_calculadas': ['total_pareceres', 'total_parcerias'],
         'labels': {
             'nome_pg': 'Nome', 
             'setor': 'Setor', 
             'numero_rf': 'Número do R.F.', 
             'status_pg': 'Status', 
             'email_pg': 'E-mail',
-            'total_pareceres': 'Total de Pareceres'
+            'total_pareceres': 'Total de Pareceres',
+            'total_parcerias': 'Total de Parcerias'
         },
         'colunas_filtro': ['nome_pg', 'setor', 'numero_rf', 'status_pg'],
         'ordem': 'nome_pg',
@@ -115,10 +116,11 @@ def obter_dados(tabela):
                 item[col] = row[col]
             resultado.append(item)
         
-        # Se for pessoa_gestora, adicionar contagem de pareceres
+        # Se for pessoa_gestora, adicionar contagem de pareceres e parcerias
         if tabela == 'c_pessoa_gestora':
             cur = get_cursor()
             for item in resultado:
+                # Contar pareceres
                 cur.execute("""
                     SELECT COUNT(*) as total
                     FROM parcerias_analises
@@ -126,6 +128,20 @@ def obter_dados(tabela):
                 """, (item['nome_pg'],))
                 contagem = cur.fetchone()
                 item['total_pareceres'] = contagem['total'] if contagem else 0
+                
+                # Contar parcerias (somente a última atribuição de cada termo)
+                cur.execute("""
+                    SELECT COUNT(DISTINCT numero_termo) as total
+                    FROM parcerias_pg pg1
+                    WHERE pg1.nome_pg = %s
+                    AND pg1.data_de_criacao = (
+                        SELECT MAX(pg2.data_de_criacao)
+                        FROM parcerias_pg pg2
+                        WHERE pg2.numero_termo = pg1.numero_termo
+                    )
+                """, (item['nome_pg'],))
+                contagem_parcerias = cur.fetchone()
+                item['total_parcerias'] = contagem_parcerias['total'] if contagem_parcerias else 0
             cur.close()
         
         # Buscar opções dinâmicas para selects

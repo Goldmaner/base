@@ -96,6 +96,8 @@
             <label for="filtro_pessoa_gestora" class="form-label">Pessoa Gestora</label>
             <select class="form-select" id="filtro_pessoa_gestora" name="filtro_pessoa_gestora">
               <option value="">-- Todas --</option>
+              <option value="Nenhuma" {% if filtro_pessoa_gestora == 'Nenhuma' %}selected{% endif %}>Nenhuma</option>
+              <option value="Inativos" {% if filtro_pessoa_gestora == 'Inativos' %}selected{% endif %}>Inativos</option>
               {% for pg in pessoas_gestoras_filtro %}
                 <option value="{{ pg }}" {% if filtro_pessoa_gestora == pg %}selected{% endif %}>{{ pg }}</option>
               {% endfor %}
@@ -208,6 +210,9 @@
                   {{ parceria.pessoa_gestora or '-' }}
                   {% if parceria.status_pg and parceria.status_pg != 'Ativo' and parceria.status_calculado == 'Vigente' %}
                     <i class="bi bi-exclamation-triangle text-warning" title="Pessoa gestora inativa em termo vigente"></i>
+                    {% if parceria.solicitacao %}
+                      <i class="bi bi-check-circle text-success" title="Alteração já solicitada"></i>
+                    {% endif %}
                   {% endif %}
                 </td>
                 <td class="text-center">{{ parceria.inicio.strftime('%d/%m/%Y') if parceria.inicio else '-' }}</td>
@@ -272,8 +277,12 @@
       btnExportar.disabled = true;
       btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Exportando...';
       
+      // Construir URL com os mesmos parâmetros de filtro da página atual
+      const params = new URLSearchParams(window.location.search);
+      const exportUrl = '{{ url_for("parcerias.exportar_csv") }}' + '?' + params.toString();
+      
       // Fazer requisição para a API de exportação
-      window.location.href = '{{ url_for("parcerias.exportar_csv") }}';
+      window.location.href = exportUrl;
       
       // Restaurar botão após um tempo
       setTimeout(() => {

@@ -87,7 +87,12 @@ def listar():
              LEFT JOIN categoricas.c_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
              WHERE pg.numero_termo = p.numero_termo 
              ORDER BY pg.data_de_criacao DESC 
-             LIMIT 1) as status_pg
+             LIMIT 1) as status_pg,
+            (SELECT pg.solicitacao 
+             FROM parcerias_pg pg 
+             WHERE pg.numero_termo = p.numero_termo 
+             ORDER BY pg.data_de_criacao DESC 
+             LIMIT 1) as solicitacao
         FROM Parcerias p
         WHERE 1=1
     """
@@ -112,17 +117,38 @@ def listar():
         params.append(f"%{filtro_tipo_termo}%")
     
     if filtro_pessoa_gestora:
-        query += """ AND EXISTS (
-            SELECT 1 FROM parcerias_pg pg 
-            WHERE pg.numero_termo = p.numero_termo 
-            AND pg.nome_pg ILIKE %s
-            AND pg.data_de_criacao = (
-                SELECT MAX(data_de_criacao) 
-                FROM parcerias_pg 
-                WHERE numero_termo = p.numero_termo
-            )
-        )"""
-        params.append(f"%{filtro_pessoa_gestora}%")
+        if filtro_pessoa_gestora.lower() == 'nenhuma':
+            # Filtrar parcerias que NÃO têm pessoa gestora
+            query += """ AND NOT EXISTS (
+                SELECT 1 FROM parcerias_pg pg 
+                WHERE pg.numero_termo = p.numero_termo
+            )"""
+        elif filtro_pessoa_gestora.lower() == 'inativos':
+            # Filtrar parcerias com pessoas gestoras inativas
+            query += """ AND EXISTS (
+                SELECT 1 FROM parcerias_pg pg 
+                LEFT JOIN categoricas.c_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
+                WHERE pg.numero_termo = p.numero_termo 
+                AND cpg.status_pg != 'Ativo'
+                AND pg.data_de_criacao = (
+                    SELECT MAX(data_de_criacao) 
+                    FROM parcerias_pg 
+                    WHERE numero_termo = p.numero_termo
+                )
+            )"""
+        else:
+            # Filtrar parcerias com pessoa gestora específica
+            query += """ AND EXISTS (
+                SELECT 1 FROM parcerias_pg pg 
+                WHERE pg.numero_termo = p.numero_termo 
+                AND pg.nome_pg ILIKE %s
+                AND pg.data_de_criacao = (
+                    SELECT MAX(data_de_criacao) 
+                    FROM parcerias_pg 
+                    WHERE numero_termo = p.numero_termo
+                )
+            )"""
+            params.append(f"%{filtro_pessoa_gestora}%")
     
     if busca_sei_celeb:
         query += " AND sei_celeb ILIKE %s"
@@ -220,6 +246,9 @@ def nova():
     Criar nova parceria
     """
     if request.method == "POST":
+        print("[DEBUG NOVA] Recebendo POST para criar nova parceria")
+        print(f"[DEBUG NOVA] Número do termo: {request.form.get('numero_termo')}")
+        
         try:
             query = """
                 INSERT INTO Parcerias (
@@ -254,30 +283,51 @@ def nova():
                 1 if request.form.get('contrapartida') == 'on' else 0
             )
             
-            if execute_query(query, params):
+            print(f"[DEBUG NOVA] Parâmetros do INSERT: {params[:5]}...")  # Primeiros 5 para não lotar o log
+            
+            resultado_insert = execute_query(query, params)
+            print(f"[DEBUG NOVA] Resultado do INSERT na Parcerias: {resultado_insert}")
+            
+            if resultado_insert:
+                print("[DEBUG NOVA] INSERT bem-sucedido! Processando auditoria...")
+                
                 # Registrar na tabela de auditoria parcerias_pg
                 numero_termo = request.form.get('numero_termo')
                 pessoa_gestora = request.form.get('pessoa_gestora')
+                solicitacao_checkbox = request.form.get('solicitacao_alteracao')
+                solicitacao = True if solicitacao_checkbox == 'on' else False
+                
+                # DEBUG
+                print(f"[DEBUG NOVA] Checkbox solicitacao_alteracao: {solicitacao_checkbox}")
+                print(f"[DEBUG NOVA] Valor solicitacao: {solicitacao}")
+                print(f"[DEBUG NOVA] Pessoa gestora: {pessoa_gestora}")
                 
                 if pessoa_gestora:  # Só registrar se foi selecionada uma pessoa gestora
                     from flask import session
                     usuario_id = session.get('user_id')  # ID do usuário logado
                     
                     audit_query = """
-                        INSERT INTO parcerias_pg (numero_termo, nome_pg, usuario_id, dado_anterior)
-                        VALUES (%s, %s, %s, %s)
+                        INSERT INTO parcerias_pg (numero_termo, nome_pg, usuario_id, dado_anterior, solicitacao)
+                        VALUES (%s, %s, %s, %s, %s)
                     """
-                    execute_query(audit_query, (numero_termo, pessoa_gestora, usuario_id, None))
+                    print(f"[DEBUG NOVA] Executando INSERT com solicitacao={solicitacao}")
+                    resultado = execute_query(audit_query, (numero_termo, pessoa_gestora, usuario_id, None, solicitacao))
+                    print(f"[DEBUG NOVA] Resultado INSERT parcerias_pg: {resultado}")
                 
+                print("[DEBUG NOVA] Enviando flash de sucesso e redirecionando...")
                 flash("Parceria criada com sucesso!", "success")
                 return redirect(url_for('parcerias.nova'))
             else:
+                print("[DEBUG NOVA] FALHA no INSERT! execute_query retornou False")
                 flash("Erro ao criar parceria no banco de dados!", "danger")
             
         except Exception as e:
+            print(f"[DEBUG NOVA] EXCEÇÃO capturada: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             flash(f"Erro ao criar parceria: {str(e)}", "danger")
     
-    # GET - retornar formulário vazio
+    # GET - retornar formulário vazio (ou com dados pré-preenchidos da conferência)
     # Buscar dados dos dropdowns
     cur = get_cursor()
     cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
@@ -291,12 +341,54 @@ def nova():
     
     cur.close()
     
+    # Verificar se há um número de termo na query string (vindo da conferência)
+    numero_termo_param = request.args.get('numero_termo', '')
+    
+    # Criar objeto parceria com dados pré-preenchidos se existir
+    parceria_preenchida = None
+    if numero_termo_param:
+        # Buscar dados do CSV para este termo
+        import pandas as pd
+        import os
+        
+        csv_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'saida.csv')
+        
+        if os.path.exists(csv_path):
+            try:
+                df = pd.read_csv(csv_path, sep=';', encoding='utf-8-sig')
+                # Buscar a linha correspondente ao termo
+                termo_data = df[df['numero_termo'] == numero_termo_param]
+                
+                if not termo_data.empty:
+                    # Converter para dicionário
+                    parceria_preenchida = termo_data.iloc[0].to_dict()
+                    
+                    # Converter valores NaN para None/vazios
+                    for key, value in parceria_preenchida.items():
+                        if pd.isna(value):
+                            parceria_preenchida[key] = None
+                    
+                    # Tratar datas do pandas (Timestamp) para string no formato YYYY-MM-DD
+                    if parceria_preenchida.get('inicio') and isinstance(parceria_preenchida['inicio'], pd.Timestamp):
+                        parceria_preenchida['inicio'] = parceria_preenchida['inicio'].strftime('%Y-%m-%d')
+                    if parceria_preenchida.get('final') and isinstance(parceria_preenchida['final'], pd.Timestamp):
+                        parceria_preenchida['final'] = parceria_preenchida['final'].strftime('%Y-%m-%d')
+                else:
+                    # Se não encontrou no CSV, criar apenas com numero_termo
+                    parceria_preenchida = {'numero_termo': numero_termo_param}
+            except Exception as e:
+                print(f"[ERRO] Ao ler CSV: {e}")
+                parceria_preenchida = {'numero_termo': numero_termo_param}
+        else:
+            parceria_preenchida = {'numero_termo': numero_termo_param}
+    
     return render_template("parcerias_form.html", 
-                         parceria=None,
+                         parceria=parceria_preenchida,
                          tipos_contrato=tipos_contrato,
                          legislacoes=legislacoes,
                          pessoas_gestoras=pessoas_gestoras,
-                         rf_pessoa_gestora=None)
+                         rf_pessoa_gestora=None,
+                         modo_importacao=True if parceria_preenchida else False)
 
 
 @parcerias_bp.route("/editar/<path:numero_termo>", methods=["GET", "POST"])
@@ -369,15 +461,58 @@ def editar(numero_termo):
             
             if execute_query(query, params):
                 # Registrar na tabela de auditoria parcerias_pg se houve mudança
+                solicitacao_checkbox = request.form.get('solicitacao_alteracao')
+                solicitacao = True if solicitacao_checkbox == 'on' else False
+                
+                # DEBUG
+                print(f"[DEBUG EDITAR] Checkbox solicitacao_alteracao: {solicitacao_checkbox}")
+                print(f"[DEBUG EDITAR] Valor solicitacao: {solicitacao}")
+                print(f"[DEBUG EDITAR] Pessoa gestora nova: {pessoa_gestora_nova}")
+                print(f"[DEBUG EDITAR] Pessoa gestora anterior: {pessoa_gestora_anterior}")
+                
                 if pessoa_gestora_nova != pessoa_gestora_anterior:
                     from flask import session
                     usuario_id = session.get('user_id')
                     
+                    print(f"[DEBUG EDITAR] Pessoa gestora MUDOU - criando novo registro")
                     audit_query = """
-                        INSERT INTO parcerias_pg (numero_termo, nome_pg, usuario_id, dado_anterior)
-                        VALUES (%s, %s, %s, %s)
+                        INSERT INTO parcerias_pg (numero_termo, nome_pg, usuario_id, dado_anterior, solicitacao)
+                        VALUES (%s, %s, %s, %s, %s)
                     """
-                    execute_query(audit_query, (numero_termo, pessoa_gestora_nova, usuario_id, pessoa_gestora_anterior))
+                    resultado = execute_query(audit_query, (numero_termo, pessoa_gestora_nova, usuario_id, pessoa_gestora_anterior, solicitacao))
+                    print(f"[DEBUG EDITAR] Resultado INSERT (mudou PG): {resultado}")
+                elif pessoa_gestora_nova:
+                    # Se a pessoa gestora não mudou mas a checkbox mudou, atualizar apenas o flag
+                    from flask import session
+                    usuario_id = session.get('user_id')
+                    
+                    print(f"[DEBUG EDITAR] Pessoa gestora NÃO mudou - verificando solicitacao")
+                    # Verificar o estado atual de solicitacao
+                    cur = get_cursor()
+                    cur.execute("""
+                        SELECT solicitacao FROM parcerias_pg 
+                        WHERE numero_termo = %s 
+                        ORDER BY data_de_criacao DESC 
+                        LIMIT 1
+                    """, (numero_termo,))
+                    resultado = cur.fetchone()
+                    solicitacao_anterior = resultado['solicitacao'] if resultado else False
+                    cur.close()
+                    
+                    print(f"[DEBUG EDITAR] Solicitacao anterior: {solicitacao_anterior}")
+                    print(f"[DEBUG EDITAR] Solicitacao nova: {solicitacao}")
+                    
+                    # Se mudou, criar novo registro
+                    if solicitacao != solicitacao_anterior:
+                        print(f"[DEBUG EDITAR] Solicitacao MUDOU - criando novo registro")
+                        audit_query = """
+                            INSERT INTO parcerias_pg (numero_termo, nome_pg, usuario_id, dado_anterior, solicitacao)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """
+                        resultado_insert = execute_query(audit_query, (numero_termo, pessoa_gestora_nova, usuario_id, pessoa_gestora_anterior, solicitacao))
+                        print(f"[DEBUG EDITAR] Resultado INSERT (mudou solicitacao): {resultado_insert}")
+                    else:
+                        print(f"[DEBUG EDITAR] Solicitacao NÃO mudou - nenhum registro criado")
                 
                 flash("Parceria atualizada com sucesso!", "success")
                 return redirect(url_for('parcerias.listar'))
@@ -423,17 +558,18 @@ def editar(numero_termo):
     
     # Buscar pessoa gestora atual de parcerias_pg
     cur.execute("""
-        SELECT nome_pg FROM parcerias_pg 
+        SELECT nome_pg, solicitacao FROM parcerias_pg 
         WHERE numero_termo = %s 
         ORDER BY data_de_criacao DESC 
         LIMIT 1
     """, (numero_termo,))
     pg_result = cur.fetchone()
     
-    # Adicionar pessoa_gestora ao dicionário parceria
+    # Adicionar pessoa_gestora e solicitacao ao dicionário parceria
     if pg_result:
         parceria = dict(parceria)
         parceria['pessoa_gestora'] = pg_result['nome_pg']
+        parceria['solicitacao'] = pg_result['solicitacao']
     
     # Buscar dados dos dropdowns
     cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
@@ -516,39 +652,131 @@ def api_sigla_tipo_termo():
 @login_required
 def exportar_csv():
     """
-    Exporta TODAS as parcerias para CSV
+    Exporta parcerias para CSV respeitando os filtros aplicados
     """
     try:
+        # Obter os mesmos parâmetros de filtro da listagem
+        filtro_termo = request.args.get('filtro_termo', '').strip()
+        filtro_osc = request.args.get('filtro_osc', '').strip()
+        filtro_projeto = request.args.get('filtro_projeto', '').strip()
+        filtro_tipo_termo = request.args.get('filtro_tipo_termo', '').strip()
+        filtro_status = request.args.get('filtro_status', '').strip()
+        filtro_pessoa_gestora = request.args.get('filtro_pessoa_gestora', '').strip()
+        busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
+        busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
+        
         cur = get_cursor()
         
-        # Query para buscar TODAS as parcerias
+        # Construir query com filtros (mesma lógica da listagem)
         query = """
             SELECT 
-                numero_termo,
-                tipo_termo,
-                osc,
-                cnpj,
-                projeto,
-                portaria,
-                inicio,
-                final,
-                meses,
-                total_previsto,
-                sei_celeb,
-                sei_pc,
-                sei_plano,
-                sei_orcamento,
-                transicao
-            FROM Parcerias
-            ORDER BY numero_termo
+                p.numero_termo,
+                p.tipo_termo,
+                p.osc,
+                p.cnpj,
+                p.projeto,
+                p.portaria,
+                p.inicio,
+                p.final,
+                p.meses,
+                p.total_previsto,
+                p.sei_celeb,
+                p.sei_pc,
+                p.sei_plano,
+                p.sei_orcamento,
+                p.transicao,
+                (SELECT pg.nome_pg 
+                 FROM parcerias_pg pg 
+                 WHERE pg.numero_termo = p.numero_termo 
+                 ORDER BY pg.data_de_criacao DESC 
+                 LIMIT 1) as pessoa_gestora,
+                (SELECT pg.solicitacao 
+                 FROM parcerias_pg pg 
+                 WHERE pg.numero_termo = p.numero_termo 
+                 ORDER BY pg.data_de_criacao DESC 
+                 LIMIT 1) as solicitacao
+            FROM Parcerias p
+            WHERE 1=1
         """
         
-        cur.execute(query)
+        params = []
+        
+        # Adicionar filtros se fornecidos
+        if filtro_termo:
+            query += " AND p.numero_termo ILIKE %s"
+            params.append(f"%{filtro_termo}%")
+        
+        if filtro_osc:
+            query += " AND p.osc ILIKE %s"
+            params.append(f"%{filtro_osc}%")
+        
+        if filtro_projeto:
+            query += " AND p.projeto ILIKE %s"
+            params.append(f"%{filtro_projeto}%")
+        
+        if filtro_tipo_termo:
+            query += " AND p.tipo_termo ILIKE %s"
+            params.append(f"%{filtro_tipo_termo}%")
+        
+        if filtro_pessoa_gestora:
+            if filtro_pessoa_gestora.lower() == 'nenhuma':
+                query += """ AND NOT EXISTS (
+                    SELECT 1 FROM parcerias_pg pg 
+                    WHERE pg.numero_termo = p.numero_termo
+                )"""
+            elif filtro_pessoa_gestora.lower() == 'inativos':
+                query += """ AND EXISTS (
+                    SELECT 1 FROM parcerias_pg pg 
+                    LEFT JOIN categoricas.c_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
+                    WHERE pg.numero_termo = p.numero_termo 
+                    AND cpg.status_pg != 'Ativo'
+                    AND pg.data_de_criacao = (
+                        SELECT MAX(data_de_criacao) 
+                        FROM parcerias_pg 
+                        WHERE numero_termo = p.numero_termo
+                    )
+                )"""
+            else:
+                query += """ AND EXISTS (
+                    SELECT 1 FROM parcerias_pg pg 
+                    WHERE pg.numero_termo = p.numero_termo 
+                    AND pg.nome_pg ILIKE %s
+                    AND pg.data_de_criacao = (
+                        SELECT MAX(data_de_criacao) 
+                        FROM parcerias_pg 
+                        WHERE numero_termo = p.numero_termo
+                    )
+                )"""
+                params.append(f"%{filtro_pessoa_gestora}%")
+        
+        if busca_sei_celeb:
+            query += " AND p.sei_celeb ILIKE %s"
+            params.append(f"%{busca_sei_celeb}%")
+        
+        if busca_sei_pc:
+            query += " AND p.sei_pc ILIKE %s"
+            params.append(f"%{busca_sei_pc}%")
+        
+        # Filtro de status baseado em datas
+        if filtro_status:
+            if filtro_status == 'vigente':
+                query += " AND p.inicio <= CURRENT_DATE AND p.final >= CURRENT_DATE"
+            elif filtro_status == 'encerrado':
+                query += " AND p.final < CURRENT_DATE"
+            elif filtro_status == 'nao_iniciado':
+                query += " AND p.inicio > CURRENT_DATE"
+            elif filtro_status in ['rescindido', 'suspenso']:
+                query += " AND 1=0"  # Condição falsa para não retornar resultados
+        
+        query += " ORDER BY p.numero_termo"
+        
+        cur.execute(query, params)
         parcerias = cur.fetchall()
         cur.close()
         
-        # Criar arquivo CSV em memória
+        # Criar arquivo CSV em memória com BOM UTF-8 para corrigir encoding
         output = StringIO()
+        output.write('\ufeff')  # BOM UTF-8
         writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
         
         # Cabeçalho do CSV
@@ -559,7 +787,8 @@ def exportar_csv():
             'CNPJ',
             'Projeto',
             'Portaria',
-            'Coordenação',
+            'Pessoa Gestora',
+            'Solicitação',
             'Data Início',
             'Data Término',
             'Meses',
@@ -582,6 +811,8 @@ def exportar_csv():
                 parceria['cnpj'] or '-',
                 parceria['projeto'] or '-',
                 parceria['portaria'] or '-',
+                parceria['pessoa_gestora'] or '-',
+                'Sim' if parceria.get('solicitacao') else 'Não',
                 parceria['inicio'].strftime('%d/%m/%Y') if parceria['inicio'] else '-',
                 parceria['final'].strftime('%d/%m/%Y') if parceria['final'] else '-',
                 parceria['meses'] if parceria['meses'] is not None else '-',
@@ -596,7 +827,19 @@ def exportar_csv():
         # Preparar resposta
         output.seek(0)
         data_atual = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f'parcerias_{data_atual}.csv'
+        
+        # Verificar se há filtros aplicados para incluir no nome do arquivo
+        tem_filtros = any([filtro_termo, filtro_osc, filtro_projeto, filtro_tipo_termo, 
+                          filtro_status, filtro_pessoa_gestora, busca_sei_celeb, busca_sei_pc])
+        
+        if tem_filtros:
+            filename = f'parcerias_filtradas_{data_atual}.csv'
+        else:
+            filename = f'parcerias_completo_{data_atual}.csv'
+        
+        # Log para debug
+        print(f"[EXPORTAR CSV] Total de registros exportados: {len(parcerias)}")
+        print(f"[EXPORTAR CSV] Filtros aplicados: {tem_filtros}")
         
         return Response(
             output.getvalue(),
@@ -771,40 +1014,50 @@ def exportar_pdf():
 @login_required
 def conferencia():
     """
-    Compara as parcerias do CSV (coluna A) com as do banco (coluna B)
-    e mostra as parcerias não inseridas no sistema
+    Compara as parcerias do CSV com as do banco
+    e mostra as parcerias não inseridas no sistema com todos os dados
     """
+    print("[DEBUG CONFERENCIA] Função conferencia() foi chamada!")
+    
     import pandas as pd
     import os
     
     try:
         # Caminho do CSV gerado pelo script import_conferencia.py
         csv_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'saida.csv')
+        csv_path_abs = os.path.abspath(csv_path)
+        
+        print(f"[DEBUG CONFERENCIA] Procurando CSV em: {csv_path_abs}")
+        print(f"[DEBUG CONFERENCIA] Arquivo existe: {os.path.exists(csv_path_abs)}")
         
         # Verifica se o arquivo existe
         if not os.path.exists(csv_path):
-            flash("Arquivo de conferência não encontrado. Execute o script import_conferencia.py primeiro.", "warning")
+            flash("Arquivo de conferência não encontrado. Clique em 'Atualizar' para gerar.", "warning")
+            print(f"[DEBUG CONFERENCIA] Redirecionando para listar - arquivo não existe")
             return redirect(url_for('parcerias.listar'))
         
-        # Lê o CSV
+        # Lê o CSV com todos os campos
         df = pd.read_csv(csv_path, sep=';', encoding='utf-8-sig')
         
-        # Extrai as colunas
-        termos_planilha = df['Planilha'].dropna().tolist()
-        termos_database = df['Database'].dropna().tolist()
+        print(f"[DEBUG CONFERENCIA] CSV lido com sucesso - {len(df)} linhas")
+        print(f"[DEBUG CONFERENCIA] Colunas: {list(df.columns)}")
         
-        # Converte para sets para facilitar a comparação
-        set_planilha = set(termos_planilha)
-        set_database = set(termos_database)
+        # O CSV já contém apenas os termos não inseridos
+        termos_nao_inseridos = df['numero_termo'].tolist()
         
-        # Encontra os termos que estão na planilha mas NÃO estão no banco
-        termos_nao_inseridos = sorted(set_planilha - set_database)
+        # Busca total de termos no banco para estatísticas
+        cur = get_cursor()
+        cur.execute("SELECT COUNT(DISTINCT numero_termo) as total FROM Parcerias")
+        total_database = cur.fetchone()['total']
+        cur.close()
+        
+        print(f"[DEBUG CONFERENCIA] Total no banco: {total_database}")
+        print(f"[DEBUG CONFERENCIA] Termos não inseridos: {len(termos_nao_inseridos)}")
         
         # Estatísticas
-        total_planilha = len(set_planilha)
-        total_database = len(set_database)
         total_nao_inseridos = len(termos_nao_inseridos)
-        total_inseridos = len(set_planilha & set_database)
+        total_planilha = total_database + total_nao_inseridos
+        total_inseridos = total_database
         
         return render_template(
             'temp_conferencia.html',
@@ -816,5 +1069,50 @@ def conferencia():
         )
         
     except Exception as e:
+        import traceback
+        print(f"[ERRO CONFERENCIA] Exceção capturada: {str(e)}")
+        print(f"[ERRO CONFERENCIA] Traceback completo:")
+        traceback.print_exc()
         flash(f"Erro ao processar conferência: {str(e)}", "danger")
         return redirect(url_for('parcerias.listar'))
+
+
+@parcerias_bp.route("/conferencia/atualizar", methods=["POST"])
+@login_required
+def atualizar_conferencia():
+    """
+    Executa o script import_conferencia.py para atualizar os dados
+    e redireciona de volta para a página de conferência
+    """
+    import subprocess
+    import os
+    
+    try:
+        # Caminho do script
+        script_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'import_conferencia.py')
+        
+        if not os.path.exists(script_path):
+            flash("Script import_conferencia.py não encontrado.", "danger")
+            return redirect(url_for('parcerias.conferencia'))
+        
+        # Executa o script
+        result = subprocess.run(
+            ['python', script_path],
+            capture_output=True,
+            text=True,
+            timeout=30  # Timeout de 30 segundos
+        )
+        
+        if result.returncode == 0:
+            flash("Conferência atualizada com sucesso! ✓", "success")
+        else:
+            flash(f"Erro ao executar o script: {result.stderr}", "danger")
+        
+        return redirect(url_for('parcerias.conferencia'))
+        
+    except subprocess.TimeoutExpired:
+        flash("Timeout: O script demorou muito para executar.", "danger")
+        return redirect(url_for('parcerias.conferencia'))
+    except Exception as e:
+        flash(f"Erro ao atualizar conferência: {str(e)}", "danger")
+        return redirect(url_for('parcerias.conferencia'))
