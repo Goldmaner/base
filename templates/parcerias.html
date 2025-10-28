@@ -92,6 +92,15 @@
               <option value="suspenso" {% if filtro_status == 'suspenso' %}selected{% endif %}>Suspenso</option>
             </select>
           </div>
+          <div class="col-md-3">
+            <label for="filtro_pessoa_gestora" class="form-label">Pessoa Gestora</label>
+            <select class="form-select" id="filtro_pessoa_gestora" name="filtro_pessoa_gestora">
+              <option value="">-- Todas --</option>
+              {% for pg in pessoas_gestoras_filtro %}
+                <option value="{{ pg }}" {% if filtro_pessoa_gestora == pg %}selected{% endif %}>{{ pg }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
 
         <div class="row mb-3">
@@ -142,19 +151,32 @@
     <!-- Tabela de Parcerias -->
     <div class="table-container">
       {% if parcerias %}
-        <table class="table table-hover table-bordered">
+        <table class="table table-hover table-bordered" id="tabelaParcerias">
           <thead>
             <tr>
               <th class="text-center">Número do Termo</th>
-              <th class="text-center">OSC</th>
+              <th class="text-center sortable" onclick="sortTable(1)" style="cursor: pointer;">
+                OSC <i class="bi bi-arrow-down-up"></i>
+              </th>
               <th class="text-center">Projeto</th>
               <th class="text-center">Tipo de Termo</th>
               <th class="text-center">Status</th>
-              <th class="text-center">Data de Início</th>
-              <th class="text-center">Data de Término</th>
-              <th class="text-center">Meses do Projeto</th>
-              <th class="text-center">Total Valor Previsto</th>
-              <th class="text-center">Total Valor Pago</th>
+              <th class="text-center">Pessoa Gestora</th>
+              <th class="text-center sortable" onclick="sortTable(6)" style="cursor: pointer;">
+                Data de Início <i class="bi bi-arrow-down-up"></i>
+              </th>
+              <th class="text-center sortable" onclick="sortTable(7)" style="cursor: pointer;">
+                Data de Término <i class="bi bi-arrow-down-up"></i>
+              </th>
+              <th class="text-center sortable" onclick="sortTable(8)" style="cursor: pointer;">
+                Meses do Projeto <i class="bi bi-arrow-down-up"></i>
+              </th>
+              <th class="text-center sortable" onclick="sortTable(9)" style="cursor: pointer;">
+                Total Valor Previsto <i class="bi bi-arrow-down-up"></i>
+              </th>
+              <th class="text-center sortable" onclick="sortTable(10)" style="cursor: pointer;">
+                Total Valor Pago <i class="bi bi-arrow-down-up"></i>
+              </th>
               <th class="text-center">SEI de Celebração</th>
               <th class="text-center">SEI de Pagamento</th>
               <th class="text-center">Ações</th>
@@ -180,6 +202,12 @@
                     </span>
                   {% else %}
                     <span class="badge bg-light text-dark">-</span>
+                  {% endif %}
+                </td>
+                <td class="text-center {% if parceria.status_pg and parceria.status_pg != 'Ativo' and parceria.status_calculado == 'Vigente' %}table-warning{% endif %}">
+                  {{ parceria.pessoa_gestora or '-' }}
+                  {% if parceria.status_pg and parceria.status_pg != 'Ativo' and parceria.status_calculado == 'Vigente' %}
+                    <i class="bi bi-exclamation-triangle text-warning" title="Pessoa gestora inativa em termo vigente"></i>
                   {% endif %}
                 </td>
                 <td class="text-center">{{ parceria.inicio.strftime('%d/%m/%Y') if parceria.inicio else '-' }}</td>
@@ -252,6 +280,86 @@
         btnExportar.disabled = false;
         btnExportar.innerHTML = textoOriginal;
       }, 2000);
+    }
+
+    // Função de ordenação de tabela
+    let sortDirections = {}; // Armazena a direção da ordenação para cada coluna
+
+    function sortTable(columnIndex) {
+      const table = document.getElementById('tabelaParcerias');
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      
+      // Determinar direção da ordenação (alternando entre ascendente/descendente)
+      if (!sortDirections[columnIndex]) {
+        sortDirections[columnIndex] = 'asc';
+      } else {
+        sortDirections[columnIndex] = sortDirections[columnIndex] === 'asc' ? 'desc' : 'asc';
+      }
+      const direction = sortDirections[columnIndex];
+      
+      // Ordenar linhas
+      rows.sort((a, b) => {
+        const cellA = a.cells[columnIndex];
+        const cellB = b.cells[columnIndex];
+        
+        let valueA = cellA.textContent.trim();
+        let valueB = cellB.textContent.trim();
+        
+        // Remover ícones de aviso do texto antes de comparar
+        valueA = valueA.replace(/\s*\u26A0.*$/, '').trim();
+        valueB = valueB.replace(/\s*\u26A0.*$/, '').trim();
+        
+        // Tratar células vazias
+        if (valueA === '-') valueA = '';
+        if (valueB === '-') valueB = '';
+        
+        // Detectar tipo de dado e fazer comparação apropriada
+        let comparison = 0;
+        
+        // Datas no formato dd/mm/yyyy
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(valueA) && /^\d{2}\/\d{2}\/\d{4}$/.test(valueB)) {
+          const [dayA, monthA, yearA] = valueA.split('/').map(Number);
+          const [dayB, monthB, yearB] = valueB.split('/').map(Number);
+          const dateA = new Date(yearA, monthA - 1, dayA);
+          const dateB = new Date(yearB, monthB - 1, dayB);
+          comparison = dateA - dateB;
+        }
+        // Valores monetários (R$ 1.234,56)
+        else if (valueA.startsWith('R$') && valueB.startsWith('R$')) {
+          const numA = parseFloat(valueA.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+          const numB = parseFloat(valueB.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+          comparison = numA - numB;
+        }
+        // Números inteiros
+        else if (!isNaN(valueA) && !isNaN(valueB) && valueA !== '' && valueB !== '') {
+          comparison = parseFloat(valueA) - parseFloat(valueB);
+        }
+        // Texto
+        else {
+          comparison = valueA.localeCompare(valueB, 'pt-BR', { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+      });
+      
+      // Reordenar as linhas na tabela
+      rows.forEach(row => tbody.appendChild(row));
+      
+      // Atualizar ícones de ordenação
+      const headers = table.querySelectorAll('th.sortable');
+      headers.forEach((header, index) => {
+        const icon = header.querySelector('i');
+        if (icon) {
+          // Encontrar qual índice de coluna corresponde a este cabeçalho
+          const headerIndex = Array.from(table.querySelectorAll('th')).indexOf(header);
+          if (headerIndex === columnIndex) {
+            icon.className = direction === 'asc' ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
+          } else {
+            icon.className = 'bi bi-arrow-down-up';
+          }
+        }
+      });
     }
   </script>
 </body>

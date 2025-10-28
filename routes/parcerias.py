@@ -31,6 +31,7 @@ def listar():
     filtro_projeto = request.args.get('filtro_projeto', '').strip()
     filtro_tipo_termo = request.args.get('filtro_tipo_termo', '').strip()
     filtro_status = request.args.get('filtro_status', '').strip()
+    filtro_pessoa_gestora = request.args.get('filtro_pessoa_gestora', '').strip()
     busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
     busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
     
@@ -51,6 +52,10 @@ def listar():
     tipos_contrato_raw = cur.fetchall()
     tipos_contrato = [row['informacao'] for row in tipos_contrato_raw]
     
+    # Buscar pessoas gestoras para o dropdown de filtro (todas, incluindo inativas)
+    cur.execute("SELECT DISTINCT nome_pg FROM categoricas.c_pessoa_gestora ORDER BY nome_pg")
+    pessoas_gestoras_filtro = [row['nome_pg'] for row in cur.fetchall()]
+    
     # DEBUG: Verificar duplicação
     print(f"[DEBUG] Total de tipos_contrato retornados: {len(tipos_contrato)}")
     print(f"[DEBUG] Tipos únicos: {len(set(tipos_contrato))}")
@@ -61,18 +66,29 @@ def listar():
     # Construir query dinamicamente com filtros
     query = """
         SELECT 
-            numero_termo,
-            osc,
-            projeto,
-            tipo_termo,
-            inicio,
-            final,
-            meses,
-            total_previsto,
-            total_pago,
-            sei_celeb,
-            sei_pc
-        FROM Parcerias
+            p.numero_termo,
+            p.osc,
+            p.projeto,
+            p.tipo_termo,
+            p.inicio,
+            p.final,
+            p.meses,
+            p.total_previsto,
+            p.total_pago,
+            p.sei_celeb,
+            p.sei_pc,
+            (SELECT pg.nome_pg 
+             FROM parcerias_pg pg 
+             WHERE pg.numero_termo = p.numero_termo 
+             ORDER BY pg.data_de_criacao DESC 
+             LIMIT 1) as pessoa_gestora,
+            (SELECT cpg.status_pg 
+             FROM parcerias_pg pg 
+             LEFT JOIN categoricas.c_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
+             WHERE pg.numero_termo = p.numero_termo 
+             ORDER BY pg.data_de_criacao DESC 
+             LIMIT 1) as status_pg
+        FROM Parcerias p
         WHERE 1=1
     """
     
@@ -92,8 +108,21 @@ def listar():
         params.append(f"%{filtro_projeto}%")
     
     if filtro_tipo_termo:
-        query += " AND tipo_termo ILIKE %s"
+        query += " AND p.tipo_termo ILIKE %s"
         params.append(f"%{filtro_tipo_termo}%")
+    
+    if filtro_pessoa_gestora:
+        query += """ AND EXISTS (
+            SELECT 1 FROM parcerias_pg pg 
+            WHERE pg.numero_termo = p.numero_termo 
+            AND pg.nome_pg ILIKE %s
+            AND pg.data_de_criacao = (
+                SELECT MAX(data_de_criacao) 
+                FROM parcerias_pg 
+                WHERE numero_termo = p.numero_termo
+            )
+        )"""
+        params.append(f"%{filtro_pessoa_gestora}%")
     
     if busca_sei_celeb:
         query += " AND sei_celeb ILIKE %s"
@@ -170,11 +199,13 @@ def listar():
     return render_template("parcerias.html", 
                          parcerias=parcerias,
                          tipos_contrato=tipos_contrato,
+                         pessoas_gestoras_filtro=pessoas_gestoras_filtro,
                          filtro_termo=filtro_termo,
                          filtro_osc=filtro_osc,
                          filtro_projeto=filtro_projeto,
                          filtro_tipo_termo=filtro_tipo_termo,
                          filtro_status=filtro_status,
+                         filtro_pessoa_gestora=filtro_pessoa_gestora,
                          busca_sei_celeb=busca_sei_celeb,
                          busca_sei_pc=busca_sei_pc,
                          limite=limite,
@@ -224,6 +255,20 @@ def nova():
             )
             
             if execute_query(query, params):
+                # Registrar na tabela de auditoria parcerias_pg
+                numero_termo = request.form.get('numero_termo')
+                pessoa_gestora = request.form.get('pessoa_gestora')
+                
+                if pessoa_gestora:  # Só registrar se foi selecionada uma pessoa gestora
+                    from flask import session
+                    usuario_id = session.get('user_id')  # ID do usuário logado
+                    
+                    audit_query = """
+                        INSERT INTO parcerias_pg (numero_termo, nome_pg, usuario_id, dado_anterior)
+                        VALUES (%s, %s, %s, %s)
+                    """
+                    execute_query(audit_query, (numero_termo, pessoa_gestora, usuario_id, None))
+                
                 flash("Parceria criada com sucesso!", "success")
                 return redirect(url_for('parcerias.nova'))
             else:
@@ -239,12 +284,19 @@ def nova():
     tipos_contrato = [row['informacao'] for row in cur.fetchall()]
     cur.execute("SELECT lei FROM categoricas.c_legislacao ORDER BY lei")
     legislacoes = [row['lei'] for row in cur.fetchall()]
+    
+    # Buscar pessoas gestoras (todas, incluindo inativas)
+    cur.execute("SELECT nome_pg, numero_rf, status_pg FROM categoricas.c_pessoa_gestora ORDER BY nome_pg")
+    pessoas_gestoras = cur.fetchall()
+    
     cur.close()
     
     return render_template("parcerias_form.html", 
                          parceria=None,
                          tipos_contrato=tipos_contrato,
-                         legislacoes=legislacoes)
+                         legislacoes=legislacoes,
+                         pessoas_gestoras=pessoas_gestoras,
+                         rf_pessoa_gestora=None)
 
 
 @parcerias_bp.route("/editar/<path:numero_termo>", methods=["GET", "POST"])
@@ -254,6 +306,18 @@ def editar(numero_termo):
     Formulário completo de edição de parceria
     """
     if request.method == "POST":
+        # Buscar valor anterior da pessoa_gestora para auditoria
+        cur = get_cursor()
+        cur.execute("""
+            SELECT nome_pg FROM parcerias_pg 
+            WHERE numero_termo = %s 
+            ORDER BY data_de_criacao DESC 
+            LIMIT 1
+        """, (numero_termo,))
+        resultado = cur.fetchone()
+        pessoa_gestora_anterior = resultado['nome_pg'] if resultado else None
+        cur.close()
+        
         # Atualizar os dados da parceria
         try:
             query = """
@@ -279,6 +343,8 @@ def editar(numero_termo):
                 WHERE numero_termo = %s
             """
             
+            pessoa_gestora_nova = request.form.get('pessoa_gestora') or None
+            
             params = (
                 request.form.get('osc'),
                 request.form.get('projeto'),
@@ -291,17 +357,28 @@ def editar(numero_termo):
                 request.form.get('total_previsto_hidden') or request.form.get('total_previsto') or None,
                 request.form.get('total_pago_hidden') or request.form.get('total_pago') or 0,
                 request.form.get('conta'),
-                1 if request.form.get('transicao') == 'on' else 0,  # checkbox como integer
+                1 if request.form.get('transicao') == 'on' else 0,
                 request.form.get('sei_celeb'),
                 request.form.get('sei_pc'),
                 request.form.get('endereco'),
                 request.form.get('sei_plano'),
                 request.form.get('sei_orcamento'),
-                1 if request.form.get('contrapartida') == 'on' else 0,  # checkbox como integer
+                1 if request.form.get('contrapartida') == 'on' else 0,
                 numero_termo
             )
             
             if execute_query(query, params):
+                # Registrar na tabela de auditoria parcerias_pg se houve mudança
+                if pessoa_gestora_nova != pessoa_gestora_anterior:
+                    from flask import session
+                    usuario_id = session.get('user_id')
+                    
+                    audit_query = """
+                        INSERT INTO parcerias_pg (numero_termo, nome_pg, usuario_id, dado_anterior)
+                        VALUES (%s, %s, %s, %s)
+                    """
+                    execute_query(audit_query, (numero_termo, pessoa_gestora_nova, usuario_id, pessoa_gestora_anterior))
+                
                 flash("Parceria atualizada com sucesso!", "success")
                 return redirect(url_for('parcerias.listar'))
             else:
@@ -339,21 +416,51 @@ def editar(numero_termo):
     
     parceria = cur.fetchone()
     
+    if not parceria:
+        cur.close()
+        flash("Parceria não encontrada!", "danger")
+        return redirect(url_for('parcerias.listar'))
+    
+    # Buscar pessoa gestora atual de parcerias_pg
+    cur.execute("""
+        SELECT nome_pg FROM parcerias_pg 
+        WHERE numero_termo = %s 
+        ORDER BY data_de_criacao DESC 
+        LIMIT 1
+    """, (numero_termo,))
+    pg_result = cur.fetchone()
+    
+    # Adicionar pessoa_gestora ao dicionário parceria
+    if pg_result:
+        parceria = dict(parceria)
+        parceria['pessoa_gestora'] = pg_result['nome_pg']
+    
     # Buscar dados dos dropdowns
     cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
     tipos_contrato = [row['informacao'] for row in cur.fetchall()]
     cur.execute("SELECT lei FROM categoricas.c_legislacao ORDER BY lei")
     legislacoes = [row['lei'] for row in cur.fetchall()]
-    cur.close()
     
-    if not parceria:
-        flash("Parceria não encontrada!", "danger")
-        return redirect(url_for('parcerias.listar'))
+    # Buscar pessoas gestoras (todas, incluindo inativas)
+    cur.execute("SELECT nome_pg, numero_rf, status_pg FROM categoricas.c_pessoa_gestora ORDER BY nome_pg")
+    pessoas_gestoras = cur.fetchall()
+    
+    # Buscar RF da pessoa gestora atual se existir
+    rf_pessoa_gestora = None
+    if pg_result:
+        cur.execute("SELECT numero_rf FROM categoricas.c_pessoa_gestora WHERE nome_pg = %s", (pg_result['nome_pg'],))
+        rf_result = cur.fetchone()
+        if rf_result:
+            rf_pessoa_gestora = rf_result['numero_rf']
+    
+    cur.close()
     
     return render_template("parcerias_form.html", 
                          parceria=parceria,
                          tipos_contrato=tipos_contrato,
-                         legislacoes=legislacoes)
+                         legislacoes=legislacoes,
+                         pessoas_gestoras=pessoas_gestoras,
+                         rf_pessoa_gestora=rf_pessoa_gestora)
 
 
 @parcerias_bp.route("/api/oscs", methods=["GET"])

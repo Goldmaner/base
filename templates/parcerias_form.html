@@ -230,6 +230,39 @@
           </div>
         </div>
 
+        <!-- Seção: Pessoa Gestora -->
+        <div class="section-title">PESSOA GESTORA</div>
+        
+        <div class="row mb-3">
+          <div class="col-md-8">
+            <label for="pessoa_gestora" class="form-label">Pessoa Gestora</label>
+            <select class="form-select" id="pessoa_gestora" name="pessoa_gestora">
+              <option value="">-- Selecione --</option>
+              {% for pg in pessoas_gestoras %}
+                <option value="{{ pg.nome_pg }}" data-rf="{{ pg.numero_rf or '' }}" 
+                        data-status="{{ pg.status_pg }}"
+                        style="{% if pg.status_pg != 'Ativo' %}background-color: #fff3cd; font-style: italic;{% endif %}"
+                        {% if parceria and parceria.pessoa_gestora == pg.nome_pg %}selected{% endif %}>
+                  {{ pg.nome_pg }}{% if pg.status_pg != 'Ativo' %} (Inativo){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              <i class="bi bi-info-circle"></i> 
+              Selecione a pessoa gestora responsável por esta parceria.
+              <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Pessoas gestoras inativas estão destacadas em amarelo.</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label for="rf_pessoa_gestora" class="form-label">R.F. da Pessoa Gestora</label>
+            <input type="text" class="form-control" id="rf_pessoa_gestora" name="rf_pessoa_gestora" 
+                   value="{{ rf_pessoa_gestora if rf_pessoa_gestora else '' }}" readonly disabled>
+            <div class="form-text">
+              <i class="bi bi-lock"></i> Preenchido automaticamente
+            </div>
+          </div>
+        </div>
+
         <!-- Botões de Ação -->
         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
           <button type="button" class="btn btn-danger" onclick="exportarPDF()">
@@ -318,6 +351,24 @@
         cnpjField.style.borderColor = '#28a745';
         setTimeout(() => {
           cnpjField.style.borderColor = '';
+        }, 1000);
+      }
+    });
+
+    // ========== 3.1. PREENCHIMENTO AUTOMÁTICO DE R.F. DA PESSOA GESTORA ==========
+    document.getElementById('pessoa_gestora').addEventListener('change', function(e) {
+      const selectPG = e.target;
+      const selectedOption = selectPG.options[selectPG.selectedIndex];
+      const rf = selectedOption.getAttribute('data-rf') || '';
+      
+      const rfField = document.getElementById('rf_pessoa_gestora');
+      rfField.value = rf;
+      
+      // Feedback visual
+      if (rf) {
+        rfField.style.borderColor = '#28a745';
+        setTimeout(() => {
+          rfField.style.borderColor = '';
         }, 1000);
       }
     });
