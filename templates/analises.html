@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menu de Análises - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f8f9fa; }
+    .filtro-row { background-color: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+    .table-responsive { max-height: 70vh; overflow-y: auto; }
+    .table thead { position: sticky; top: 0; z-index: 10; }
+    .badge-regularidade-no-prazo { background-color: #28a745; }
+    .badge-regularidade-pendente { background-color: #ffc107; color: #000; }
+    .badge-regularidade-atrasado { background-color: #dc3545; }
+    
+    /* Centralizar todas as células da tabela */
+    .table th, .table td {
+      text-align: center;
+      vertical-align: middle;
+    }
+    
+    /* Estilo para os dropdowns de checkbox */
+    .dropdown-menu label {
+      cursor: pointer;
+      margin: 0;
+      padding: 0.25rem 1rem;
+    }
+    .dropdown-menu label:hover {
+      background-color: #f8f9fa;
+    }
+    .dropdown-menu .form-check-input {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid mt-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2><i class="bi bi-file-earmark-bar-graph"></i> Menu de Análises</h2>
+        <p class="text-muted">Gestão de prestações de contas</p>
+      </div>
+      <div>
+        <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filtro-row">
+      <div class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Limite de Linhas</label>
+          <select id="filtroLimite" class="form-select">
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+            <option value="todas">Todas</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Tipo de Prestação</label>
+          <input type="text" id="filtroTipo" class="form-control" placeholder="Final, Semestral...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">SEI PC</label>
+          <input type="text" id="filtroSeiPc" class="form-control" placeholder="Número SEI PC...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Termo</label>
+          <input type="text" id="filtroTermo" class="form-control" placeholder="TFM/001/2024...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">OSC</label>
+          <input type="text" id="filtroOSC" class="form-control" placeholder="Nome da OSC...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Responsabilidade</label>
+          <select id="filtroResponsabilidade" class="form-select">
+            <option value="">Todas</option>
+            <option value="1">DP</option>
+            <option value="2">Compartilhada</option>
+            <option value="3">Pessoa Gestora</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Entregue</label>
+          <select id="filtroEntregue" class="form-select">
+            <option value="">Todos</option>
+            <option value="sim">✓ Sim</option>
+            <option value="nao">✗ Não</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold"><i class="bi bi-bell"></i> Notificação</label>
+          <select id="filtroNotificacao" class="form-select">
+            <option value="">Todos</option>
+            <option value="sim">✓ Sim</option>
+            <option value="nao">✗ Não</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold"><i class="bi bi-file-text"></i> Parecer</label>
+          <select id="filtroParecer" class="form-select">
+            <option value="">Todos</option>
+            <option value="sim">✓ Sim</option>
+            <option value="nao">✗ Não</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold"><i class="bi bi-arrow-repeat"></i> Fase Recursal</label>
+          <select id="filtroFaseRecursal" class="form-select">
+            <option value="">Todos</option>
+            <option value="sim">✓ Sim</option>
+            <option value="nao">✗ Não</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold"><i class="bi bi-check-circle"></i> Encerramento</label>
+          <select id="filtroEncerramento" class="form-select">
+            <option value="">Todos</option>
+            <option value="sim">✓ Sim</option>
+            <option value="nao">✗ Não</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Regularidade</label>
+          <select id="filtroRegularidade" class="form-select">
+            <option value="">Todas</option>
+            <option value="No prazo">No prazo</option>
+            <option value="Pendente">Pendente</option>
+            <option value="Atrasado">Atrasado</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Data Parecer DP</label>
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="dropdownDataParecerDP" data-bs-toggle="dropdown" aria-expanded="false">
+              <span id="labelDataParecerDP">Todos os anos</span>
+            </button>
+            <ul class="dropdown-menu w-100" aria-labelledby="dropdownDataParecerDP" id="listaAnosDP" style="max-height: 200px; overflow-y: auto;">
+              <li><small class="dropdown-item-text text-muted">Carregando...</small></li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Data Parecer PG</label>
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="dropdownDataParecerPG" data-bs-toggle="dropdown" aria-expanded="false">
+              <span id="labelDataParecerPG">Todos os anos</span>
+            </button>
+            <ul class="dropdown-menu w-100" aria-labelledby="dropdownDataParecerPG" id="listaAnosPG" style="max-height: 200px; overflow-y: auto;">
+              <li><small class="dropdown-item-text text-muted">Carregando...</small></li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-primary w-100" onclick="aplicarFiltros()">
+            <i class="bi bi-search me-2"></i>Buscar
+          </button>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-secondary w-100" onclick="limparFiltros()">
+            <i class="bi bi-x-circle me-2"></i>Limpar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contador de resultados -->
+    <div id="contadorResultados" class="alert alert-info mb-3 text-center" style="display: none;">
+      <i class="bi bi-info-circle-fill me-2"></i>
+      <strong><span id="numeroResultados">0</span> prestações de contas encontradas</strong>
+    </div>
+
+    <!-- Botões de ação -->
+    <div class="mb-3">
+      <button class="btn btn-success" onclick="adicionarAnalise()" disabled>
+        <i class="bi bi-plus-circle me-2"></i>Adicionar Análise
+      </button>
+      <button class="btn btn-info" onclick="exportarCSV()">
+        <i class="bi bi-download me-2"></i>Exportar CSV
+      </button>
+    </div>
+
+    <!-- Tabela de dados -->
+    <div id="areaTabela" style="display: none;">
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0" id="tabelaAnalises">
+              <thead class="table-dark">
+                <tr>
+                  <th>Tipo</th>
+                  <th>Número</th>
+                  <th>Vigência Inicial</th>
+                  <th>Vigência Final</th>
+                  <th>Termo</th>
+                  <th>SEI PC</th>
+                  <th>OSC</th>
+                  <th>Responsabilidade</th>
+                  <th>Prazo</th>
+                  <th>Entregue</th>
+                  <th>Regularidade</th>
+                  <th>Cobrado</th>
+                  <th>Notificação</th>
+                  <th>Parecer</th>
+                  <th>Fase Recursal</th>
+                  <th>Encerramento</th>
+                  <th>Data Parecer DP</th>
+                  <th>Valor Devolução</th>
+                  <th>Valor Devolvido</th>
+                  <th>Responsável DP</th>
+                  <th>Data Parecer PG</th>
+                  <th>Responsável PG</th>
+                  <th>Observações</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="corpoTabela">
+                <!-- Dados carregados via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensagem inicial -->
+    <div id="mensagemInicial" class="alert alert-info text-center">
+      <i class="bi bi-info-circle-fill me-2"></i>
+      Configure os filtros e clique em <strong>Buscar</strong> para visualizar as análises.
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let dadosAtuais = [];
+    let anosSelecionadosDP = new Set();
+    let anosSelecionadosPG = new Set();
+
+    // Carregar anos disponíveis ao iniciar a página
+    document.addEventListener('DOMContentLoaded', function() {
+      carregarAnosDisponiveis();
+    });
+
+    async function carregarAnosDisponiveis() {
+      try {
+        const response = await fetch('/analises/api/anos-disponiveis');
+        const data = await response.json();
+        
+        console.log('[DEBUG] Anos disponíveis:', data);
+        
+        // Preencher dropdown de Data Parecer DP
+        const listaDP = document.getElementById('listaAnosDP');
+        listaDP.innerHTML = '';
+        
+        if (data.anos_dp && data.anos_dp.length > 0) {
+          data.anos_dp.forEach(ano => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <label class="dropdown-item">
+                <input type="checkbox" class="form-check-input me-2" value="${ano}" onchange="atualizarFiltroAnosDP()">
+                ${ano}
+              </label>
+            `;
+            listaDP.appendChild(li);
+          });
+        } else {
+          listaDP.innerHTML = '<li><small class="dropdown-item-text text-muted">Nenhum ano disponível</small></li>';
+        }
+        
+        // Preencher dropdown de Data Parecer PG
+        const listaPG = document.getElementById('listaAnosPG');
+        listaPG.innerHTML = '';
+        
+        if (data.anos_pg && data.anos_pg.length > 0) {
+          data.anos_pg.forEach(ano => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <label class="dropdown-item">
+                <input type="checkbox" class="form-check-input me-2" value="${ano}" onchange="atualizarFiltroAnosPG()">
+                ${ano}
+              </label>
+            `;
+            listaPG.appendChild(li);
+          });
+        } else {
+          listaPG.innerHTML = '<li><small class="dropdown-item-text text-muted">Nenhum ano disponível</small></li>';
+        }
+        
+      } catch (error) {
+        console.error('[ERRO] Erro ao carregar anos:', error);
+      }
+    }
+
+    function atualizarFiltroAnosDP() {
+      anosSelecionadosDP.clear();
+      const checkboxes = document.querySelectorAll('#listaAnosDP input[type="checkbox"]:checked');
+      checkboxes.forEach(cb => anosSelecionadosDP.add(cb.value));
+      
+      const label = document.getElementById('labelDataParecerDP');
+      if (anosSelecionadosDP.size === 0) {
+        label.textContent = 'Todos os anos';
+      } else {
+        label.textContent = `${anosSelecionadosDP.size} ano(s) selecionado(s)`;
+      }
+    }
+
+    function atualizarFiltroAnosPG() {
+      anosSelecionadosPG.clear();
+      const checkboxes = document.querySelectorAll('#listaAnosPG input[type="checkbox"]:checked');
+      checkboxes.forEach(cb => anosSelecionadosPG.add(cb.value));
+      
+      const label = document.getElementById('labelDataParecerPG');
+      if (anosSelecionadosPG.size === 0) {
+        label.textContent = 'Todos os anos';
+      } else {
+        label.textContent = `${anosSelecionadosPG.size} ano(s) selecionado(s)`;
+      }
+    }
+
+    async function aplicarFiltros() {
+      try {
+        // Mostrar loading
+        document.getElementById('areaTabela').style.display = 'none';
+        document.getElementById('mensagemInicial').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Carregando...</span></div><p class="mt-2">Carregando análises...</p></div>';
+        document.getElementById('mensagemInicial').style.display = 'block';
+
+        // Montar parâmetros de filtro
+        const params = new URLSearchParams({
+          limite: document.getElementById('filtroLimite')?.value || '50',
+          filtro_tipo: document.getElementById('filtroTipo')?.value || '',
+          filtro_sei_pc: document.getElementById('filtroSeiPc')?.value || '',
+          filtro_termo: document.getElementById('filtroTermo')?.value || '',
+          filtro_osc: document.getElementById('filtroOSC')?.value || '',
+          filtro_responsabilidade: document.getElementById('filtroResponsabilidade')?.value || '',
+          filtro_entregue: document.getElementById('filtroEntregue')?.value || '',
+          filtro_notificacao: document.getElementById('filtroNotificacao')?.value || '',
+          filtro_parecer: document.getElementById('filtroParecer')?.value || '',
+          filtro_fase_recursal: document.getElementById('filtroFaseRecursal')?.value || '',
+          filtro_encerramento: document.getElementById('filtroEncerramento')?.value || '',
+          filtro_regularidade: document.getElementById('filtroRegularidade')?.value || '',
+          filtro_data_parecer_dp: Array.from(anosSelecionadosDP).join(','),
+          filtro_data_parecer_pg: Array.from(anosSelecionadosPG).join(',')
+        });
+
+        const response = await fetch(`/analises/api/dados?${params}`);
+        const dados = await response.json();
+
+        console.log('[DEBUG] Dados recebidos:', dados.length);
+        dadosAtuais = dados;
+
+        if (dados.length === 0) {
+          document.getElementById('mensagemInicial').innerHTML = '<div class="alert alert-warning text-center"><i class="bi bi-exclamation-triangle-fill me-2"></i>Nenhuma análise encontrada com os filtros aplicados.</div>';
+          document.getElementById('areaTabela').style.display = 'none';
+          document.getElementById('contadorResultados').style.display = 'none';
+          return;
+        }
+
+        // Atualizar contador de resultados
+        document.getElementById('numeroResultados').textContent = dados.length;
+        document.getElementById('contadorResultados').style.display = 'block';
+
+        // Renderizar tabela
+        renderizarTabela(dados);
+        document.getElementById('mensagemInicial').style.display = 'none';
+        document.getElementById('areaTabela').style.display = 'block';
+
+      } catch (error) {
+        console.error('[ERRO] Erro ao carregar análises:', error);
+        document.getElementById('contadorResultados').style.display = 'none';
+        document.getElementById('areaTabela').style.display = 'none';
+        document.getElementById('mensagemInicial').innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Erro ao carregar análises: ' + error.message + '</div>';
+        document.getElementById('mensagemInicial').style.display = 'block';
+      }
+    }
+
+    function renderizarTabela(dados) {
+      const tbody = document.getElementById('corpoTabela');
+      tbody.innerHTML = '';
+
+      dados.forEach(row => {
+        const tr = document.createElement('tr');
+        
+        // Badge de regularidade com cores
+        let badgeClass = '';
+        if (row.regularidade === 'No prazo') badgeClass = 'badge-regularidade-no-prazo';
+        else if (row.regularidade === 'Pendente') badgeClass = 'badge-regularidade-pendente';
+        else if (row.regularidade === 'Atrasado') badgeClass = 'badge-regularidade-atrasado';
+
+        tr.innerHTML = `
+          <td>${row.tipo_prestacao}</td>
+          <td>${row.numero_prestacao}</td>
+          <td>${row.vigencia_inicial}</td>
+          <td>${row.vigencia_final}</td>
+          <td>${row.numero_termo}</td>
+          <td>${row.sei_pc}</td>
+          <td>${row.osc}</td>
+          <td>${row.responsabilidade_analise}</td>
+          <td>${row.prazo}</td>
+          <td>${row.entregue}</td>
+          <td><span class="badge ${badgeClass}">${row.regularidade}</span></td>
+          <td>${row.cobrado}</td>
+          <td>${row.e_notificacao}</td>
+          <td>${row.e_parecer}</td>
+          <td>${row.e_fase_recursal}</td>
+          <td>${row.e_encerramento}</td>
+          <td>${row.data_parecer_dp}</td>
+          <td>${row.valor_devolucao}</td>
+          <td>${row.valor_devolvido}</td>
+          <td>${row.responsavel_dp}</td>
+          <td>${row.data_parecer_pg}</td>
+          <td>${row.responsavel_pg}</td>
+          <td title="${row.observacoes}">${row.observacoes.substring(0, 50)}${row.observacoes.length > 50 ? '...' : ''}</td>
+          <td>
+            <button class="btn btn-sm btn-warning" onclick="editarPorTermo('${row.numero_termo}')" title="Editar todas as análises deste termo">
+              <i class="bi bi-pencil"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function limparFiltros() {
+      const elementos = [
+        'filtroLimite', 'filtroTipo', 'filtroSeiPc', 'filtroTermo', 'filtroOSC',
+        'filtroResponsabilidade', 'filtroEntregue', 'filtroNotificacao', 'filtroParecer',
+        'filtroFaseRecursal', 'filtroEncerramento', 'filtroRegularidade'
+      ];
+      
+      elementos.forEach(id => {
+        const elem = document.getElementById(id);
+        if (elem) {
+          elem.value = id === 'filtroLimite' ? '50' : '';
+        }
+      });
+      
+      // Limpar checkboxes de anos
+      document.querySelectorAll('#listaAnosDP input[type="checkbox"]').forEach(cb => cb.checked = false);
+      document.querySelectorAll('#listaAnosPG input[type="checkbox"]').forEach(cb => cb.checked = false);
+      anosSelecionadosDP.clear();
+      anosSelecionadosPG.clear();
+      document.getElementById('labelDataParecerDP').textContent = 'Todos os anos';
+      document.getElementById('labelDataParecerPG').textContent = 'Todos os anos';
+      
+      document.getElementById('areaTabela').style.display = 'none';
+      document.getElementById('contadorResultados').style.display = 'none';
+      document.getElementById('mensagemInicial').innerHTML = '<div class="alert alert-info text-center"><i class="bi bi-info-circle-fill me-2"></i>Configure os filtros e clique em <strong>Buscar</strong> para visualizar as análises.</div>';
+      document.getElementById('mensagemInicial').style.display = 'block';
+    }
+
+    function editarPorTermo(numeroTermo) {
+      window.location.href = `/analises/editar-termo?termo=${encodeURIComponent(numeroTermo)}`;
+    }
+
+    function exportarCSV() {
+      const params = new URLSearchParams({
+        limite: document.getElementById('filtroLimite')?.value || '50',
+        filtro_tipo: document.getElementById('filtroTipo')?.value || '',
+        filtro_sei_pc: document.getElementById('filtroSeiPc')?.value || '',
+        filtro_termo: document.getElementById('filtroTermo')?.value || '',
+        filtro_osc: document.getElementById('filtroOSC')?.value || '',
+        filtro_responsabilidade: document.getElementById('filtroResponsabilidade')?.value || '',
+        filtro_entregue: document.getElementById('filtroEntregue')?.value || '',
+        filtro_notificacao: document.getElementById('filtroNotificacao')?.value || '',
+        filtro_parecer: document.getElementById('filtroParecer')?.value || '',
+        filtro_fase_recursal: document.getElementById('filtroFaseRecursal')?.value || '',
+        filtro_encerramento: document.getElementById('filtroEncerramento')?.value || '',
+        filtro_regularidade: document.getElementById('filtroRegularidade')?.value || '',
+        filtro_data_parecer_dp: Array.from(anosSelecionadosDP).join(','),
+        filtro_data_parecer_pg: Array.from(anosSelecionadosPG).join(',')
+      });
+      
+      window.location.href = `/analises/api/exportar?${params}`;
+    }
+
+    function adicionarAnalise() {
+      alert('Funcionalidade em desenvolvimento');
+    }
+  </script>
+</body>
+</html>

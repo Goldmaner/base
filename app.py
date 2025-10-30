@@ -17,6 +17,7 @@ from routes.instrucoes import instrucoes_bp
 from routes.despesas import despesas_bp
 from routes.parcerias import parcerias_bp
 from routes.listas import listas_bp
+from routes.analises import analises_bp
 
 
 def create_app():
@@ -60,6 +61,7 @@ def create_app():
     app.register_blueprint(despesas_bp)
     app.register_blueprint(parcerias_bp)
     app.register_blueprint(listas_bp)
+    app.register_blueprint(analises_bp)
     
     return app
 
@@ -71,5 +73,13 @@ app = create_app()
 import os
 
 if __name__ == '__main__':
+    # Se executar direto app.py (não recomendado), usa porta 8080
     port = int(os.environ.get('PORT', 8080))
-    app.run(debug=True, host='0.0.0.0', port=port, use_reloader=False)
+    debug_mode = os.environ.get('FLASK_ENV', 'development') == 'development'
+    
+    print("⚠️  Executando app.py diretamente.")
+    print(f"   Porta: {port}")
+    print(f"   Use 'python run_dev.py' para desenvolvimento")
+    print(f"   Use 'python run_prod.py' para produção")
+    
+    app.run(debug=debug_mode, host='0.0.0.0', port=port, use_reloader=debug_mode)

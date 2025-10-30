@@ -45,6 +45,11 @@ df_planilha.columns = list(colunas_interesse.values())
 # Remove linhas onde numero_termo está vazio
 df_planilha = df_planilha[df_planilha['numero_termo'].notna()]
 
+# Remove linhas onde numero_termo é "0", 0 (número) ou string vazia
+df_planilha = df_planilha[df_planilha['numero_termo'] != '0']
+df_planilha = df_planilha[df_planilha['numero_termo'] != 0]
+df_planilha = df_planilha[df_planilha['numero_termo'].astype(str).str.strip() != '']
+
 # Remove duplicados baseado no numero_termo
 df_planilha = df_planilha.drop_duplicates(subset=['numero_termo'])
 

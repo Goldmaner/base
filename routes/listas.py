@@ -48,6 +48,29 @@ TABELAS_CONFIG = {
         'labels': {'nome_setor': 'Nome do Setor'},
         'ordem': 'nome_setor'
     },
+    'c_coordenadores': {
+        'nome': 'Coordenadores',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['secretaria', 'coordenacao', 'nome_c', 'rf_c', 'status_c', 'e_mail_c'],
+        'labels': {
+            'secretaria': 'Secretaria',
+            'coordenacao': 'Coordenação',
+            'nome_c': 'Nome',
+            'rf_c': 'R.F.',
+            'status_c': 'Status',
+            'e_mail_c': 'E-mail'
+        },
+        'colunas_filtro': ['secretaria', 'coordenacao', 'nome_c', 'status_c'],
+        'ordem': 'nome_c',
+        'tipos_campo': {
+            'secretaria': 'select_dinamico',
+            'query_secretaria': 'SELECT DISTINCT secretaria FROM categoricas.c_coordenadores WHERE secretaria IS NOT NULL ORDER BY secretaria',
+            'coordenacao': 'text_com_datalist',
+            'query_coordenacao': 'SELECT DISTINCT coordenacao FROM categoricas.c_coordenadores WHERE coordenacao IS NOT NULL ORDER BY coordenacao',
+            'status_c': 'select',
+            'opcoes_status_c': ['Ativo', 'Afastado', 'Inativo']
+        }
+    },
     'c_origem_recurso': {
         'nome': 'Origens de Recurso',
         'schema': 'categoricas',

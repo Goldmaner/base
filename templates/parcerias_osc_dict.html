@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dicionário de OSCs</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+body { background-color: #f5f5f5; }
+.main-container { background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 2rem; margin: 2rem auto; max-width: 1400px; }
+.header-section { border-bottom: 2px solid #0d6efd; padding-bottom: 1rem; margin-bottom: 2rem; }
+.info-box { background-color: #e7f3ff; border-left: 4px solid #0d6efd; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px; }
+.stats-card { text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; margin-bottom: 1rem; }
+.stats-card h2 { font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem; }
+.stats-card.success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+.stats-card.info { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); }
+.osc-input { border: 2px solid #e0e0e0; padding: 0.5rem; border-radius: 4px; width: 100%; transition: all 0.2s; }
+.osc-input:focus { border-color: #667eea; outline: none; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+.osc-input.modified { border-color: #ffc107; background-color: #fff9e6; }
+.btn-salvar { opacity: 0; transition: all 0.2s; }
+tr:hover .btn-salvar { opacity: 1; }
+.table thead { background-color: #2c3e50; color: white; }
+.table tbody tr:hover { background-color: #f8f9fa; }
+.checkbox-alteracao { width: 20px; height: 20px; cursor: pointer; }
+tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107; }
+.action-bar { position: sticky; bottom: 0; background: linear-gradient(to right, #667eea, #764ba2); padding: 1rem; border-radius: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: none; z-index: 1000; }
+.action-bar.show { display: flex; }
+.contador-selecao { background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 4px; color: white; font-weight: bold; }
+.badge.bg-success:hover { background-color: #157347 !important; transform: scale(1.05); transition: all 0.2s; cursor: pointer; }
+.modal-body .table { margin-bottom: 0; }
+.table-success { background-color: #d1e7dd !important; }
+</style>
+</head>
+<body>
+<div class="main-container">
+<div class="header-section">
+<div class="d-flex justify-content-between align-items-center">
+<h1><i class="bi bi-building text-primary"></i> Dicionário de OSCs</h1>
+<a href="{{ url_for('parcerias.listar') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar</a>
+</div>
+</div>
+<div class="info-box">
+<h5><i class="bi bi-info-circle"></i> Como usar:</h5>
+<ul class="mb-0">
+<li><strong>Padronizar:</strong> Edite o nome da OSC para corrigir erros ou padronizar grafias</li>
+<li><strong>Atualização em massa:</strong> Ao salvar, TODOS os termos associados serão atualizados</li>
+<li><strong>Ver termos:</strong> Clique no badge verde para ver todos os termos da OSC</li>
+</ul>
+</div>
+<div class="row mb-4">
+<div class="col-md-4"><div class="stats-card"><h2>{{ total_oscs }}</h2><p>OSCs Únicas</p></div></div>
+<div class="col-md-4"><div class="stats-card success"><h2>{{ oscs|sum(attribute='total_termos') }}</h2><p>Total de Termos (página atual)</p></div></div>
+<div class="col-md-4"><div class="stats-card info"><h2 id="contadorModificacoes">0</h2><p>Modificações Pendentes</p></div></div>
+</div>
+
+<!-- Informações de Paginação -->
+<div class="alert alert-info mb-3" id="alertInfo">
+    <i class="bi bi-info-circle"></i> Mostrando <strong>{{ ((pagina_atual - 1) * 50) + 1 }}</strong> a <strong>{{ [pagina_atual * 50, total_oscs]|min }}</strong> de <strong>{{ total_oscs }}</strong> OSCs | Página <strong>{{ pagina_atual }}</strong> de <strong>{{ total_paginas }}</strong>
+</div>
+
+<div class="mb-3">
+<input type="text" class="form-control form-control-lg" id="filtroOSC" placeholder="🔍 Buscar OSC...">
+</div>
+
+<!-- Controles de Paginação -->
+<nav aria-label="Paginação de OSCs" class="mb-3" id="paginacaoTop">
+    <ul class="pagination justify-content-center">
+        <!-- Botão Anterior -->
+        <li class="page-item {% if pagina_atual == 1 %}disabled{% endif %}">
+            <a class="page-link" href="{% if pagina_atual > 1 %}{{ url_for('parcerias.dicionario_oscs', pagina=pagina_atual - 1) }}{% else %}#{% endif %}" aria-label="Anterior">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        </li>
+        
+        <!-- Primeira página -->
+        {% if pagina_atual > 3 %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('parcerias.dicionario_oscs', pagina=1) }}">1</a>
+        </li>
+        {% if pagina_atual > 4 %}
+        <li class="page-item disabled">
+            <a class="page-link" href="#">...</a>
+        </li>
+        {% endif %}
+        {% endif %}
+        
+        <!-- Páginas numeradas -->
+        {% for p in range([1, pagina_atual - 2]|max, [total_paginas, pagina_atual + 2]|min + 1) %}
+        <li class="page-item {% if p == pagina_atual %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('parcerias.dicionario_oscs', pagina=p) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+        
+        <!-- Última página -->
+        {% if pagina_atual < total_paginas - 2 %}
+        {% if pagina_atual < total_paginas - 3 %}
+        <li class="page-item disabled">
+            <a class="page-link" href="#">...</a>
+        </li>
+        {% endif %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('parcerias.dicionario_oscs', pagina=total_paginas) }}">{{ total_paginas }}</a>
+        </li>
+        {% endif %}
+        
+        <!-- Botão Próximo -->
+        <li class="page-item {% if pagina_atual == total_paginas %}disabled{% endif %}">
+            <a class="page-link" href="{% if pagina_atual < total_paginas %}{{ url_for('parcerias.dicionario_oscs', pagina=pagina_atual + 1) }}{% else %}#{% endif %}" aria-label="Próxima">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        </li>
+    </ul>
+</nav>
+<div class="table-responsive">
+<table class="table table-hover">
+<thead><tr>
+<th style="width:3%" class="text-center">
+    <input type="checkbox" id="selecionarTodos" class="checkbox-alteracao" title="Selecionar todas as alterações">
+</th>
+<th style="width:50%">Nome da OSC</th>
+<th style="width:22%">CNPJ (Exemplo)</th>
+<th style="width:10%" class="text-center">Termos</th>
+<th style="width:15%" class="text-center">Ações</th>
+</tr></thead>
+<tbody id="tbody">
+{% for osc_item in oscs %}
+<tr data-original-osc="{{ osc_item.osc }}">
+<td class="text-center">
+    <input type="checkbox" class="checkbox-alteracao checkbox-linha" disabled>
+</td>
+<td><input type="text" class="osc-input" value="{{ osc_item.osc }}" data-original="{{ osc_item.osc }}"></td>
+<td><span class="badge bg-secondary">{{ osc_item.cnpj_exemplo or 'N/A' }}</span></td>
+<td class="text-center">
+    <span class="badge bg-success badge-termos" 
+        data-osc="{{ osc_item.osc }}"
+        data-total-termos="{{ osc_item.total_termos }}"
+        title="Clique para ver os termos">
+        <i class="bi bi-list-ul"></i> {{ osc_item.total_termos }}
+    </span>
+</td>
+<td class="text-center"><button class="btn btn-primary btn-sm btn-salvar" onclick="salvarOSC(this)"><i class="bi bi-check-lg"></i> Salvar</button></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<!-- Barra de Ação para Salvar Múltiplos -->
+<div class="action-bar" id="actionBar">
+    <div class="d-flex justify-content-between align-items-center w-100">
+        <div class="contador-selecao">
+            <i class="bi bi-check-square"></i> <span id="contadorSelecionados">0</span> alteração(ões) selecionada(s)
+        </div>
+        <div>
+            <button class="btn btn-light me-2" onclick="desmarcarTodos()">
+                <i class="bi bi-x-circle"></i> Desmarcar Todos
+            </button>
+            <button class="btn btn-success btn-lg" onclick="salvarSelecionados()">
+                <i class="bi bi-check-circle"></i> Salvar Selecionados
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Termos -->
+<div class="modal fade" id="modalTermos" tabindex="-1" aria-labelledby="modalTermosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modalTermosLabel">
+                    <i class="bi bi-list-ul"></i> Termos da OSC
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3">
+                    <strong>OSC:</strong> <span id="oscNome"></span><br>
+                    <strong>Total de Termos:</strong> <span id="totalTermos"></span>
+                </div>
+                <div id="listaTermos">
+                    <div class="text-center">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Controles de Paginação Inferior -->
+<nav aria-label="Paginação de OSCs" class="mt-4" id="paginacaoBottom">
+    <ul class="pagination justify-content-center">
+        <!-- Botão Anterior -->
+        <li class="page-item {% if pagina_atual == 1 %}disabled{% endif %}">
+            <a class="page-link" href="{% if pagina_atual > 1 %}{{ url_for('parcerias.dicionario_oscs', pagina=pagina_atual - 1) }}{% else %}#{% endif %}" aria-label="Anterior">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        </li>
+        
+        <!-- Primeira página -->
+        {% if pagina_atual > 3 %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('parcerias.dicionario_oscs', pagina=1) }}">1</a>
+        </li>
+        {% if pagina_atual > 4 %}
+        <li class="page-item disabled">
+            <a class="page-link" href="#">...</a>
+        </li>
+        {% endif %}
+        {% endif %}
+        
+        <!-- Páginas numeradas -->
+        {% for p in range([1, pagina_atual - 2]|max, [total_paginas, pagina_atual + 2]|min + 1) %}
+        <li class="page-item {% if p == pagina_atual %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('parcerias.dicionario_oscs', pagina=p) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+        
+        <!-- Última página -->
+        {% if pagina_atual < total_paginas - 2 %}
+        {% if pagina_atual < total_paginas - 3 %}
+        <li class="page-item disabled">
+            <a class="page-link" href="#">...</a>
+        </li>
+        {% endif %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('parcerias.dicionario_oscs', pagina=total_paginas) }}">{{ total_paginas }}</a>
+        </li>
+        {% endif %}
+        
+        <!-- Botão Próximo -->
+        <li class="page-item {% if pagina_atual == total_paginas %}disabled{% endif %}">
+            <a class="page-link" href="{% if pagina_atual < total_paginas %}{{ url_for('parcerias.dicionario_oscs', pagina=pagina_atual + 1) }}{% else %}#{% endif %}" aria-label="Próxima">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        </li>
+    </ul>
+</nav>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Variável para armazenar timeout de busca
+let timeoutBusca = null;
+
+// Função para ver termos de uma OSC
+function verTermos(osc, totalTermos) {
+    // Atualizar informações do modal
+    document.getElementById('oscNome').textContent = osc;
+    document.getElementById('totalTermos').textContent = totalTermos;
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('modalTermos'));
+    modal.show();
+    
+    // Resetar conteúdo
+    const listaTermos = document.getElementById('listaTermos');
+    listaTermos.innerHTML = '<div class="text-center"><div class="spinner-border text-success" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
+    
+    // Buscar termos do backend
+    fetch('/parcerias/termos-por-osc/' + encodeURIComponent(osc))
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                listaTermos.innerHTML = '<div class="alert alert-danger">❌ Erro: ' + data.error + '</div>';
+                return;
+            }
+            
+            if (data.termos.length === 0) {
+                listaTermos.innerHTML = '<div class="alert alert-warning">Nenhum termo encontrado.</div>';
+                return;
+            }
+            
+            // Criar tabela com os termos
+            let html = '<table class="table table-hover table-striped">';
+            html += '<thead class="table-success"><tr>';
+            html += '<th style="width: 25%"><i class="bi bi-file-text"></i> Número do Termo</th>';
+            html += '<th style="width: 15%"><i class="bi bi-tag"></i> Tipo</th>';
+            html += '<th style="width: 25%"><i class="bi bi-folder"></i> Projeto</th>';
+            html += '<th style="width: 10%" class="text-center"><i class="bi bi-calendar"></i> Início</th>';
+            html += '<th style="width: 10%" class="text-center"><i class="bi bi-calendar-check"></i> Término</th>';
+            html += '<th style="width: 15%" class="text-end"><i class="bi bi-currency-dollar"></i> Valor Previsto</th>';
+            html += '</tr></thead><tbody>';
+            
+            let valorGrandTotal = 0;
+            
+            data.termos.forEach(termo => {
+                valorGrandTotal += termo.total_previsto;
+                
+                html += '<tr>';
+                html += '<td><strong>' + termo.numero_termo + '</strong></td>';
+                html += '<td><span class="badge bg-info">' + (termo.tipo_termo || '-') + '</span></td>';
+                html += '<td>' + (termo.projeto || '-') + '</td>';
+                html += '<td class="text-center">' + termo.inicio + '</td>';
+                html += '<td class="text-center">' + termo.final + '</td>';
+                html += '<td class="text-end">R$ ' + termo.total_previsto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>';
+                html += '</tr>';
+            });
+            
+            html += '</tbody>';
+            html += '<tfoot class="table-secondary"><tr>';
+            html += '<th colspan="5">TOTAL PREVISTO</th>';
+            html += '<th class="text-end"><strong>R$ ' + valorGrandTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</strong></th>';
+            html += '</tr></tfoot>';
+            html += '</table>';
+            
+            listaTermos.innerHTML = html;
+        })
+        .catch(error => {
+            listaTermos.innerHTML = '<div class="alert alert-danger">❌ Erro ao carregar termos: ' + error + '</div>';
+        });
+}
+
+// Gerenciamento de checkboxes e seleção múltipla
+function atualizarContadorSelecao() {
+    const checkboxesMarcadas = document.querySelectorAll('.checkbox-linha:checked');
+    const total = checkboxesMarcadas.length;
+    document.getElementById('contadorSelecionados').textContent = total;
+    document.getElementById('contadorModificacoes').textContent = total;
+    
+    const actionBar = document.getElementById('actionBar');
+    if (total > 0) {
+        actionBar.classList.add('show');
+    } else {
+        actionBar.classList.remove('show');
+    }
+}
+
+// Selecionar/Desmarcar todos
+document.getElementById('selecionarTodos').addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('.checkbox-linha:not(:disabled)');
+    checkboxes.forEach(cb => {
+        cb.checked = this.checked;
+        const linha = cb.closest('tr');
+        if (this.checked) {
+            linha.classList.add('marcado-alteracao');
+        } else {
+            linha.classList.remove('marcado-alteracao');
+        }
+    });
+    atualizarContadorSelecao();
+});
+
+function desmarcarTodos() {
+    document.querySelectorAll('.checkbox-linha:checked').forEach(cb => {
+        cb.checked = false;
+        cb.closest('tr').classList.remove('marcado-alteracao');
+    });
+    document.getElementById('selecionarTodos').checked = false;
+    atualizarContadorSelecao();
+}
+
+// Busca global no banco de dados
+document.getElementById('filtroOSC').addEventListener('input', function(e) {
+    const termoBusca = e.target.value.trim();
+    
+    // Limpar timeout anterior
+    if (timeoutBusca) {
+        clearTimeout(timeoutBusca);
+    }
+    
+    // Se vazio, recarregar página normal
+    if (termoBusca === '') {
+        window.location.href = '{{ url_for("parcerias.dicionario_oscs") }}';
+        return;
+    }
+    
+    // Aguardar 500ms antes de fazer a busca (debounce)
+    timeoutBusca = setTimeout(() => {
+        realizarBuscaGlobal(termoBusca);
+    }, 500);
+});
+
+function realizarBuscaGlobal(termo) {
+    // Mostrar indicador de carregamento
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Buscando...</span></div></td></tr>';
+    
+    fetch('/parcerias/buscar-oscs?q=' + encodeURIComponent(termo))
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">❌ Erro: ' + data.error + '</td></tr>';
+                return;
+            }
+            
+            if (data.oscs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">🔍 Nenhuma OSC encontrada com "' + termo + '"</td></tr>';
+                return;
+            }
+            
+            // Atualizar estatísticas
+            document.querySelector('.stats-card h2').textContent = data.total;
+            
+            // Ocultar paginação durante busca
+            document.getElementById('paginacaoTop').style.display = 'none';
+            document.getElementById('paginacaoBottom').style.display = 'none';
+            
+            // Atualizar alerta de info
+            const alertInfo = document.getElementById('alertInfo');
+            alertInfo.innerHTML = '<i class="bi bi-search"></i> Mostrando <strong>' + data.total + '</strong> resultado(s) para "<strong>' + data.termo_busca + '</strong>" | <a href="{{ url_for("parcerias.dicionario_oscs") }}" class="alert-link">Limpar busca</a>';
+            
+            // Renderizar resultados
+            let html = '';
+            data.oscs.forEach(osc => {
+                html += `
+                <tr data-original-osc="${osc.osc}">
+                    <td class="text-center"><input type="checkbox" class="checkbox-alteracao checkbox-linha" disabled></td>
+                    <td><input type="text" class="osc-input" value="${osc.osc}" data-original="${osc.osc}"></td>
+                    <td><span class="badge bg-secondary">${osc.cnpj_exemplo || 'N/A'}</span></td>
+                    <td class="text-center">
+                        <span class="badge bg-success badge-termos" data-osc="${osc.osc}" data-total-termos="${osc.total_termos}" title="Clique para ver os termos">
+                            <i class="bi bi-list-ul"></i> ${osc.total_termos}
+                        </span>
+                    </td>
+                    <td class="text-center"><button class="btn btn-primary btn-sm btn-salvar" onclick="salvarOSC(this)"><i class="bi bi-check-lg"></i> Salvar</button></td>
+                </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+            
+            // Reconfigurar eventos nos inputs e badges
+            configurarEventosInputs();
+            configurarEventosBadges();
+        })
+        .catch(error => {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">❌ Erro na busca: ' + error + '</td></tr>';
+        });
+}
+
+function configurarEventosInputs() {
+    document.querySelectorAll('.osc-input').forEach(input => {
+        input.addEventListener('input', function() {
+            const modificado = this.value.trim() !== this.dataset.original;
+            this.classList.toggle('modified', modificado);
+            
+            const linha = this.closest('tr');
+            const checkbox = linha.querySelector('.checkbox-linha');
+            
+            // Habilitar/desabilitar checkbox baseado na modificação
+            if (modificado) {
+                checkbox.disabled = false;
+                checkbox.checked = true;
+                linha.classList.add('marcado-alteracao');
+            } else {
+                checkbox.disabled = true;
+                checkbox.checked = false;
+                linha.classList.remove('marcado-alteracao');
+            }
+            
+            atualizarContadorSelecao();
+        });
+        
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') salvarOSC(this.closest('tr').querySelector('.btn-salvar'));
+        });
+    });
+    
+    // Eventos das checkboxes
+    document.querySelectorAll('.checkbox-linha').forEach(cb => {
+        cb.addEventListener('change', function() {
+            const linha = this.closest('tr');
+            if (this.checked) {
+                linha.classList.add('marcado-alteracao');
+            } else {
+                linha.classList.remove('marcado-alteracao');
+            }
+            atualizarContadorSelecao();
+        });
+    });
+}
+
+// Configurar eventos iniciais
+configurarEventosInputs();
+
+// Salvar OSCs selecionadas em lote
+function salvarSelecionados() {
+    const linhasSelecionadas = document.querySelectorAll('.checkbox-linha:checked');
+    
+    if (linhasSelecionadas.length === 0) {
+        alert('⚠ Nenhuma alteração selecionada!');
+        return;
+    }
+    
+    // Coletar todas as alterações
+    const alteracoes = [];
+    linhasSelecionadas.forEach(cb => {
+        const linha = cb.closest('tr');
+        const input = linha.querySelector('.osc-input');
+        const oscAntiga = input.dataset.original;
+        const oscNova = input.value.trim();
+        
+        if (oscNova && oscAntiga !== oscNova) {
+            alteracoes.push({
+                antiga: oscAntiga,
+                nova: oscNova
+            });
+        }
+    });
+    
+    if (alteracoes.length === 0) {
+        alert('⚠ Nenhuma alteração válida encontrada!');
+        return;
+    }
+    
+    // Confirmar ação
+    let mensagem = `⚠ Você está prestes a atualizar ${alteracoes.length} OSC(s):\n\n`;
+    alteracoes.slice(0, 5).forEach(alt => {
+        mensagem += `"${alt.antiga}" → "${alt.nova}"\n`;
+    });
+    if (alteracoes.length > 5) {
+        mensagem += `\n... e mais ${alteracoes.length - 5} alteração(ões)\n`;
+    }
+    mensagem += '\nTODOS os termos associados serão atualizados!\n\nDeseja continuar?';
+    
+    if (!confirm(mensagem)) {
+        return;
+    }
+    
+    // Desabilitar botão e mostrar progresso
+    const actionBar = document.getElementById('actionBar');
+    const btnSalvar = actionBar.querySelector('.btn-success');
+    btnSalvar.disabled = true;
+    btnSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+    
+    // Processar alterações sequencialmente
+    processarAlteracoesSequenciais(alteracoes, 0, []);
+}
+
+function processarAlteracoesSequenciais(alteracoes, indice, resultados) {
+    if (indice >= alteracoes.length) {
+        // Todas concluídas
+        const sucesso = resultados.filter(r => r.sucesso).length;
+        const erros = resultados.filter(r => !r.sucesso).length;
+        
+        let mensagem = `✅ Processo concluído!\n\n`;
+        mensagem += `Sucesso: ${sucesso}\n`;
+        if (erros > 0) {
+            mensagem += `Erros: ${erros}\n\n`;
+            mensagem += 'Erros encontrados:\n';
+            resultados.filter(r => !r.sucesso).forEach(r => {
+                mensagem += `- ${r.antiga}: ${r.erro}\n`;
+            });
+        }
+        
+        alert(mensagem);
+        setTimeout(() => location.reload(), 1000);
+        return;
+    }
+    
+    const alteracao = alteracoes[indice];
+    
+    // Atualizar contador
+    document.getElementById('contadorSelecionados').textContent = 
+        `Processando ${indice + 1} de ${alteracoes.length}...`;
+    
+    fetch('/parcerias/atualizar-osc', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            osc_antiga: alteracao.antiga,
+            osc_nova: alteracao.nova
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            resultados.push({
+                antiga: alteracao.antiga,
+                nova: alteracao.nova,
+                sucesso: false,
+                erro: data.error
+            });
+        } else {
+            resultados.push({
+                antiga: alteracao.antiga,
+                nova: alteracao.nova,
+                sucesso: true,
+                linhas: data.linhas_afetadas
+            });
+        }
+        
+        // Processar próxima
+        processarAlteracoesSequenciais(alteracoes, indice + 1, resultados);
+    })
+    .catch(error => {
+        resultados.push({
+            antiga: alteracao.antiga,
+            nova: alteracao.nova,
+            sucesso: false,
+            erro: error.toString()
+        });
+        
+        // Processar próxima mesmo com erro
+        processarAlteracoesSequenciais(alteracoes, indice + 1, resultados);
+    });
+}
+
+function salvarOSC(btn) {
+    const linha = btn.closest('tr');
+    const input = linha.querySelector('.osc-input');
+    const oscAntiga = input.dataset.original;
+    const oscNova = input.value.trim();
+    
+    if (!oscNova) { 
+        alert('⚠ Nome da OSC não pode estar vazio!'); 
+        return; 
+    }
+    
+    if (oscAntiga === oscNova) { 
+        alert('ℹ Nenhuma alteração detectada.'); 
+        return; 
+    }
+    
+    if (!confirm('⚠ Atualizar TODOS os termos de:\n"' + oscAntiga + '"\n\nPara:\n"' + oscNova + '"?')) 
+        return;
+    
+    btn.disabled = true;
+    const htmlOriginal = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    
+    fetch('/parcerias/atualizar-osc', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            osc_antiga: oscAntiga, 
+            osc_nova: oscNova
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert('❌ Erro: ' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal;
+        } else {
+            alert('✅ ' + data.message);
+            input.dataset.original = oscNova;
+            input.classList.remove('modified');
+            setTimeout(() => location.reload(), 1000);
+        }
+    })
+    .catch(error => {
+        alert('❌ Erro: ' + error);
+        btn.disabled = false;
+        btn.innerHTML = htmlOriginal;
+    });
+}
+
+// Event listener para badges de termos
+document.addEventListener('DOMContentLoaded', function() {
+    configurarEventosBadges();
+});
+
+function configurarEventosBadges() {
+    document.querySelectorAll('.badge-termos').forEach(badge => {
+        badge.removeEventListener('click', handleBadgeClick);
+        badge.addEventListener('click', handleBadgeClick);
+    });
+}
+
+function handleBadgeClick() {
+    const osc = this.getAttribute('data-osc');
+    const totalTermos = this.getAttribute('data-total-termos');
+    verTermos(osc, totalTermos);
+}
+</script>
+</body>
+</html>

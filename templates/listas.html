@@ -268,6 +268,27 @@
           div.appendChild(label);
           div.appendChild(input);
           div.appendChild(datalist);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'text_com_datalist') {
+          // Campo de texto com sugestões (datalist)
+          input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control';
+          input.setAttribute('list', `datalist_${col}`);
+          
+          // Criar datalist com as opções
+          const datalist = document.createElement('datalist');
+          datalist.id = `datalist_${col}`;
+          
+          const opcoes = configAtual.tipos_campo[`opcoes_${col}`] || [];
+          for (const opcao of opcoes) {
+            const opt = document.createElement('option');
+            opt.value = opcao;
+            datalist.appendChild(opt);
+          }
+          
+          div.appendChild(label);
+          div.appendChild(input);
+          div.appendChild(datalist);
         } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'select') {
           // Select tradicional (dropdown restritivo)
           input = document.createElement('select');
@@ -307,8 +328,9 @@
         }
         
         input.id = `campo_${col}`;
-        // E-mail, número RF e setor não são obrigatórios
-        if (col !== 'email_pg' && col !== 'numero_rf' && col !== 'setor') {
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c'];
+        if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
         
@@ -341,6 +363,28 @@
         // Verificar se é um campo select_dinamico (lista de sugestões)
         if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'select_dinamico') {
           // Criar input com datalist para sugestões (permite digitação livre)
+          input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control';
+          input.setAttribute('list', `datalist_${col}`);
+          input.value = registro[col] || '';
+          
+          // Criar datalist com as opções
+          const datalist = document.createElement('datalist');
+          datalist.id = `datalist_${col}`;
+          
+          const opcoes = configAtual.tipos_campo[`opcoes_${col}`] || [];
+          for (const opcao of opcoes) {
+            const opt = document.createElement('option');
+            opt.value = opcao;
+            datalist.appendChild(opt);
+          }
+          
+          div.appendChild(label);
+          div.appendChild(input);
+          div.appendChild(datalist);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'text_com_datalist') {
+          // Campo de texto com sugestões (datalist)
           input = document.createElement('input');
           input.type = 'text';
           input.className = 'form-control';
@@ -404,8 +448,9 @@
         }
         
         input.id = `campo_${col}`;
-        // E-mail, número RF e setor não são obrigatórios
-        if (col !== 'email_pg' && col !== 'numero_rf' && col !== 'setor') {
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c'];
+        if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
         
@@ -420,8 +465,8 @@
       const dados = {};
       for (const col of configAtual.colunas_editaveis) {
         const input = document.getElementById(`campo_${col}`);
-        // E-mail, número RF e setor não são obrigatórios
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor'];
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c'];
         if (!input.value.trim() && !camposOpcionais.includes(col)) {
           alert(`O campo ${configAtual.labels[col]} é obrigatório`);
           return;

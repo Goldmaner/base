@@ -20,6 +20,7 @@
       <h2>Módulo de Análise de Contas</h2>
       <div>
         <small>Logado como: <strong>{{ user['email'] }}</strong></small><br>
+        <small>Tipo: <span class="badge bg-info">{{ user['tipo_usuario'] }}</span></small><br>
         <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-secondary mt-2">Sair</a>
       </div>
     </div>
@@ -28,8 +29,8 @@
       <a href="{{ url_for('instrucoes.listar_view') }}" class="btn btn-main">
         <i class="bi bi-plus-circle-fill me-2"></i>Iniciar nova análise
       </a>
-      <a href="#" class="btn btn-main">
-        <i class="bi bi-arrow-clockwise me-2"></i>Prosseguir análise
+      <a href="{{ url_for('analises.listar') }}" class="btn btn-main">
+        <i class="bi bi-arrow-clockwise me-2"></i>Menu de Prestações de Contas
       </a>
       <a href="{{ url_for('orcamento.listar') }}" class="btn btn-main">
         <i class="bi bi-currency-dollar me-2"></i>Orçamento anual
@@ -38,6 +39,16 @@
         <i class="bi bi-people-fill me-2"></i>Parcerias
       </a>
     </div>
+
+    <!-- Listas Suspensas (para Agente Público e outros Agentes) -->
+    {% if user['tipo_usuario'] in ['Agente Público', 'Agente DAC', 'Agente DGP', 'Agente DP'] %}
+      <div class="mt-4 p-3 border-top">
+        <h5>Gestão de Dados</h5>
+        <a href="{{ url_for('listas.index') }}" class="btn btn-main btn-admin">
+          <i class="bi bi-list-ul me-2"></i>Listas suspensas
+        </a>
+      </div>
+    {% endif %}
 
     {% if user['tipo_usuario'] == 'Agente Público' %}
       <div class="mt-4 p-3 border-top">
@@ -50,9 +61,6 @@
         </a>
         <a href="#" class="btn btn-main btn-admin">
           <i class="bi bi-file-text me-2"></i>Modelos de texto
-        </a>
-        <a href="{{ url_for('listas.index') }}" class="btn btn-main btn-admin">
-          <i class="bi bi-list-ul me-2"></i>Listas suspensas
         </a>
       </div>
     {% endif %}
@@ -96,8 +104,11 @@
                   <label for="novoTipo" class="form-label">Tipo de Usuário</label>
                   <select class="form-select" id="novoTipo" required>
                     <option value="">-- Selecione --</option>
-                    <option value="Agente Público">Agente Público</option>
-                    <option value="OSC">OSC</option>
+                    <option value="Agente Público">Agente Público (Admin)</option>
+                    <option value="Agente DAC">Agente DAC</option>
+                    <option value="Agente DGP">Agente DGP</option>
+                    <option value="Agente DP">Agente DP</option>
+                    <option value="Externo">Externo</option>
                   </select>
                 </div>
                 <div class="d-flex gap-2">
@@ -142,9 +153,22 @@
     }
 
     async function carregarUsuarios() {
+      console.log('[DEBUG] Iniciando carregamento de usuários...');
+      const listaUsuariosDiv = document.getElementById('listaUsuarios');
+      listaUsuariosDiv.innerHTML = '<div class="text-center p-3"><div class="spinner-border" role="status"><span class="visually-hidden">Carregando...</span></div><p class="mt-2">Carregando usuários...</p></div>';
+      
       try {
+        console.log('[DEBUG] Fazendo requisição para /api/usuarios');
         const response = await fetch('/api/usuarios');
+        console.log('[DEBUG] Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.erro || 'Erro ao carregar usuários');
+        }
+        
         const usuarios = await response.json();
+        console.log('[DEBUG] Usuários recebidos:', usuarios.length);
         
         let html = '<div class="table-responsive"><table class="table table-hover">';
         html += '<thead class="table-dark"><tr>';
@@ -155,7 +179,14 @@
           html += '<tr>';
           html += `<td>${user.id}</td>`;
           html += `<td>${user.email}</td>`;
-          html += `<td><span class="badge ${user.tipo_usuario === 'Agente Público' ? 'bg-primary' : 'bg-secondary'}">${user.tipo_usuario}</span></td>`;
+          
+          // Definir cor do badge baseado no tipo
+          let badgeClass = 'bg-secondary';
+          if (user.tipo_usuario === 'Agente Público') badgeClass = 'bg-primary';
+          else if (user.tipo_usuario.startsWith('Agente')) badgeClass = 'bg-info';
+          else if (user.tipo_usuario === 'Externo') badgeClass = 'bg-warning text-dark';
+          
+          html += `<td><span class="badge ${badgeClass}">${user.tipo_usuario}</span></td>`;
           html += `<td>${new Date(user.data_criacao).toLocaleDateString('pt-BR')}</td>`;
           html += `<td class="text-center">
             <button class="btn btn-sm btn-info me-1" onclick="resetarSenha(${user.id}, '${user.email}')" title="Resetar Senha">
@@ -172,10 +203,15 @@
         });
         
         html += '</tbody></table></div>';
-        document.getElementById('listaUsuarios').innerHTML = html;
+        listaUsuariosDiv.innerHTML = html;
+        console.log('[DEBUG] Tabela de usuários renderizada com sucesso');
       } catch (error) {
-        console.error('Erro ao carregar usuários:', error);
-        document.getElementById('listaUsuarios').innerHTML = '<div class="alert alert-danger">Erro ao carregar usuários.</div>';
+        console.error('[ERRO] Erro ao carregar usuários:', error);
+        listaUsuariosDiv.innerHTML = `<div class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <strong>Erro ao carregar usuários:</strong> ${error.message}
+          <br><small>Verifique o console do navegador (F12) para mais detalhes.</small>
+        </div>`;
       }
     }
 
@@ -209,11 +245,34 @@
     }
 
     async function editarUsuario(id, email, tipo) {
-      const novoTipo = prompt(`Alterar tipo de usuário de "${email}":\n\n1 - Agente Público\n2 - OSC\n\nDigite 1 ou 2:`, tipo === 'Agente Público' ? '1' : '2');
+      const opcoes = `Alterar tipo de usuário de "${email}":
+
+1 - Agente Público (Admin)
+2 - Agente DAC
+3 - Agente DGP
+4 - Agente DP
+5 - Externo
+
+Digite o número correspondente:`;
+      
+      const novoTipo = prompt(opcoes, '1');
       
       if (novoTipo === null) return;
       
-      const tipoFinal = novoTipo === '1' ? 'Agente Público' : 'OSC';
+      const tipos = {
+        '1': 'Agente Público',
+        '2': 'Agente DAC',
+        '3': 'Agente DGP',
+        '4': 'Agente DP',
+        '5': 'Externo'
+      };
+      
+      const tipoFinal = tipos[novoTipo];
+      
+      if (!tipoFinal) {
+        alert('Opção inválida!');
+        return;
+      }
       
       try {
         const response = await fetch(`/api/usuarios/${id}`, {

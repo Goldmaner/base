@@ -63,11 +63,15 @@ def listar_usuarios():
     """
     API para listar todos os usuários (apenas para Agente Público)
     """
+    print(f"[DEBUG] Listar usuários - Tipo do usuário logado: {session.get('tipo_usuario')}")
+    
     # Verificar se é Agente Público
     if session.get("tipo_usuario") != "Agente Público":
+        print(f"[DEBUG] Acesso negado para tipo: {session.get('tipo_usuario')}")
         return jsonify({"erro": "Acesso negado"}), 403
     
     try:
+        print("[DEBUG] Executando query para listar usuários...")
         cur = get_cursor()
         cur.execute("""
             SELECT id, email, tipo_usuario, data_criacao 
@@ -76,6 +80,8 @@ def listar_usuarios():
         """)
         usuarios = cur.fetchall()
         cur.close()
+        
+        print(f"[DEBUG] {len(usuarios)} usuários encontrados")
         
         # Converter para lista de dicionários
         resultado = []
@@ -87,8 +93,12 @@ def listar_usuarios():
                 "data_criacao": user["data_criacao"].isoformat() if user["data_criacao"] else None
             })
         
+        print(f"[DEBUG] Retornando {len(resultado)} usuários")
         return jsonify(resultado), 200
     except Exception as e:
+        print(f"[ERRO] Erro ao listar usuários: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
 
 
@@ -112,7 +122,8 @@ def criar_usuario():
         if not email or not senha or not tipo_usuario:
             return jsonify({"erro": "Email, senha e tipo de usuário são obrigatórios"}), 400
         
-        if tipo_usuario not in ["Agente Público", "OSC"]:
+        tipos_validos = ["Agente Público", "Agente DAC", "Agente DGP", "Agente DP", "Externo"]
+        if tipo_usuario not in tipos_validos:
             return jsonify({"erro": "Tipo de usuário inválido"}), 400
         
         # Gerar hash da senha
@@ -161,7 +172,8 @@ def atualizar_usuario(user_id):
         tipo_usuario = data.get("tipo_usuario", "").strip()
         
         # Validações
-        if tipo_usuario not in ["Agente Público", "OSC"]:
+        tipos_validos = ["Agente Público", "Agente DAC", "Agente DGP", "Agente DP", "Externo"]
+        if tipo_usuario not in tipos_validos:
             return jsonify({"erro": "Tipo de usuário inválido"}), 400
         
         # Atualizar no banco

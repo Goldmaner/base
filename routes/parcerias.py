@@ -2,7 +2,7 @@
 Blueprint de parcerias (listagem e formulário)
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, jsonify
 from db import get_cursor, get_db, execute_query
 from utils import login_required
 import csv
@@ -1116,3 +1116,201 @@ def atualizar_conferencia():
     except Exception as e:
         flash(f"Erro ao atualizar conferência: {str(e)}", "danger")
         return redirect(url_for('parcerias.conferencia'))
+
+
+@parcerias_bp.route("/dicionario-oscs", methods=["GET"])
+@login_required
+def dicionario_oscs():
+    """
+    Dicionário de OSCs - permite padronizar e corrigir nomes de OSCs
+    Mostra todas as OSCs únicas com contagem de termos associados
+    """
+    try:
+        # Parâmetro de paginação
+        pagina = request.args.get('pagina', 1, type=int)
+        por_pagina = 50
+        offset = (pagina - 1) * por_pagina
+        
+        cur = get_cursor()
+        
+        # Buscar total de OSCs únicas
+        cur.execute("""
+            SELECT COUNT(DISTINCT osc) as total
+            FROM Parcerias
+            WHERE osc IS NOT NULL AND osc != ''
+        """)
+        total_oscs = cur.fetchone()['total']
+        total_paginas = (total_oscs + por_pagina - 1) // por_pagina
+        
+        # Buscar OSCs com contagem de termos (paginado)
+        query = """
+            SELECT 
+                osc,
+                COUNT(numero_termo) as total_termos,
+                MIN(cnpj) as cnpj_exemplo
+            FROM Parcerias
+            WHERE osc IS NOT NULL AND osc != ''
+            GROUP BY osc
+            ORDER BY osc
+            LIMIT %s OFFSET %s
+        """
+        
+        cur.execute(query, (por_pagina, offset))
+        oscs = cur.fetchall()
+        cur.close()
+        
+        return render_template('parcerias_osc_dict.html',
+                             oscs=oscs,
+                             total_oscs=total_oscs,
+                             pagina_atual=pagina,
+                             total_paginas=total_paginas)
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao carregar dicionário de OSCs: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Erro ao carregar dicionário de OSCs: {str(e)}", "danger")
+        return redirect(url_for('parcerias.listar'))
+
+
+@parcerias_bp.route("/buscar-oscs", methods=["GET"])
+@login_required
+def buscar_oscs():
+    """
+    API para buscar OSCs no banco de dados (busca global)
+    """
+    try:
+        termo_busca = request.args.get('q', '').strip()
+        
+        if not termo_busca:
+            return jsonify({'error': 'Termo de busca vazio'}), 400
+        
+        cur = get_cursor()
+        
+        # Buscar OSCs que contenham o termo (ILIKE para case-insensitive)
+        query = """
+            SELECT 
+                osc,
+                COUNT(numero_termo) as total_termos,
+                MIN(cnpj) as cnpj_exemplo
+            FROM Parcerias
+            WHERE osc ILIKE %s
+            GROUP BY osc
+            ORDER BY osc
+            LIMIT 100
+        """
+        
+        cur.execute(query, (f'%{termo_busca}%',))
+        oscs = cur.fetchall()
+        cur.close()
+        
+        return jsonify({
+            'oscs': [dict(osc) for osc in oscs],
+            'total': len(oscs),
+            'termo_busca': termo_busca
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar OSCs: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@parcerias_bp.route("/termos-por-osc/<path:osc>", methods=["GET"])
+@login_required
+def termos_por_osc(osc):
+    """
+    API para buscar todos os termos de uma OSC específica
+    """
+    try:
+        cur = get_cursor()
+        
+        query = """
+            SELECT 
+                numero_termo,
+                tipo_termo,
+                projeto,
+                inicio,
+                final,
+                total_previsto
+            FROM Parcerias
+            WHERE osc = %s
+            ORDER BY numero_termo
+        """
+        
+        cur.execute(query, (osc,))
+        termos = cur.fetchall()
+        cur.close()
+        
+        # Converter datas para string e formatar valores
+        termos_formatados = []
+        for termo in termos:
+            termo_dict = dict(termo)
+            termo_dict['inicio'] = termo['inicio'].strftime('%d/%m/%Y') if termo['inicio'] else '-'
+            termo_dict['final'] = termo['final'].strftime('%d/%m/%Y') if termo['final'] else '-'
+            termo_dict['total_previsto'] = float(termo['total_previsto']) if termo['total_previsto'] else 0
+            termos_formatados.append(termo_dict)
+        
+        return jsonify({'termos': termos_formatados}), 200
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar termos da OSC: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@parcerias_bp.route("/atualizar-osc", methods=["POST"])
+@login_required
+def atualizar_osc():
+    """
+    API para atualizar nome de uma OSC em todos os registros
+    """
+    try:
+        data = request.get_json()
+        osc_antiga = data.get('osc_antiga', '').strip()
+        osc_nova = data.get('osc_nova', '').strip()
+        
+        if not osc_antiga or not osc_nova:
+            return jsonify({'error': 'OSC antiga e nova são obrigatórias'}), 400
+        
+        if osc_antiga == osc_nova:
+            return jsonify({'error': 'OSC antiga e nova são iguais'}), 400
+        
+        cur = get_cursor()
+        
+        # Verificar se já existe outra OSC com o nome novo (para evitar duplicação não intencional)
+        cur.execute("""
+            SELECT COUNT(*) as count 
+            FROM Parcerias 
+            WHERE osc = %s AND osc != %s
+        """, (osc_nova, osc_antiga))
+        
+        if cur.fetchone()['count'] > 0:
+            # Se já existe, avisar mas permitir (pode ser fusão intencional)
+            print(f"[AVISO] Já existe OSC com nome '{osc_nova}' no banco")
+        
+        # Atualizar todos os registros
+        query = """
+            UPDATE Parcerias
+            SET osc = %s
+            WHERE osc = %s
+        """
+        
+        cur.execute(query, (osc_nova, osc_antiga))
+        linhas_afetadas = cur.rowcount
+        
+        # Commit da transação
+        get_db().commit()
+        cur.close()
+        
+        print(f"[SUCESSO] OSC atualizada: '{osc_antiga}' → '{osc_nova}' ({linhas_afetadas} registros)")
+        
+        return jsonify({
+            'message': f'✅ OSC atualizada com sucesso! {linhas_afetadas} registro(s) afetado(s).',
+            'linhas_afetadas': linhas_afetadas
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao atualizar OSC: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        get_db().rollback()
+        return jsonify({'error': str(e)}), 500
