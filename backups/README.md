@@ -1,53 +1,64 @@
-# FAF - Sistema de Gestão de Orçamento e Parcerias
+# Pasta de Backups - FAF
 
-Este projeto é uma aplicação web desenvolvida em Flask para gestão de orçamento, parcerias e despesas, com integração ao PostgreSQL e interface moderna baseada em Bootstrap.
+Esta pasta contém os backups automáticos do banco de dados PostgreSQL.
 
-## Estrutura de Pastas
+## 📁 Estrutura dos Arquivos
 
+Os backups são salvos com o seguinte formato:
 ```
-FAF/
-│
-├── app.py                # Arquivo principal da aplicação Flask
-├── config.py             # Configurações do projeto (DB, variáveis)
-├── db.py                 # Conexão e funções do banco de dados
-├── utils.py              # Funções utilitárias
-│
-├── routes/               # Blueprints e rotas da aplicação
-│   ├── __init__.py
-│   ├── auth.py           # Autenticação de usuários
-│   ├── despesas.py       # Rotas de despesas
-│   ├── instrucoes.py     # Rotas de instruções
-│   ├── main.py           # Rotas principais
-│   ├── orcamento.py      # Rotas de orçamento e dicionário de categorias
-│   └── parcerias.py      # Rotas de parcerias
-│
-├── templates/            # Templates HTML (Jinja2)
-│   ├── instrucoes.html
-│   ├── login.html
-│   ├── orcamento_1.html  # Listagem de orçamento
-│   ├── orcamento_2.html  # Edição de orçamento
-│   ├── orcamento_3_dict.html # Dicionário de categorias de despesas
-│   ├── parcerias_form.html
-│   ├── parcerias.html
-│   └── tela_inicial.html
-│
-├── outras coisas/        # Scripts auxiliares e documentação
-│   ├── create_users.py
-│   ├── debug_table.py
-│   ├── ESTRUTURA_MODULAR.md
-│   ├── fix_sequence.py
-│   ├── import_2.py
-│   ├── parcerias.csv
-│   ├── parcerias_despesas.csv
-│   ├── README.md         # (Este arquivo)
-│   ├── test_flask_apis.py
-│   ├── test_insert.py
-│   ├── test_postgres_connection.py
-│   └── ...
-│
-├── melhorias/            # Documentação de melhorias e changelogs
-│   ├── CHANGELOG_AUTOSAVE_PAGINATION.md
-│   ├── CORRECOES_FILTRO_FORMATACAO.md
+backup_faf_YYYYMMDD_HHMMSS.sql
+```
+
+Exemplo: `backup_faf_20251030_143522.sql`
+
+## 🔧 Como Fazer Backup
+
+### Opção 1: Script Python
+```bash
+python backup_database.py
+```
+
+### Opção 2: Manualmente com pg_dump
+```bash
+pg_dump -h <host> -p <port> -U <user> -d <database> -F p --no-owner --no-acl -f backups/backup_manual.sql
+```
+
+## 🔄 Como Restaurar um Backup
+
+### Opção 1: psql
+```bash
+psql -h <host> -p <port> -U <user> -d <database> -f backups/backup_faf_20251030_143522.sql
+```
+
+### Opção 2: pgAdmin
+1. Abra o pgAdmin
+2. Conecte ao servidor PostgreSQL
+3. Clique com botão direito no banco de dados → Restore
+4. Selecione o arquivo .sql
+
+## ⚠️ Importante
+
+- **Não commitar backups no Git**: Arquivos `.sql` estão no `.gitignore`
+- **Fazer backup regularmente**: Recomendado antes de grandes mudanças
+- **Verificar espaço em disco**: Backups podem ocupar bastante espaço
+- **Guardar backups em local seguro**: Considere copiar para outro local/nuvem
+
+## 🧹 Limpeza Automática
+
+O script `backup_database.py` pode limpar backups antigos automaticamente.
+Para ativar, descomente a linha no final do script:
+
+```python
+limpar_backups_antigos(dias=30)  # Remove backups com mais de 30 dias
+```
+
+## 📊 Informações dos Backups
+
+O script mostra automaticamente:
+- Nome do arquivo
+- Tamanho (MB)
+- Data e hora de criação
+- Lista de todos os backups existentes
 │   └── MELHORIAS_UX_FORMULARIO.md
 │
 └── __pycache__/          # Arquivos temporários do Python

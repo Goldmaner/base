@@ -536,3 +536,538 @@ def editar_por_termo():
             import traceback
             traceback.print_exc()
             return jsonify({'erro': str(e)}), 500
+
+
+@analises_bp.route('/adicionar', methods=['GET', 'POST'])
+@login_required
+def adicionar_analises():
+    """
+    Interface para adicionar novas análises de prestação de contas
+    """
+    from db import get_db
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            numero_termo = data.get('numero_termo')
+            analises = data.get('analises', [])
+            
+            if not numero_termo or not analises:
+                return jsonify({'erro': 'Dados incompletos'}), 400
+            
+            cur = get_cursor()
+            
+            # Inserir cada análise
+            for analise in analises:
+                query = """
+                    INSERT INTO parcerias_analises (
+                        numero_termo, tipo_prestacao, numero_prestacao,
+                        vigencia_inicial, vigencia_final,
+                        entregue, cobrado, e_notificacao, e_parecer,
+                        e_fase_recursal, e_encerramento,
+                        data_parecer_dp, valor_devolucao, valor_devolvido,
+                        responsavel_dp, data_parecer_pg, responsavel_pg, observacoes
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                params = (
+                    numero_termo,
+                    analise.get('tipo_prestacao'),
+                    analise.get('numero_prestacao'),
+                    analise.get('vigencia_inicial'),
+                    analise.get('vigencia_final'),
+                    analise.get('entregue', False),
+                    analise.get('cobrado', False),
+                    analise.get('e_notificacao', False),
+                    analise.get('e_parecer', False),
+                    analise.get('e_fase_recursal', False),
+                    analise.get('e_encerramento', False),
+                    analise.get('data_parecer_dp') or None,
+                    analise.get('valor_devolucao') or None,
+                    analise.get('valor_devolvido') or None,
+                    analise.get('responsavel_dp') or None,
+                    analise.get('data_parecer_pg') or None,
+                    analise.get('responsavel_pg'),
+                    analise.get('observacoes')
+                )
+                cur.execute(query, params)
+            
+            get_db().commit()
+            cur.close()
+            
+            return jsonify({'mensagem': 'Análises adicionadas com sucesso!'}), 200
+            
+        except Exception as e:
+            print(f"[ERRO] Erro ao adicionar análises: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'erro': str(e)}), 500
+    
+    # GET - Buscar termos sem análises
+    cur = get_cursor()
+    
+    # Buscar termos que não estão em parcerias_analises
+    query = """
+        SELECT DISTINCT p.numero_termo, p.inicio, p.final, p.portaria
+        FROM Parcerias p
+        WHERE p.numero_termo NOT IN (
+            SELECT DISTINCT numero_termo FROM parcerias_analises
+        )
+        AND p.inicio IS NOT NULL
+        AND p.final IS NOT NULL
+        ORDER BY p.numero_termo DESC
+    """
+    cur.execute(query)
+    termos_pendentes = cur.fetchall()
+    
+    # Buscar analistas para dropdown
+    cur.execute("SELECT id, nome_analista FROM categoricas.c_analistas ORDER BY nome_analista")
+    analistas = cur.fetchall()
+    cur.close()
+    
+    return render_template('adicionar_analises.html', 
+                         termos_pendentes=termos_pendentes,
+                         analistas=analistas)
+
+
+@analises_bp.route('/api/calcular-prestacoes', methods=['POST'])
+@login_required
+def calcular_prestacoes():
+    """
+    API para calcular as prestações de contas baseado no termo selecionado
+    """
+    try:
+        data = request.get_json()
+        numero_termo = data.get('numero_termo')
+        
+        if not numero_termo:
+            return jsonify({'erro': 'Termo não informado'}), 400
+        
+        # Buscar dados do termo
+        cur = get_cursor()
+        query = """
+            SELECT numero_termo, inicio, final, portaria
+            FROM Parcerias
+            WHERE numero_termo = %s
+        """
+        cur.execute(query, (numero_termo,))
+        termo = cur.fetchone()
+        cur.close()
+        
+        if not termo:
+            return jsonify({'erro': 'Termo não encontrado'}), 404
+        
+        data_inicio = termo['inicio']
+        data_termino = termo['final']
+        portaria = termo['portaria']
+        
+        # Calcular prestações baseado na portaria
+        prestacoes = gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria)
+        
+        return jsonify({'prestacoes': prestacoes}), 200
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao calcular prestações: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
+
+def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
+    """
+    Gera as prestações de contas baseado na portaria e período de vigência
+    """
+    from dateutil.relativedelta import relativedelta
+    
+    prestacoes = []
+    
+    # Definir tipo de prestações baseado na portaria
+    portarias_semestral = ['Portaria nº 021/SMDHC/2023', 'Portaria nº 090/SMDHC/2023']
+    portarias_trimestral_semestral = ['Portaria nº 121/SMDHC/2019', 'Portaria nº 140/SMDHC/2019']
+    
+    # Calcular duração em meses
+    duracao_meses = (data_termino.year - data_inicio.year) * 12 + (data_termino.month - data_inicio.month) + 1
+    
+    if portaria in portarias_semestral:
+        # Portarias 021 e 090: Semestral + Final
+        numero_prestacao = 1
+        data_atual = data_inicio
+        
+        # Criar prestações semestrais enquanto couber um semestre completo
+        while True:
+            # Calcular fim do semestre (6 meses a partir da data_atual)
+            data_fim_semestre = data_atual + relativedelta(months=6) - relativedelta(days=1)
+            
+            # Se o fim do semestre ultrapassa ou alcança o término do termo, parar
+            # (não criar semestral parcial, a Final cobre todo o período)
+            if data_fim_semestre >= data_termino:
+                break
+            
+            prestacoes.append({
+                'tipo_prestacao': 'Semestral',
+                'numero_prestacao': numero_prestacao,
+                'vigencia_inicial': data_atual.strftime('%Y-%m-%d'),
+                'vigencia_final': data_fim_semestre.strftime('%Y-%m-%d')
+            })
+            
+            numero_prestacao += 1
+            # Próximo período começa no dia seguinte
+            data_atual = data_fim_semestre + relativedelta(days=1)
+        
+        # Sempre adicionar prestação final (cobre todo o período do termo)
+        prestacoes.append({
+            'tipo_prestacao': 'Final',
+            'numero_prestacao': 1,
+            'vigencia_inicial': data_inicio.strftime('%Y-%m-%d'),
+            'vigencia_final': data_termino.strftime('%Y-%m-%d')
+        })
+        
+    elif portaria in portarias_trimestral_semestral:
+        # Portarias 121 e 140: Trimestral + Semestral + Final
+        
+        # Gerar prestações trimestrais
+        numero_prestacao = 1
+        data_atual = data_inicio
+        
+        while data_atual < data_termino:
+            # Calcular fim do trimestre (3 meses)
+            data_fim_trimestre = data_atual + relativedelta(months=3) - relativedelta(days=1)
+            
+            # Se passou do término, ajustar
+            if data_fim_trimestre > data_termino:
+                data_fim_trimestre = data_termino
+            
+            prestacoes.append({
+                'tipo_prestacao': 'Trimestral',
+                'numero_prestacao': numero_prestacao,
+                'vigencia_inicial': data_atual.strftime('%Y-%m-%d'),
+                'vigencia_final': data_fim_trimestre.strftime('%Y-%m-%d')
+            })
+            
+            numero_prestacao += 1
+            data_atual = data_fim_trimestre + relativedelta(days=1)
+            
+            if data_atual > data_termino:
+                break
+        
+        # Gerar prestações semestrais
+        numero_semestral = 1
+        data_atual = data_inicio
+        
+        while data_atual < data_termino:
+            # Calcular fim do semestre (6 meses)
+            data_fim_semestre = data_atual + relativedelta(months=6) - relativedelta(days=1)
+            
+            # Se passou do término, ajustar
+            if data_fim_semestre > data_termino:
+                data_fim_semestre = data_termino
+            
+            prestacoes.append({
+                'tipo_prestacao': 'Semestral',
+                'numero_prestacao': numero_semestral,
+                'vigencia_inicial': data_atual.strftime('%Y-%m-%d'),
+                'vigencia_final': data_fim_semestre.strftime('%Y-%m-%d')
+            })
+            
+            numero_semestral += 1
+            data_atual = data_fim_semestre + relativedelta(days=1)
+            
+            if data_atual > data_termino:
+                break
+        
+        # Adicionar prestação final
+        prestacoes.append({
+            'tipo_prestacao': 'Final',
+            'numero_prestacao': 1,
+            'vigencia_inicial': data_inicio.strftime('%Y-%m-%d'),
+            'vigencia_final': data_termino.strftime('%Y-%m-%d')
+        })
+        
+    else:
+        # Outras portarias: Trimestral + Final
+        numero_prestacao = 1
+        data_atual = data_inicio
+        
+        while data_atual < data_termino:
+            # Calcular fim do trimestre (3 meses)
+            data_fim_trimestre = data_atual + relativedelta(months=3) - relativedelta(days=1)
+            
+            # Se passou do término, ajustar
+            if data_fim_trimestre > data_termino:
+                data_fim_trimestre = data_termino
+            
+            prestacoes.append({
+                'tipo_prestacao': 'Trimestral',
+                'numero_prestacao': numero_prestacao,
+                'vigencia_inicial': data_atual.strftime('%Y-%m-%d'),
+                'vigencia_final': data_fim_trimestre.strftime('%Y-%m-%d')
+            })
+            
+            numero_prestacao += 1
+            data_atual = data_fim_trimestre + relativedelta(days=1)
+            
+            if data_atual > data_termino:
+                break
+        
+        # Adicionar prestação final
+        prestacoes.append({
+            'tipo_prestacao': 'Final',
+            'numero_prestacao': 1,
+            'vigencia_inicial': data_inicio.strftime('%Y-%m-%d'),
+            'vigencia_final': data_termino.strftime('%Y-%m-%d')
+        })
+    
+    return prestacoes
+
+
+@analises_bp.route('/atualizar-prestacoes', methods=['GET', 'POST'])
+@login_required
+def atualizar_prestacoes():
+    """
+    Interface para atualizar prestações de contas que estão com divergência de datas
+    Compara datas de vigência da tabela Parcerias com parcerias_analises
+    """
+    from db import get_db
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            numero_termo = data.get('numero_termo')
+            
+            if not numero_termo:
+                return jsonify({'erro': 'Termo não informado'}), 400
+            
+            cur = get_cursor()
+            
+            # Buscar dados do termo (datas corretas e portaria)
+            cur.execute("""
+                SELECT inicio, final, portaria
+                FROM Parcerias
+                WHERE numero_termo = %s
+            """, (numero_termo,))
+            termo = cur.fetchone()
+            
+            if not termo:
+                return jsonify({'erro': 'Termo não encontrado'}), 404
+            
+            data_inicio = termo['inicio']
+            data_termino = termo['final']
+            portaria = termo['portaria']
+            
+            # Recalcular todas as prestações baseado na portaria e novas datas
+            prestacoes_novas = gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria)
+            
+            # Buscar prestações antigas para preservar dados preenchidos
+            cur.execute("""
+                SELECT id, tipo_prestacao, numero_prestacao, 
+                       entregue, cobrado, e_notificacao, e_parecer,
+                       e_fase_recursal, e_encerramento, data_parecer_dp,
+                       valor_devolucao, valor_devolvido, responsavel_dp,
+                       data_parecer_pg, responsavel_pg, observacoes
+                FROM parcerias_analises
+                WHERE numero_termo = %s
+                ORDER BY tipo_prestacao, numero_prestacao
+            """, (numero_termo,))
+            prestacoes_antigas = cur.fetchall()
+            
+            # Criar mapa das prestações antigas (chave: tipo+numero)
+            mapa_antigas = {}
+            for p in prestacoes_antigas:
+                chave = f"{p['tipo_prestacao']}_{p['numero_prestacao']}"
+                mapa_antigas[chave] = p
+            
+            # Deletar todas as prestações antigas
+            cur.execute("DELETE FROM parcerias_analises WHERE numero_termo = %s", (numero_termo,))
+            
+            # Inserir prestações novas, preservando dados se existiam antes
+            for prestacao_nova in prestacoes_novas:
+                chave = f"{prestacao_nova['tipo_prestacao']}_{prestacao_nova['numero_prestacao']}"
+                antiga = mapa_antigas.get(chave)
+                
+                # Se existia prestação com mesmo tipo+número, preservar dados
+                if antiga:
+                    query = """
+                        INSERT INTO parcerias_analises (
+                            numero_termo, tipo_prestacao, numero_prestacao,
+                            vigencia_inicial, vigencia_final,
+                            entregue, cobrado, e_notificacao, e_parecer,
+                            e_fase_recursal, e_encerramento, data_parecer_dp,
+                            valor_devolucao, valor_devolvido, responsavel_dp,
+                            data_parecer_pg, responsavel_pg, observacoes
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    params = (
+                        numero_termo,
+                        prestacao_nova['tipo_prestacao'],
+                        prestacao_nova['numero_prestacao'],
+                        prestacao_nova['vigencia_inicial'],
+                        prestacao_nova['vigencia_final'],
+                        antiga['entregue'],
+                        antiga['cobrado'],
+                        antiga['e_notificacao'],
+                        antiga['e_parecer'],
+                        antiga['e_fase_recursal'],
+                        antiga['e_encerramento'],
+                        antiga['data_parecer_dp'],
+                        antiga['valor_devolucao'],
+                        antiga['valor_devolvido'],
+                        antiga['responsavel_dp'],
+                        antiga['data_parecer_pg'],
+                        antiga['responsavel_pg'],
+                        antiga['observacoes']
+                    )
+                else:
+                    # Prestação nova (não existia antes), inserir vazia
+                    query = """
+                        INSERT INTO parcerias_analises (
+                            numero_termo, tipo_prestacao, numero_prestacao,
+                            vigencia_inicial, vigencia_final,
+                            entregue, cobrado, e_notificacao, e_parecer,
+                            e_fase_recursal, e_encerramento
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    params = (
+                        numero_termo,
+                        prestacao_nova['tipo_prestacao'],
+                        prestacao_nova['numero_prestacao'],
+                        prestacao_nova['vigencia_inicial'],
+                        prestacao_nova['vigencia_final'],
+                        False, False, False, False, False, False
+                    )
+                
+                cur.execute(query, params)
+            
+            get_db().commit()
+            cur.close()
+            
+            return jsonify({'mensagem': f'Prestações recalculadas com sucesso! Total: {len(prestacoes_novas)}'}), 200
+            
+        except Exception as e:
+            print(f"[ERRO] Erro ao atualizar prestações: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'erro': str(e)}), 500
+    
+    # GET - Buscar termos com divergências
+    cur = get_cursor()
+    
+    # Verificar se deve usar comparação exata (parâmetro da URL)
+    modo_exato = request.args.get('exato', '0') == '1'
+    
+    # Buscar TODOS os termos que têm prestações cadastradas
+    # Vamos recalcular as prestações corretas e comparar com as existentes
+    query_termos = """
+        SELECT DISTINCT 
+            p.numero_termo,
+            p.sei_celeb,
+            p.inicio,
+            p.final,
+            p.portaria
+        FROM Parcerias p
+        INNER JOIN parcerias_analises pa ON p.numero_termo = pa.numero_termo
+        WHERE p.inicio IS NOT NULL 
+        AND p.final IS NOT NULL
+        AND p.numero_termo NOT ILIKE '%TCL%'
+        AND p.numero_termo NOT ILIKE '%COSAN%'
+        AND p.numero_termo NOT ILIKE '%ACP%'
+        AND p.numero_termo NOT ILIKE '%TCC%'
+        AND p.numero_termo NOT ILIKE '%TCP%'
+        ORDER BY p.numero_termo DESC
+    """
+    
+    cur.execute(query_termos)
+    termos = cur.fetchall()
+    
+    termos_divergentes = {}
+    
+    for termo in termos:
+        numero_termo = termo['numero_termo']
+        data_inicio = termo['inicio']
+        data_termino = termo['final']
+        portaria = termo['portaria']
+        
+        # Buscar APENAS a prestação Final cadastrada
+        cur.execute("""
+            SELECT id, tipo_prestacao, numero_prestacao, 
+                   vigencia_inicial, vigencia_final
+            FROM parcerias_analises
+            WHERE numero_termo = %s
+            AND tipo_prestacao = 'Final'
+            LIMIT 1
+        """, (numero_termo,))
+        prestacao_final_cadastrada = cur.fetchone()
+        
+        # Se não existe Final cadastrada, tem divergência
+        if not prestacao_final_cadastrada:
+            tem_divergencia = True
+        else:
+            # Comparar mês/ano da Final com o termo
+            if modo_exato:
+                # Modo exato: compara dia/mês/ano
+                inicial_bate = (prestacao_final_cadastrada['vigencia_inicial'] == data_inicio)
+                final_bate = (prestacao_final_cadastrada['vigencia_final'] == data_termino)
+            else:
+                # Modo mês/ano: compara apenas mês e ano
+                inicial_bate = (
+                    prestacao_final_cadastrada['vigencia_inicial'].month == data_inicio.month and
+                    prestacao_final_cadastrada['vigencia_inicial'].year == data_inicio.year
+                )
+                final_bate = (
+                    prestacao_final_cadastrada['vigencia_final'].month == data_termino.month and
+                    prestacao_final_cadastrada['vigencia_final'].year == data_termino.year
+                )
+            
+            # Se a Final não bate com o termo, tem divergência
+            tem_divergencia = not (inicial_bate and final_bate)
+        
+        # Se tem divergência, calcular todas as prestações corretas e cadastradas para mostrar no front
+        if tem_divergencia:
+            # Calcular prestações corretas baseado na portaria
+            prestacoes_corretas = gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria)
+            
+            # Ordenar prestações corretas
+            ordem_tipo = {'Trimestral': 1, 'Semestral': 2, 'Final': 3}
+            prestacoes_corretas_ordenadas = sorted(
+                prestacoes_corretas, 
+                key=lambda x: (ordem_tipo.get(x['tipo_prestacao'], 4), x['numero_prestacao'])
+            )
+            
+            # Buscar TODAS as prestações cadastradas
+            cur.execute("""
+                SELECT id, tipo_prestacao, numero_prestacao, 
+                       vigencia_inicial, vigencia_final
+                FROM parcerias_analises
+                WHERE numero_termo = %s
+                ORDER BY 
+                    CASE 
+                        WHEN tipo_prestacao = 'Trimestral' THEN 1
+                        WHEN tipo_prestacao = 'Semestral' THEN 2
+                        WHEN tipo_prestacao = 'Final' THEN 3
+                        ELSE 4
+                    END,
+                    numero_prestacao
+            """, (numero_termo,))
+            prestacoes_cadastradas = cur.fetchall()
+            
+            # Adicionar à lista de divergentes
+            termos_divergentes[numero_termo] = {
+                'numero_termo': numero_termo,
+                'sei_celeb': termo['sei_celeb'],
+                'data_inicio_termo': data_inicio,
+                'data_final_termo': data_termino,
+                'portaria': portaria,
+                'prestacoes_cadastradas': [
+                    {
+                        'id': p['id'],
+                        'tipo_prestacao': p['tipo_prestacao'],
+                        'numero_prestacao': p['numero_prestacao'],
+                        'vigencia_inicial': p['vigencia_inicial'],
+                        'vigencia_final': p['vigencia_final']
+                    } for p in prestacoes_cadastradas
+                ],
+                'prestacoes_corretas': prestacoes_corretas_ordenadas
+            }
+    
+    cur.close()
+    
+    return render_template('atualizar_prestacoes.html', 
+                         termos_divergentes=list(termos_divergentes.values()))

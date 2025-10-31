@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atualizar Prestações de Contas</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f8f9fa; }
+    .divergencia-card { 
+      margin-bottom: 20px; 
+      border-left: 4px solid #dc3545; 
+    }
+    .data-antiga { 
+      background-color: #fff3cd; 
+      padding: 10px; 
+      border-radius: 5px; 
+      margin-bottom: 10px;
+    }
+    .data-nova { 
+      background-color: #d1e7dd; 
+      padding: 10px; 
+      border-radius: 5px; 
+    }
+    .comparacao {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .comparacao i {
+      font-size: 24px;
+      color: #0d6efd;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2><i class="bi bi-arrow-repeat"></i> Atualizar Prestações de Contas</h2>
+        <p class="text-muted">Correção de divergências entre datas de vigência</p>
+      </div>
+      <a href="{{ url_for('analises.listar') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+
+    {% if termos_divergentes %}
+    <!-- Opções de filtro -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="checkExato" 
+                 onchange="alterarModoComparacao()"
+                 {% if request.args.get('exato') == '1' %}checked{% endif %}>
+          <label class="form-check-label" for="checkExato">
+            <strong>Mostrar resultados exatos</strong>
+            <small class="text-muted d-block">
+              Por padrão, comparamos apenas mês/ano. Marque esta opção para comparar dia/mês/ano exato.
+            </small>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerta informativo -->
+    <div class="alert alert-warning mb-4">
+      <h5><i class="bi bi-exclamation-triangle me-2"></i>Divergências Encontradas</h5>
+      <p class="mb-0">
+        <strong>{{ termos_divergentes|length }} termo(s)</strong> com prestações <strong>Finais</strong> 
+        cuja vigência não corresponde às datas do termo original. 
+        Revise e atualize as datas conforme necessário.
+      </p>
+    </div>
+
+    <!-- Lista de divergências -->
+    {% for termo in termos_divergentes %}
+    <div class="card divergencia-card">
+      <div class="card-header bg-danger text-white">
+        <h5 class="mb-0">
+          <i class="bi bi-file-earmark-excel"></i> {{ termo.numero_termo }}
+        </h5>
+        <small class="d-block mt-1">
+          <i class="bi bi-folder2-open me-1"></i>Processo SEI: {{ termo.sei_celeb or 'Não informado' }}
+        </small>
+        <small class="d-block mt-1">
+          <i class="bi bi-calendar-range me-1"></i>Portaria: {{ termo.portaria or 'Não informada' }}
+        </small>
+      </div>
+      <div class="card-body">
+        <!-- Info sobre vigência do termo -->
+        <div class="alert alert-info mb-3">
+          <strong><i class="bi bi-info-circle me-2"></i>Vigência do Termo:</strong>
+          {{ termo.data_inicio_termo.strftime('%d/%m/%Y') if termo.data_inicio_termo else 'N/A' }}
+          até
+          {{ termo.data_final_termo.strftime('%d/%m/%Y') if termo.data_final_termo else 'N/A' }}
+        </div>
+
+        <!-- Comparação de Prestações -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <div class="data-antiga">
+              <h6><i class="bi bi-clock-history me-2"></i>Prestações Cadastradas ({{ termo.prestacoes_cadastradas|length }})</h6>
+              {% for prestacao in termo.prestacoes_cadastradas %}
+              <div class="mb-2">
+                <strong>{{ prestacao.tipo_prestacao }} #{{ prestacao.numero_prestacao }}:</strong><br>
+                <small>
+                  {{ prestacao.vigencia_inicial.strftime('%d/%m/%Y') if prestacao.vigencia_inicial else 'N/A' }}
+                  até
+                  {{ prestacao.vigencia_final.strftime('%d/%m/%Y') if prestacao.vigencia_final else 'N/A' }}
+                </small>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="data-nova">
+              <h6><i class="bi bi-check-circle me-2"></i>Prestações Corretas ({{ termo.prestacoes_corretas|length }})</h6>
+              {% for prestacao in termo.prestacoes_corretas %}
+              <div class="mb-2">
+                <strong>{{ prestacao.tipo_prestacao }} #{{ prestacao.numero_prestacao }}:</strong><br>
+                <small>
+                  {% set inicio_parts = prestacao.vigencia_inicial.split('-') %}
+                  {% set final_parts = prestacao.vigencia_final.split('-') %}
+                  {{ inicio_parts[2] }}/{{ inicio_parts[1] }}/{{ inicio_parts[0] }}
+                  até
+                  {{ final_parts[2] }}/{{ final_parts[1] }}/{{ final_parts[0] }}
+                </small>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Botão de Atualizar -->
+        <form class="form-atualizar" data-termo="{{ termo.numero_termo }}">
+          <input type="hidden" name="numero_termo" value="{{ termo.numero_termo }}">
+          
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Atenção:</strong> Ao clicar em "Recalcular", todas as prestações deste termo serão 
+            deletadas e recriadas baseado nas datas corretas do termo e na portaria.
+            Os dados preenchidos (como pareceres e status) serão preservados quando possível.
+          </div>
+
+          <div class="text-end">
+            <button type="submit" class="btn btn-primary btn-lg">
+              <i class="bi bi-arrow-repeat me-2"></i>Recalcular Prestações deste Termo
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Botão de Atualizar Tudo -->
+    <div class="text-center mt-4 mb-4">
+      <button type="button" class="btn btn-success btn-lg" id="btnAtualizarTudo">
+        <i class="bi bi-check-all me-2"></i>Recalcular Todos os Termos
+      </button>
+    </div>
+
+    {% else %}
+    <!-- Mensagem quando não há divergências -->
+    <div class="alert alert-success">
+      <h4><i class="bi bi-check-circle me-2"></i>Nenhuma Divergência Encontrada</h4>
+      <p>
+        Todas as prestações de contas estão com datas e quantidades corretas 
+        baseadas nas vigências dos termos e suas portarias.
+      </p>
+      <a href="{{ url_for('analises.listar') }}" class="btn btn-primary mt-2">
+        <i class="bi bi-arrow-left me-2"></i>Voltar para Análises
+      </a>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Atualizar termo individual
+    document.querySelectorAll('.form-atualizar').forEach(form => {
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const numeroTermo = this.dataset.termo;
+        
+        if (!confirm(`Confirma o recálculo de TODAS as prestações do termo ${numeroTermo}?\n\nAs prestações atuais serão deletadas e recriadas com as datas corretas.`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch('/analises/atualizar-prestacoes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ numero_termo: numeroTermo })
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert(result.mensagem || 'Prestações recalculadas com sucesso!');
+            window.location.reload();
+          } else {
+            alert('Erro: ' + result.erro);
+          }
+        } catch (error) {
+          console.error('Erro:', error);
+          alert('Erro ao recalcular: ' + error.message);
+        }
+      });
+    });
+
+    // Atualizar todos os termos
+    document.getElementById('btnAtualizarTudo')?.addEventListener('click', async function() {
+      if (!confirm('Confirma o recálculo de TODAS as prestações divergentes?\n\nEsta ação irá recalcular múltiplos termos.')) {
+        return;
+      }
+
+      const forms = document.querySelectorAll('.form-atualizar');
+      let sucessos = 0;
+      let erros = 0;
+
+      for (const form of forms) {
+        const numeroTermo = form.dataset.termo;
+
+        try {
+          const response = await fetch('/analises/atualizar-prestacoes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ numero_termo: numeroTermo })
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            sucessos++;
+          } else {
+            erros++;
+            console.error(`Erro no termo ${numeroTermo}:`, result.erro);
+          }
+        } catch (error) {
+          erros++;
+          console.error(`Erro no termo ${numeroTermo}:`, error);
+        }
+      }
+
+      if (erros === 0) {
+        alert(`Todos os ${sucessos} termo(s) foram recalculados com sucesso!`);
+        window.location.reload();
+      } else {
+        alert(`Recálculo concluído:\n${sucessos} sucesso(s)\n${erros} erro(s)\n\nVerifique o console para detalhes.`);
+        window.location.reload();
+      }
+    });
+
+    // Alternar modo de comparação (exato vs mês/ano)
+    function alterarModoComparacao() {
+      const checkExato = document.getElementById('checkExato');
+      const url = new URL(window.location.href);
+      
+      if (checkExato.checked) {
+        url.searchParams.set('exato', '1');
+      } else {
+        url.searchParams.delete('exato');
+      }
+      
+      window.location.href = url.toString();
+    }
+  </script>
+</body>
+</html>

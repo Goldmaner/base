@@ -44,6 +44,12 @@
         <p class="text-muted">Gestão de prestações de contas</p>
       </div>
       <div>
+        <a href="{{ url_for('analises.adicionar_analises') }}" class="btn btn-success me-2">
+          <i class="bi bi-plus-circle"></i> Adicionar Análise
+        </a>
+        <a href="{{ url_for('analises.atualizar_prestacoes') }}" class="btn btn-warning me-2">
+          <i class="bi bi-arrow-repeat"></i> Atualizar Prestações
+        </a>
         <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
           <i class="bi bi-arrow-left"></i> Voltar
         </a>
@@ -179,9 +185,6 @@
 
     <!-- Botões de ação -->
     <div class="mb-3">
-      <button class="btn btn-success" onclick="adicionarAnalise()" disabled>
-        <i class="bi bi-plus-circle me-2"></i>Adicionar Análise
-      </button>
       <button class="btn btn-info" onclick="exportarCSV()">
         <i class="bi bi-download me-2"></i>Exportar CSV
       </button>
@@ -479,10 +482,6 @@
       });
       
       window.location.href = `/analises/api/exportar?${params}`;
-    }
-
-    function adicionarAnalise() {
-      alert('Funcionalidade em desenvolvimento');
     }
   </script>
 </body>

@@ -25,6 +25,16 @@
       </a>
     </div>
 
+    <!-- Botão de ação rápida -->
+    <div class="mb-3">
+      <button type="button" class="btn btn-warning btn-lg" id="btnMarcarEncerrado">
+        <i class="bi bi-check-all me-2"></i>Marcar Tudo como Encerrado
+      </button>
+      <small class="text-muted ms-3">
+        Marca: Notificação, Parecer, Fase Recursal, Encerramento e zera valores de devolução
+      </small>
+    </div>
+
     <form id="formEditarAnalises">
       {% for analise in analises %}
       <div class="card analise-card">
@@ -127,6 +137,29 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    // Botão "Marcar tudo como encerrado"
+    document.getElementById('btnMarcarEncerrado').addEventListener('click', function() {
+      if (!confirm('Deseja marcar todas as prestações como encerradas? Isso irá marcar as checkboxes e zerar os valores de devolução.')) {
+        return;
+      }
+      
+      const totalAnalises = document.querySelectorAll('[name^="id_"]').length;
+      
+      for (let i = 1; i <= totalAnalises; i++) {
+        // Marcar checkboxes
+        document.getElementById(`e_notificacao_${i}`).checked = true;
+        document.getElementById(`e_parecer_${i}`).checked = true;
+        document.getElementById(`e_fase_recursal_${i}`).checked = true;
+        document.getElementById(`e_encerramento_${i}`).checked = true;
+        
+        // Zerar valores de devolução
+        document.getElementById(`valor_devolucao_${i}`).value = '0.00';
+        document.getElementById(`valor_devolvido_${i}`).value = '0.00';
+      }
+      
+      alert('Todas as prestações foram marcadas como encerradas com valores zerados!');
+    });
+    
     // Bloquear campos PG para termos TCV até 2016
     document.addEventListener('DOMContentLoaded', function() {
       const numeroTermo = "{{ numero_termo }}";

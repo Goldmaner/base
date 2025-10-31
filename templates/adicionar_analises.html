@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adicionar Análises de Prestação de Contas</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f8f9fa; }
+    .analise-card { margin-bottom: 20px; border-left: 4px solid #28a745; }
+    .form-check-inline { margin-right: 15px; }
+    .termo-option { 
+      padding: 10px; 
+      margin: 5px 0; 
+      border: 1px solid #ddd; 
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .termo-option:hover {
+      background-color: #e9ecef;
+    }
+    .termo-option input[type="radio"] {
+      margin-right: 10px;
+    }
+    #prestacoesContainer {
+      display: none;
+    }
+    .loading {
+      text-align: center;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-4">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2><i class="bi bi-plus-circle"></i> Adicionar Análises de Prestação de Contas</h2>
+        <p class="text-muted">Selecione um termo para gerar automaticamente as prestações de contas</p>
+      </div>
+      <a href="{{ url_for('analises.listar') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+
+    {% if termos_pendentes %}
+    <!-- Seleção de Termo -->
+    <div class="card mb-4">
+      <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Termos Pendentes de Análise</h5>
+      </div>
+      <div class="card-body">
+        <p class="mb-3">Selecione o termo para o qual deseja criar as prestações de contas:</p>
+        
+        <!-- Checkbox para mostrar ACP/TCC/TCP -->
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="mostrarAcpTcc">
+          <label class="form-check-label" for="mostrarAcpTcc">
+            <strong>Mostrar ACP, TCC e TCP?</strong>
+            <small class="text-muted">(Por padrão, estes tipos de termo ficam ocultos)</small>
+          </label>
+        </div>
+        
+        <div id="termosContainer">
+          {% for termo in termos_pendentes %}
+          <div class="termo-option" data-tipo-termo="{{ 'acp-tcc' if 'ACP' in termo.numero_termo.upper() or 'TCC' in termo.numero_termo.upper() or 'TCP' in termo.numero_termo.upper() else 'normal' }}">
+            <input type="radio" 
+                   name="termo_selecionado" 
+                   id="termo_{{ loop.index }}" 
+                   value="{{ termo.numero_termo }}"
+                   data-inicio="{{ termo.inicio }}"
+                   data-termino="{{ termo.final }}"
+                   data-portaria="{{ termo.portaria or '' }}">
+            <label for="termo_{{ loop.index }}" style="cursor: pointer; width: 100%;">
+              <strong>{{ termo.numero_termo }}</strong>
+              <br>
+              <small class="text-muted">
+                Período: {{ termo.inicio.strftime('%d/%m/%Y') if termo.inicio else 'N/A' }} 
+                até {{ termo.final.strftime('%d/%m/%Y') if termo.final else 'N/A' }}
+                {% if termo.portaria %}| Portaria: {{ termo.portaria }}{% endif %}
+              </small>
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="mt-3">
+          <button type="button" class="btn btn-primary btn-lg" id="btnGerarPrestacoes">
+            <i class="bi bi-calculator me-2"></i>Gerar Prestações
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingContainer" class="loading" style="display: none;">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Calculando...</span>
+      </div>
+      <p class="mt-2">Calculando prestações de contas...</p>
+    </div>
+
+    <!-- Formulário de Prestações (gerado dinamicamente) -->
+    <div id="prestacoesContainer">
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-list-check"></i> Prestações de Contas Geradas
+          </h5>
+          <small id="termoSelecionadoDisplay"></small>
+        </div>
+        <div class="card-body">
+          <p class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            As prestações foram calculadas automaticamente. Revise as informações e preencha os campos necessários.
+          </p>
+          
+          <!-- Botão de ação rápida -->
+          <div class="mb-3">
+            <button type="button" class="btn btn-warning" id="btnMarcarEncerradoAdd">
+              <i class="bi bi-check-all me-2"></i>Marcar Tudo como Encerrado
+            </button>
+            <small class="text-muted ms-3">
+              Marca: Notificação, Parecer, Fase Recursal, Encerramento e zera valores de devolução
+            </small>
+          </div>
+
+          <form id="formAdicionarAnalises">
+            <input type="hidden" id="numeroTermoHidden" name="numero_termo">
+            <div id="prestacoesListContainer"></div>
+
+            <!-- Botões de ação -->
+            <div class="mt-4 text-end">
+              <button type="button" class="btn btn-secondary btn-lg" id="btnCancelar">
+                <i class="bi bi-x-circle me-2"></i>Cancelar
+              </button>
+              <button type="submit" class="btn btn-success btn-lg">
+                <i class="bi bi-check-circle me-2"></i>Salvar Todas as Prestações
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <!-- Mensagem quando não há termos pendentes -->
+    <div class="alert alert-info">
+      <h4><i class="bi bi-info-circle me-2"></i>Nenhum Termo Pendente</h4>
+      <p>Todos os termos cadastrados já possuem análises de prestação de contas registradas.</p>
+      <a href="{{ url_for('analises.listar') }}" class="btn btn-primary mt-2">
+        <i class="bi bi-arrow-left me-2"></i>Voltar para Análises
+      </a>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let prestacoesGeradas = [];
+    const analistasData = {{ analistas | tojson }};
+
+    // Filtrar termos ACP/TCC
+    document.getElementById('mostrarAcpTcc')?.addEventListener('change', function() {
+      const mostrar = this.checked;
+      const termosAcpTcc = document.querySelectorAll('[data-tipo-termo="acp-tcc"]');
+      
+      termosAcpTcc.forEach(termo => {
+        termo.style.display = mostrar ? 'block' : 'none';
+      });
+    });
+
+    // Inicializar: ocultar ACP/TCC por padrão
+    document.addEventListener('DOMContentLoaded', function() {
+      const termosAcpTcc = document.querySelectorAll('[data-tipo-termo="acp-tcc"]');
+      termosAcpTcc.forEach(termo => {
+        termo.style.display = 'none';
+      });
+    });
+
+    // Gerar prestações ao clicar no botão
+    document.getElementById('btnGerarPrestacoes')?.addEventListener('click', async function() {
+      const termoSelecionado = document.querySelector('input[name="termo_selecionado"]:checked');
+      
+      if (!termoSelecionado) {
+        alert('Por favor, selecione um termo antes de gerar as prestações.');
+        return;
+      }
+
+      const numeroTermo = termoSelecionado.value;
+      
+      // Mostrar loading
+      document.getElementById('loadingContainer').style.display = 'block';
+      document.getElementById('termosContainer').style.display = 'none';
+      document.querySelector('#btnGerarPrestacoes').disabled = true;
+
+      try {
+        const response = await fetch('/analises/api/calcular-prestacoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numero_termo: numeroTermo })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          prestacoesGeradas = result.prestacoes;
+          renderizarPrestacoes(numeroTermo, prestacoesGeradas);
+          
+          // Esconder loading e seleção de termos
+          document.getElementById('loadingContainer').style.display = 'none';
+          document.querySelector('.card').style.display = 'none';
+          document.getElementById('prestacoesContainer').style.display = 'block';
+        } else {
+          alert('Erro ao calcular prestações: ' + result.erro);
+          document.getElementById('loadingContainer').style.display = 'none';
+          document.getElementById('termosContainer').style.display = 'block';
+          document.querySelector('#btnGerarPrestacoes').disabled = false;
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao calcular prestações: ' + error.message);
+        document.getElementById('loadingContainer').style.display = 'none';
+        document.getElementById('termosContainer').style.display = 'block';
+        document.querySelector('#btnGerarPrestacoes').disabled = false;
+      }
+    });
+
+    // Renderizar prestações no formulário
+    function renderizarPrestacoes(numeroTermo, prestacoes) {
+      document.getElementById('numeroTermoHidden').value = numeroTermo;
+      document.getElementById('termoSelecionadoDisplay').textContent = `Termo: ${numeroTermo} - ${prestacoes.length} prestação(ões) gerada(s)`;
+      
+      const container = document.getElementById('prestacoesListContainer');
+      container.innerHTML = '';
+
+      prestacoes.forEach((prestacao, index) => {
+        const idx = index + 1;
+        
+        const cardHtml = `
+          <div class="card analise-card">
+            <div class="card-header bg-success text-white">
+              <h5 class="mb-0">
+                Prestação ${prestacao.tipo_prestacao} - Número ${prestacao.numero_prestacao}
+              </h5>
+              <small>Vigência: ${formatarData(prestacao.vigencia_inicial)} até ${formatarData(prestacao.vigencia_final)}</small>
+            </div>
+            <div class="card-body">
+              <input type="hidden" name="tipo_prestacao_${idx}" value="${prestacao.tipo_prestacao}">
+              <input type="hidden" name="numero_prestacao_${idx}" value="${prestacao.numero_prestacao}">
+              <input type="hidden" name="vigencia_inicial_${idx}" value="${prestacao.vigencia_inicial}">
+              <input type="hidden" name="vigencia_final_${idx}" value="${prestacao.vigencia_final}">
+              
+              <div class="row g-3">
+                <!-- Campos booleanos -->
+                <div class="col-md-12">
+                  <label class="form-label fw-bold">Status da Prestação</label>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="entregue_${idx}" name="entregue_${idx}">
+                    <label class="form-check-label" for="entregue_${idx}">Entregue</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="cobrado_${idx}" name="cobrado_${idx}">
+                    <label class="form-check-label" for="cobrado_${idx}">Cobrado</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="e_notificacao_${idx}" name="e_notificacao_${idx}">
+                    <label class="form-check-label" for="e_notificacao_${idx}">Notificação</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="e_parecer_${idx}" name="e_parecer_${idx}">
+                    <label class="form-check-label" for="e_parecer_${idx}">Parecer</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="e_fase_recursal_${idx}" name="e_fase_recursal_${idx}">
+                    <label class="form-check-label" for="e_fase_recursal_${idx}">Fase Recursal</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="e_encerramento_${idx}" name="e_encerramento_${idx}">
+                    <label class="form-check-label" for="e_encerramento_${idx}">Encerramento</label>
+                  </div>
+                </div>
+
+                <!-- Datas e valores -->
+                <div class="col-md-4">
+                  <label for="data_parecer_dp_${idx}" class="form-label">Data Parecer DP</label>
+                  <input type="date" class="form-control" id="data_parecer_dp_${idx}" name="data_parecer_dp_${idx}">
+                </div>
+
+                <div class="col-md-4">
+                  <label for="data_parecer_pg_${idx}" class="form-label">Data Parecer PG</label>
+                  <input type="date" class="form-control" id="data_parecer_pg_${idx}" name="data_parecer_pg_${idx}">
+                </div>
+
+                <div class="col-md-4">
+                  <label for="responsavel_dp_${idx}" class="form-label">Responsável DP</label>
+                  <select class="form-control" id="responsavel_dp_${idx}" name="responsavel_dp_${idx}">
+                    <option value="">Selecione...</option>
+                    ${analistasData.map(a => `<option value="${a.id}">${a.nome_analista}</option>`).join('')}
+                  </select>
+                </div>
+
+                <div class="col-md-4">
+                  <label for="responsavel_pg_${idx}" class="form-label">Responsável PG</label>
+                  <input type="text" class="form-control" id="responsavel_pg_${idx}" name="responsavel_pg_${idx}">
+                </div>
+
+                <div class="col-md-4">
+                  <label for="valor_devolucao_${idx}" class="form-label">Valor Devolução (R$)</label>
+                  <input type="number" step="0.01" class="form-control" id="valor_devolucao_${idx}" name="valor_devolucao_${idx}">
+                </div>
+
+                <div class="col-md-4">
+                  <label for="valor_devolvido_${idx}" class="form-label">Valor Devolvido (R$)</label>
+                  <input type="number" step="0.01" class="form-control" id="valor_devolvido_${idx}" name="valor_devolvido_${idx}">
+                </div>
+
+                <!-- Observações -->
+                <div class="col-md-12">
+                  <label for="observacoes_${idx}" class="form-label">Observações</label>
+                  <textarea class="form-control" id="observacoes_${idx}" name="observacoes_${idx}" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        container.insertAdjacentHTML('beforeend', cardHtml);
+      });
+    }
+
+    // Função auxiliar para formatar data
+    function formatarData(dataStr) {
+      if (!dataStr) return 'N/A';
+      const [ano, mes, dia] = dataStr.split('-');
+      return `${dia}/${mes}/${ano}`;
+    }
+
+    // Botão "Marcar tudo como encerrado"
+    document.addEventListener('click', function(e) {
+      if (e.target.id === 'btnMarcarEncerradoAdd' || e.target.closest('#btnMarcarEncerradoAdd')) {
+        if (!confirm('Deseja marcar todas as prestações como encerradas? Isso irá marcar as checkboxes e zerar os valores de devolução.')) {
+          return;
+        }
+        
+        const totalPrestacoes = prestacoesGeradas.length;
+        
+        for (let i = 1; i <= totalPrestacoes; i++) {
+          document.getElementById(`e_notificacao_${i}`).checked = true;
+          document.getElementById(`e_parecer_${i}`).checked = true;
+          document.getElementById(`e_fase_recursal_${i}`).checked = true;
+          document.getElementById(`e_encerramento_${i}`).checked = true;
+          document.getElementById(`valor_devolucao_${i}`).value = '0.00';
+          document.getElementById(`valor_devolvido_${i}`).value = '0.00';
+        }
+        
+        alert('Todas as prestações foram marcadas como encerradas com valores zerados!');
+      }
+    });
+
+    // Botão Cancelar
+    document.getElementById('btnCancelar')?.addEventListener('click', function() {
+      if (confirm('Deseja cancelar? Todas as prestações geradas serão perdidas.')) {
+        window.location.href = '/analises';
+      }
+    });
+
+    // Submit do formulário
+    document.getElementById('formAdicionarAnalises')?.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      if (!confirm('Confirma o salvamento de todas as prestações de contas?')) {
+        return;
+      }
+
+      const numeroTermo = document.getElementById('numeroTermoHidden').value;
+      const analises = [];
+
+      prestacoesGeradas.forEach((prestacao, index) => {
+        const idx = index + 1;
+        
+        analises.push({
+          tipo_prestacao: prestacao.tipo_prestacao,
+          numero_prestacao: prestacao.numero_prestacao,
+          vigencia_inicial: prestacao.vigencia_inicial,
+          vigencia_final: prestacao.vigencia_final,
+          entregue: document.getElementById(`entregue_${idx}`).checked,
+          cobrado: document.getElementById(`cobrado_${idx}`).checked,
+          e_notificacao: document.getElementById(`e_notificacao_${idx}`).checked,
+          e_parecer: document.getElementById(`e_parecer_${idx}`).checked,
+          e_fase_recursal: document.getElementById(`e_fase_recursal_${idx}`).checked,
+          e_encerramento: document.getElementById(`e_encerramento_${idx}`).checked,
+          data_parecer_dp: document.getElementById(`data_parecer_dp_${idx}`).value || null,
+          data_parecer_pg: document.getElementById(`data_parecer_pg_${idx}`).value || null,
+          responsavel_dp: document.getElementById(`responsavel_dp_${idx}`).value || null,
+          responsavel_pg: document.getElementById(`responsavel_pg_${idx}`).value || null,
+          valor_devolucao: document.getElementById(`valor_devolucao_${idx}`).value || null,
+          valor_devolvido: document.getElementById(`valor_devolvido_${idx}`).value || null,
+          observacoes: document.getElementById(`observacoes_${idx}`).value || null
+        });
+      });
+
+      try {
+        const response = await fetch('/analises/adicionar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numero_termo: numeroTermo, analises })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          alert('Prestações de contas adicionadas com sucesso!');
+          window.location.href = '/analises';
+        } else {
+          alert('Erro: ' + result.erro);
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao salvar: ' + error.message);
+      }
+    });
+  </script>
+</body>
+</html>

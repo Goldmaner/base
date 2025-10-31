@@ -118,7 +118,10 @@
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="col-total-linha text-end total-linha">0,00</td>
-            <td><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>
+            <td>
+              <button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar valor do Mês 1 para todos os meses">Listar</button>
+              <button type="button" class="btn btn-danger btn-sm remover">Remover</button>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -431,12 +434,33 @@
         <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I" list="categoriasDisponiveis"></td>`;
   for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
       cols += `<td class="col-total-linha text-end total-linha">0,00</td>`;
-      cols += `<td><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
+      cols += `<td><button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar valor do Mês 1 para todos os meses">Listar</button><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
       tr.innerHTML = cols; tbody.appendChild(tr); recalcTotals();
     });
 
     // remover linha
     document.getElementById('bodyOrc2').addEventListener('click', function(e){ if (e.target && e.target.classList.contains('remover')){ e.target.closest('tr').remove(); recalcTotals(); }});
+
+    // listar valor do Mês 1 para todos os meses
+    document.getElementById('bodyOrc2').addEventListener('click', function(e) {
+      if (e.target && e.target.classList.contains('listar-valor')) {
+        const linha = e.target.closest('tr');
+        const inputsMeses = linha.querySelectorAll('.month-td input.valor');
+        
+        if (inputsMeses.length > 0) {
+          // Pegar o valor do primeiro mês (Mês 1)
+          const valorMes1 = inputsMeses[0].value.trim();
+          
+          // Replicar para todos os outros meses
+          inputsMeses.forEach(input => {
+            input.value = valorMes1;
+          });
+          
+          // Recalcular totais
+          recalcTotals();
+        }
+      }
+    });
 
     // salvar: coleta a tabela, normaliza valores e envia para o backend
     document.getElementById('salvarOrc2').addEventListener('click', function(){
