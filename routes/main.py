@@ -199,3 +199,189 @@ def portaria_automatica():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# ROTAS PARA MODELOS DE TEXTO
+# ============================================================================
+
+@main_bp.route('/modelos-textos', methods=['GET'])
+@login_required
+def modelos_textos_index():
+    """
+    Página para gerenciar modelos de texto (lista, criar, editar, ocultar)
+    """
+    is_admin = False
+    try:
+        if session.get('tipo_usuario') == 'Agente Público':
+            is_admin = True
+    except Exception:
+        pass
+
+    return render_template('o_modelo_textos.html', is_admin=is_admin)
+
+
+@main_bp.route('/modelos-textos/api', methods=['GET'])
+@login_required
+def modelos_textos_list():
+    """Retorna lista de modelos de texto. Se o usuário for admin e passar mostrar_ocultos=1, traz ocultos."""
+    try:
+        mostrar_ocultos = request.args.get('mostrar_ocultos', '0') == '1'
+        print(f"DEBUG: mostrar_ocultos = {request.args.get('mostrar_ocultos', '0')}, parsed = {mostrar_ocultos}, tipo_usuario = {session.get('tipo_usuario')}")
+
+        # Garantir que a coluna 'oculto' exista (adiciona se necessário)
+        cur = get_cursor()
+        try:
+            cur.execute("ALTER TABLE categoricas.c_modelo_textos ADD COLUMN IF NOT EXISTS oculto boolean DEFAULT FALSE")
+            get_db().commit()
+        except Exception:
+            try:
+                get_db().rollback()
+            except:
+                pass
+
+        # Montar query
+        if mostrar_ocultos and session.get('tipo_usuario') == 'Agente Público':
+            query = "SELECT id, titulo_texto, modelo_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_modelo_textos ORDER BY id"
+            print(f"DEBUG: Usando query TODOS (admin)")
+            cur.execute(query)
+        else:
+            query = "SELECT id, titulo_texto, modelo_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_modelo_textos WHERE COALESCE(oculto, false) = false ORDER BY id"
+            print(f"DEBUG: Usando query NÃO OCULTOS")
+            cur.execute(query)
+
+        dados = cur.fetchall()
+        print(f"DEBUG: Encontrados {len(dados)} registros")
+        cur.close()
+
+        # Converter para lista simples
+        resultado = []
+        for row in dados:
+            resultado.append({
+                'id': row['id'],
+                'titulo_texto': row['titulo_texto'],
+                'modelo_texto': row['modelo_texto'],
+                'oculto': bool(row.get('oculto'))
+            })
+
+        return jsonify({'dados': resultado})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
+
+@main_bp.route('/modelos-textos/api', methods=['POST'])
+@login_required
+def modelos_textos_create():
+    """Cria um novo modelo de texto"""
+    try:
+        dados = request.json
+        titulo = dados.get('titulo_texto')
+        modelo = dados.get('modelo_texto')
+        if not titulo:
+            return jsonify({'erro': 'titulo_texto é obrigatório'}), 400
+
+        cur = get_cursor()
+        cur.execute("INSERT INTO categoricas.c_modelo_textos (titulo_texto, modelo_texto, oculto) VALUES (%s, %s, false) RETURNING id",
+                    (titulo, modelo))
+        novo = cur.fetchone()
+        get_db().commit()
+        cur.close()
+        return jsonify({'sucesso': True, 'id': novo['id']})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        try:
+            get_db().rollback()
+        except:
+            pass
+        return jsonify({'erro': str(e)}), 500
+
+
+@main_bp.route('/modelos-textos/api/<int:id>', methods=['PUT'])
+@login_required
+def modelos_textos_update(id):
+    """Atualiza título e/ou conteúdo do modelo"""
+    try:
+        dados = request.json
+        titulo = dados.get('titulo_texto')
+        modelo = dados.get('modelo_texto')
+        if titulo is None and modelo is None:
+            return jsonify({'erro': 'Nenhum campo para atualizar'}), 400
+
+        cur = get_cursor()
+        # Montar SET dinâmico
+        sets = []
+        params = []
+        if titulo is not None:
+            sets.append('titulo_texto = %s')
+            params.append(titulo)
+        if modelo is not None:
+            sets.append('modelo_texto = %s')
+            params.append(modelo)
+        params.append(id)
+
+        query = f"UPDATE categoricas.c_modelo_textos SET {', '.join(sets)} WHERE id = %s"
+        cur.execute(query, tuple(params))
+        get_db().commit()
+        cur.close()
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        try:
+            get_db().rollback()
+        except:
+            pass
+        return jsonify({'erro': str(e)}), 500
+
+
+@main_bp.route('/modelos-textos/api/<int:id>/toggle_oculto', methods=['POST'])
+@login_required
+def modelos_textos_toggle_oculto(id):
+    """Alterna sinalizador oculto (true/false)."""
+    try:
+        dados = request.json or {}
+        novo = dados.get('oculto')
+        if novo is None:
+            return jsonify({'erro': 'Campo oculto obrigatório (true/false)'}), 400
+
+        cur = get_cursor()
+        cur.execute("UPDATE categoricas.c_modelo_textos SET oculto = %s WHERE id = %s", (bool(novo), id))
+        get_db().commit()
+        cur.close()
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        try:
+            get_db().rollback()
+        except:
+            pass
+        return jsonify({'erro': str(e)}), 500
+
+
+@main_bp.route('/modelos-textos/api/<int:id>', methods=['DELETE'])
+@login_required
+def modelos_textos_delete(id):
+    """Apaga um modelo de texto (apenas para Agente Público)"""
+    try:
+        # Verificar se é admin
+        if session.get('tipo_usuario') != 'Agente Público':
+            return jsonify({'erro': 'Acesso negado. Apenas Agente Público pode apagar modelos.'}), 403
+
+        cur = get_cursor()
+        cur.execute("DELETE FROM categoricas.c_modelo_textos WHERE id = %s", (id,))
+        get_db().commit()
+        cur.close()
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        try:
+            get_db().rollback()
+        except:
+            pass
+        return jsonify({'erro': str(e)}), 500
+

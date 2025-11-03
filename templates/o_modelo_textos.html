@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Modelos de Texto</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container-main {
+      background: white;
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .header-title {
+      color: #667eea;
+      font-weight: bold;
+      margin-bottom: 25px;
+    }
+    .btn-voltar {
+      background: #6c757d;
+      color: white;
+      border: none;
+    }
+    .btn-voltar:hover {
+      background: #5a6268;
+      color: white;
+    }
+    .btn-novo {
+      background: #667eea;
+      color: white;
+      border: none;
+    }
+    .btn-novo:hover {
+      background: #5568d3;
+      color: white;
+    }
+    .table thead {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .modal-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .modal-header .btn-close {
+      filter: brightness(0) invert(1);
+    }
+    #previewHtml {
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      padding: 20px;
+      background: #f8f9fa;
+      min-height: 100px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    #editorRico {
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      padding: 15px;
+      background: white;
+      min-height: 500px;
+      max-height: 600px;
+      overflow-y: auto;
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 11pt;
+    }
+    #editorRico:focus {
+      outline: none;
+      border-color: #5568d3;
+      box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
+    }
+    .editor-toolbar {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+    .editor-toolbar button {
+      margin: 0 2px;
+    }
+  </style>
+</head>
+<body class="p-4">
+  <div class="container container-main">
+    <h3 class="header-title">📝 Modelos de Texto</h3>
+    <div class="mb-3">
+      <a class="btn btn-voltar btn-sm" href="{{ url_for('main.index') }}">&larr; Voltar</a>
+      <button id="novoModeloBtn" class="btn btn-novo btn-sm">➕ Novo Modelo</button>
+      {% if is_admin %}
+        <div class="form-check form-check-inline ms-3">
+          <input class="form-check-input" type="checkbox" id="mostrarOcultos" />
+          <label class="form-check-label" for="mostrarOcultos">Mostrar ocultos</label>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Campo de pesquisa -->
+    <div class="mb-3">
+      <div class="input-group" style="max-width: 400px;">
+        <span class="input-group-text">🔍</span>
+        <input type="text" class="form-control" id="filtroTitulo" placeholder="Pesquisar por título...">
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered" id="tabelaModelos">
+        <thead class="table-light">
+          <tr>
+            <th>Título</th>
+            <th style="width:220px">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="bodyModelos">
+          <!-- preenchido via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal de edição/criação -->
+  <div class="modal fade" id="modalModelo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitle">Novo Modelo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Título</label>
+            <input id="inputTitulo" class="form-control" placeholder="Digite o título do modelo" />
+          </div>
+          
+          <!-- Abas para escolher entre Editor Rico ou HTML Puro -->
+          <ul class="nav nav-tabs mb-2" id="editorTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="tab-rico" data-bs-toggle="tab" data-bs-target="#pane-rico" type="button" role="tab">
+                ✨ Editor Formatado
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="tab-html" data-bs-toggle="tab" data-bs-target="#pane-html" type="button" role="tab">
+                💻 Código HTML
+              </button>
+            </li>
+          </ul>
+                  </button>
+                </li>
+              </ul>
+
+              <div class="tab-content" id="editorTabContent">
+                <!-- Aba do Editor Rico -->
+                <div class="tab-pane fade show active" id="pane-rico" role="tabpanel">
+                  <label class="form-label fw-bold">Conteúdo Formatado</label>
+                  <div class="editor-toolbar">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('bold');" title="Negrito">
+                      <strong>B</strong>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('italic');" title="Itálico">
+                      <em>I</em>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('underline');" title="Sublinhado">
+                      <u>U</u>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('justifyLeft');" title="Alinhar à esquerda">
+                      ⬅
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('justifyCenter');" title="Centralizar">
+                      ↔
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('justifyRight');" title="Alinhar à direita">
+                      ➡
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('editorRico').innerHTML = '';" title="Limpar tudo">
+                      🗑️
+                    </button>
+                  </div>
+                  <div id="editorRico" contenteditable="true" spellcheck="false">
+                    <p>Cole aqui o conteúdo formatado do SEI ou digite livremente...</p>
+                </div>
+                <small class="text-muted d-block mt-1">
+                  💡 Cole diretamente do SEI (Ctrl+V) e a formatação será preservada
+                </small>
+              </div>
+
+              <!-- Aba do HTML Puro -->
+              <div class="tab-pane fade" id="pane-html" role="tabpanel">
+                <label class="form-label fw-bold">Código HTML</label>
+                <textarea id="inputModelo" rows="28" class="form-control" placeholder="Código HTML será gerado automaticamente ou edite manualmente"></textarea>
+                <small class="text-muted d-block mt-1">
+                  💡 Edições aqui serão sincronizadas com o editor formatado
+                </small>
+              </div>
+            </div>
+
+            <div class="form-check mt-3 mb-3">
+              <input id="inputOculto" type="checkbox" class="form-check-input" />
+              <label class="form-check-label" for="inputOculto">Ocultar (não será mostrado por padrão)</label>
+            </div>
+        </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          {% if is_admin %}
+          <button id="apagarModeloBtn" type="button" class="btn btn-danger me-auto" style="display:none;">🗑️ Apagar</button>
+          {% endif %}
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button id="salvarModeloBtn" type="button" class="btn btn-primary">💾 Salvar</button>
+        </div>
+      </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Aguardar DOM estar completamente carregado
+    document.addEventListener('DOMContentLoaded', function() {
+      const isAdmin = {{ 'true' if is_admin else 'false' }};
+      let todosModelos = []; // Armazenar todos os modelos para filtrar
+
+      async function carregarModelos(){
+        // Garantir que o checkbox existe e só usar seu valor se existir
+        const checkboxOcultos = document.getElementById('mostrarOcultos');
+        const mostrar = (isAdmin && checkboxOcultos && checkboxOcultos.checked === true) ? '1' : '0';
+        console.log('Carregando modelos... mostrar_ocultos:', mostrar, 'checkbox exists:', !!checkboxOcultos, 'checked:', checkboxOcultos ? checkboxOcultos.checked : 'N/A');
+      const res = await fetch(`/modelos-textos/api?mostrar_ocultos=${mostrar}`);
+      const data = await res.json();
+      console.log('Dados recebidos:', data);
+      
+      if (data.dados) {
+        todosModelos = data.dados;
+        aplicarFiltro();
+      } else {
+        todosModelos = [];
+        renderizarTabela([]);
+      }
+    }
+
+    function aplicarFiltro() {
+      const filtro = document.getElementById('filtroTitulo').value.toLowerCase();
+      const modelosFiltrados = todosModelos.filter(m => 
+        (m.titulo_texto || '').toLowerCase().includes(filtro)
+      );
+      renderizarTabela(modelosFiltrados);
+    }
+
+    function renderizarTabela(modelos) {
+      const body = document.getElementById('bodyModelos');
+      body.innerHTML = '';
+      
+      if (modelos && modelos.length){
+        modelos.forEach(m => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${m.titulo_texto || ''}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="${m.id}">Editar</button>
+              ${m.oculto ? '<span class="badge bg-secondary me-1">Oculto</span>' : ''}
+              ${isAdmin ? `<button class="btn btn-sm btn-outline-success" data-action="mostrar" data-id="${m.id}" data-oculto="${m.oculto}">${m.oculto ? 'Mostrar' : 'Ocultar'}</button>` : `<button class="btn btn-sm btn-outline-success" data-action="mostrar" data-id="${m.id}" data-oculto="false">Ocultar</button>`}
+            </td>
+          `;
+          body.appendChild(tr);
+        })
+      } else {
+        body.innerHTML = `<tr><td colspan="2" class="text-center text-muted">Nenhum modelo encontrado</td></tr>`;
+      }
+    }
+
+    // Filtro em tempo real
+    document.getElementById('filtroTitulo').addEventListener('input', aplicarFiltro);
+
+    // Delegação de eventos para ações
+    document.addEventListener('click', async function(e){
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      if (!action) return;
+      const id = btn.getAttribute('data-id');
+
+      if (action === 'edit'){
+        // Buscar conteúdo do modelo (podemos reutilizar a listagem atual já carregada)
+        const res = await fetch(`/modelos-textos/api`);
+        const data = await res.json();
+        const item = (data.dados || []).find(x => String(x.id) === String(id));
+        if (item){
+          document.getElementById('modalTitle').textContent = 'Editar Modelo';
+          document.getElementById('inputTitulo').value = item.titulo_texto || '';
+          
+          // Carregar no editor rico e no HTML
+          const htmlContent = item.modelo_texto || '';
+          document.getElementById('inputModelo').value = htmlContent;
+          document.getElementById('editorRico').innerHTML = htmlContent || '<p>Cole aqui o conteúdo formatado do SEI ou digite livremente...</p>';
+          
+          document.getElementById('inputOculto').checked = !!item.oculto;
+          document.getElementById('salvarModeloBtn').setAttribute('data-id', id);
+          // Mostrar botão apagar se admin e editando
+          if (isAdmin && document.getElementById('apagarModeloBtn')){
+            document.getElementById('apagarModeloBtn').style.display = 'inline-block';
+            document.getElementById('apagarModeloBtn').setAttribute('data-id', id);
+          }
+          new bootstrap.Modal(document.getElementById('modalModelo')).show();
+        }
+      }
+
+      if (action === 'mostrar'){
+        // Toggle oculto
+        const currentOculto = btn.getAttribute('data-oculto') === 'true';
+        const res = await fetch(`/modelos-textos/api/${id}/toggle_oculto`, {
+          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({oculto: !currentOculto})
+        });
+        if (res.ok) carregarModelos(); else alert('Erro ao alternar visibilidade');
+      }
+    });
+
+    // Novo modelo
+    document.getElementById('novoModeloBtn').addEventListener('click', function(){
+      document.getElementById('modalTitle').textContent = 'Novo Modelo';
+      document.getElementById('inputTitulo').value = '';
+      document.getElementById('inputModelo').value = '';
+      document.getElementById('editorRico').innerHTML = '<p>Cole aqui o conteúdo formatado do SEI ou digite livremente...</p>';
+      document.getElementById('inputOculto').checked = false;
+      document.getElementById('salvarModeloBtn').removeAttribute('data-id');
+      // Esconder botão apagar ao criar novo
+      if (document.getElementById('apagarModeloBtn')){
+        document.getElementById('apagarModeloBtn').style.display = 'none';
+      }
+      new bootstrap.Modal(document.getElementById('modalModelo')).show();
+    });
+
+    // Salvar modelo (create or update)
+    document.getElementById('salvarModeloBtn').addEventListener('click', async function(){
+      const id = this.getAttribute('data-id');
+      const titulo = document.getElementById('inputTitulo').value.trim();
+      
+      // Sincronizar editor rico com textarea HTML antes de salvar
+      document.getElementById('inputModelo').value = document.getElementById('editorRico').innerHTML;
+      
+      const modelo = document.getElementById('inputModelo').value;
+      const oculto = document.getElementById('inputOculto').checked;
+      if (!titulo){ alert('Título obrigatório'); return; }
+
+      // Desabilitar botão para evitar cliques múltiplos
+      this.disabled = true;
+      this.textContent = '💾 Salvando...';
+
+      try {
+        if (id){
+          const res = await fetch(`/modelos-textos/api/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({titulo_texto: titulo, modelo_texto: modelo})});
+          if (res.ok){
+            fecharModal();
+            carregarModelos();
+          } else { 
+            alert('Erro ao salvar alterações');
+            this.disabled = false;
+            this.textContent = '💾 Salvar';
+          }
+        } else {
+          const res = await fetch(`/modelos-textos/api`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({titulo_texto: titulo, modelo_texto: modelo})});
+          if (res.ok){
+            fecharModal();
+            carregarModelos();
+          } else { 
+            alert('Erro ao criar modelo');
+            this.disabled = false;
+            this.textContent = '💾 Salvar';
+          }
+        }
+      } catch (err) {
+        alert('Erro ao salvar: ' + err.message);
+        this.disabled = false;
+        this.textContent = '💾 Salvar';
+      }
+    });
+
+    // Função para fechar modal corretamente
+    function fecharModal() {
+      const modalElement = document.getElementById('modalModelo');
+      const modalInstance = bootstrap.Modal.getInstance(modalElement);
+      if (modalInstance) {
+        modalInstance.hide();
+      }
+      // Garantir que backdrop também seja removido
+      setTimeout(() => {
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.remove();
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+        // Reabilitar botão
+        const btnSalvar = document.getElementById('salvarModeloBtn');
+        btnSalvar.disabled = false;
+        btnSalvar.textContent = '💾 Salvar';
+      }, 300);
+    }
+
+    // Apagar modelo (apenas admin)
+    if (isAdmin && document.getElementById('apagarModeloBtn')){
+      document.getElementById('apagarModeloBtn').addEventListener('click', async function(){
+        const id = this.getAttribute('data-id');
+        if (!id) return;
+        if (!confirm('Tem certeza que deseja apagar este modelo de texto? Esta ação não pode ser desfeita.')) return;
+        
+        const res = await fetch(`/modelos-textos/api/${id}`, {method:'DELETE'});
+        if (res.ok){
+          fecharModal();
+          carregarModelos();
+        } else { alert('Erro ao apagar modelo'); }
+      });
+    }
+
+    // Mostrar/Ocultar checkbox (apenas para admins disponível)
+    if (isAdmin && document.getElementById('mostrarOcultos')){
+      document.getElementById('mostrarOcultos').addEventListener('change', function(){ carregarModelos(); });
+    }
+
+    // Sincronização bidirecional entre Editor Rico e HTML
+    // Quando edita no editor rico, atualiza o HTML
+    document.getElementById('editorRico').addEventListener('input', function(){
+      document.getElementById('inputModelo').value = this.innerHTML;
+    });
+
+    // Quando edita no HTML, atualiza o editor rico
+    document.getElementById('inputModelo').addEventListener('input', function(){
+      document.getElementById('editorRico').innerHTML = this.value;
+    });
+
+    // Carregar inicialmente
+    carregarModelos();
+    
+    }); // Fim do DOMContentLoaded
+  </script>
+</body>
+</html>

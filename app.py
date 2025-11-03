@@ -18,6 +18,7 @@ from routes.despesas import despesas_bp
 from routes.parcerias import parcerias_bp
 from routes.listas import listas_bp
 from routes.analises import analises_bp
+from routes.pesquisa_parcerias import pesquisa_parcerias_bp
 
 
 def create_app():
@@ -62,6 +63,7 @@ def create_app():
     app.register_blueprint(parcerias_bp)
     app.register_blueprint(listas_bp)
     app.register_blueprint(analises_bp)
+    app.register_blueprint(pesquisa_parcerias_bp)
     
     return app
 

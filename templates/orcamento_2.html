@@ -59,6 +59,9 @@
 
     <div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
       <a class="btn btn-light btn-sm" href="{{ url_for('orcamento.listar') }}">&larr; Voltar</a>
+      <button id="listarTudoBtn" class="btn btn-success btn-sm" title="Replica o valor do Mês 1 para todos os meses em TODAS as linhas">
+        📋 Listar Tudo
+      </button>
       <button id="toggleMonthsBtn" class="btn btn-outline-secondary btn-sm">
         <span id="toggleMonthsText">👁️ Ocultar Meses</span>
       </button>
@@ -80,6 +83,7 @@
       <table class="table table-sm table-bordered" id="tabelaOrc2">
         <thead class="table-light">
           <tr>
+            <th style="width: 60px;">Mover</th>
             <th class="col-rubrica">Rubrica<span class="col-resizer"></span></th>
             <th>Quantidade</th>
             <th class="col-categoria">Categoria de Despesa<span class="col-resizer"></span></th>
@@ -95,6 +99,13 @@
         <tbody id="bodyOrc2">
           {% for i in range(20) %}
           <tr>
+            <td class="text-center" style="padding: 0.25rem;">
+              <div class="btn-group-vertical" style="width: 100%;">
+                <button type="button" class="btn btn-sm btn-outline-secondary move-up" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para cima">▲</button>
+                <button type="button" class="btn btn-sm btn-outline-success insert-row" style="padding: 0.1rem; font-size: 0.7rem;" title="Inserir linha abaixo">+</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary move-down" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para baixo">▼</button>
+              </div>
+            </td>
             <td class="col-rubrica">
               <select class="form-select form-select-sm" name="rubrica">
                 <option value="">Selecione...</option>
@@ -418,6 +429,13 @@
       // número de meses atual
       const monthCount = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
       let cols = `
+        <td class="text-center" style="padding: 0.25rem;">
+          <div class="btn-group-vertical" style="width: 100%;">
+            <button type="button" class="btn btn-sm btn-outline-secondary move-up" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para cima">▲</button>
+            <button type="button" class="btn btn-sm btn-outline-success insert-row" style="padding: 0.1rem; font-size: 0.7rem;" title="Inserir linha abaixo">+</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary move-down" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para baixo">▼</button>
+          </div>
+        </td>
         <td>
           <select class="form-select form-select-sm" name="rubrica">
             <option value="">Selecione...</option>
@@ -460,6 +478,149 @@
           recalcTotals();
         }
       }
+    });
+
+    // LISTAR TUDO - Replica Mês 1 para todos os meses em TODAS as linhas
+    document.getElementById('listarTudoBtn').addEventListener('click', function() {
+      const todasLinhas = document.querySelectorAll('#bodyOrc2 tr');
+      let linhasAfetadas = 0;
+      
+      todasLinhas.forEach(linha => {
+        const inputsMeses = linha.querySelectorAll('.month-td input.valor');
+        if (inputsMeses.length > 0) {
+          const valorMes1 = inputsMeses[0].value.trim();
+          if (valorMes1) { // Só replica se tiver valor no Mês 1
+            inputsMeses.forEach(input => {
+              input.value = valorMes1;
+            });
+            linhasAfetadas++;
+          }
+        }
+      });
+      
+      recalcTotals();
+      alert(`✅ ${linhasAfetadas} linha(s) foram replicadas com o valor do Mês 1!`);
+    });
+
+    // MOVER LINHA PARA CIMA
+    document.getElementById('bodyOrc2').addEventListener('click', function(e) {
+      if (e.target && e.target.classList.contains('move-up')) {
+        const linha = e.target.closest('tr');
+        const linhaAnterior = linha.previousElementSibling;
+        if (linhaAnterior) {
+          linha.parentNode.insertBefore(linha, linhaAnterior);
+        }
+      }
+    });
+
+    // MOVER LINHA PARA BAIXO
+    document.getElementById('bodyOrc2').addEventListener('click', function(e) {
+      if (e.target && e.target.classList.contains('move-down')) {
+        const linha = e.target.closest('tr');
+        const proximaLinha = linha.nextElementSibling;
+        if (proximaLinha) {
+          linha.parentNode.insertBefore(proximaLinha, linha);
+        }
+      }
+    });
+
+    // INSERIR LINHA ABAIXO
+    document.getElementById('bodyOrc2').addEventListener('click', function(e) {
+      if (e.target && e.target.classList.contains('insert-row')) {
+        const linhaAtual = e.target.closest('tr');
+        const tbody = document.getElementById('bodyOrc2');
+        const novaLinha = document.createElement('tr');
+        const monthCount = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
+        
+        let cols = `
+          <td class="text-center" style="padding: 0.25rem;">
+            <div class="btn-group-vertical" style="width: 100%;">
+              <button type="button" class="btn btn-sm btn-outline-secondary move-up" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para cima">▲</button>
+              <button type="button" class="btn btn-sm btn-outline-success insert-row" style="padding: 0.1rem; font-size: 0.7rem;" title="Inserir linha abaixo">+</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary move-down" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para baixo">▼</button>
+            </div>
+          </td>
+          <td>
+            <select class="form-select form-select-sm" name="rubrica">
+              <option value="">Selecione...</option>
+              <option>Pessoal</option>
+              <option>Materiais</option>
+              <option>Administrativas</option>
+              <option>Serviços de Terceiros</option>
+              <option>Outras Despesas</option>
+              <option>Imobilizado</option>
+              <option>Implantação</option>
+            </select>
+          </td>
+          <td><input type="text" class="form-control form-control-sm quantidade" value="0"></td>
+          <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I" list="categoriasDisponiveis"></td>`;
+        for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
+        cols += `<td class="col-total-linha text-end total-linha">0,00</td>`;
+        cols += `<td><button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar valor do Mês 1 para todos os meses">Listar</button><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
+        
+        novaLinha.innerHTML = cols;
+        linhaAtual.parentNode.insertBefore(novaLinha, linhaAtual.nextSibling);
+        recalcTotals();
+      }
+    });
+
+    // COLAR DO EXCEL DE FORMA CELULAR (funcionalidade 3)
+    document.getElementById('bodyOrc2').addEventListener('paste', function(e) {
+      // Verificar se o foco está em um input
+      const target = e.target;
+      if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT') return;
+      
+      const clipboardData = e.clipboardData || window.clipboardData;
+      const pastedData = clipboardData.getData('Text');
+      
+      // Se não tem quebras de linha ou tabs, é cola simples, deixa o comportamento padrão
+      if (!pastedData.includes('\n') && !pastedData.includes('\t')) return;
+      
+      e.preventDefault(); // Impede comportamento padrão
+      
+      const linhaAtual = target.closest('tr');
+      const celulaAtual = target.closest('td');
+      const tbody = document.getElementById('bodyOrc2');
+      const todasLinhas = Array.from(tbody.querySelectorAll('tr'));
+      const linhaIndex = todasLinhas.indexOf(linhaAtual);
+      
+      // Processar dados colados (dividir por linhas e colunas)
+      const linhas = pastedData.split(/\r?\n/).filter(l => l.trim());
+      
+      linhas.forEach((linhaTexto, offsetLinha) => {
+        const colunas = linhaTexto.split('\t');
+        const linhaDestino = todasLinhas[linhaIndex + offsetLinha];
+        
+        if (!linhaDestino) return; // Não tem mais linhas disponíveis
+        
+        // Encontrar a célula inicial
+        const celulas = Array.from(linhaDestino.querySelectorAll('td'));
+        const celulaIndex = Array.from(linhaAtual.querySelectorAll('td')).indexOf(celulaAtual);
+        
+        colunas.forEach((valor, offsetColuna) => {
+          const celulaDestino = celulas[celulaIndex + offsetColuna];
+          if (!celulaDestino) return;
+          
+          const input = celulaDestino.querySelector('input');
+          const select = celulaDestino.querySelector('select');
+          
+          if (input) {
+            input.value = valor.trim();
+          } else if (select) {
+            // Tentar encontrar a opção que corresponde ao valor
+            const opcoes = Array.from(select.options);
+            const opcaoEncontrada = opcoes.find(opt => 
+              opt.value.toLowerCase() === valor.trim().toLowerCase() ||
+              opt.text.toLowerCase() === valor.trim().toLowerCase()
+            );
+            if (opcaoEncontrada) {
+              select.value = opcaoEncontrada.value;
+            }
+          }
+        });
+      });
+      
+      recalcTotals();
     });
 
     // salvar: coleta a tabela, normaliza valores e envia para o backend

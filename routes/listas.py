@@ -14,9 +14,14 @@ TABELAS_CONFIG = {
     'c_analistas': {
         'nome': 'Analistas',
         'schema': 'categoricas',
-        'colunas_editaveis': ['nome_analista'],
-        'labels': {'nome_analista': 'Nome do Analista'},
-        'ordem': 'nome_analista'
+        'colunas_editaveis': ['nome_analista', 'status'],
+        'labels': {'nome_analista': 'Nome do Analista', 'status': 'Status'},
+        'ordem': 'nome_analista',
+        'tipos_campo': {
+            'status': ['Ativo', 'Inativo']
+        },
+        'inline_edit': True,  # Habilita edição inline
+        'inline_columns': ['status']  # Colunas que podem ser editadas inline
     },
     'c_pessoa_gestora': {
         'nome': 'Pessoas Gestoras',
@@ -51,14 +56,16 @@ TABELAS_CONFIG = {
     'c_coordenadores': {
         'nome': 'Coordenadores',
         'schema': 'categoricas',
-        'colunas_editaveis': ['secretaria', 'coordenacao', 'nome_c', 'rf_c', 'status_c', 'e_mail_c'],
+        'colunas_editaveis': ['secretaria', 'coordenacao', 'nome_c', 'pronome', 'rf_c', 'status_c', 'e_mail_c', 'setor_sei'],
         'labels': {
             'secretaria': 'Secretaria',
             'coordenacao': 'Coordenação',
             'nome_c': 'Nome',
+            'pronome': 'Pronome',
             'rf_c': 'R.F.',
             'status_c': 'Status',
-            'e_mail_c': 'E-mail'
+            'e_mail_c': 'E-mail',
+            'setor_sei': 'Setor SEI'
         },
         'colunas_filtro': ['secretaria', 'coordenacao', 'nome_c', 'status_c'],
         'ordem': 'nome_c',
@@ -68,7 +75,9 @@ TABELAS_CONFIG = {
             'coordenacao': 'text_com_datalist',
             'query_coordenacao': 'SELECT DISTINCT coordenacao FROM categoricas.c_coordenadores WHERE coordenacao IS NOT NULL ORDER BY coordenacao',
             'status_c': 'select',
-            'opcoes_status_c': ['Ativo', 'Afastado', 'Inativo']
+            'opcoes_status_c': ['Ativo', 'Afastado', 'Inativo'],
+            'pronome': 'select',
+            'opcoes_pronome': ['Sr.', 'Sra.', 'Sr.(a)']
         }
     },
     'c_origem_recurso': {
@@ -322,3 +331,76 @@ def excluir_registro(tabela, id):
         
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/dados/<tabela>/salvar-lote", methods=["POST"])
+@login_required
+def salvar_lote(tabela):
+    """
+    Salva múltiplos registros de uma vez (edição inline em lote)
+    """
+    if tabela not in TABELAS_CONFIG:
+        return jsonify({'erro': 'Tabela inválida'}), 400
+    
+    try:
+        dados = request.json
+        registros = dados.get('registros', [])
+        
+        if not registros:
+            return jsonify({'erro': 'Nenhum registro para salvar'}), 400
+        
+        config = TABELAS_CONFIG[tabela]
+        schema = config['schema']
+        
+        # Processar cada registro
+        erros = []
+        sucesso_count = 0
+        
+        for registro in registros:
+            reg_id = registro.get('id')
+            campos = registro.get('campos', {})
+            
+            if not reg_id or not campos:
+                continue
+            
+            # Montar query de update
+            sets = []
+            valores = []
+            for campo, valor in campos.items():
+                if campo in config['colunas_editaveis']:
+                    sets.append(f"{campo} = %s")
+                    valores.append(valor)
+            
+            if not sets:
+                continue
+            
+            valores.append(reg_id)
+            query = f"""
+                UPDATE {schema}.{tabela}
+                SET {', '.join(sets)}
+                WHERE id = %s
+            """
+            
+            if execute_query(query, tuple(valores)):
+                sucesso_count += 1
+            else:
+                erros.append(f"Falha ao atualizar registro ID {reg_id}")
+        
+        if erros:
+            return jsonify({
+                'sucesso': True,
+                'parcial': True,
+                'sucesso_count': sucesso_count,
+                'mensagem': f'{sucesso_count} registros salvos. Alguns falharam.',
+                'erros': erros
+            })
+        else:
+            return jsonify({
+                'sucesso': True,
+                'sucesso_count': sucesso_count,
+                'mensagem': f'{sucesso_count} registro(s) salvo(s) com sucesso'
+            })
+        
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+

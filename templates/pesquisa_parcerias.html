@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Operação: Pesquisa de Parcerias</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      min-height: 100vh; 
+      padding: 20px; 
+    }
+    .main-container { 
+      max-width: 900px; 
+      margin: 0 auto; 
+      background: white; 
+      border-radius: 15px; 
+      padding: 30px; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+    }
+    .btn-voltar {
+      background-color: #6c757d;
+      color: white;
+      border: none;
+    }
+    .btn-voltar:hover {
+      background-color: #5a6268;
+      color: white;
+    }
+    .form-section {
+      background-color: #f8f9fa;
+      padding: 25px;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    .btn-registro {
+      background-color: #198754;
+      color: white;
+      padding: 12px 30px;
+      border: none;
+    }
+    .btn-registro:hover {
+      background-color: #157347;
+      color: white;
+    }
+    .btn-prosseguir {
+      background-color: #0d6efd;
+      color: white;
+      padding: 12px 30px;
+      border: none;
+    }
+    .btn-prosseguir:hover {
+      background-color: #0b5ed7;
+      color: white;
+    }
+    .btn-relatorio {
+      background-color: #0dcaf0;
+      color: black;
+    }
+    .btn-relatorio:hover {
+      background-color: #31d2f2;
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2 class="mb-0">
+        <i class="bi bi-search me-2"></i>Operação: Pesquisa de Parcerias
+      </h2>
+      <div>
+        <a href="{{ url_for('pesquisa_parcerias.relatorio') }}" class="btn btn-relatorio me-2">
+          <i class="bi bi-file-earmark-text me-2"></i>Relatório de Pesquisas
+        </a>
+        <a href="{{ url_for('main.index') }}" class="btn btn-voltar">
+          <i class="bi bi-arrow-left me-2"></i>Voltar
+        </a>
+      </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="form-section">
+      <form id="formPesquisa">
+        <!-- Documento SEI -->
+        <div class="mb-3">
+          <label for="seiSolicitacao" class="form-label">
+            <i class="bi bi-file-earmark-text me-2"></i>Documento SEI de Solicitação de Pesquisa de Parcerias
+          </label>
+          <input 
+            type="text" 
+            class="form-control" 
+            id="seiSolicitacao" 
+            name="sei_informado"
+            maxlength="12" 
+            pattern="[0-9]*" 
+            placeholder="Digite apenas números (máx. 12 caracteres)"
+            required
+          >
+          <small class="text-muted">Apenas números, máximo 12 caracteres</small>
+        </div>
+
+        <!-- Nome da OSC -->
+        <div class="mb-3">
+          <label for="nomeOsc" class="form-label">
+            <i class="bi bi-building me-2"></i>Nome da OSC pesquisada
+          </label>
+          <select class="form-select" id="nomeOsc" name="nome_osc" required>
+            <option value="">Selecione uma OSC...</option>
+          </select>
+        </div>
+
+        <!-- CNPJ (preenchido automaticamente) -->
+        <div class="mb-3">
+          <label for="cnpj" class="form-label">
+            <i class="bi bi-card-text me-2"></i>CNPJ
+          </label>
+          <input 
+            type="text" 
+            class="form-control" 
+            id="cnpj" 
+            name="cnpj"
+            readonly 
+            placeholder="Será preenchido automaticamente ao selecionar a OSC"
+          >
+          <small class="text-muted">Preenchimento automático</small>
+        </div>
+
+        <!-- Nome do Emissor -->
+        <div class="mb-3">
+          <label for="nomeEmissor" class="form-label">
+            <i class="bi bi-person-badge me-2"></i>Nome do Emissor
+          </label>
+          <select class="form-select" id="nomeEmissor" name="nome_emissor" required>
+            <option value="">Selecione um analista...</option>
+          </select>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="d-flex justify-content-end gap-3 mt-4">
+          <button type="button" class="btn btn-registro" onclick="salvarParaRegistro()">
+            <i class="bi bi-save me-2"></i>Para Registro
+          </button>
+          <button type="button" class="btn btn-prosseguir" disabled>
+            <i class="bi bi-arrow-right me-2"></i>Prosseguir Pesquisa
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Carrega lista de OSCs únicas ao carregar a página
+    document.addEventListener('DOMContentLoaded', async () => {
+      await carregarOscs();
+      await carregarAnalistas();
+    });
+
+    // Função para carregar OSCs únicas
+    async function carregarOscs() {
+      try {
+        const response = await fetch('/pesquisa-parcerias/api/oscs');
+        const data = await response.json();
+        
+        const select = document.getElementById('nomeOsc');
+        
+        if (data.erro) {
+          console.error('Erro ao carregar OSCs:', data.erro);
+          return;
+        }
+
+        data.oscs.forEach(osc => {
+          const option = document.createElement('option');
+          option.value = osc;
+          option.textContent = osc;
+          select.appendChild(option);
+        });
+
+      } catch (error) {
+        console.error('Erro ao carregar OSCs:', error);
+        alert('Erro ao carregar lista de OSCs');
+      }
+    }
+
+    // Função para carregar analistas ativos
+    async function carregarAnalistas() {
+      try {
+        const response = await fetch('/pesquisa-parcerias/api/analistas-ativos');
+        const data = await response.json();
+        
+        const select = document.getElementById('nomeEmissor');
+        
+        if (data.erro) {
+          console.error('Erro ao carregar analistas:', data.erro);
+          return;
+        }
+
+        data.analistas.forEach(analista => {
+          const option = document.createElement('option');
+          option.value = analista.nome_analista;
+          option.textContent = analista.nome_analista;
+          select.appendChild(option);
+        });
+
+      } catch (error) {
+        console.error('Erro ao carregar analistas:', error);
+        alert('Erro ao carregar lista de analistas');
+      }
+    }
+
+    // Listener para preencher CNPJ automaticamente ao selecionar OSC
+    document.getElementById('nomeOsc').addEventListener('change', async function() {
+      const nomeOsc = this.value;
+      
+      if (!nomeOsc) {
+        document.getElementById('cnpj').value = '';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/pesquisa-parcerias/api/cnpj/${encodeURIComponent(nomeOsc)}`);
+        const data = await response.json();
+        
+        if (data.erro) {
+          alert('Erro ao buscar CNPJ: ' + data.erro);
+          document.getElementById('cnpj').value = '';
+          return;
+        }
+
+        document.getElementById('cnpj').value = data.cnpj || 'CNPJ não encontrado';
+
+      } catch (error) {
+        console.error('Erro ao buscar CNPJ:', error);
+        alert('Erro ao buscar CNPJ da OSC');
+      }
+    });
+
+    // Validar entrada numérica do SEI
+    document.getElementById('seiSolicitacao').addEventListener('input', function(e) {
+      this.value = this.value.replace(/[^0-9]/g, '');
+    });
+
+    // Função para salvar Para Registro
+    async function salvarParaRegistro() {
+      const form = document.getElementById('formPesquisa');
+      
+      // Validar formulário
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const dados = {
+        sei_informado: document.getElementById('seiSolicitacao').value,
+        nome_osc: document.getElementById('nomeOsc').value,
+        nome_emissor: document.getElementById('nomeEmissor').value
+      };
+
+      try {
+        const response = await fetch('/pesquisa-parcerias/api/salvar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados)
+        });
+
+        const result = await response.json();
+
+        if (result.erro) {
+          alert('Erro ao salvar: ' + result.erro);
+          return;
+        }
+
+        alert('Pesquisa registrada com sucesso!\nNúmero da Pesquisa: ' + result.numero_pesquisa);
+        
+        // Limpar formulário
+        form.reset();
+        document.getElementById('cnpj').value = '';
+
+      } catch (error) {
+        console.error('Erro ao salvar:', error);
+        alert('Erro ao salvar pesquisa');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -38,6 +38,11 @@
       <a href="{{ url_for('parcerias.listar') }}" class="btn btn-main">
         <i class="bi bi-people-fill me-2"></i>Parcerias
       </a>
+      {% if user['tipo_usuario'] in ['Agente DAC', 'Agente Público'] %}
+      <a href="{{ url_for('pesquisa_parcerias.index') }}" class="btn btn-main" style="background-color: #198754;">
+        <i class="bi bi-search me-2"></i>Pesquisa de Parcerias
+      </a>
+      {% endif %}
     </div>
 
     <!-- Listas Suspensas (para Agente Público e outros Agentes) -->
@@ -59,7 +64,7 @@
         <a href="#" class="btn btn-main btn-admin" data-bs-toggle="modal" data-bs-target="#modalUsuarios">
           <i class="bi bi-people me-2"></i>Gerenciar Usuários
         </a>
-        <a href="#" class="btn btn-main btn-admin">
+        <a href="{{ url_for('main.modelos_textos_index') }}" class="btn btn-main btn-admin">
           <i class="bi bi-file-text me-2"></i>Modelos de texto
         </a>
       </div>

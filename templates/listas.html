@@ -42,6 +42,9 @@
             <button class="btn btn-warning me-2" onclick="limparFiltros()" id="btnLimparFiltros" style="display: none;">
               <i class="bi bi-x-circle"></i> Limpar Filtros
             </button>
+            <button class="btn btn-info me-2" onclick="salvarTodos()" id="btnSalvarTodos" style="display: none;">
+              <i class="bi bi-check-all"></i> Salvar Todos
+            </button>
             <button class="btn btn-success" onclick="abrirModalCriar()">
               <i class="bi bi-plus-circle"></i> Adicionar
             </button>
@@ -122,6 +125,22 @@
         const cabecalho = document.getElementById('cabecalhoTabela');
         cabecalho.innerHTML = '';
         
+        // Se tem inline_edit, adicionar coluna de checkbox
+        if (configAtual.inline_edit) {
+          const thCheck = document.createElement('th');
+          thCheck.style.width = '40px';
+          const checkAll = document.createElement('input');
+          checkAll.type = 'checkbox';
+          checkAll.id = 'checkboxTodos';
+          checkAll.className = 'form-check-input';
+          checkAll.onchange = () => {
+            const checkboxes = document.querySelectorAll('.checkbox-linha');
+            checkboxes.forEach(cb => cb.checked = checkAll.checked);
+          };
+          thCheck.appendChild(checkAll);
+          cabecalho.appendChild(thCheck);
+        }
+        
         // Adicionar colunas editáveis
         for (const col of configAtual.colunas_editaveis) {
           const th = document.createElement('th');
@@ -179,12 +198,52 @@
 
         for (const registro of dados) {
           const tr = document.createElement('tr');
+          tr.setAttribute('data-id', registro.id);
+          
+          // Se tem inline_edit, adicionar checkbox
+          if (configAtual.inline_edit) {
+            const tdCheck = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'form-check-input checkbox-linha';
+            tdCheck.appendChild(checkbox);
+            tr.appendChild(tdCheck);
+          }
           
           // Adicionar dados editáveis
           for (const col of configAtual.colunas_editaveis) {
             const td = document.createElement('td');
-            td.textContent = registro[col] || '-';
             td.setAttribute('data-col', col);
+            
+            // Se a coluna é inline editável, criar dropdown
+            if (configAtual.inline_edit && configAtual.inline_columns && configAtual.inline_columns.includes(col)) {
+              const select = document.createElement('select');
+              select.className = 'form-select form-select-sm';
+              select.setAttribute('data-original', registro[col]);
+              select.onchange = () => {
+                tr.classList.add('table-warning');
+                mostrarBotaoSalvarTodos();
+              };
+              
+              // Pegar opções do tipos_campo
+              if (configAtual.tipos_campo && configAtual.tipos_campo[col]) {
+                const opcoes = configAtual.tipos_campo[col];
+                for (const opcao of opcoes) {
+                  const option = document.createElement('option');
+                  option.value = opcao;
+                  option.textContent = opcao;
+                  if (registro[col] === opcao) {
+                    option.selected = true;
+                  }
+                  select.appendChild(option);
+                }
+              }
+              
+              td.appendChild(select);
+            } else {
+              td.textContent = registro[col] || '-';
+            }
+            
             tr.appendChild(td);
           }
           
@@ -203,14 +262,30 @@
 
           // Adicionar ações
           const tdAcoes = document.createElement('td');
-          tdAcoes.innerHTML = `
-            <button class="btn btn-sm btn-primary" onclick='editarRegistro(${JSON.stringify(registro)})'>
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="excluirRegistro(${registro.id})">
-              <i class="bi bi-trash"></i>
-            </button>
-          `;
+          
+          // Se tem inline_edit, adicionar botão de salvar individual
+          if (configAtual.inline_edit) {
+            const btnSalvar = document.createElement('button');
+            btnSalvar.className = 'btn btn-sm btn-success me-1';
+            btnSalvar.onclick = () => salvarIndividual(registro.id);
+            btnSalvar.innerHTML = '<i class="bi bi-check-lg"></i>';
+            btnSalvar.title = 'Salvar';
+            tdAcoes.appendChild(btnSalvar);
+          }
+          
+          // Botões padrão de editar e excluir
+          const btnEditar = document.createElement('button');
+          btnEditar.className = 'btn btn-sm btn-primary me-1';
+          btnEditar.onclick = () => editarRegistro(registro);
+          btnEditar.innerHTML = '<i class="bi bi-pencil"></i>';
+          tdAcoes.appendChild(btnEditar);
+          
+          const btnExcluir = document.createElement('button');
+          btnExcluir.className = 'btn btn-sm btn-danger';
+          btnExcluir.onclick = () => excluirRegistro(registro.id);
+          btnExcluir.innerHTML = '<i class="bi bi-trash"></i>';
+          tdAcoes.appendChild(btnExcluir);
+          
           tr.appendChild(tdAcoes);
 
           corpo.appendChild(tr);
@@ -557,6 +632,116 @@
       } catch (error) {
         console.error('Erro ao excluir:', error);
         alert('Erro ao excluir registro');
+      }
+    }
+
+    // Função para mostrar botão "Salvar Todos" quando há alterações
+    function mostrarBotaoSalvarTodos() {
+      if (configAtual.inline_edit) {
+        document.getElementById('btnSalvarTodos').style.display = 'inline-block';
+      }
+    }
+
+    // Função para salvar um registro individual
+    async function salvarIndividual(id) {
+      const tr = document.querySelector(`tr[data-id="${id}"]`);
+      if (!tr) return;
+
+      const campos = {};
+      
+      // Coletar valores dos campos inline editáveis
+      if (configAtual.inline_columns) {
+        for (const col of configAtual.inline_columns) {
+          const select = tr.querySelector(`select`);
+          if (select) {
+            campos[col] = select.value;
+          }
+        }
+      }
+
+      try {
+        const response = await fetch(`/listas/api/dados/${tabelaAtual}/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campos })
+        });
+
+        const result = await response.json();
+
+        if (result.erro) {
+          alert('Erro: ' + result.erro);
+          return;
+        }
+
+        // Remover highlight de alteração
+        tr.classList.remove('table-warning');
+        
+        // Atualizar valor original do select
+        const select = tr.querySelector('select');
+        if (select) {
+          select.setAttribute('data-original', select.value);
+        }
+
+        alert('Registro salvo com sucesso!');
+
+      } catch (error) {
+        console.error('Erro ao salvar:', error);
+        alert('Erro ao salvar registro');
+      }
+    }
+
+    // Função para salvar todos os registros marcados ou alterados
+    async function salvarTodos() {
+      const registros = [];
+      const linhas = document.querySelectorAll('#corpoTabela tr.table-warning');
+      
+      if (linhas.length === 0) {
+        alert('Nenhuma alteração pendente para salvar.');
+        return;
+      }
+
+      // Coletar todos os registros alterados
+      for (const tr of linhas) {
+        const id = tr.getAttribute('data-id');
+        const campos = {};
+        
+        if (configAtual.inline_columns) {
+          for (const col of configAtual.inline_columns) {
+            const select = tr.querySelector('select');
+            if (select) {
+              campos[col] = select.value;
+            }
+          }
+        }
+        
+        registros.push({ id: parseInt(id), campos });
+      }
+
+      try {
+        const response = await fetch(`/listas/api/dados/${tabelaAtual}/salvar-lote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registros })
+        });
+
+        const result = await response.json();
+
+        if (result.erro) {
+          alert('Erro: ' + result.erro);
+          return;
+        }
+
+        // Recarregar tabela
+        await carregarTabela();
+        
+        // Esconder botão "Salvar Todos"
+        document.getElementById('btnSalvarTodos').style.display = 'none';
+        
+        alert(`${result.sucesso_count} registro(s) salvo(s) com sucesso!`);
+
+      } catch (error) {
+        console.error('Erro ao salvar lote:', error);
+        alert('Erro ao salvar registros');
       }
     }
 
