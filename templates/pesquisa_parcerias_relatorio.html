@@ -212,6 +212,19 @@
         }
         tr.appendChild(tdData);
 
+        // Coluna de Ações
+        const tdAcoes = document.createElement('td');
+        tdAcoes.className = 'text-center';
+        tdAcoes.innerHTML = `
+          <button 
+            class="btn btn-danger btn-sm" 
+            onclick="excluirPesquisa(${pesquisa.numero_pesquisa})"
+            title="Excluir pesquisa">
+            <i class="bi bi-trash"></i>
+          </button>
+        `;
+        tr.appendChild(tdAcoes);
+
         tbody.appendChild(tr);
       });
 
@@ -238,6 +251,33 @@
     function limparFiltro() {
       document.getElementById('filtroOsc').value = '';
       renderizarTabela(pesquisas);
+    }
+
+    // Excluir pesquisa
+    async function excluirPesquisa(numeroPesquisa) {
+      if (!confirm('Tem certeza que deseja excluir esta pesquisa?\n\nNúmero da Pesquisa: ' + numeroPesquisa)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/pesquisa-parcerias/api/pesquisas/${numeroPesquisa}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (data.erro) {
+          alert('Erro ao excluir: ' + data.erro);
+          return;
+        }
+
+        alert('Pesquisa excluída com sucesso!');
+        await carregarPesquisas();  // Recarregar lista
+
+      } catch (error) {
+        console.error('Erro ao excluir pesquisa:', error);
+        alert('Erro ao excluir pesquisa');
+      }
     }
   </script>
 </body>

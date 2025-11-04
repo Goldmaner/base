@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Texto Automático - Pesquisa de Parcerias</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      min-height: 100vh; 
+      padding: 20px; 
+    }
+    .main-container { 
+      max-width: 1200px; 
+      margin: 0 auto; 
+      background: white; 
+      border-radius: 15px; 
+      padding: 30px; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+    }
+    .header-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+    }
+    .info-card {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .info-card strong {
+      color: #667eea;
+    }
+    .texto-resultado {
+      background-color: #fff;
+      padding: 25px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      margin: 20px 0;
+      line-height: 1.8;
+      font-family: 'Calibri', Arial, sans-serif;
+      font-size: 12pt;
+    }
+    .btn-copiar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      font-size: 16px;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+    .btn-copiar:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      color: white;
+    }
+    .btn-voltar {
+      background-color: #6c757d;
+      color: white;
+      border: none;
+    }
+    .btn-voltar:hover {
+      background-color: #5a6268;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <h2 class="mb-0">
+        <i class="bi bi-file-text me-2"></i>Texto Automático Gerado
+      </h2>
+      <p class="mb-0 mt-2">{{ titulo_texto }}</p>
+    </div>
+
+    <!-- Informações da Pesquisa -->
+    <div class="info-card">
+      <div class="row">
+        <div class="col-md-3">
+          <strong>Número da Pesquisa:</strong> {{ numero_pesquisa }}
+        </div>
+        <div class="col-md-3">
+          <strong>SEI:</strong> {{ sei_informado }}
+        </div>
+        <div class="col-md-3">
+          <strong>OSC:</strong> {{ nome_osc }}
+        </div>
+        <div class="col-md-3">
+          <strong>Emissor:</strong> {{ nome_emissor }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Texto Processado -->
+    <div class="texto-resultado">
+      {{ texto_processado|safe }}
+    </div>
+
+    <!-- Botões de Ação -->
+    <div class="d-flex justify-content-between mt-4">
+      <a href="{{ url_for('pesquisa_parcerias.index') }}" class="btn btn-voltar">
+        <i class="bi bi-arrow-left me-2"></i>Nova Pesquisa
+      </a>
+      
+      <button class="btn btn-copiar" onclick="copiarTexto()">
+        <i class="bi bi-clipboard me-2"></i>Copiar Texto
+      </button>
+      
+      <a href="{{ url_for('pesquisa_parcerias.relatorio') }}" class="btn btn-info">
+        <i class="bi bi-list-ul me-2"></i>Ver Relatório
+      </a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function copiarTexto() {
+      // Pegar o conteúdo do texto resultado
+      const textoElemento = document.querySelector('.texto-resultado');
+      const texto = textoElemento.innerHTML;
+      
+      // Criar elemento temporário para copiar
+      const tempElement = document.createElement('div');
+      tempElement.innerHTML = texto;
+      tempElement.style.position = 'absolute';
+      tempElement.style.left = '-9999px';
+      document.body.appendChild(tempElement);
+      
+      // Selecionar e copiar
+      const range = document.createRange();
+      range.selectNodeContents(tempElement);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      try {
+        document.execCommand('copy');
+        alert('Texto copiado com sucesso! Cole no SEI.');
+      } catch (err) {
+        alert('Erro ao copiar texto. Tente selecionar manualmente.');
+      }
+      
+      // Limpar
+      document.body.removeChild(tempElement);
+      selection.removeAllRanges();
+    }
+  </script>
+</body>
+</html>
