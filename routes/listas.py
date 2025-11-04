@@ -259,9 +259,16 @@ def atualizar_registro(tabela, id):
         schema = config['schema']
         dados = request.json
         
+        # Verificar se veio 'campos' (edição inline) ou dados diretos (edição modal)
+        campos_a_atualizar = dados.get('campos', dados)
+        
+        print(f"[DEBUG atualizar_registro] Tabela: {tabela}, ID: {id}")
+        print(f"[DEBUG atualizar_registro] Dados recebidos: {dados}")
+        print(f"[DEBUG atualizar_registro] Campos a atualizar: {campos_a_atualizar}")
+        
         # Se for pessoa_gestora e o nome mudou, precisamos atualizar Parcerias também
         nome_antigo = None
-        if tabela == 'c_pessoa_gestora' and 'nome_pg' in dados:
+        if tabela == 'c_pessoa_gestora' and 'nome_pg' in campos_a_atualizar:
             cur = get_cursor()
             cur.execute(f"SELECT nome_pg FROM {schema}.{tabela} WHERE id = %s", (id,))
             resultado = cur.fetchone()
@@ -269,10 +276,21 @@ def atualizar_registro(tabela, id):
                 nome_antigo = resultado['nome_pg']
             cur.close()
         
-        # Montar query de atualização apenas com campos editáveis
-        colunas = config['colunas_editaveis']
-        set_clause = ', '.join([f"{col} = %s" for col in colunas])
-        valores = [dados.get(col) for col in colunas]
+        # Montar query de atualização APENAS com os campos enviados
+        colunas_validas = []
+        valores = []
+        
+        for campo, valor in campos_a_atualizar.items():
+            # Verificar se o campo está nas colunas editáveis
+            if campo in config['colunas_editaveis']:
+                colunas_validas.append(campo)
+                valores.append(valor)
+                print(f"[DEBUG atualizar_registro] Campo válido: {campo} = {valor}")
+        
+        if not colunas_validas:
+            return jsonify({'erro': 'Nenhum campo válido para atualizar'}), 400
+        
+        set_clause = ', '.join([f"{col} = %s" for col in colunas_validas])
         valores.append(id)
         
         query = f"""
@@ -281,16 +299,19 @@ def atualizar_registro(tabela, id):
             WHERE id = %s
         """
         
+        print(f"[DEBUG atualizar_registro] Query: {query}")
+        print(f"[DEBUG atualizar_registro] Valores: {valores}")
+        
         if execute_query(query, valores):
             # Se alterou nome da pessoa gestora, atualizar também na tabela parcerias_analises
-            if tabela == 'c_pessoa_gestora' and nome_antigo and nome_antigo != dados.get('nome_pg'):
+            if tabela == 'c_pessoa_gestora' and nome_antigo and nome_antigo != campos_a_atualizar.get('nome_pg'):
                 query_parcerias = """
                     UPDATE parcerias_analises
                     SET responsavel_pg = %s
                     WHERE responsavel_pg = %s
                 """
-                resultado_update = execute_query(query_parcerias, (dados.get('nome_pg'), nome_antigo))
-                print(f"[INFO] Atualizado responsavel_pg de '{nome_antigo}' para '{dados.get('nome_pg')}' em parcerias_analises")
+                resultado_update = execute_query(query_parcerias, (campos_a_atualizar.get('nome_pg'), nome_antigo))
+                print(f"[INFO] Atualizado responsavel_pg de '{nome_antigo}' para '{campos_a_atualizar.get('nome_pg')}' em parcerias_analises")
             
             return jsonify({
                 'sucesso': True,
@@ -346,6 +367,9 @@ def salvar_lote(tabela):
         dados = request.json
         registros = dados.get('registros', [])
         
+        print(f"[DEBUG salvar_lote] Tabela: {tabela}")
+        print(f"[DEBUG salvar_lote] Registros recebidos: {registros}")
+        
         if not registros:
             return jsonify({'erro': 'Nenhum registro para salvar'}), 400
         
@@ -360,6 +384,8 @@ def salvar_lote(tabela):
             reg_id = registro.get('id')
             campos = registro.get('campos', {})
             
+            print(f"[DEBUG salvar_lote] Processando ID {reg_id}, campos: {campos}")
+            
             if not reg_id or not campos:
                 continue
             
@@ -370,6 +396,7 @@ def salvar_lote(tabela):
                 if campo in config['colunas_editaveis']:
                     sets.append(f"{campo} = %s")
                     valores.append(valor)
+                    print(f"[DEBUG salvar_lote] Campo {campo} = {valor} (tipo: {type(valor)})")
             
             if not sets:
                 continue
@@ -380,6 +407,9 @@ def salvar_lote(tabela):
                 SET {', '.join(sets)}
                 WHERE id = %s
             """
+            
+            print(f"[DEBUG salvar_lote] Query: {query}")
+            print(f"[DEBUG salvar_lote] Valores: {tuple(valores)}")
             
             if execute_query(query, tuple(valores)):
                 sucesso_count += 1
@@ -402,5 +432,8 @@ def salvar_lote(tabela):
             })
         
     except Exception as e:
+        print(f"[ERRO salvar_lote] {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'erro': str(e)}), 500
 

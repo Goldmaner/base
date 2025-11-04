@@ -20,10 +20,6 @@ meu_banco.db
 meu_banco.db-shm
 meu_banco.db-wal
 
-# Backups do banco de dados
-backups/*.sql
-backups/backup_*.sql
-
 # Excel / exports / uploads temporários
 *.xlsx
 *.xls

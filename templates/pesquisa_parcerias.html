@@ -84,6 +84,38 @@
     <!-- Formulário -->
     <div class="form-section">
       <form id="formPesquisa">
+        <!-- Número da Pesquisa -->
+        <div class="mb-3">
+          <label for="numeroPesquisa" class="form-label">
+            <i class="bi bi-hash me-2"></i>Número da Pesquisa
+          </label>
+          <div class="d-flex align-items-center gap-2">
+            <input 
+              type="number" 
+              class="form-control" 
+              id="numeroPesquisa" 
+              name="numero_pesquisa"
+              readonly
+              min="1"
+              placeholder="Será gerado automaticamente..."
+              style="flex: 1;"
+            >
+            {% if user['tipo_usuario'] == 'Agente Público' %}
+            <div class="form-check mb-0">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                id="permitirEdicaoNumero"
+              >
+              <label class="form-check-label" for="permitirEdicaoNumero">
+                Editar
+              </label>
+            </div>
+            {% endif %}
+          </div>
+          <small class="text-muted">Geração automática anual (reseta em janeiro)</small>
+        </div>
+
         <!-- Documento SEI -->
         <div class="mb-3">
           <label for="seiSolicitacao" class="form-label">
@@ -107,12 +139,37 @@
           <label for="nomeOsc" class="form-label">
             <i class="bi bi-building me-2"></i>Nome da OSC pesquisada
           </label>
-          <select class="form-select" id="nomeOsc" name="nome_osc" required>
-            <option value="">Selecione uma OSC...</option>
-          </select>
+          <input 
+            type="text" 
+            class="form-control" 
+            id="nomeOsc" 
+            name="nome_osc"
+            list="listaOscs"
+            placeholder="Digite o nome da OSC..."
+            required
+          >
+          <datalist id="listaOscs">
+            <!-- Opções serão carregadas via JavaScript -->
+          </datalist>
+          <small class="text-muted">Digite para ver sugestões ou escreva um novo nome</small>
         </div>
 
-        <!-- CNPJ (preenchido automaticamente) -->
+        <!-- Checkbox: OSC não identificada -->
+        <div class="mb-3">
+          <div class="form-check">
+            <input 
+              class="form-check-input" 
+              type="checkbox" 
+              id="oscNaoIdentificada" 
+              name="osc_nao_identificada"
+            >
+            <label class="form-check-label" for="oscNaoIdentificada">
+              <i class="bi bi-exclamation-triangle me-2"></i>OSC não identificada nos bancos de dados
+            </label>
+          </div>
+        </div>
+
+        <!-- CNPJ (preenchido automaticamente ou editável se não identificada) -->
         <div class="mb-3">
           <label for="cnpj" class="form-label">
             <i class="bi bi-card-text me-2"></i>CNPJ
@@ -122,10 +179,9 @@
             class="form-control" 
             id="cnpj" 
             name="cnpj"
-            readonly 
-            placeholder="Será preenchido automaticamente ao selecionar a OSC"
+            placeholder="Será preenchido automaticamente ao selecionar OSC conhecida"
           >
-          <small class="text-muted">Preenchimento automático</small>
+          <small class="text-muted" id="cnpjHelp">Preenchimento automático</small>
         </div>
 
         <!-- Nome do Emissor -->
@@ -143,7 +199,7 @@
           <button type="button" class="btn btn-registro" onclick="salvarParaRegistro()">
             <i class="bi bi-save me-2"></i>Para Registro
           </button>
-          <button type="button" class="btn btn-prosseguir" disabled>
+          <button type="button" class="btn btn-prosseguir" onclick="prosseguirPesquisa()">
             <i class="bi bi-arrow-right me-2"></i>Prosseguir Pesquisa
           </button>
         </div>
@@ -155,9 +211,29 @@
   <script>
     // Carrega lista de OSCs únicas ao carregar a página
     document.addEventListener('DOMContentLoaded', async () => {
+      await carregarProximoNumero();
       await carregarOscs();
       await carregarAnalistas();
     });
+
+    // Função para carregar o próximo número de pesquisa
+    async function carregarProximoNumero() {
+      try {
+        const response = await fetch('/pesquisa-parcerias/api/proximo-numero');
+        const data = await response.json();
+        
+        if (data.erro) {
+          console.error('Erro ao carregar próximo número:', data.erro);
+          return;
+        }
+
+        document.getElementById('numeroPesquisa').value = data.proximo_numero;
+
+      } catch (error) {
+        console.error('Erro ao carregar próximo número:', error);
+        alert('Erro ao carregar próximo número de pesquisa');
+      }
+    }
 
     // Função para carregar OSCs únicas
     async function carregarOscs() {
@@ -165,7 +241,7 @@
         const response = await fetch('/pesquisa-parcerias/api/oscs');
         const data = await response.json();
         
-        const select = document.getElementById('nomeOsc');
+        const datalist = document.getElementById('listaOscs');
         
         if (data.erro) {
           console.error('Erro ao carregar OSCs:', data.erro);
@@ -175,8 +251,7 @@
         data.oscs.forEach(osc => {
           const option = document.createElement('option');
           option.value = osc;
-          option.textContent = osc;
-          select.appendChild(option);
+          datalist.appendChild(option);
         });
 
       } catch (error) {
@@ -211,9 +286,14 @@
       }
     }
 
-    // Listener para preencher CNPJ automaticamente ao selecionar OSC
-    document.getElementById('nomeOsc').addEventListener('change', async function() {
-      const nomeOsc = this.value;
+    // Listener para preencher CNPJ automaticamente ao digitar OSC conhecida
+    document.getElementById('nomeOsc').addEventListener('input', async function() {
+      const nomeOsc = this.value.trim();
+      
+      // Se checkbox "não identificada" estiver marcado, não buscar CNPJ
+      if (document.getElementById('oscNaoIdentificada').checked) {
+        return;
+      }
       
       if (!nomeOsc) {
         document.getElementById('cnpj').value = '';
@@ -225,18 +305,59 @@
         const data = await response.json();
         
         if (data.erro) {
-          alert('Erro ao buscar CNPJ: ' + data.erro);
+          // OSC não encontrada, limpar CNPJ
           document.getElementById('cnpj').value = '';
           return;
         }
 
-        document.getElementById('cnpj').value = data.cnpj || 'CNPJ não encontrado';
+        document.getElementById('cnpj').value = data.cnpj || '';
 
       } catch (error) {
         console.error('Erro ao buscar CNPJ:', error);
-        alert('Erro ao buscar CNPJ da OSC');
       }
     });
+
+    // Listener para checkbox "OSC não identificada"
+    document.getElementById('oscNaoIdentificada').addEventListener('change', function() {
+      const cnpjInput = document.getElementById('cnpj');
+      const cnpjHelp = document.getElementById('cnpjHelp');
+      
+      if (this.checked) {
+        // Permitir edição manual do CNPJ
+        cnpjInput.removeAttribute('readonly');
+        cnpjInput.value = '';
+        cnpjInput.placeholder = 'Digite o CNPJ manualmente';
+        cnpjHelp.textContent = 'Digite o CNPJ (se disponível)';
+        cnpjInput.required = false;
+      } else {
+        // Voltar para preenchimento automático
+        cnpjInput.setAttribute('readonly', 'readonly');
+        cnpjInput.value = '';
+        cnpjInput.placeholder = 'Será preenchido automaticamente ao selecionar OSC conhecida';
+        cnpjHelp.textContent = 'Preenchimento automático';
+        cnpjInput.required = false;
+        
+        // Tentar buscar CNPJ se houver OSC digitada
+        const nomeOsc = document.getElementById('nomeOsc').value.trim();
+        if (nomeOsc) {
+          document.getElementById('nomeOsc').dispatchEvent(new Event('input'));
+        }
+      }
+    });
+
+    // Listener para checkbox "Permitir Edição do Número" (apenas para Agente Público)
+    const checkboxEdicao = document.getElementById('permitirEdicaoNumero');
+    if (checkboxEdicao) {
+      checkboxEdicao.addEventListener('change', function() {
+        const numeroInput = document.getElementById('numeroPesquisa');
+        if (this.checked) {
+          numeroInput.removeAttribute('readonly');
+          numeroInput.focus();
+        } else {
+          numeroInput.setAttribute('readonly', 'readonly');
+        }
+      });
+    }
 
     // Validar entrada numérica do SEI
     document.getElementById('seiSolicitacao').addEventListener('input', function(e) {
@@ -254,9 +375,12 @@
       }
 
       const dados = {
+        numero_pesquisa: parseInt(document.getElementById('numeroPesquisa').value),
         sei_informado: document.getElementById('seiSolicitacao').value,
         nome_osc: document.getElementById('nomeOsc').value,
-        nome_emissor: document.getElementById('nomeEmissor').value
+        cnpj: document.getElementById('cnpjOsc').value || '',
+        nome_emissor: document.getElementById('nomeEmissor').value,
+        osc_identificada: !document.getElementById('oscNaoIdentificada').checked // Inverte: se "não identificada" está marcado, osc_identificada = false
       };
 
       try {
@@ -277,11 +401,79 @@
         
         // Limpar formulário
         form.reset();
-        document.getElementById('cnpj').value = '';
+        document.getElementById('cnpjOsc').value = '';
+        document.getElementById('cnpjOsc').setAttribute('readonly', 'readonly');
+        document.getElementById('cnpjOsc').placeholder = 'Será preenchido automaticamente ao selecionar OSC conhecida';
+        
+        // Desmarcar checkbox de edição (se existir)
+        const checkboxEdicao = document.getElementById('permitirEdicaoNumero');
+        if (checkboxEdicao) {
+          checkboxEdicao.checked = false;
+        }
+        document.getElementById('numeroPesquisa').setAttribute('readonly', 'readonly');
+        
+        // Recarregar próximo número
+        await carregarProximoNumero();
 
       } catch (error) {
         console.error('Erro ao salvar:', error);
         alert('Erro ao salvar pesquisa');
+      }
+    }
+
+    // Função para prosseguir com a pesquisa (gera texto automático)
+    async function prosseguirPesquisa() {
+      const form = document.getElementById('formPesquisa');
+      
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      try {
+        // Coletar dados do formulário
+        console.log('DEBUG: Coletando dados do formulário...');
+        console.log('numeroPesquisa:', document.getElementById('numeroPesquisa'));
+        console.log('seiSolicitacao:', document.getElementById('seiSolicitacao'));
+        console.log('nomeOsc:', document.getElementById('nomeOsc'));
+        console.log('nomeEmissor:', document.getElementById('nomeEmissor'));
+        console.log('oscNaoIdentificada:', document.getElementById('oscNaoIdentificada'));
+        
+        const dados = {
+          numero_pesquisa: parseInt(document.getElementById('numeroPesquisa').value) || 0,
+          sei_informado: document.getElementById('seiSolicitacao').value,
+          nome_osc: document.getElementById('nomeOsc').value,
+          cnpj: document.getElementById('cnpj').value || '',
+          nome_emissor: document.getElementById('nomeEmissor').value,
+          osc_identificada: !document.getElementById('oscNaoIdentificada').checked
+        };
+        
+        console.log('Dados coletados:', dados);
+
+        // Enviar para API
+        const response = await fetch('/pesquisa-parcerias/api/prosseguir-pesquisa', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(dados)
+        });
+
+        const result = await response.json();
+
+        if (result.erro) {
+          alert('Erro: ' + result.erro);
+          return;
+        }
+
+        // Redirecionar para página de texto automático
+        if (result.redirect) {
+          window.location.href = result.redirect;
+        }
+
+      } catch (error) {
+        console.error('Erro ao prosseguir pesquisa:', error);
+        alert('Erro ao processar pesquisa');
       }
     }
   </script>

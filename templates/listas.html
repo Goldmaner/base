@@ -652,12 +652,21 @@
       // Coletar valores dos campos inline editáveis
       if (configAtual.inline_columns) {
         for (const col of configAtual.inline_columns) {
-          const select = tr.querySelector(`select`);
-          if (select) {
-            campos[col] = select.value;
+          // Encontrar a célula (td) que corresponde à coluna
+          const tds = tr.querySelectorAll('td[data-col]');
+          for (const td of tds) {
+            if (td.getAttribute('data-col') === col) {
+              const select = td.querySelector('select');
+              if (select) {
+                campos[col] = select.value;
+              }
+              break;
+            }
           }
         }
       }
+
+      console.log('Salvando individual:', { id, campos }); // Debug
 
       try {
         const response = await fetch(`/listas/api/dados/${tabelaAtual}/${id}`, {
@@ -676,10 +685,20 @@
         // Remover highlight de alteração
         tr.classList.remove('table-warning');
         
-        // Atualizar valor original do select
-        const select = tr.querySelector('select');
-        if (select) {
-          select.setAttribute('data-original', select.value);
+        // Atualizar valor original de todos os selects inline editáveis
+        if (configAtual.inline_columns) {
+          for (const col of configAtual.inline_columns) {
+            const tds = tr.querySelectorAll('td[data-col]');
+            for (const td of tds) {
+              if (td.getAttribute('data-col') === col) {
+                const select = td.querySelector('select');
+                if (select) {
+                  select.setAttribute('data-original', select.value);
+                }
+                break;
+              }
+            }
+          }
         }
 
         alert('Registro salvo com sucesso!');
@@ -707,15 +726,24 @@
         
         if (configAtual.inline_columns) {
           for (const col of configAtual.inline_columns) {
-            const select = tr.querySelector('select');
-            if (select) {
-              campos[col] = select.value;
+            // Encontrar a célula (td) que corresponde à coluna
+            const tds = tr.querySelectorAll('td[data-col]');
+            for (const td of tds) {
+              if (td.getAttribute('data-col') === col) {
+                const select = td.querySelector('select');
+                if (select) {
+                  campos[col] = select.value;
+                }
+                break;
+              }
             }
           }
         }
         
         registros.push({ id: parseInt(id), campos });
       }
+
+      console.log('Registros a salvar:', registros); // Debug
 
       try {
         const response = await fetch(`/listas/api/dados/${tabelaAtual}/salvar-lote`, {
