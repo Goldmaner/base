@@ -11,7 +11,15 @@ if scripts_path not in sys.path:
     sys.path.insert(0, scripts_path)
 
 try:
-    from funcoes_texto import processar_texto_automatico, obter_modelo_texto, verificar_osc_existe
+    from funcoes_texto import (
+        processar_texto_automatico, 
+        obter_modelo_texto, 
+        verificar_osc_existe,
+        verificar_osc_tem_pos2023,
+        verificar_responsabilidades_mistas,
+        gerar_encaminhamentos_pos2023,
+        gerar_texto_misto
+    )
 except ImportError as e:
     print(f"[ERRO] Não foi possível importar funcoes_texto: {e}")
     print(f"[DEBUG] scripts_path = {scripts_path}")
@@ -20,6 +28,10 @@ except ImportError as e:
     processar_texto_automatico = None
     obter_modelo_texto = None
     verificar_osc_existe = None
+    verificar_osc_tem_pos2023 = None
+    verificar_responsabilidades_mistas = None
+    gerar_encaminhamentos_pos2023 = None
+    gerar_texto_misto = None
 
 pesquisa_parcerias_bp = Blueprint('pesquisa_parcerias', __name__, url_prefix='/pesquisa-parcerias')
 
@@ -391,20 +403,48 @@ def prosseguir_pesquisa():
         # Verificar se OSC existe no banco de parcerias
         osc_existe = verificar_osc_existe(nome_osc)
         
-        # Determinar qual modelo usar
-        if osc_existe:
-            # OSC existe - usar modelo com tabela de termos
-            titulo_modelo = "Pesquisa de Parcerias: Parcerias pré-2023"
-        else:
-            # OSC não existe - usar modelo sem parcerias
+        # Determinar qual modelo usar baseado em 4 casos:
+        # Caso 1: OSC não existe → "OSC sem parcerias SMDHC"
+        # Caso 2: OSC existe APENAS com termos pré-2023 (DP) → "Parcerias pré-2023"
+        # Caso 3: OSC existe APENAS com termos pós-2023 (PG/Compartilhado) → "Parcerias pós-2023"
+        # Caso 4: OSC existe com AMBOS (DP + Pós-2023) → Texto misto
+        
+        if not osc_existe:
+            # Caso 1: OSC não existe
             titulo_modelo = "Pesquisa de Parcerias: OSC sem parcerias SMDHC"
-        
-        modelo = obter_modelo_texto(titulo_modelo)
-        
-        if not modelo:
-            return jsonify({
-                'erro': f'Modelo de texto "{titulo_modelo}" não encontrado no banco de dados'
-            }), 404
+            usar_multiplos_encaminhamentos = False
+            usar_texto_misto = False
+        else:
+            # OSC existe - verificar responsabilidades
+            resp = verificar_responsabilidades_mistas(nome_osc)
+            
+            print(f"[DEBUG verificar_responsabilidades_mistas] OSC: {nome_osc}")
+            print(f"[DEBUG] tem_dp: {resp['tem_dp']}, tem_pos2023: {resp['tem_pos2023']}, misto: {resp['misto']}")
+            
+            if resp['misto']:
+                # Caso 4: Responsabilidades mistas (DP + Pós-2023)
+                print(f"[DEBUG] → Usando DROPDOWN (Caso 4: Misto)")
+                usar_texto_misto = True
+                usar_multiplos_encaminhamentos = False
+                titulo_modelo = None  # Não usa modelo único
+            elif resp['tem_pos2023']:
+                # Caso 3: Apenas pós-2023 (responsabilidade 2 ou 3)
+                print(f"[DEBUG] → Usando modelo pós-2023 (Caso 3)")
+                titulo_modelo = "Pesquisa de Parcerias: Parcerias pós-2023"
+                usar_multiplos_encaminhamentos = True
+                usar_texto_misto = False
+            elif resp['tem_dp']:
+                # Caso 2: Apenas pré-2023 (responsabilidade 1)
+                print(f"[DEBUG] → Usando modelo pré-2023 (Caso 2)")
+                titulo_modelo = "Pesquisa de Parcerias: Parcerias pré-2023"
+                usar_multiplos_encaminhamentos = False
+                usar_texto_misto = False
+            else:
+                # Fallback: OSC existe mas não tem prestações (caso improvável)
+                print(f"[DEBUG] → OSC existe mas sem prestações (fallback)")
+                titulo_modelo = "Pesquisa de Parcerias: OSC sem parcerias SMDHC"
+                usar_multiplos_encaminhamentos = False
+                usar_texto_misto = False
         
         # Preparar variáveis para substituição
         variaveis = {
@@ -415,8 +455,24 @@ def prosseguir_pesquisa():
             'numero_pesquisa': str(numero_pesquisa)
         }
         
-        # Processar texto automático
-        texto_processado = processar_texto_automatico(modelo['modelo_texto'], variaveis)
+        # Processar texto automático baseado no caso
+        if usar_texto_misto:
+            # Caso 4: Gerar texto completo com múltiplos modelos
+            texto_processado = gerar_texto_misto(variaveis)
+        else:
+            # Casos 1, 2 ou 3: Usar modelo único
+            modelo = obter_modelo_texto(titulo_modelo)
+            
+            if not modelo:
+                return jsonify({
+                    'erro': f'Modelo de texto "{titulo_modelo}" não encontrado no banco de dados'
+                }), 404
+            
+            # Se for Caso 3 (múltiplas coordenações pós-2023), usar função especial
+            if usar_multiplos_encaminhamentos:
+                texto_processado = gerar_encaminhamentos_pos2023(modelo['modelo_texto'], variaveis)
+            else:
+                texto_processado = processar_texto_automatico(modelo['modelo_texto'], variaveis)
         
         # Retornar dados para renderizar no template
         return jsonify({
@@ -463,18 +519,46 @@ def exibir_texto_automatico(numero_pesquisa):
         if not pesquisa:
             return "Pesquisa não encontrada", 404
         
-        # Verificar se OSC existe no banco para determinar modelo
+        # Verificar se OSC existe
         osc_existe = verificar_osc_existe(pesquisa['nome_osc'])
         
-        if osc_existe:
-            titulo_modelo = "Pesquisa de Parcerias: Parcerias pré-2023"
-        else:
+        # Determinar qual modelo usar baseado em 4 casos (MESMA LÓGICA de prosseguir_pesquisa)
+        if not osc_existe:
+            # Caso 1: OSC não existe
             titulo_modelo = "Pesquisa de Parcerias: OSC sem parcerias SMDHC"
-        
-        modelo = obter_modelo_texto(titulo_modelo)
-        
-        if not modelo:
-            return f'Modelo "{titulo_modelo}" não encontrado', 404
+            usar_multiplos_encaminhamentos = False
+            usar_texto_misto = False
+        else:
+            # OSC existe - verificar responsabilidades
+            resp = verificar_responsabilidades_mistas(pesquisa['nome_osc'])
+            
+            print(f"[DEBUG exibir_texto_automatico] OSC: {pesquisa['nome_osc']}")
+            print(f"[DEBUG] tem_dp: {resp['tem_dp']}, tem_pos2023: {resp['tem_pos2023']}, misto: {resp['misto']}")
+            
+            if resp['misto']:
+                # Caso 4: Responsabilidades mistas (DP + Pós-2023)
+                print(f"[DEBUG] → Renderizando DROPDOWN (Caso 4: Misto)")
+                usar_texto_misto = True
+                usar_multiplos_encaminhamentos = False
+                titulo_modelo = None  # Não usa modelo único
+            elif resp['tem_pos2023']:
+                # Caso 3: Apenas pós-2023 (responsabilidade 2 ou 3)
+                print(f"[DEBUG] → Renderizando modelo pós-2023 (Caso 3)")
+                titulo_modelo = "Pesquisa de Parcerias: Parcerias pós-2023"
+                usar_multiplos_encaminhamentos = True
+                usar_texto_misto = False
+            elif resp['tem_dp']:
+                # Caso 2: Apenas pré-2023 (responsabilidade 1)
+                print(f"[DEBUG] → Renderizando modelo pré-2023 (Caso 2)")
+                titulo_modelo = "Pesquisa de Parcerias: Parcerias pré-2023"
+                usar_multiplos_encaminhamentos = False
+                usar_texto_misto = False
+            else:
+                # Fallback: OSC existe mas não tem prestações
+                print(f"[DEBUG] → OSC existe mas sem prestações (fallback)")
+                titulo_modelo = "Pesquisa de Parcerias: OSC sem parcerias SMDHC"
+                usar_multiplos_encaminhamentos = False
+                usar_texto_misto = False
         
         # Preparar variáveis
         cnpj_texto = pesquisa.get('cnpj', '') or 'não informado'
@@ -487,12 +571,29 @@ def exibir_texto_automatico(numero_pesquisa):
             'numero_pesquisa': str(pesquisa['numero_pesquisa'])
         }
         
-        # Processar texto
-        texto_processado = processar_texto_automatico(modelo['modelo_texto'], variaveis)
+        # Processar texto baseado no caso
+        if usar_texto_misto:
+            # Caso 4: Gerar texto com dropdown
+            texto_processado = gerar_texto_misto(variaveis)
+            titulo_exibicao = "Pesquisa de Parcerias: Parcerias pós-2023"  # Título genérico
+        else:
+            # Casos 1, 2 ou 3: Usar modelo único
+            modelo = obter_modelo_texto(titulo_modelo)
+            
+            if not modelo:
+                return f'Modelo "{titulo_modelo}" não encontrado', 404
+            
+            # Se for Caso 3 (múltiplas coordenações pós-2023), usar função especial
+            if usar_multiplos_encaminhamentos:
+                texto_processado = gerar_encaminhamentos_pos2023(modelo['modelo_texto'], variaveis)
+            else:
+                texto_processado = processar_texto_automatico(modelo['modelo_texto'], variaveis)
+            
+            titulo_exibicao = modelo['titulo_texto']
         
         # Renderizar template
         return render_template('pesquisa_parcerias_texto.html',
-                               titulo_texto=modelo['titulo_texto'],
+                               titulo_texto=titulo_exibicao,
                                numero_pesquisa=pesquisa['numero_pesquisa'],
                                sei_informado=pesquisa['sei_informado'],
                                nome_osc=pesquisa['nome_osc'],
@@ -501,5 +602,7 @@ def exibir_texto_automatico(numero_pesquisa):
         
     except Exception as e:
         print(f"[ERRO exibir_texto_automatico] {e}")
+        import traceback
+        traceback.print_exc()
         return str(e), 500
 

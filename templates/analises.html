@@ -91,6 +91,7 @@
             <option value="1">DP</option>
             <option value="2">Compartilhada</option>
             <option value="3">Pessoa Gestora</option>
+            <option value="null">Vazia</option>
           </select>
         </div>
         <div class="col-md-2">
@@ -297,6 +298,30 @@
           listaPG.innerHTML = '<li><small class="dropdown-item-text text-muted">Nenhum ano disponível</small></li>';
         }
         
+        // Verificar se há filtros salvos e restaurá-los
+        const temFiltrosSalvos = restaurarEstadoFiltros();
+        
+        if (temFiltrosSalvos) {
+          // Marcar checkboxes de anos após restaurar
+          anosSelecionadosDP.forEach(ano => {
+            const checkbox = document.querySelector(`#listaAnosDP input[value="${ano}"]`);
+            if (checkbox) checkbox.checked = true;
+          });
+          
+          anosSelecionadosPG.forEach(ano => {
+            const checkbox = document.querySelector(`#listaAnosPG input[value="${ano}"]`);
+            if (checkbox) checkbox.checked = true;
+          });
+          
+          // Atualizar labels
+          atualizarFiltroAnosDP();
+          atualizarFiltroAnosPG();
+          
+          // Aplicar filtros automaticamente
+          console.log('[DEBUG] Aplicando filtros restaurados automaticamente');
+          buscarAnalises();
+        }
+        
       } catch (error) {
         console.error('[ERRO] Erro ao carregar anos:', error);
       }
@@ -453,6 +478,10 @@
       document.getElementById('labelDataParecerDP').textContent = 'Todos os anos';
       document.getElementById('labelDataParecerPG').textContent = 'Todos os anos';
       
+      // Limpar estado salvo no sessionStorage
+      sessionStorage.removeItem('analisesEstadoFiltros');
+      console.log('[DEBUG] Filtros e estado salvo limpos');
+      
       document.getElementById('areaTabela').style.display = 'none';
       document.getElementById('contadorResultados').style.display = 'none';
       document.getElementById('mensagemInicial').innerHTML = '<div class="alert alert-info text-center"><i class="bi bi-info-circle-fill me-2"></i>Configure os filtros e clique em <strong>Buscar</strong> para visualizar as análises.</div>';
@@ -460,7 +489,76 @@
     }
 
     function editarPorTermo(numeroTermo) {
+      // Salvar estado dos filtros no sessionStorage antes de navegar
+      salvarEstadoFiltros();
       window.location.href = `/analises/editar-termo?termo=${encodeURIComponent(numeroTermo)}`;
+    }
+
+    function salvarEstadoFiltros() {
+      const estadoFiltros = {
+        filtroLimite: document.getElementById('filtroLimite')?.value || '50',
+        filtroTipo: document.getElementById('filtroTipo')?.value || '',
+        filtroSeiPc: document.getElementById('filtroSeiPc')?.value || '',
+        filtroTermo: document.getElementById('filtroTermo')?.value || '',
+        filtroOSC: document.getElementById('filtroOSC')?.value || '',
+        filtroResponsabilidade: document.getElementById('filtroResponsabilidade')?.value || '',
+        filtroEntregue: document.getElementById('filtroEntregue')?.value || '',
+        filtroNotificacao: document.getElementById('filtroNotificacao')?.value || '',
+        filtroParecer: document.getElementById('filtroParecer')?.value || '',
+        filtroFaseRecursal: document.getElementById('filtroFaseRecursal')?.value || '',
+        filtroEncerramento: document.getElementById('filtroEncerramento')?.value || '',
+        filtroRegularidade: document.getElementById('filtroRegularidade')?.value || '',
+        anosSelecionadosDP: Array.from(anosSelecionadosDP),
+        anosSelecionadosPG: Array.from(anosSelecionadosPG)
+      };
+      
+      sessionStorage.setItem('analisesEstadoFiltros', JSON.stringify(estadoFiltros));
+      console.log('[DEBUG] Filtros salvos:', estadoFiltros);
+    }
+
+    function restaurarEstadoFiltros() {
+      const estadoSalvo = sessionStorage.getItem('analisesEstadoFiltros');
+      
+      if (!estadoSalvo) {
+        console.log('[DEBUG] Nenhum estado de filtros salvo');
+        return false;
+      }
+      
+      try {
+        const estado = JSON.parse(estadoSalvo);
+        console.log('[DEBUG] Restaurando filtros:', estado);
+        
+        // Restaurar valores dos campos
+        if (estado.filtroLimite) document.getElementById('filtroLimite').value = estado.filtroLimite;
+        if (estado.filtroTipo) document.getElementById('filtroTipo').value = estado.filtroTipo;
+        if (estado.filtroSeiPc) document.getElementById('filtroSeiPc').value = estado.filtroSeiPc;
+        if (estado.filtroTermo) document.getElementById('filtroTermo').value = estado.filtroTermo;
+        if (estado.filtroOSC) document.getElementById('filtroOSC').value = estado.filtroOSC;
+        if (estado.filtroResponsabilidade) document.getElementById('filtroResponsabilidade').value = estado.filtroResponsabilidade;
+        if (estado.filtroEntregue) document.getElementById('filtroEntregue').value = estado.filtroEntregue;
+        if (estado.filtroNotificacao) document.getElementById('filtroNotificacao').value = estado.filtroNotificacao;
+        if (estado.filtroParecer) document.getElementById('filtroParecer').value = estado.filtroParecer;
+        if (estado.filtroFaseRecursal) document.getElementById('filtroFaseRecursal').value = estado.filtroFaseRecursal;
+        if (estado.filtroEncerramento) document.getElementById('filtroEncerramento').value = estado.filtroEncerramento;
+        if (estado.filtroRegularidade) document.getElementById('filtroRegularidade').value = estado.filtroRegularidade;
+        
+        // Restaurar anos selecionados
+        if (estado.anosSelecionadosDP && estado.anosSelecionadosDP.length > 0) {
+          estado.anosSelecionadosDP.forEach(ano => anosSelecionadosDP.add(ano));
+        }
+        if (estado.anosSelecionadosPG && estado.anosSelecionadosPG.length > 0) {
+          estado.anosSelecionadosPG.forEach(ano => anosSelecionadosPG.add(ano));
+        }
+        
+        // Limpar estado salvo após restaurar
+        sessionStorage.removeItem('analisesEstadoFiltros');
+        
+        return true;
+      } catch (e) {
+        console.error('[ERRO] Falha ao restaurar filtros:', e);
+        sessionStorage.removeItem('analisesEstadoFiltros');
+        return false;
+      }
     }
 
     function exportarCSV() {

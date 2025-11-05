@@ -7,6 +7,75 @@ from db import get_cursor, execute_query
 from utils import login_required
 from datetime import datetime, timedelta
 import io
+import re
+
+
+def determinar_responsabilidade_por_vigencia(portaria, vigencia_final):
+    """
+    Determina a responsabilidade da análise baseada na portaria do termo 
+    e na data de término da vigência da prestação.
+    
+    Regras baseadas em períodos de transição:
+    
+    - Portaria 021 (TFM/TCL sem FUMCAD): 
+      - Se vigencia_final >= 01/03/2023 → Pessoa Gestora (3)
+      - Se vigencia_final < 01/03/2023 → Compartilhada (2) [era Portaria 121]
+    
+    - Portaria 090 (TFM/TCL com FUMCAD/FMID):
+      - Se vigencia_final >= 01/01/2024 → Pessoa Gestora (3)
+      - Se vigencia_final < 01/01/2024 → Compartilhada (2) [era Portaria 140]
+    
+    - Portaria 121 ou 140 diretamente → Compartilhada (2)
+    - Outras portarias antigas (TCV, etc) → DP (1)
+    
+    Exemplo: Termo TFM/XXX/2023 com Portaria 090
+    - Prestação 01/12/2023 a 28/02/2024 → Termina antes de 01/01/2024 = Compartilhada (2)
+    - Prestação 01/03/2024 a 31/05/2024 → Termina depois de 01/01/2024 = Pessoa Gestora (3)
+    
+    Args:
+        portaria (str): Nome da portaria (ex: 'Portaria nº 021/SMDHC/2023')
+        vigencia_final (date/str): Data de término da vigência da prestação
+    
+    Returns:
+        int: 1 (DP), 2 (Compartilhada) ou 3 (Pessoa Gestora)
+    """
+    if not portaria:
+        return 1  # Default: DP
+    
+    # Converter vigencia_final para date se for string
+    if isinstance(vigencia_final, str):
+        try:
+            vigencia_final = datetime.strptime(vigencia_final, '%Y-%m-%d').date()
+        except:
+            pass  # Se falhar, continua com o valor original
+    
+    # Datas de transição das portarias
+    DATA_TRANSICAO_021 = datetime(2023, 3, 1).date()   # 01/03/2023 - Portaria 021 assume
+    DATA_TRANSICAO_090 = datetime(2024, 1, 1).date()   # 01/01/2024 - Portaria 090 assume
+    
+    portaria_upper = portaria.upper()
+    
+    # Portaria 021 (TFM/TCL sem fundos) - verifica data de transição
+    if '021/SMDHC/2023' in portaria_upper or '021' in portaria_upper and '2023' in portaria_upper:
+        if vigencia_final and vigencia_final >= DATA_TRANSICAO_021:
+            return 3  # Pessoa Gestora (prestação termina após 01/03/2023)
+        else:
+            return 2  # Compartilhada (prestação termina antes, ainda era Portaria 121)
+    
+    # Portaria 090 (TFM/TCL com FUMCAD/FMID) - verifica data de transição
+    if '090/SMDHC/2023' in portaria_upper or '090' in portaria_upper and '2023' in portaria_upper:
+        if vigencia_final and vigencia_final >= DATA_TRANSICAO_090:
+            return 3  # Pessoa Gestora (prestação termina após 01/01/2024)
+        else:
+            return 2  # Compartilhada (prestação termina antes, ainda era Portaria 140)
+    
+    # Portarias 121 e 140 diretamente (período de transição 2017-2023)
+    if '121/SMDHC/2019' in portaria_upper or '140/SMDHC/2019' in portaria_upper:
+        return 2  # Compartilhada
+    
+    # Outras portarias antigas (TCV, Portarias 006, 072, 009, Decreto 6.170)
+    return 1  # DP
+
 
 
 def adicionar_dias_uteis(data_inicial, dias):
@@ -202,6 +271,8 @@ def obter_dados():
                 query += " AND pa.responsabilidade_analise = 2"
             elif filtro_responsabilidade == "3":
                 query += " AND pa.responsabilidade_analise = 3"
+            elif filtro_responsabilidade == "null":
+                query += " AND pa.responsabilidade_analise IS NULL"
         
         if filtro_entregue:
             if filtro_entregue == "sim":
@@ -492,6 +563,7 @@ def editar_por_termo():
             for analise in analises_atualizadas:
                 query = """
                     UPDATE parcerias_analises SET
+                        responsabilidade_analise = %s,
                         entregue = %s,
                         cobrado = %s,
                         e_notificacao = %s,
@@ -508,6 +580,7 @@ def editar_por_termo():
                     WHERE id = %s
                 """
                 params = (
+                    analise.get('responsabilidade_analise') or None,
                     analise.get('entregue'),
                     analise.get('cobrado'),
                     analise.get('e_notificacao'),
@@ -557,17 +630,28 @@ def adicionar_analises():
             
             cur = get_cursor()
             
+            # Buscar portaria do termo para determinar responsabilidade automática
+            cur.execute("SELECT portaria FROM parcerias WHERE numero_termo = %s LIMIT 1", (numero_termo,))
+            termo_info = cur.fetchone()
+            portaria = termo_info['portaria'] if termo_info else None
+            
             # Inserir cada análise
             for analise in analises:
+                vigencia_final = analise.get('vigencia_final')
+                
+                # Determinar responsabilidade automática baseada na portaria E vigência final
+                responsabilidade_auto = determinar_responsabilidade_por_vigencia(portaria, vigencia_final)
+                
                 query = """
                     INSERT INTO parcerias_analises (
                         numero_termo, tipo_prestacao, numero_prestacao,
                         vigencia_inicial, vigencia_final,
+                        responsabilidade_analise,
                         entregue, cobrado, e_notificacao, e_parecer,
                         e_fase_recursal, e_encerramento,
                         data_parecer_dp, valor_devolucao, valor_devolvido,
                         responsavel_dp, data_parecer_pg, responsavel_pg, observacoes
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 params = (
                     numero_termo,
@@ -575,6 +659,7 @@ def adicionar_analises():
                     analise.get('numero_prestacao'),
                     analise.get('vigencia_inicial'),
                     analise.get('vigencia_final'),
+                    responsabilidade_auto,  # ← RESPONSABILIDADE AUTOMÁTICA
                     analise.get('entregue', False),
                     analise.get('cobrado', False),
                     analise.get('e_notificacao', False),
@@ -883,17 +968,22 @@ def atualizar_prestacoes():
                 chave = f"{prestacao_nova['tipo_prestacao']}_{prestacao_nova['numero_prestacao']}"
                 antiga = mapa_antigas.get(chave)
                 
+                # Determinar responsabilidade baseada na vigência final de CADA prestação
+                vigencia_final = prestacao_nova['vigencia_final']
+                responsabilidade_auto = determinar_responsabilidade_por_vigencia(portaria, vigencia_final)
+                
                 # Se existia prestação com mesmo tipo+número, preservar dados
                 if antiga:
                     query = """
                         INSERT INTO parcerias_analises (
                             numero_termo, tipo_prestacao, numero_prestacao,
                             vigencia_inicial, vigencia_final,
+                            responsabilidade_analise,
                             entregue, cobrado, e_notificacao, e_parecer,
                             e_fase_recursal, e_encerramento, data_parecer_dp,
                             valor_devolucao, valor_devolvido, responsavel_dp,
                             data_parecer_pg, responsavel_pg, observacoes
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """
                     params = (
                         numero_termo,
@@ -901,6 +991,7 @@ def atualizar_prestacoes():
                         prestacao_nova['numero_prestacao'],
                         prestacao_nova['vigencia_inicial'],
                         prestacao_nova['vigencia_final'],
+                        antiga.get('responsabilidade_analise') or responsabilidade_auto,  # ← Preservar se existe, senão usar auto
                         antiga['entregue'],
                         antiga['cobrado'],
                         antiga['e_notificacao'],
@@ -916,14 +1007,15 @@ def atualizar_prestacoes():
                         antiga['observacoes']
                     )
                 else:
-                    # Prestação nova (não existia antes), inserir vazia
+                    # Prestação nova (não existia antes), inserir vazia com responsabilidade automática
                     query = """
                         INSERT INTO parcerias_analises (
                             numero_termo, tipo_prestacao, numero_prestacao,
                             vigencia_inicial, vigencia_final,
+                            responsabilidade_analise,
                             entregue, cobrado, e_notificacao, e_parecer,
                             e_fase_recursal, e_encerramento
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """
                     params = (
                         numero_termo,
@@ -931,6 +1023,7 @@ def atualizar_prestacoes():
                         prestacao_nova['numero_prestacao'],
                         prestacao_nova['vigencia_inicial'],
                         prestacao_nova['vigencia_final'],
+                        responsabilidade_auto,  # ← RESPONSABILIDADE AUTOMÁTICA
                         False, False, False, False, False, False
                     )
                 

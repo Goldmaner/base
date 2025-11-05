@@ -48,6 +48,30 @@
           <input type="hidden" name="id_{{ loop.index }}" value="{{ analise.id }}">
           
           <div class="row g-3">
+            <!-- Responsabilidade da Análise (NOVO CAMPO) -->
+            <div class="col-md-6">
+              <label for="responsabilidade_analise_{{ loop.index }}" class="form-label fw-bold text-primary">
+                <i class="bi bi-person-badge"></i> Responsabilidade da Análise
+              </label>
+              <select class="form-select" id="responsabilidade_analise_{{ loop.index }}" name="responsabilidade_analise_{{ loop.index }}">
+                <option value="">-- Sem Responsabilidade --</option>
+                <option value="1" {{ 'selected' if analise.responsabilidade_analise == 1 else '' }}>DP</option>
+                <option value="2" {{ 'selected' if analise.responsabilidade_analise == 2 else '' }}>Compartilhada</option>
+                <option value="3" {{ 'selected' if analise.responsabilidade_analise == 3 else '' }}>Pessoa Gestora</option>
+              </select>
+              <small class="text-muted">
+                <strong>Auto:</strong> 
+                021/090 após transição = PG | 
+                021/090 antes transição = Compartilhada | 
+                121/140 = Compartilhada | 
+                Outras = DP
+              </small>
+            </div>
+
+            <div class="col-md-6">
+              <!-- Espaço vazio para alinhar com layout existente -->
+            </div>
+
             <!-- Campos booleanos -->
             <div class="col-md-12">
               <label class="form-label fw-bold">Status da Prestação</label>
@@ -202,6 +226,7 @@
         
         analises.push({
           id: parseInt(id),
+          responsabilidade_analise: document.getElementById(`responsabilidade_analise_${idx}`).value || null,
           entregue: document.getElementById(`entregue_${idx}`).checked,
           cobrado: document.getElementById(`cobrado_${idx}`).checked,
           e_notificacao: document.getElementById(`e_notificacao_${idx}`).checked,
