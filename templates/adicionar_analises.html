@@ -76,10 +76,22 @@
                    data-portaria="{{ termo.portaria or '' }}">
             <label for="termo_{{ loop.index }}" style="cursor: pointer; width: 100%;">
               <strong>{{ termo.numero_termo }}</strong>
+              {% if termo.data_rescisao %}
+                <span class="badge bg-danger ms-2" title="Termo rescindido em {{ termo.data_rescisao.strftime('%d/%m/%Y') }}">
+                  🔴 RESCINDIDO
+                </span>
+              {% endif %}
               <br>
               <small class="text-muted">
                 Período: {{ termo.inicio.strftime('%d/%m/%Y') if termo.inicio else 'N/A' }} 
-                até {{ termo.final.strftime('%d/%m/%Y') if termo.final else 'N/A' }}
+                até 
+                {% if termo.data_rescisao %}
+                  <strong class="text-danger">{{ termo.data_rescisao.strftime('%d/%m/%Y') }}</strong>
+                  <span class="text-danger" title="Data de rescisão - as prestações serão calculadas até esta data">(rescindido)</span>
+                  <span class="text-muted" style="text-decoration: line-through;">{{ termo.final.strftime('%d/%m/%Y') if termo.final else 'N/A' }}</span>
+                {% else %}
+                  {{ termo.final.strftime('%d/%m/%Y') if termo.final else 'N/A' }}
+                {% endif %}
                 {% if termo.portaria %}| Portaria: {{ termo.portaria }}{% endif %}
               </small>
             </label>
@@ -209,7 +221,7 @@
 
         if (response.ok) {
           prestacoesGeradas = result.prestacoes;
-          renderizarPrestacoes(numeroTermo, prestacoesGeradas);
+          renderizarPrestacoes(numeroTermo, prestacoesGeradas, result.rescindido, result.aviso);
           
           // Esconder loading e seleção de termos
           document.getElementById('loadingContainer').style.display = 'none';
@@ -231,12 +243,30 @@
     });
 
     // Renderizar prestações no formulário
-    function renderizarPrestacoes(numeroTermo, prestacoes) {
+    function renderizarPrestacoes(numeroTermo, prestacoes, rescindido, aviso) {
       document.getElementById('numeroTermoHidden').value = numeroTermo;
-      document.getElementById('termoSelecionadoDisplay').textContent = `Termo: ${numeroTermo} - ${prestacoes.length} prestação(ões) gerada(s)`;
+      
+      // Adicionar badge de rescindido no display do termo
+      let termoDisplay = `Termo: ${numeroTermo} - ${prestacoes.length} prestação(ões) gerada(s)`;
+      if (rescindido) {
+        termoDisplay += ' <span class="badge bg-danger ms-2">🔴 RESCINDIDO</span>';
+      }
+      document.getElementById('termoSelecionadoDisplay').innerHTML = termoDisplay;
       
       const container = document.getElementById('prestacoesListContainer');
       container.innerHTML = '';
+      
+      // Adicionar alerta de rescisão se houver
+      if (rescindido && aviso) {
+        const alertHtml = `
+          <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Atenção!</strong> ${aviso}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        `;
+        container.innerHTML = alertHtml;
+      }
 
       prestacoes.forEach((prestacao, index) => {
         const idx = index + 1;

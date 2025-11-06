@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Termos Rescindidos - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <!-- Select2 para dropdown com busca -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      padding: 20px; 
+    }
+    .header-section { 
+      background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+      color: white;
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .form-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table th { 
+      background-color: #dc3545; 
+      color: white; 
+      white-space: nowrap; 
+    }
+    .btn-action { 
+      padding: 5px 15px; 
+      font-size: 0.85rem;
+    }
+    .sei-formatted { 
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+    }
+    .select2-container { 
+      width: 100% !important; 
+    }
+    .alert-info-custom {
+      background-color: #e7f3ff;
+      border-left: 4px solid #0d6efd;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="bi bi-x-circle-fill"></i> Termos Rescindidos</h2>
+          <p class="mb-0">Cadastro e gerenciamento de termos de parceria rescindidos</p>
+        </div>
+        <div>
+          <a href="{{ url_for('parcerias.listar') }}" class="btn btn-light">
+            <i class="bi bi-arrow-left"></i> Voltar para Parcerias
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensagens Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Formulário de Cadastro/Edição -->
+    <div class="form-section">
+      <h4 class="mb-4">
+        <i class="bi bi-plus-circle"></i> 
+        {% if rescisao_editando %}Editar Rescisão{% else %}Cadastrar Nova Rescisão{% endif %}
+      </h4>
+
+      <div class="alert-info-custom">
+        <i class="bi bi-info-circle-fill"></i> 
+        <strong>Importante:</strong> Apenas termos existentes na base de parcerias podem ser rescindidos. 
+        Termos já rescindidos não podem ser cadastrados novamente.
+      </div>
+
+      <form method="POST" action="{% if rescisao_editando %}{{ url_for('parcerias.editar_rescisao', id=rescisao_editando.id) }}{% else %}{{ url_for('parcerias.salvar_rescisao') }}{% endif %}">
+        <div class="row g-3">
+          <!-- Número do Termo -->
+          <div class="col-md-4">
+            <label for="numero_termo" class="form-label">
+              <i class="bi bi-file-text"></i> Número do Termo *
+            </label>
+            <select class="form-select" id="numero_termo" name="numero_termo" required 
+                    {% if rescisao_editando %}disabled{% endif %}>
+              <option value="">Selecione o termo...</option>
+              {% for termo in termos_disponiveis %}
+                <option value="{{ termo }}" 
+                        {% if rescisao_editando and rescisao_editando.numero_termo == termo %}selected{% endif %}>
+                  {{ termo }}
+                </option>
+              {% endfor %}
+            </select>
+            {% if rescisao_editando %}
+              <input type="hidden" name="numero_termo" value="{{ rescisao_editando.numero_termo }}">
+              <small class="text-muted">O número do termo não pode ser alterado ao editar.</small>
+            {% endif %}
+          </div>
+
+          <!-- Data de Rescisão -->
+          <div class="col-md-4">
+            <label for="data_rescisao" class="form-label">
+              <i class="bi bi-calendar-x"></i> Data de Rescisão *
+            </label>
+            <input type="date" class="form-control" id="data_rescisao" name="data_rescisao" 
+                   value="{% if rescisao_editando and rescisao_editando.data_rescisao %}{{ rescisao_editando.data_rescisao.strftime('%Y-%m-%d') }}{% endif %}" 
+                   required>
+          </div>
+
+          <!-- SEI da Rescisão -->
+          <div class="col-md-4">
+            <label for="sei_rescisao" class="form-label">
+              <i class="bi bi-hash"></i> SEI da Rescisão *
+            </label>
+            <input type="text" class="form-control sei-formatted" id="sei_rescisao" name="sei_rescisao" 
+                   placeholder="Ex: 12456789" 
+                   value="{% if rescisao_editando %}{{ rescisao_editando.sei_rescisao }}{% endif %}"
+                   pattern="[0-9.\-/]+" 
+                   title="Apenas números, pontos, hífens e barras"
+                   maxlength="30"
+                   required>
+            <small class="text-muted">Digite apenas números e caracteres de formatação (. - /)</small>
+          </div>
+        </div>
+
+        <!-- Botões -->
+        <div class="mt-4">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-check-circle"></i> 
+            {% if rescisao_editando %}Atualizar Rescisão{% else %}Cadastrar Rescisão{% endif %}
+          </button>
+          {% if rescisao_editando %}
+            <a href="{{ url_for('parcerias.termos_rescindidos') }}" class="btn btn-secondary">
+              <i class="bi bi-x-circle"></i> Cancelar Edição
+            </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+
+    <!-- Tabela de Termos Rescindidos -->
+    <div class="table-section">
+      <h4 class="mb-4">
+        <i class="bi bi-table"></i> Termos Rescindidos Cadastrados
+        <span class="badge bg-danger">{{ rescisoes|length }}</span>
+      </h4>
+
+      {% if rescisoes %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped">
+            <thead>
+              <tr>
+                <th style="width: 5%;">ID</th>
+                <th style="width: 25%;">Número do Termo</th>
+                <th style="width: 15%;">Data Rescisão</th>
+                <th style="width: 25%;">SEI Rescisão</th>
+                <th style="width: 20%;">OSC</th>
+                <th style="width: 10%;" class="text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rescisao in rescisoes %}
+                <tr>
+                  <td>{{ rescisao.id }}</td>
+                  <td><strong>{{ rescisao.numero_termo }}</strong></td>
+                  <td>
+                    {% if rescisao.data_rescisao %}
+                      {{ rescisao.data_rescisao.strftime('%d/%m/%Y') }}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="sei-formatted">{{ rescisao.sei_rescisao or '-' }}</td>
+                  <td class="text-muted small">
+                    {% if rescisao.osc_nome %}
+                      {{ rescisao.osc_nome }}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <a href="{{ url_for('parcerias.editar_rescisao', id=rescisao.id) }}" 
+                       class="btn btn-sm btn-warning btn-action" 
+                       title="Editar rescisão">
+                      <i class="bi bi-pencil"></i> Editar
+                    </a>
+                    <button type="button" 
+                            class="btn btn-sm btn-danger btn-action" 
+                            onclick="confirmarExclusao({{ rescisao.id }}, '{{ rescisao.numero_termo }}')"
+                            title="Excluir rescisão">
+                      <i class="bi bi-trash"></i> Excluir
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Nenhum termo rescindido cadastrado ainda.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Modal de Confirmação de Exclusão -->
+  <div class="modal fade" id="modalExcluir" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">
+            <i class="bi bi-exclamation-triangle-fill"></i> Confirmar Exclusão
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Tem certeza que deseja excluir a rescisão do termo:</p>
+          <p class="text-center"><strong id="termoExcluir" class="text-danger"></strong></p>
+          <p class="text-muted small">Esta ação não pode ser desfeita.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <form id="formExcluir" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-danger">
+              <i class="bi bi-trash"></i> Confirmar Exclusão
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script>
+    // Inicializar Select2 no dropdown de termos
+    $(document).ready(function() {
+      $('#numero_termo').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Digite para buscar o termo...',
+        allowClear: true,
+        language: {
+          noResults: function() {
+            return "Nenhum termo encontrado";
+          },
+          searching: function() {
+            return "Buscando...";
+          }
+        }
+      });
+    });
+
+    // Função para confirmar exclusão
+    function confirmarExclusao(id, numeroTermo) {
+      document.getElementById('termoExcluir').textContent = numeroTermo;
+      document.getElementById('formExcluir').action = '/parcerias/rescisao/deletar/' + id;
+      
+      var modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+      modal.show();
+    }
+
+    // Validação do campo SEI (apenas números e formatação)
+    document.getElementById('sei_rescisao').addEventListener('input', function(e) {
+      // Remove caracteres não permitidos
+      this.value = this.value.replace(/[^0-9.\-/]/g, '');
+    });
+  </script>
+</body>
+</html>

@@ -218,9 +218,10 @@ def salvar_pesquisa():
         cnpj = dados.get('cnpj', '')  # CNPJ pode ser vazio
         osc_identificada = dados.get('osc_identificada', True)  # Default True
         numero_pesquisa = dados.get('numero_pesquisa')  # Pode vir editado do frontend
+        psei_pesquisa = dados.get('psei_pesquisa')  # Processo SEI da Pesquisa (NOVO CAMPO)
         
-        if not all([sei_informado, nome_osc, nome_emissor]):
-            return jsonify({'erro': 'Campos obrigatórios: SEI, Nome OSC e Emissor'}), 400
+        if not all([sei_informado, nome_osc, nome_emissor, psei_pesquisa]):
+            return jsonify({'erro': 'Campos obrigatórios: Processo SEI da Pesquisa, SEI Informado, Nome OSC e Emissor'}), 400
         
         # Se não veio número da pesquisa ou é inválido, gerar automaticamente
         if not numero_pesquisa or numero_pesquisa < 1:
@@ -246,17 +247,17 @@ def salvar_pesquisa():
             else:
                 numero_pesquisa = resultado_numero[0]['proximo_numero']
         
-        # Inserir pesquisa com CNPJ
+        # Inserir pesquisa com CNPJ e Processo SEI da Pesquisa
         query_insert = """
             INSERT INTO public.o_pesquisa_parcerias 
-            (numero_pesquisa, sei_informado, nome_osc, cnpj, nome_emissor, osc_identificada, criado_em)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            (numero_pesquisa, psei_pesquisa, sei_informado, nome_osc, cnpj, nome_emissor, osc_identificada, criado_em)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
             RETURNING id
         """
         
         sucesso = execute_query(
             query_insert, 
-            (numero_pesquisa, sei_informado, nome_osc, cnpj, nome_emissor, osc_identificada)
+            (numero_pesquisa, psei_pesquisa, sei_informado, nome_osc, cnpj, nome_emissor, osc_identificada)
         )
         
         if not sucesso:
@@ -281,10 +282,13 @@ def listar_pesquisas():
             SELECT 
                 id,
                 numero_pesquisa,
+                psei_pesquisa,
                 sei_informado,
                 nome_osc,
                 nome_emissor,
                 osc_identificada,
+                respondido,
+                obs,
                 criado_em
             FROM public.o_pesquisa_parcerias
             ORDER BY criado_em DESC
@@ -334,6 +338,44 @@ def excluir_pesquisa(numero_pesquisa):
         return jsonify({'erro': str(e)}), 500
 
 
+@pesquisa_parcerias_bp.route('/api/pesquisas/<int:numero_pesquisa>', methods=['PUT'])
+@agente_dac_required
+def atualizar_pesquisa(numero_pesquisa):
+    """Atualiza os campos de uma pesquisa (sei_informado, nome_osc, respondido, obs)"""
+    try:
+        dados = request.json
+        
+        sei_informado = dados.get('sei_informado')
+        nome_osc = dados.get('nome_osc')
+        respondido = dados.get('respondido', False)
+        obs = dados.get('obs')
+        
+        query = """
+            UPDATE public.o_pesquisa_parcerias
+            SET sei_informado = %s, 
+                nome_osc = %s,
+                respondido = %s, 
+                obs = %s
+            WHERE numero_pesquisa = %s
+        """
+        
+        cur = get_cursor()
+        if cur is None:
+            return jsonify({'erro': 'Erro ao conectar com banco de dados'}), 500
+        
+        cur.execute(query, (sei_informado, nome_osc, respondido, obs, numero_pesquisa))
+        cur.connection.commit()
+        cur.close()
+        
+        return jsonify({
+            'sucesso': True,
+            'mensagem': f'Pesquisa {numero_pesquisa} atualizada com sucesso'
+        })
+        
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
 @pesquisa_parcerias_bp.route('/api/prosseguir-pesquisa', methods=['POST'])
 @agente_dac_required
 def prosseguir_pesquisa():
@@ -355,10 +397,11 @@ def prosseguir_pesquisa():
         cnpj = dados.get('cnpj', '')  # CNPJ pode ser vazio
         osc_identificada = dados.get('osc_identificada', True)
         numero_pesquisa = dados.get('numero_pesquisa')
+        psei_pesquisa = dados.get('psei_pesquisa')  # Processo SEI da Pesquisa
         cnpj_informado = cnpj if cnpj else 'não informado'  # Para o texto
         
-        if not all([sei_informado, nome_osc, nome_emissor]):
-            return jsonify({'erro': 'Campos obrigatórios: SEI, Nome OSC e Emissor'}), 400
+        if not all([sei_informado, nome_osc, nome_emissor, psei_pesquisa]):
+            return jsonify({'erro': 'Campos obrigatórios: Processo SEI da Pesquisa, SEI Informado, Nome OSC e Emissor'}), 400
         
         # Se não veio número ou é inválido, gerar automaticamente
         if not numero_pesquisa or numero_pesquisa < 1:
@@ -384,17 +427,17 @@ def prosseguir_pesquisa():
             else:
                 numero_pesquisa = resultado_numero[0]['proximo_numero']
         
-        # Salvar pesquisa primeiro com CNPJ
+        # Salvar pesquisa primeiro com CNPJ e Processo SEI
         query_insert = """
             INSERT INTO public.o_pesquisa_parcerias 
-            (numero_pesquisa, sei_informado, nome_osc, cnpj, nome_emissor, osc_identificada, criado_em)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            (numero_pesquisa, psei_pesquisa, sei_informado, nome_osc, cnpj, nome_emissor, osc_identificada, criado_em)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
             RETURNING id
         """
         
         sucesso = execute_query(
             query_insert, 
-            (numero_pesquisa, sei_informado, nome_osc, cnpj, nome_emissor, osc_identificada)
+            (numero_pesquisa, psei_pesquisa, sei_informado, nome_osc, cnpj, nome_emissor, osc_identificada)
         )
         
         if not sucesso:

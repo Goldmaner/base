@@ -116,6 +116,23 @@
           <small class="text-muted">Geração automática anual (reseta em janeiro)</small>
         </div>
 
+        <!-- Processo SEI da Pesquisa -->
+        <div class="mb-3">
+          <label for="pseiPesquisa" class="form-label">
+            <i class="bi bi-folder2-open me-2"></i>Processo SEI da Pesquisa
+          </label>
+          <input 
+            type="text" 
+            class="form-control" 
+            id="pseiPesquisa" 
+            name="psei_pesquisa"
+            maxlength="30" 
+            placeholder="Ex: 6074.2025/0004245-3"
+            required
+          >
+          <small class="text-muted">Número do processo SEI completo (com barras e hífen)</small>
+        </div>
+
         <!-- Documento SEI -->
         <div class="mb-3">
           <label for="seiSolicitacao" class="form-label">
@@ -376,6 +393,7 @@
 
       const dados = {
         numero_pesquisa: parseInt(document.getElementById('numeroPesquisa').value),
+        psei_pesquisa: document.getElementById('pseiPesquisa').value,
         sei_informado: document.getElementById('seiSolicitacao').value,
         nome_osc: document.getElementById('nomeOsc').value,
         cnpj: document.getElementById('cnpjOsc').value || '',
@@ -441,6 +459,7 @@
         
         const dados = {
           numero_pesquisa: parseInt(document.getElementById('numeroPesquisa').value) || 0,
+          psei_pesquisa: document.getElementById('pseiPesquisa').value,
           sei_informado: document.getElementById('seiSolicitacao').value,
           nome_osc: document.getElementById('nomeOsc').value,
           cnpj: document.getElementById('cnpj').value || '',

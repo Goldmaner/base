@@ -1314,3 +1314,210 @@ def atualizar_osc():
         traceback.print_exc()
         get_db().rollback()
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# ROTAS DE TERMOS RESCINDIDOS
+# ============================================================================
+
+@parcerias_bp.route("/rescisoes", methods=["GET"])
+@login_required
+def termos_rescindidos():
+    """
+    Página de cadastro e listagem de termos rescindidos
+    """
+    cur = get_cursor()
+    
+    # Buscar termos já rescindidos
+    cur.execute("""
+        SELECT tr.id, tr.numero_termo, tr.data_rescisao, tr.sei_rescisao, p.osc as osc_nome
+        FROM public.termos_rescisao tr
+        LEFT JOIN public.parcerias p ON tr.numero_termo = p.numero_termo
+        ORDER BY tr.data_rescisao DESC NULLS LAST, tr.id DESC
+    """)
+    rescisoes = cur.fetchall()
+    
+    # Buscar termos disponíveis (não rescindidos)
+    cur.execute("""
+        SELECT DISTINCT p.numero_termo
+        FROM public.parcerias p
+        WHERE p.numero_termo NOT IN (
+            SELECT numero_termo FROM public.termos_rescisao
+        )
+        ORDER BY p.numero_termo
+    """)
+    termos_disponiveis = [row['numero_termo'] for row in cur.fetchall()]
+    
+    cur.close()
+    
+    return render_template('termos_rescindidos.html',
+                         rescisoes=rescisoes,
+                         termos_disponiveis=termos_disponiveis,
+                         rescisao_editando=None)
+
+
+@parcerias_bp.route("/rescisao/salvar", methods=["POST"])
+@login_required
+def salvar_rescisao():
+    """
+    Salvar novo termo rescindido
+    """
+    numero_termo = request.form.get('numero_termo', '').strip()
+    data_rescisao = request.form.get('data_rescisao', '').strip()
+    sei_rescisao = request.form.get('sei_rescisao', '').strip()
+    
+    # Validações
+    if not numero_termo:
+        flash('Número do termo é obrigatório!', 'danger')
+        return redirect(url_for('parcerias.termos_rescindidos'))
+    
+    if not data_rescisao:
+        flash('Data de rescisão é obrigatória!', 'danger')
+        return redirect(url_for('parcerias.termos_rescindidos'))
+    
+    if not sei_rescisao:
+        flash('SEI da rescisão é obrigatório!', 'danger')
+        return redirect(url_for('parcerias.termos_rescindidos'))
+    
+    cur = get_cursor()
+    
+    try:
+        # Verificar se o termo existe em parcerias
+        cur.execute("SELECT COUNT(*) as total FROM public.parcerias WHERE numero_termo = %s", (numero_termo,))
+        termo_existe = cur.fetchone()['total'] > 0
+        
+        if not termo_existe:
+            flash(f'Termo "{numero_termo}" não existe na base de parcerias!', 'danger')
+            return redirect(url_for('parcerias.termos_rescindidos'))
+        
+        # Verificar se já foi rescindido
+        cur.execute("SELECT COUNT(*) as total FROM public.termos_rescisao WHERE numero_termo = %s", (numero_termo,))
+        ja_rescindido = cur.fetchone()['total'] > 0
+        
+        if ja_rescindido:
+            flash(f'Termo "{numero_termo}" já está cadastrado como rescindido!', 'warning')
+            return redirect(url_for('parcerias.termos_rescindidos'))
+        
+        # Inserir rescisão
+        cur.execute("""
+            INSERT INTO public.termos_rescisao (numero_termo, data_rescisao, sei_rescisao)
+            VALUES (%s, %s, %s)
+        """, (numero_termo, data_rescisao, sei_rescisao))
+        
+        get_db().commit()
+        cur.close()
+        
+        flash(f'Termo "{numero_termo}" cadastrado como rescindido com sucesso!', 'success')
+        return redirect(url_for('parcerias.termos_rescindidos'))
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao salvar rescisão: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        get_db().rollback()
+        flash(f'Erro ao salvar rescisão: {str(e)}', 'danger')
+        return redirect(url_for('parcerias.termos_rescindidos'))
+
+
+@parcerias_bp.route("/rescisao/editar/<int:id>", methods=["GET", "POST"])
+@login_required
+def editar_rescisao(id):
+    """
+    Editar termo rescindido existente
+    """
+    cur = get_cursor()
+    
+    if request.method == 'POST':
+        # Processar atualização
+        data_rescisao = request.form.get('data_rescisao', '').strip()
+        sei_rescisao = request.form.get('sei_rescisao', '').strip()
+        numero_termo = request.form.get('numero_termo', '').strip()  # Hidden field
+        
+        if not data_rescisao or not sei_rescisao:
+            flash('Todos os campos são obrigatórios!', 'danger')
+            return redirect(url_for('parcerias.editar_rescisao', id=id))
+        
+        try:
+            cur.execute("""
+                UPDATE public.termos_rescisao
+                SET data_rescisao = %s, sei_rescisao = %s
+                WHERE id = %s
+            """, (data_rescisao, sei_rescisao, id))
+            
+            get_db().commit()
+            cur.close()
+            
+            flash(f'Rescisão do termo "{numero_termo}" atualizada com sucesso!', 'success')
+            return redirect(url_for('parcerias.termos_rescindidos'))
+            
+        except Exception as e:
+            print(f"[ERRO] Erro ao atualizar rescisão: {str(e)}")
+            get_db().rollback()
+            flash(f'Erro ao atualizar rescisão: {str(e)}', 'danger')
+            return redirect(url_for('parcerias.editar_rescisao', id=id))
+    
+    # GET: Carregar dados para edição
+    cur.execute("""
+        SELECT tr.*, p.osc as osc_nome
+        FROM public.termos_rescisao tr
+        LEFT JOIN public.parcerias p ON tr.numero_termo = p.numero_termo
+        WHERE tr.id = %s
+    """, (id,))
+    rescisao_editando = cur.fetchone()
+    
+    if not rescisao_editando:
+        flash('Rescisão não encontrada!', 'danger')
+        return redirect(url_for('parcerias.termos_rescindidos'))
+    
+    # Buscar todas as rescisões para a tabela
+    cur.execute("""
+        SELECT tr.id, tr.numero_termo, tr.data_rescisao, tr.sei_rescisao, p.osc as osc_nome
+        FROM public.termos_rescisao tr
+        LEFT JOIN public.parcerias p ON tr.numero_termo = p.numero_termo
+        ORDER BY tr.data_rescisao DESC NULLS LAST, tr.id DESC
+    """)
+    rescisoes = cur.fetchall()
+    
+    # Termos disponíveis (vazio pois está editando)
+    termos_disponiveis = [rescisao_editando['numero_termo']]
+    
+    cur.close()
+    
+    return render_template('termos_rescindidos.html',
+                         rescisoes=rescisoes,
+                         termos_disponiveis=termos_disponiveis,
+                         rescisao_editando=rescisao_editando)
+
+
+@parcerias_bp.route("/rescisao/deletar/<int:id>", methods=["POST"])
+@login_required
+def deletar_rescisao(id):
+    """
+    Deletar termo rescindido
+    """
+    cur = get_cursor()
+    
+    try:
+        # Buscar número do termo antes de deletar (para mensagem)
+        cur.execute("SELECT numero_termo FROM public.termos_rescisao WHERE id = %s", (id,))
+        rescisao = cur.fetchone()
+        
+        if not rescisao:
+            flash('Rescisão não encontrada!', 'danger')
+            return redirect(url_for('parcerias.termos_rescindidos'))
+        
+        numero_termo = rescisao['numero_termo']
+        
+        # Deletar
+        cur.execute("DELETE FROM public.termos_rescisao WHERE id = %s", (id,))
+        get_db().commit()
+        cur.close()
+        
+        flash(f'Rescisão do termo "{numero_termo}" excluída com sucesso!', 'success')
+        return redirect(url_for('parcerias.termos_rescindidos'))
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao deletar rescisão: {str(e)}")
+        get_db().rollback()
+        flash(f'Erro ao deletar rescisão: {str(e)}', 'danger')
+        return redirect(url_for('parcerias.termos_rescindidos'))

@@ -13,7 +13,7 @@
       padding: 20px; 
     }
     .main-container { 
-      max-width: 1200px; 
+      max-width: 98%; 
       margin: 0 auto; 
       background: white; 
       border-radius: 15px; 
@@ -62,8 +62,8 @@
 
     <!-- Filtros -->
     <div class="filter-section">
-      <div class="row">
-        <div class="col-md-8">
+      <div class="row mb-3">
+        <div class="col-md-6">
           <label for="filtroOsc" class="form-label">
             <i class="bi bi-funnel me-2"></i>Filtrar por Nome da OSC
           </label>
@@ -74,31 +74,47 @@
             placeholder="Digite o nome da OSC para filtrar..."
           >
         </div>
-        <div class="col-md-4 d-flex align-items-end">
-          <button class="btn btn-warning w-100" onclick="limparFiltro()">
-            <i class="bi bi-x-circle me-2"></i>Limpar Filtro
+        <div class="col-md-3">
+          <label for="filtroRespondido" class="form-label">
+            <i class="bi bi-check-circle me-2"></i>Respondido?
+          </label>
+          <select class="form-select" id="filtroRespondido">
+            <option value="">Todos</option>
+            <option value="true">Sim</option>
+            <option value="false">Não</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end gap-2">
+          <button class="btn btn-warning flex-fill" onclick="limparFiltros()">
+            <i class="bi bi-x-circle me-2"></i>Limpar
+          </button>
+          <button class="btn btn-success flex-fill" onclick="exportarCSV()">
+            <i class="bi bi-download me-2"></i>CSV
           </button>
         </div>
       </div>
     </div>
 
     <!-- Tabela de Pesquisas -->
-    <div class="table-responsive">
-      <table class="table table-striped table-hover">
+    <div class="table-responsive" style="max-width: 100%; overflow-x: auto;">
+      <table class="table table-striped table-hover" style="min-width: 1600px; width: 100%;">
         <thead>
           <tr>
-            <th>Número da Pesquisa</th>
-            <th>SEI Informado</th>
-            <th>Nome da OSC</th>
-            <th>Nome do Emissor</th>
-            <th>OSC com parceria?</th>
-            <th>Data da Pesquisa</th>
-            <th class="text-center">Ações</th>
+            <th style="min-width: 80px;">Número da Pesquisa</th>
+            <th style="min-width: 180px;">Processo SEI da Pesquisa</th>
+            <th style="min-width: 120px;">SEI Informado</th>
+            <th style="min-width: 250px;">Nome da OSC</th>
+            <th style="min-width: 150px;">Nome do Emissor</th>
+            <th style="min-width: 120px;">OSC com parceria?</th>
+            <th style="min-width: 140px;">Data da Pesquisa</th>
+            <th style="min-width: 120px;">Respondido?</th>
+            <th style="min-width: 250px;">Observação</th>
+            <th class="text-center" style="min-width: 150px;">Ações</th>
           </tr>
         </thead>
         <tbody id="corpoPesquisas">
           <tr>
-            <td colspan="7" class="text-center">
+            <td colspan="10" class="text-center">
               <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Carregando...</span>
               </div>
@@ -137,6 +153,7 @@
         }
 
         pesquisas = data.pesquisas;
+        pesquisasFiltradas = pesquisas;  // Inicializar com todos os dados
         renderizarTabela(pesquisas);
 
       } catch (error) {
@@ -153,7 +170,7 @@
       if (dados.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" class="text-center text-muted">
+            <td colspan="9" class="text-center text-muted">
               <i class="bi bi-inbox me-2"></i>Nenhuma pesquisa registrada
             </td>
           </tr>
@@ -164,20 +181,44 @@
 
       dados.forEach(pesquisa => {
         const tr = document.createElement('tr');
+        tr.id = `pesquisa-${pesquisa.numero_pesquisa}`;
         
         // Número da Pesquisa
         const tdNumero = document.createElement('td');
         tdNumero.textContent = pesquisa.numero_pesquisa || '-';
         tr.appendChild(tdNumero);
 
-        // SEI Informado
+        // Processo SEI da Pesquisa (apenas visualização)
+        const tdPseiPesquisa = document.createElement('td');
+        tdPseiPesquisa.textContent = pesquisa.psei_pesquisa || '-';
+        tdPseiPesquisa.className = 'text-muted';
+        tr.appendChild(tdPseiPesquisa);
+
+        // SEI Informado (editável)
         const tdSei = document.createElement('td');
-        tdSei.textContent = pesquisa.sei_informado || '-';
+        tdSei.innerHTML = `
+          <input 
+            type="text" 
+            class="form-control form-control-sm" 
+            id="sei-${pesquisa.numero_pesquisa}"
+            value="${pesquisa.sei_informado || ''}"
+            placeholder="SEI..."
+            maxlength="20"
+            style="width: 110px;">
+        `;
         tr.appendChild(tdSei);
 
-        // Nome da OSC
+        // Nome da OSC (editável)
         const tdOsc = document.createElement('td');
-        tdOsc.textContent = pesquisa.nome_osc || '-';
+        tdOsc.innerHTML = `
+          <input 
+            type="text" 
+            class="form-control form-control-sm" 
+            id="osc-${pesquisa.numero_pesquisa}"
+            value="${pesquisa.nome_osc || ''}"
+            placeholder="Nome da OSC..."
+            style="width: 240px;">
+        `;
         tr.appendChild(tdOsc);
 
         // Nome do Emissor
@@ -212,12 +253,44 @@
         }
         tr.appendChild(tdData);
 
+        // Respondido? (dropdown)
+        const tdRespondido = document.createElement('td');
+        const selectRespondido = document.createElement('select');
+        selectRespondido.className = 'form-select form-select-sm';
+        selectRespondido.id = `respondido-${pesquisa.numero_pesquisa}`;
+        selectRespondido.style.width = '110px';
+        selectRespondido.innerHTML = `
+          <option value="false" ${pesquisa.respondido === false || pesquisa.respondido === null ? 'selected' : ''}>Não</option>
+          <option value="true" ${pesquisa.respondido === true ? 'selected' : ''}>Sim</option>
+        `;
+        tdRespondido.appendChild(selectRespondido);
+        tr.appendChild(tdRespondido);
+
+        // Observação (textarea inline)
+        const tdObs = document.createElement('td');
+        tdObs.innerHTML = `
+          <textarea 
+            class="form-control form-control-sm" 
+            id="obs-${pesquisa.numero_pesquisa}"
+            rows="2"
+            placeholder="Digite observações..."
+            style="width: 240px;">${pesquisa.obs || ''}</textarea>
+        `;
+        tr.appendChild(tdObs);
+
         // Coluna de Ações
         const tdAcoes = document.createElement('td');
         tdAcoes.className = 'text-center';
+        tdAcoes.style.whiteSpace = 'nowrap';
         tdAcoes.innerHTML = `
           <button 
-            class="btn btn-danger btn-sm" 
+            class="btn btn-success btn-sm me-1 mb-1" 
+            onclick="salvarPesquisa(${pesquisa.numero_pesquisa})"
+            title="Salvar alterações">
+            <i class="bi bi-check-circle"></i> Salvar
+          </button>
+          <button 
+            class="btn btn-danger btn-sm mb-1" 
             onclick="excluirPesquisa(${pesquisa.numero_pesquisa})"
             title="Excluir pesquisa">
             <i class="bi bi-trash"></i>
@@ -231,26 +304,165 @@
       document.getElementById('totalPesquisas').textContent = dados.length;
     }
 
-    // Filtro por nome da OSC
-    document.getElementById('filtroOsc').addEventListener('input', function() {
-      const filtro = this.value.toLowerCase().trim();
+    // Variável para armazenar pesquisas filtradas
+    let pesquisasFiltradas = [];
 
-      if (!filtro) {
-        renderizarTabela(pesquisas);
+    // Função para aplicar todos os filtros
+    function aplicarFiltros() {
+      const filtroOsc = document.getElementById('filtroOsc').value.toLowerCase().trim();
+      const filtroRespondido = document.getElementById('filtroRespondido').value;
+
+      let filtradas = pesquisas;
+
+      // Filtro por Nome da OSC
+      if (filtroOsc) {
+        filtradas = filtradas.filter(p => 
+          p.nome_osc && p.nome_osc.toLowerCase().includes(filtroOsc)
+        );
+      }
+
+      // Filtro por Respondido
+      if (filtroRespondido !== '') {
+        const valorRespondido = filtroRespondido === 'true';
+        filtradas = filtradas.filter(p => p.respondido === valorRespondido);
+      }
+
+      pesquisasFiltradas = filtradas;
+      renderizarTabela(filtradas);
+    }
+
+    // Filtro por nome da OSC
+    document.getElementById('filtroOsc').addEventListener('input', aplicarFiltros);
+
+    // Filtro por Respondido
+    document.getElementById('filtroRespondido').addEventListener('change', aplicarFiltros);
+
+    // Limpar filtros
+    function limparFiltros() {
+      document.getElementById('filtroOsc').value = '';
+      document.getElementById('filtroRespondido').value = '';
+      pesquisasFiltradas = pesquisas;
+      renderizarTabela(pesquisas);
+    }
+
+    // Exportar CSV com filtros aplicados
+    function exportarCSV() {
+      const dadosExportar = pesquisasFiltradas.length > 0 ? pesquisasFiltradas : pesquisas;
+      
+      if (dadosExportar.length === 0) {
+        alert('Não há dados para exportar!');
         return;
       }
 
-      const filtradas = pesquisas.filter(p => 
-        p.nome_osc && p.nome_osc.toLowerCase().includes(filtro)
-      );
+      // Cabeçalho do CSV
+      const headers = [
+        'Número da Pesquisa',
+        'Processo SEI da Pesquisa',
+        'SEI Informado',
+        'Nome da OSC',
+        'CNPJ',
+        'Nome do Emissor',
+        'OSC com parceria?',
+        'Data da Pesquisa',
+        'Respondido?',
+        'Observação'
+      ];
 
-      renderizarTabela(filtradas);
-    });
+      // Construir linhas do CSV
+      const linhas = dadosExportar.map(p => {
+        const data = p.criado_em ? new Date(p.criado_em).toLocaleString('pt-BR') : '';
+        const oscIdentificada = p.osc_identificada === true ? 'Sim' : p.osc_identificada === false ? 'Não' : '';
+        const respondido = p.respondido === true ? 'Sim' : p.respondido === false ? 'Não' : '';
+        
+        return [
+          p.numero_pesquisa || '',
+          p.psei_pesquisa || '',
+          p.sei_informado || '',
+          p.nome_osc || '',
+          p.cnpj || '',
+          p.nome_emissor || '',
+          oscIdentificada,
+          data,
+          respondido,
+          p.obs || ''
+        ].map(campo => `"${String(campo).replace(/"/g, '""')}"`).join(';');
+      });
 
-    // Limpar filtro
-    function limparFiltro() {
-      document.getElementById('filtroOsc').value = '';
-      renderizarTabela(pesquisas);
+      // Juntar cabeçalho e linhas
+      const csvContent = [
+        headers.map(h => `"${h}"`).join(';'),
+        ...linhas
+      ].join('\n');
+
+      // Criar blob e download
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      const dataHoje = new Date().toISOString().split('T')[0];
+      link.setAttribute('href', url);
+      link.setAttribute('download', `pesquisas_parcerias_${dataHoje}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert(`Exportados ${dadosExportar.length} registro(s) para CSV!`);
+    }
+
+    // Salvar alterações de uma pesquisa
+    async function salvarPesquisa(numeroPesquisa) {
+      const seiInformado = document.getElementById(`sei-${numeroPesquisa}`).value.trim();
+      const nomeOsc = document.getElementById(`osc-${numeroPesquisa}`).value.trim();
+      const respondido = document.getElementById(`respondido-${numeroPesquisa}`).value === 'true';
+      const obs = document.getElementById(`obs-${numeroPesquisa}`).value.trim();
+
+      try {
+        const response = await fetch(`/pesquisa-parcerias/api/pesquisas/${numeroPesquisa}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sei_informado: seiInformado || null,
+            nome_osc: nomeOsc || null,
+            respondido: respondido,
+            obs: obs || null
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.erro) {
+          alert('Erro ao salvar: ' + data.erro);
+          return;
+        }
+
+        alert('Alterações salvas com sucesso!');
+        
+        // Atualizar o array de pesquisas localmente
+        const pesquisa = pesquisas.find(p => p.numero_pesquisa === numeroPesquisa);
+        if (pesquisa) {
+          pesquisa.sei_informado = seiInformado || null;
+          pesquisa.nome_osc = nomeOsc || null;
+          pesquisa.respondido = respondido;
+          pesquisa.obs = obs || null;
+        }
+
+        // Destacar linha temporariamente
+        const linha = document.getElementById(`pesquisa-${numeroPesquisa}`);
+        if (linha) {
+          linha.style.backgroundColor = '#d4edda';
+          setTimeout(() => {
+            linha.style.backgroundColor = '';
+          }, 1500);
+        }
+
+      } catch (error) {
+        console.error('Erro ao salvar pesquisa:', error);
+        alert('Erro ao salvar alterações');
+      }
     }
 
     // Excluir pesquisa

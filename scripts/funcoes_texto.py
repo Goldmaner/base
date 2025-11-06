@@ -16,10 +16,10 @@ MAPA_COORDENACOES_SETOR = {
     'CPIR': 'SMDHC/CPDDH/CPIR',
     'CPJ': 'SMDHC/CPDDH/CPJ',
     'CPLGBTI': 'SMDHC/CPDDH/CPLGBTI',
-    'CPPI': 'SMDHC/CPDDH/CPPI',
+    'CPPI': 'SMDHC/CPDDH/CPPI/EM',
     'CPM': 'SMDHC/CPDDH/CPM',
     'CPDDH': 'SMDHC/CPDDH',
-    'COSAN': 'SMDHC/SESANA/COSAN',
+    'COSAN': 'SMDHC/SESANA/COSAN/EMENDAS',
     'COPIND': 'SMDHC/CPDDH/COPIND',
     'ODH': 'SMDHC/CPDDH/ODH',
     'DPS': 'SMDHC/CPDDH/DPS',
@@ -29,6 +29,7 @@ MAPA_COORDENACOES_SETOR = {
     'EGRESSOS': 'SMDHC/CPDDH/CPEF',
     'DEDH': 'SMDHC/CPDDH/CEDH',
     'CPIPTD': 'SMDHC/CPDDH/CPIPTD',
+    'CIDADESOLIDÁRIA': 'SMDHC/SESANA/COSAN/EMENDAS',
     'CPPSR': 'SMDHC/CPDDH/CPPSR',
     'COSAN/RCE': 'SMDHC/SESANA/COSAN/RCE',
     'SESANA': 'SMDHC/SESANA/COSAN/EMENDAS',
@@ -383,42 +384,62 @@ def criar_tabela_pre2023(osc_nome):
         return f'<p style="color: red;">Erro ao gerar tabela pré-2023: {str(e)}</p>'
 
 
-def criar_tabela_pos2023(osc_nome, coordenacao_sigla):
+def criar_tabela_pos2023(osc_nome, coordenacao_sigla=None, lista_termos=None):
     """
     Cria uma tabela HTML simplificada (sem coluna Situação) com termos pós-2023
-    da coordenação específica (responsabilidade 2 ou 3)
+    da coordenação específica ou da lista de termos fornecida
     
     Parâmetros:
     - osc_nome: Nome da OSC para buscar as parcerias
-    - coordenacao_sigla: Sigla da coordenação (ex: 'CPJ', 'CPPI')
+    - coordenacao_sigla: Sigla da coordenação (ex: 'CPJ', 'CPPI') - OPCIONAL se lista_termos fornecida
+    - lista_termos: Lista de números de termos específicos - OPCIONAL, tem prioridade sobre coordenacao_sigla
     
     Retorna:
     - String HTML com a tabela formatada (apenas 3 colunas)
     """
     try:
-        # Query para buscar termos com responsabilidade Compartilhado (2) ou Pessoa Gestora (3)
-        # Filtrando por coordenação via padrão no numero_termo
-        query = """
-            SELECT DISTINCT 
-                p.numero_termo,
-                p.sei_pc,
-                p.projeto
-            FROM public.parcerias p
-            INNER JOIN public.parcerias_analises pa ON p.numero_termo = pa.numero_termo
-            WHERE p.osc = %s
-              AND pa.responsabilidade_analise IN (2, 3)
-              AND p.numero_termo LIKE %s
-            ORDER BY p.numero_termo
-        """
+        # Se lista_termos foi fornecida, usar filtro por IN
+        if lista_termos and len(lista_termos) > 0:
+            placeholders = ','.join(['%s'] * len(lista_termos))
+            query = f"""
+                SELECT DISTINCT 
+                    p.numero_termo,
+                    p.sei_pc,
+                    p.projeto
+                FROM public.parcerias p
+                INNER JOIN public.parcerias_analises pa ON p.numero_termo = pa.numero_termo
+                WHERE p.osc = %s
+                  AND pa.responsabilidade_analise IN (2, 3)
+                  AND p.numero_termo IN ({placeholders})
+                ORDER BY p.numero_termo
+            """
+            params = [osc_nome] + lista_termos
         
-        # Padrão para filtrar por coordenação (ex: '%/CPJ')
-        padrao_coord = f'%/{coordenacao_sigla}'
+        # Senão, usar filtro por coordenacao_sigla (legado)
+        elif coordenacao_sigla:
+            query = """
+                SELECT DISTINCT 
+                    p.numero_termo,
+                    p.sei_pc,
+                    p.projeto
+                FROM public.parcerias p
+                INNER JOIN public.parcerias_analises pa ON p.numero_termo = pa.numero_termo
+                WHERE p.osc = %s
+                  AND pa.responsabilidade_analise IN (2, 3)
+                  AND p.numero_termo LIKE %s
+                ORDER BY p.numero_termo
+            """
+            padrao_coord = f'%/{coordenacao_sigla}'
+            params = [osc_nome, padrao_coord]
+        
+        else:
+            return '<p style="color: red;">Coordenação ou lista de termos deve ser fornecida</p>'
         
         cur = get_cursor()
         if cur is None:
             return '<p style="color: red;">Erro ao conectar com banco de dados</p>'
         
-        cur.execute(query, (osc_nome, padrao_coord))
+        cur.execute(query, params)
         resultados = cur.fetchall()
         cur.close()
         
@@ -492,11 +513,19 @@ def identificar_coordenacoes(osc_nome):
     Identifica todas as coordenações distintas que possuem termos pós-2023
     para uma determinada OSC
     
+    IMPORTANTE: Agrupa por SETOR SEI de destino, não apenas por sigla.
+    Isso permite separar SESANA TFM (→EMENDAS) de SESANA TCL (→RCE)
+    
     Parâmetros:
     - osc_nome: Nome da OSC
     
     Retorna:
-    - Lista de siglas de coordenações (ex: ['CPJ', 'CPPI'])
+    - Dicionário onde chave=setor_sei, valor={'sigla': str, 'termos': [lista]}
+      Ex: {
+        'SMDHC/CPDDH/CPJ': {'sigla': 'CPJ', 'termos': ['ACP/001/2024/SMDHC/CPJ']},
+        'SMDHC/SESANA/COSAN/EMENDAS': {'sigla': 'SESANA_TFM', 'termos': ['TFM/050/2025/SMDHC/SESANA']},
+        'SMDHC/SESANA/COSAN/RCE': {'sigla': 'SESANA_TCL', 'termos': ['TCL/052/2023/SMDHC/SESANA']}
+      }
     """
     try:
         query = """
@@ -510,40 +539,83 @@ def identificar_coordenacoes(osc_nome):
         
         cur = get_cursor()
         if cur is None:
-            return []
+            return {}
         
         cur.execute(query, (osc_nome,))
         resultados = cur.fetchall()
         cur.close()
         
-        # Extrair sigla da coordenação (parte após última barra)
-        coordenacoes = set()
+        # Agrupar por SETOR SEI (não apenas por sigla)
+        from collections import defaultdict
+        setores_dict = defaultdict(lambda: {'sigla': '', 'termos': []})
+        
         for row in resultados:
             numero_termo = row.get('numero_termo', '')
-            # Ex: ACP/001/2024/SMDHC/CPJ -> CPJ
+            
             if '/' in numero_termo:
+                # Ex: ACP/001/2024/SMDHC/CPJ -> CPJ
                 sigla = numero_termo.split('/')[-1]
-                coordenacoes.add(sigla)
+                
+                # Obter setor SEI (considera tipo de termo para SESANA)
+                setor_sei = obter_setor_sei(sigla, numero_termo)
+                
+                # Criar identificador único para dropdown
+                # Para SESANA, diferencia por tipo (TFM vs TCL)
+                if sigla.upper() == 'SESANA':
+                    tipo_termo = numero_termo.split('/')[0].upper()
+                    sigla_dropdown = f'SESANA_{tipo_termo}'
+                elif sigla.upper() == 'CIDADESOLIDÁRIA':
+                    sigla_dropdown = 'CIDADESOLIDARIA'
+                else:
+                    sigla_dropdown = sigla
+                
+                # Agrupar por setor SEI
+                setores_dict[setor_sei]['sigla'] = sigla_dropdown
+                setores_dict[setor_sei]['termos'].append(numero_termo)
         
-        return sorted(list(coordenacoes))
+        return dict(setores_dict)
         
     except Exception as e:
         print(f"[ERRO identificar_coordenacoes] {e}")
-        return []
+        import traceback
+        traceback.print_exc()
+        return {}
 
 
-def obter_setor_sei(coordenacao_sigla):
+def obter_setor_sei(coordenacao_sigla, numero_termo=None):
     """
     Busca o setor_sei correspondente a uma sigla de coordenação
     usando o dicionário MAPA_COORDENACOES_SETOR
     
+    Caso especial SESANA:
+    - Se numero_termo começa com 'TFM' -> SMDHC/SESANA/COSAN/EMENDAS
+    - Se numero_termo começa com 'TCL' -> SMDHC/SESANA/COSAN/RCE
+    
     Parâmetros:
-    - coordenacao_sigla: Sigla da coordenação (ex: 'CPJ', 'FUMCAD')
+    - coordenacao_sigla: Sigla da coordenação (ex: 'CPJ', 'FUMCAD', 'SESANA')
+    - numero_termo: Número do termo (opcional, usado para SESANA)
     
     Retorna:
     - String com setor SEI (ex: 'SMDHC/CPDDH/CPJ') ou fallback se não encontrar
     """
     try:
+        # Caso especial: SESANA depende do tipo de termo
+        if coordenacao_sigla and coordenacao_sigla.upper() == 'SESANA':
+            if numero_termo:
+                # Extrair tipo do termo (primeira parte antes da primeira barra)
+                tipo_termo = numero_termo.split('/')[0].upper()
+                
+                if tipo_termo == 'TFM':
+                    return 'SMDHC/SESANA/COSAN/EMENDAS'
+                elif tipo_termo == 'TCL':
+                    return 'SMDHC/SESANA/COSAN/RCE'
+                else:
+                    # Se não for TFM nem TCL, usar default do dicionário
+                    return MAPA_COORDENACOES_SETOR.get('SESANA', 'SMDHC/SESANA/COSAN/EMENDAS')
+            else:
+                # Se não veio numero_termo, usar default
+                return MAPA_COORDENACOES_SETOR.get('SESANA', 'SMDHC/SESANA/COSAN/EMENDAS')
+        
         # Buscar no dicionário (case-sensitive)
         setor = MAPA_COORDENACOES_SETOR.get(coordenacao_sigla)
         
@@ -679,7 +751,7 @@ def verificar_responsabilidades_mistas(osc_nome):
 def gerar_encaminhamentos_pos2023(texto_base_modelo, variaveis):
     """
     Gera múltiplos encaminhamentos para o caso pós-2023,
-    um para cada coordenação identificada
+    um para cada SETOR SEI identificado
     
     Parâmetros:
     - texto_base_modelo: Texto modelo original
@@ -694,29 +766,33 @@ def gerar_encaminhamentos_pos2023(texto_base_modelo, variaveis):
         if not osc_nome:
             return '<p style="color: red;">OSC não informada para gerar encaminhamentos</p>'
         
-        # Identificar coordenações
-        coordenacoes = identificar_coordenacoes(osc_nome)
+        # Identificar setores SEI (retorna dict: {setor_sei: {'sigla': str, 'termos': [lista]}})
+        setores_dict = identificar_coordenacoes(osc_nome)
         
-        if not coordenacoes or len(coordenacoes) == 0:
+        if not setores_dict or len(setores_dict) == 0:
             return '<p><em>Nenhum termo pós-2023 encontrado para esta OSC.</em></p>'
         
-        # Gerar um encaminhamento para cada coordenação
+        # Gerar um encaminhamento para cada setor SEI
         encaminhamentos_html = []
         
-        for coord_sigla in coordenacoes:
-            # Buscar setor SEI da coordenação
-            setor_sei = obter_setor_sei(coord_sigla)
+        for setor_sei, info in sorted(setores_dict.items()):
+            sigla_dropdown = info['sigla']
+            termos = info['termos']
             
-            if not setor_sei:
-                setor_sei = f'[Setor não encontrado para {coord_sigla}]'
+            # Extrair sigla original para filtrar termos (remove sufixos como _TFM, _TCL)
+            if '_' in sigla_dropdown:
+                sigla_filtro = sigla_dropdown.split('_')[0]
+            else:
+                sigla_filtro = sigla_dropdown
             
-            # Preparar variáveis para esta coordenação
-            vars_coord = variaveis.copy()
-            vars_coord['coordenacao_informado_usuario'] = setor_sei
-            vars_coord['coordenacao_sigla'] = coord_sigla
+            # Preparar variáveis para este setor
+            vars_setor = variaveis.copy()
+            vars_setor['coordenacao_informado_usuario'] = setor_sei
+            vars_setor['coordenacao_sigla'] = sigla_filtro
+            vars_setor['lista_termos'] = termos  # Passa lista específica de termos
             
-            # Processar texto para esta coordenação
-            texto_processado = processar_texto_automatico(texto_base_modelo, vars_coord)
+            # Processar texto para este setor
+            texto_processado = processar_texto_automatico(texto_base_modelo, vars_setor)
             
             encaminhamentos_html.append(texto_processado)
         
@@ -766,16 +842,16 @@ def gerar_texto_misto(variaveis):
         if not modelo_pre or not modelo_pos:
             return '<p style="color: red;">Modelos de texto não encontrados no banco de dados</p>'
         
-        # Identificar coordenações pós-2023
-        coordenacoes = identificar_coordenacoes(osc_nome)
+        # Identificar coordenações pós-2023 (retorna dict: {setor_sei: {'sigla': str, 'termos': [lista]}})
+        setores_dict = identificar_coordenacoes(osc_nome)
         
         # Construir lista de opções do dropdown
         opcoes_dropdown = ['<option value="">Selecione um encaminhamento...</option>']
         opcoes_dropdown.append('<option value="encaminhamento_pre">SMDHC/DP/DGP (Parcerias pré-2023)</option>')
         
-        for coord in coordenacoes:
-            setor = obter_setor_sei(coord)
-            opcoes_dropdown.append(f'<option value="encaminhamento_{coord}">{setor} (Parcerias pós-2023)</option>')
+        for setor_sei, info in sorted(setores_dict.items()):
+            sigla_dropdown = info['sigla']
+            opcoes_dropdown.append(f'<option value="encaminhamento_{sigla_dropdown}">{setor_sei} (Parcerias pós-2023)</option>')
         
         opcoes_html = '\n'.join(opcoes_dropdown)
         
@@ -834,18 +910,26 @@ def gerar_texto_misto(variaveis):
         
         # Gerar encaminhamentos pós-2023 - OCULTOS inicialmente
         encaminhamentos_pos = []
-        for coord_sigla in coordenacoes:
-            setor_sei = obter_setor_sei(coord_sigla)
+        for setor_sei, info in sorted(setores_dict.items()):
+            sigla_dropdown = info['sigla']
+            termos = info['termos']
             
-            # Preparar variáveis para esta coordenação
-            vars_coord = variaveis.copy()
-            vars_coord['coordenacao_informado_usuario'] = setor_sei
-            vars_coord['coordenacao_sigla'] = coord_sigla
+            # Extrair sigla original para filtrar termos (remove sufixos como _TFM, _TCL)
+            if '_' in sigla_dropdown:
+                sigla_filtro = sigla_dropdown.split('_')[0]
+            else:
+                sigla_filtro = sigla_dropdown
             
-            texto_pos = processar_texto_automatico(modelo_pos['modelo_texto'], vars_coord)
+            # Preparar variáveis para este setor
+            vars_setor = variaveis.copy()
+            vars_setor['coordenacao_informado_usuario'] = setor_sei
+            vars_setor['coordenacao_sigla'] = sigla_filtro
+            vars_setor['lista_termos'] = termos  # Passa lista específica de termos
+            
+            texto_pos = processar_texto_automatico(modelo_pos['modelo_texto'], vars_setor)
             
             encaminhamento_pos_html = f'''
-            <div id="encaminhamento_{coord_sigla}" style="display: none;">
+            <div id="encaminhamento_{sigla_dropdown}" style="display: none;">
                 <div style="background-color: #0e7a8b; color: white; padding: 15px; margin: 30px 0 20px 0; text-align: center; font-family: Calibri, sans-serif; font-size: 16px; font-weight: bold; border-radius: 5px;">
                     ENCAMINHAMENTO - {setor_sei} (Parcerias pós-2023)
                 </div>
@@ -924,9 +1008,10 @@ def processar_texto_automatico(texto_modelo, variaveis):
     if match_pos2023:
         osc_nome = variaveis.get('osc_informado_usuario', variaveis.get('nome_osc', ''))
         coordenacao_sigla = variaveis.get('coordenacao_sigla', '')
+        lista_termos = variaveis.get('lista_termos', None)  # Lista específica de termos
         
-        if osc_nome and coordenacao_sigla:
-            tabela_html = criar_tabela_pos2023(osc_nome, coordenacao_sigla)
+        if osc_nome and (coordenacao_sigla or lista_termos):
+            tabela_html = criar_tabela_pos2023(osc_nome, coordenacao_sigla, lista_termos)
             texto_processado = re.sub(padrao_pos2023, tabela_html, texto_processado)
         else:
             texto_processado = re.sub(padrao_pos2023, '<p style="color: red;">OSC ou coordenação não informada</p>', texto_processado)

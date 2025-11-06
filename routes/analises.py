@@ -131,6 +131,37 @@ def calcular_prazo(vigencia_final, tipo_prestacao, portaria):
     return data_prazo, status
 
 
+def obter_data_rescisao(numero_termo):
+    """
+    Busca a data de rescisão de um termo na tabela termos_rescisao.
+    
+    Args:
+        numero_termo (str): Número do termo
+    
+    Returns:
+        date ou None: Data de rescisão ou None se não foi rescindido
+    """
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT data_rescisao
+            FROM public.termos_rescisao
+            WHERE numero_termo = %s
+            LIMIT 1
+        """, (numero_termo,))
+        
+        resultado = cur.fetchone()
+        cur.close()
+        
+        if resultado and resultado['data_rescisao']:
+            return resultado['data_rescisao']
+        return None
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar data de rescisão: {str(e)}")
+        return None
+
+
 analises_bp = Blueprint('analises', __name__, url_prefix='/analises')
 
 
@@ -691,14 +722,32 @@ def adicionar_analises():
     cur = get_cursor()
     
     # Buscar termos que não estão em parcerias_analises
+    # EXCLUIR:
+    # 1. Termos rescindidos em até 5 dias após o início (execução mínima)
+    # 2. Termos rescindidos com total_pago = 0 (não recebeu recursos, logo não executou)
     query = """
-        SELECT DISTINCT p.numero_termo, p.inicio, p.final, p.portaria
+        SELECT DISTINCT 
+            p.numero_termo, 
+            p.inicio, 
+            p.final,
+            p.portaria,
+            tr.data_rescisao,
+            p.total_pago,
+            CASE 
+                WHEN tr.data_rescisao IS NOT NULL THEN tr.data_rescisao
+                ELSE p.final
+            END as vigencia_efetiva
         FROM Parcerias p
+        LEFT JOIN public.termos_rescisao tr ON p.numero_termo = tr.numero_termo
         WHERE p.numero_termo NOT IN (
             SELECT DISTINCT numero_termo FROM parcerias_analises
         )
         AND p.inicio IS NOT NULL
         AND p.final IS NOT NULL
+        -- Excluir termos rescindidos em até 5 dias após o início (execução mínima)
+        AND (tr.data_rescisao IS NULL OR tr.data_rescisao > p.inicio + INTERVAL '5 days')
+        -- Excluir termos rescindidos com total_pago = 0 (não recebeu recursos)
+        AND NOT (tr.data_rescisao IS NOT NULL AND COALESCE(p.total_pago, 0) = 0)
         ORDER BY p.numero_termo DESC
     """
     cur.execute(query)
@@ -719,6 +768,7 @@ def adicionar_analises():
 def calcular_prestacoes():
     """
     API para calcular as prestações de contas baseado no termo selecionado
+    Considera data de rescisão se o termo foi rescindido
     """
     try:
         data = request.get_json()
@@ -730,9 +780,11 @@ def calcular_prestacoes():
         # Buscar dados do termo
         cur = get_cursor()
         query = """
-            SELECT numero_termo, inicio, final, portaria
-            FROM Parcerias
-            WHERE numero_termo = %s
+            SELECT p.numero_termo, p.inicio, p.final, p.portaria,
+                   tr.data_rescisao, p.total_pago
+            FROM Parcerias p
+            LEFT JOIN public.termos_rescisao tr ON p.numero_termo = tr.numero_termo
+            WHERE p.numero_termo = %s
         """
         cur.execute(query, (numero_termo,))
         termo = cur.fetchone()
@@ -742,11 +794,56 @@ def calcular_prestacoes():
             return jsonify({'erro': 'Termo não encontrado'}), 404
         
         data_inicio = termo['inicio']
-        data_termino = termo['final']
+        data_termino_original = termo['final']
+        data_rescisao = termo.get('data_rescisao')
         portaria = termo['portaria']
+        total_pago = termo.get('total_pago') or 0
         
-        # Calcular prestações baseado na portaria
+        # Se foi rescindido, validar execução
+        if data_rescisao:
+            dias_execucao = (data_rescisao - data_inicio).days
+            
+            # Validação 1: Rescindido em até 5 dias (execução mínima)
+            if dias_execucao <= 5:
+                return jsonify({
+                    'erro': f'Termo foi rescindido em {data_rescisao.strftime("%d/%m/%Y")}, apenas {dias_execucao} dia(s) após o início. Não há prestações de contas a serem geradas (execução mínima não atingida).',
+                    'data_rescisao': data_rescisao.strftime('%d/%m/%Y'),
+                    'dias_execucao': dias_execucao
+                }), 400
+            
+            # Validação 2: Rescindido com total_pago = 0 (não recebeu recursos)
+            if total_pago == 0:
+                return jsonify({
+                    'erro': f'Termo foi rescindido em {data_rescisao.strftime("%d/%m/%Y")} sem ter recebido recursos (total pago: R$ 0,00). Não há prestações de contas a serem geradas, pois não houve execução financeira.',
+                    'data_rescisao': data_rescisao.strftime('%d/%m/%Y'),
+                    'dias_execucao': dias_execucao,
+                    'total_pago': 0
+                }), 400
+        
+        # Usar data de rescisão como término se existir
+        data_termino = data_rescisao if data_rescisao else data_termino_original
+        
+        # Calcular prestações baseado na portaria e data efetiva
         prestacoes = gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria)
+        
+        # Retornar com informação sobre rescisão se houver
+        resposta = {
+            'prestacoes': prestacoes,
+            'total': len(prestacoes)
+        }
+        
+        if data_rescisao:
+            resposta['rescindido'] = True
+            resposta['data_rescisao'] = data_rescisao.strftime('%d/%m/%Y')
+            resposta['aviso'] = f'⚠️ Este termo foi rescindido em {data_rescisao.strftime("%d/%m/%Y")}. As prestações foram calculadas até esta data.'
+        
+        return jsonify(resposta), 200
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao calcular prestações: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
         
         return jsonify({'prestacoes': prestacoes}), 200
         
@@ -910,6 +1007,7 @@ def atualizar_prestacoes():
     """
     Interface para atualizar prestações de contas que estão com divergência de datas
     Compara datas de vigência da tabela Parcerias com parcerias_analises
+    Considera data de rescisão se o termo foi rescindido
     """
     from db import get_db
     
@@ -923,11 +1021,13 @@ def atualizar_prestacoes():
             
             cur = get_cursor()
             
-            # Buscar dados do termo (datas corretas e portaria)
+            # Buscar dados do termo (datas corretas, portaria, rescisão e total_pago)
             cur.execute("""
-                SELECT inicio, final, portaria
-                FROM Parcerias
-                WHERE numero_termo = %s
+                SELECT p.inicio, p.final, p.portaria,
+                       tr.data_rescisao, p.total_pago
+                FROM Parcerias p
+                LEFT JOIN public.termos_rescisao tr ON p.numero_termo = tr.numero_termo
+                WHERE p.numero_termo = %s
             """, (numero_termo,))
             termo = cur.fetchone()
             
@@ -935,8 +1035,58 @@ def atualizar_prestacoes():
                 return jsonify({'erro': 'Termo não encontrado'}), 404
             
             data_inicio = termo['inicio']
-            data_termino = termo['final']
+            data_termino_original = termo['final']
+            data_rescisao = termo.get('data_rescisao')
             portaria = termo['portaria']
+            total_pago = termo.get('total_pago') or 0
+            
+            # Se foi rescindido, validar execução
+            if data_rescisao:
+                dias_execucao = (data_rescisao - data_inicio).days
+                
+                # Validação 1: Rescindido em até 5 dias (execução mínima)
+                if dias_execucao <= 5:
+                    return jsonify({
+                        'erro': f'Termo foi rescindido em {data_rescisao.strftime("%d/%m/%Y")}, apenas {dias_execucao} dia(s) após o início. Não há prestações de contas (execução mínima não atingida).',
+                        'data_rescisao': data_rescisao.strftime('%d/%m/%Y'),
+                        'dias_execucao': dias_execucao
+                    }), 400
+                
+                # Validação 2: Rescindido com total_pago = 0 (não recebeu recursos)
+                # Neste caso, DELETAR todas as prestações existentes
+                if total_pago == 0:
+                    # Contar prestações antes de deletar para informar ao usuário
+                    cur.execute("""
+                        SELECT COUNT(*) as total,
+                               COUNT(CASE WHEN entregue = true THEN 1 END) as entregues
+                        FROM parcerias_analises
+                        WHERE numero_termo = %s
+                    """, (numero_termo,))
+                    
+                    contagem = cur.fetchone()
+                    total_prestacoes = contagem['total'] if contagem else 0
+                    prestacoes_entregues = contagem['entregues'] if contagem else 0
+                    
+                    # Deletar todas as prestações
+                    cur.execute("DELETE FROM parcerias_analises WHERE numero_termo = %s", (numero_termo,))
+                    get_db().commit()
+                    cur.close()
+                    
+                    mensagem = f'Termo {numero_termo} rescindido sem recursos (R$ 0,00). '
+                    mensagem += f'{total_prestacoes} prestação(ões) removida(s)'
+                    if prestacoes_entregues > 0:
+                        mensagem += f' (incluindo {prestacoes_entregues} marcada(s) como entregue)'
+                    mensagem += f'. Vigência: {dias_execucao} dia(s).'
+                    
+                    return jsonify({
+                        'mensagem': mensagem,
+                        'prestacoes_removidas': total_prestacoes,
+                        'prestacoes_entregues': prestacoes_entregues,
+                        'sem_recursos': True
+                    }), 200
+            
+            # Usar data de rescisão como término se existir
+            data_termino = data_rescisao if data_rescisao else data_termino_original
             
             # Recalcular todas as prestações baseado na portaria e novas datas
             prestacoes_novas = gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria)
@@ -947,7 +1097,8 @@ def atualizar_prestacoes():
                        entregue, cobrado, e_notificacao, e_parecer,
                        e_fase_recursal, e_encerramento, data_parecer_dp,
                        valor_devolucao, valor_devolvido, responsavel_dp,
-                       data_parecer_pg, responsavel_pg, observacoes
+                       data_parecer_pg, responsavel_pg, observacoes,
+                       vigencia_final
                 FROM parcerias_analises
                 WHERE numero_termo = %s
                 ORDER BY tipo_prestacao, numero_prestacao
@@ -956,9 +1107,20 @@ def atualizar_prestacoes():
             
             # Criar mapa das prestações antigas (chave: tipo+numero)
             mapa_antigas = {}
+            prestacoes_deletadas = []
+            
             for p in prestacoes_antigas:
                 chave = f"{p['tipo_prestacao']}_{p['numero_prestacao']}"
                 mapa_antigas[chave] = p
+                
+                # Se foi rescindido e a prestação tinha vigência_final posterior à rescisão
+                if data_rescisao and p['vigencia_final'] and p['vigencia_final'] > data_rescisao:
+                    # Marcar para logging
+                    obs_antiga = f"(vigência até {p['vigencia_final'].strftime('%d/%m/%Y')}"
+                    if p['entregue']:
+                        obs_antiga += ", estava marcada como entregue"
+                    obs_antiga += ")"
+                    prestacoes_deletadas.append(f"{p['tipo_prestacao']} {p['numero_prestacao']} {obs_antiga}")
             
             # Deletar todas as prestações antigas
             cur.execute("DELETE FROM parcerias_analises WHERE numero_termo = %s", (numero_termo,))
@@ -1032,7 +1194,16 @@ def atualizar_prestacoes():
             get_db().commit()
             cur.close()
             
-            return jsonify({'mensagem': f'Prestações recalculadas com sucesso! Total: {len(prestacoes_novas)}'}), 200
+            # Montar mensagem de sucesso
+            mensagem = f'Prestações recalculadas com sucesso! Total: {len(prestacoes_novas)}'
+            
+            if data_rescisao:
+                mensagem += f'\n⚠️ Termo rescindido em {data_rescisao.strftime("%d/%m/%Y")}.'
+                
+            if prestacoes_deletadas:
+                mensagem += f'\n📋 Prestações removidas (vigência posterior à rescisão): {", ".join(prestacoes_deletadas)}'
+            
+            return jsonify({'mensagem': mensagem}), 200
             
         except Exception as e:
             print(f"[ERRO] Erro ao atualizar prestações: {str(e)}")
@@ -1047,16 +1218,24 @@ def atualizar_prestacoes():
     modo_exato = request.args.get('exato', '0') == '1'
     
     # Buscar TODOS os termos que têm prestações cadastradas
-    # Vamos recalcular as prestações corretas e comparar com as existentes
+    # Incluir informação sobre rescisão e total_pago
+    # NÃO FILTRAR termos com total_pago = 0, pois precisam aparecer para validação humana
     query_termos = """
         SELECT DISTINCT 
             p.numero_termo,
             p.sei_celeb,
             p.inicio,
             p.final,
-            p.portaria
+            p.portaria,
+            tr.data_rescisao,
+            p.total_pago,
+            CASE 
+                WHEN tr.data_rescisao IS NOT NULL THEN tr.data_rescisao
+                ELSE p.final
+            END as vigencia_efetiva
         FROM Parcerias p
         INNER JOIN parcerias_analises pa ON p.numero_termo = pa.numero_termo
+        LEFT JOIN public.termos_rescisao tr ON p.numero_termo = tr.numero_termo
         WHERE p.inicio IS NOT NULL 
         AND p.final IS NOT NULL
         AND p.numero_termo NOT ILIKE '%TCL%'
@@ -1075,8 +1254,12 @@ def atualizar_prestacoes():
     for termo in termos:
         numero_termo = termo['numero_termo']
         data_inicio = termo['inicio']
-        data_termino = termo['final']
+        data_termino_original = termo['final']
+        data_rescisao = termo.get('data_rescisao')
         portaria = termo['portaria']
+        
+        # Usar data de rescisão como término se existir
+        data_termino = data_rescisao if data_rescisao else data_termino_original
         
         # Buscar APENAS a prestação Final cadastrada
         cur.execute("""
@@ -1147,6 +1330,10 @@ def atualizar_prestacoes():
                 'sei_celeb': termo['sei_celeb'],
                 'data_inicio_termo': data_inicio,
                 'data_final_termo': data_termino,
+                'data_final_original': data_termino_original,  # Data original da tabela parcerias
+                'data_rescisao': data_rescisao,  # Data de rescisão se houver
+                'rescindido': data_rescisao is not None,  # Boolean para template
+                'total_pago': termo.get('total_pago') or 0,  # Total pago (recursos repassados)
                 'portaria': portaria,
                 'prestacoes_cadastradas': [
                     {
@@ -1164,3 +1351,90 @@ def atualizar_prestacoes():
     
     return render_template('atualizar_prestacoes.html', 
                          termos_divergentes=list(termos_divergentes.values()))
+
+
+@analises_bp.route('/api/limpar-prestacoes-sem-recursos', methods=['POST'])
+@login_required
+def limpar_prestacoes_sem_recursos():
+    """
+    API para limpar prestações de termos rescindidos que não receberam recursos (total_pago = 0).
+    Esta rota deve ser chamada para fazer manutenção na base de dados.
+    
+    Retorna:
+    - Lista de termos que tiveram prestações removidas
+    - Quantidade de prestações removidas por termo
+    """
+    from db import get_db
+    
+    try:
+        cur = get_cursor()
+        
+        # Buscar termos rescindidos com total_pago = 0 que têm prestações cadastradas
+        query = """
+            SELECT DISTINCT 
+                p.numero_termo,
+                p.inicio,
+                tr.data_rescisao,
+                p.total_pago,
+                (tr.data_rescisao - p.inicio) as dias_vigencia
+            FROM Parcerias p
+            INNER JOIN public.termos_rescisao tr ON p.numero_termo = tr.numero_termo
+            INNER JOIN parcerias_analises pa ON p.numero_termo = pa.numero_termo
+            WHERE COALESCE(p.total_pago, 0) = 0
+            ORDER BY p.numero_termo
+        """
+        
+        cur.execute(query)
+        termos_invalidos = cur.fetchall()
+        
+        if not termos_invalidos:
+            cur.close()
+            return jsonify({
+                'mensagem': 'Nenhum termo rescindido sem recursos foi encontrado com prestações cadastradas.',
+                'termos_removidos': []
+            }), 200
+        
+        termos_removidos = []
+        
+        for termo in termos_invalidos:
+            numero_termo = termo['numero_termo']
+            data_rescisao = termo['data_rescisao']
+            dias_vigencia = termo['dias_vigencia'].days if termo['dias_vigencia'] else 0
+            
+            # Contar prestações antes de deletar
+            cur.execute("""
+                SELECT COUNT(*) as total,
+                       COUNT(CASE WHEN entregue = true THEN 1 END) as entregues
+                FROM parcerias_analises
+                WHERE numero_termo = %s
+            """, (numero_termo,))
+            
+            contagem = cur.fetchone()
+            total_prestacoes = contagem['total']
+            prestacoes_entregues = contagem['entregues']
+            
+            # Deletar todas as prestações deste termo
+            cur.execute("DELETE FROM parcerias_analises WHERE numero_termo = %s", (numero_termo,))
+            
+            termos_removidos.append({
+                'numero_termo': numero_termo,
+                'data_rescisao': data_rescisao.strftime('%d/%m/%Y'),
+                'dias_vigencia': dias_vigencia,
+                'prestacoes_removidas': total_prestacoes,
+                'prestacoes_entregues': prestacoes_entregues,
+                'motivo': 'Termo rescindido sem recursos (total_pago = R$ 0,00)'
+            })
+        
+        get_db().commit()
+        cur.close()
+        
+        return jsonify({
+            'mensagem': f'{len(termos_removidos)} termo(s) tiveram suas prestações removidas por não terem recebido recursos.',
+            'termos_removidos': termos_removidos
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao limpar prestações sem recursos: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500

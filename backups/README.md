@@ -1,53 +1,152 @@
-# FAF - Sistema de Gestão de Orçamento e Parcerias
+# Pasta de Backups do Sistema FAF
 
-Este projeto é uma aplicação web desenvolvida em Flask para gestão de orçamento, parcerias e despesas, com integração ao PostgreSQL e interface moderna baseada em Bootstrap.
+Esta pasta contém backups do banco de dados PostgreSQL do sistema FAF (Gestão de Orçamento e Parcerias).
 
-## Estrutura de Pastas
+## 📦 Sobre os Backups
+
+Os arquivos de backup são criados no formato SQL usando `pg_dump` e incluem:
+- ✅ Toda a estrutura do banco (schemas, tabelas, sequences)
+- ✅ Todos os dados das tabelas
+- ✅ Comandos `DROP IF EXISTS` antes de cada `CREATE`
+- ✅ Formato legível (plain SQL)
+
+### Formato dos Arquivos
 
 ```
-FAF/
-│
-├── app.py                # Arquivo principal da aplicação Flask
-├── config.py             # Configurações do projeto (DB, variáveis)
-├── db.py                 # Conexão e funções do banco de dados
-├── utils.py              # Funções utilitárias
-│
-├── routes/               # Blueprints e rotas da aplicação
-│   ├── __init__.py
-│   ├── auth.py           # Autenticação de usuários
-│   ├── despesas.py       # Rotas de despesas
-│   ├── instrucoes.py     # Rotas de instruções
-│   ├── main.py           # Rotas principais
-│   ├── orcamento.py      # Rotas de orçamento e dicionário de categorias
-│   └── parcerias.py      # Rotas de parcerias
-│
-├── templates/            # Templates HTML (Jinja2)
-│   ├── instrucoes.html
-│   ├── login.html
-│   ├── orcamento_1.html  # Listagem de orçamento
-│   ├── orcamento_2.html  # Edição de orçamento
-│   ├── orcamento_3_dict.html # Dicionário de categorias de despesas
-│   ├── parcerias_form.html
-│   ├── parcerias.html
-│   └── tela_inicial.html
-│
-├── outras coisas/        # Scripts auxiliares e documentação
-│   ├── create_users.py
-│   ├── debug_table.py
-│   ├── ESTRUTURA_MODULAR.md
-│   ├── fix_sequence.py
-│   ├── import_2.py
-│   ├── parcerias.csv
-│   ├── parcerias_despesas.csv
-│   ├── README.md         # (Este arquivo)
-│   ├── test_flask_apis.py
-│   ├── test_insert.py
-│   ├── test_postgres_connection.py
-│   └── ...
-│
-├── melhorias/            # Documentação de melhorias e changelogs
-│   ├── CHANGELOG_AUTOSAVE_PAGINATION.md
-│   ├── CORRECOES_FILTRO_FORMATACAO.md
+backup_faf_YYYYMMDD_HHMMSS.sql
+```
+
+Exemplo: `backup_faf_20251103_165713.sql`
+- Data: 03/11/2025
+- Hora: 16:57:13
+
+## 🔧 Como Criar um Backup
+
+### Opção 1: Script Python (Recomendado)
+
+```bash
+python scripts/fazer_backup.py
+```
+
+**Vantagens:**
+- Lê credenciais automaticamente do `.env`
+- Mostra listagem dos últimos backups
+- Mensagens de erro detalhadas
+
+### Opção 2: Script Batch (Windows)
+
+```bash
+fazer_backup.bat
+```
+
+**Nota:** Pode solicitar senha se `PGPASSWORD` não estiver configurada.
+
+### Opção 3: Comando Manual
+
+```bash
+pg_dump -h localhost -p 5432 -U postgres -F p -f backups/backup_manual.sql --clean --if-exists --no-owner --no-privileges projeto_parcerias
+```
+
+## 🔄 Como Restaurar um Backup
+
+### Atenção: Restaurar um backup irá **SOBRESCREVER** todos os dados atuais!
+
+### Passo 1: Fazer backup de segurança (opcional mas recomendado)
+
+```bash
+python scripts/fazer_backup.py
+```
+
+### Passo 2: Restaurar o backup desejado
+
+```bash
+psql -h localhost -p 5432 -U postgres -d projeto_parcerias -f backups/backup_faf_20251103_165713.sql
+```
+
+### Passo 3: Verificar restauração
+
+Conecte ao banco e verifique se os dados foram restaurados:
+
+```bash
+psql -h localhost -p 5432 -U postgres -d projeto_parcerias
+```
+
+```sql
+-- Verificar tabelas
+\dt public.*
+\dt categoricas.*
+
+-- Verificar quantidade de registros
+SELECT COUNT(*) FROM public.parcerias;
+SELECT COUNT(*) FROM public.o_orcamento;
+```
+
+## 📋 Backups Existentes
+
+Atualmente existem **2 backups** nesta pasta:
+
+1. `backup_faf_20251030_141449.sql` - 30/10/2025 14:14:49
+2. `backup_faf_20251103_165713.sql` - 03/11/2025 16:57:13
+
+## ⚙️ Configuração
+
+### Requisitos
+
+- PostgreSQL instalado (com `pg_dump` e `psql` no PATH)
+- Python 3.8+ (para o script Python)
+- Arquivo `.env` configurado com credenciais do banco
+
+### Variáveis de Ambiente (.env)
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_DATABASE=projeto_parcerias
+DB_USER=postgres
+DB_PASSWORD=sua_senha_aqui
+```
+
+### Adicionar PostgreSQL ao PATH (Windows)
+
+Se o comando `pg_dump` não for encontrado:
+
+1. Painel de Controle → Sistema → Configurações avançadas
+2. Variáveis de Ambiente
+3. Editar variável `PATH`
+4. Adicionar: `C:\Program Files\PostgreSQL\17\bin`
+
+## 🗑️ Limpeza de Backups Antigos
+
+Para economizar espaço, você pode deletar backups antigos manualmente:
+
+```bash
+# Manter apenas os últimos 10 backups
+# (No Windows, use o explorador de arquivos)
+```
+
+Ou criar um script de limpeza automática se necessário.
+
+## 🚨 Importante
+
+- ⚠️ **NUNCA** faça commit de backups no Git (arquivo muito grande)
+- ⚠️ Backups contêm dados sensíveis - mantenha em local seguro
+- ✅ Teste a restauração periodicamente para garantir integridade
+- ✅ Mantenha backups em múltiplos locais (local + nuvem)
+- ✅ Faça backup ANTES de migrações ou alterações grandes
+
+## 📞 Suporte
+
+Em caso de problemas com backup/restauração:
+
+1. Verifique logs de erro do PostgreSQL
+2. Confirme que o serviço PostgreSQL está rodando
+3. Teste conexão: `psql -h localhost -U postgres -d projeto_parcerias`
+4. Verifique permissões do usuário do banco
+
+---
+
+**Última atualização:** 05/11/2025
+
 │   └── MELHORIAS_UX_FORMULARIO.md
 │
 └── __pycache__/          # Arquivos temporários do Python

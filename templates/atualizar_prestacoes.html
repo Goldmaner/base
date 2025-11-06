@@ -81,6 +81,11 @@
       <div class="card-header bg-danger text-white">
         <h5 class="mb-0">
           <i class="bi bi-file-earmark-excel"></i> {{ termo.numero_termo }}
+          {% if termo.rescindido %}
+            <span class="badge bg-dark ms-2" title="Termo rescindido em {{ termo.data_rescisao.strftime('%d/%m/%Y') }}">
+              🔴 RESCINDIDO
+            </span>
+          {% endif %}
         </h5>
         <small class="d-block mt-1">
           <i class="bi bi-folder2-open me-1"></i>Processo SEI: {{ termo.sei_celeb or 'Não informado' }}
@@ -90,12 +95,43 @@
         </small>
       </div>
       <div class="card-body">
+        <!-- Alerta de rescisão se houver -->
+        {% if termo.rescindido %}
+        <div class="alert alert-warning mb-3">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <strong>Termo Rescindido!</strong> 
+          Este termo foi rescindido em <strong>{{ termo.data_rescisao.strftime('%d/%m/%Y') }}</strong>.
+          {% if termo.total_pago == 0 or termo.total_pago is none %}
+          <br>
+          <span class="badge bg-danger mt-2">⚠️ SEM RECURSOS REPASSADOS (R$ 0,00)</span>
+          <br>
+          <strong class="text-danger mt-2">
+            Ao atualizar, TODAS as prestações deste termo serão REMOVIDAS, 
+            pois não houve execução financeira.
+          </strong>
+          {% else %}
+          As prestações serão recalculadas até esta data.
+          {% endif %}
+          {% if termo.data_final_original %}
+          <br>
+          <small class="text-muted">
+            Data final original: {{ termo.data_final_original.strftime('%d/%m/%Y') }}
+          </small>
+          {% endif %}
+        </div>
+        {% endif %}
+        
         <!-- Info sobre vigência do termo -->
         <div class="alert alert-info mb-3">
           <strong><i class="bi bi-info-circle me-2"></i>Vigência do Termo:</strong>
           {{ termo.data_inicio_termo.strftime('%d/%m/%Y') if termo.data_inicio_termo else 'N/A' }}
           até
-          {{ termo.data_final_termo.strftime('%d/%m/%Y') if termo.data_final_termo else 'N/A' }}
+          {% if termo.rescindido %}
+            <strong class="text-danger">{{ termo.data_final_termo.strftime('%d/%m/%Y') }}</strong>
+            <span class="text-danger">(rescindido)</span>
+          {% else %}
+            {{ termo.data_final_termo.strftime('%d/%m/%Y') if termo.data_final_termo else 'N/A' }}
+          {% endif %}
         </div>
 
         <!-- Comparação de Prestações -->
@@ -202,7 +238,12 @@
           const result = await response.json();
 
           if (response.ok) {
-            alert(result.mensagem || 'Prestações recalculadas com sucesso!');
+            // Verificar se foi remoção por falta de recursos
+            if (result.sem_recursos) {
+              alert(`✅ ${result.mensagem}\n\n⚠️ Termo rescindido sem recursos repassados.`);
+            } else {
+              alert(result.mensagem || 'Prestações recalculadas com sucesso!');
+            }
             window.location.reload();
           } else {
             alert('Erro: ' + result.erro);

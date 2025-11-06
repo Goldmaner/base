@@ -20,6 +20,14 @@ meu_banco.db
 meu_banco.db-shm
 meu_banco.db-wal
 
+# Backups do banco de dados (arquivos grandes e sensíveis)
+backups/*.sql
+backups/*.dump
+backups/*.backup
+# Mas permitir README e scripts Python
+!backups/README.md
+!backups/*.py
+
 # Excel / exports / uploads temporários
 *.xlsx
 *.xls
