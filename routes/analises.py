@@ -857,8 +857,16 @@ def calcular_prestacoes():
 def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
     """
     Gera as prestações de contas baseado na portaria e período de vigência
+    Usa lógica de dias para cálculos precisos
+    
+    IMPORTANTE: Considera transição de portarias:
+    - Portaria 121 → 021 em 01/03/2023
+    - Portaria 140 → 090 em 01/01/2024
+    
+    Após transição, trimestrais PARAM de ser geradas (só semestral + final)
     """
     from dateutil.relativedelta import relativedelta
+    from datetime import date
     
     prestacoes = []
     
@@ -866,22 +874,36 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
     portarias_semestral = ['Portaria nº 021/SMDHC/2023', 'Portaria nº 090/SMDHC/2023']
     portarias_trimestral_semestral = ['Portaria nº 121/SMDHC/2019', 'Portaria nº 140/SMDHC/2019']
     
+    # Datas de transição de portarias
+    DATA_TRANSICAO_121_PARA_021 = date(2023, 3, 1)  # 01/03/2023
+    DATA_TRANSICAO_140_PARA_090 = date(2024, 1, 1)  # 01/01/2024
+    
+    # Determinar se há transição durante a vigência do termo
+    data_transicao = None
+    if portaria == 'Portaria nº 121/SMDHC/2019':
+        if data_inicio < DATA_TRANSICAO_121_PARA_021 <= data_termino:
+            data_transicao = DATA_TRANSICAO_121_PARA_021
+    elif portaria == 'Portaria nº 140/SMDHC/2019':
+        if data_inicio < DATA_TRANSICAO_140_PARA_090 <= data_termino:
+            data_transicao = DATA_TRANSICAO_140_PARA_090
+    
     # Calcular duração em meses
     duracao_meses = (data_termino.year - data_inicio.year) * 12 + (data_termino.month - data_inicio.month) + 1
     
     if portaria in portarias_semestral:
         # Portarias 021 e 090: Semestral + Final
+        # REGRA: Não gerar semestral parcial no final (menor que 6 meses)
         numero_prestacao = 1
         data_atual = data_inicio
         
-        # Criar prestações semestrais enquanto couber um semestre completo
-        while True:
-            # Calcular fim do semestre (6 meses a partir da data_atual)
+        while data_atual < data_termino:
+            # Calcular fim do semestre (6 meses)
             data_fim_semestre = data_atual + relativedelta(months=6) - relativedelta(days=1)
             
-            # Se o fim do semestre ultrapassa ou alcança o término do termo, parar
-            # (não criar semestral parcial, a Final cobre todo o período)
-            if data_fim_semestre >= data_termino:
+            # Se passou do término, verificar se é semestre completo
+            if data_fim_semestre > data_termino:
+                # Esta seria uma semestral parcial - NÃO gerar
+                # A prestação Final já cobre todo o período
                 break
             
             prestacoes.append({
@@ -892,10 +914,12 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
             })
             
             numero_prestacao += 1
-            # Próximo período começa no dia seguinte
             data_atual = data_fim_semestre + relativedelta(days=1)
+            
+            if data_atual > data_termino:
+                break
         
-        # Sempre adicionar prestação final (cobre todo o período do termo)
+        # Adicionar prestação final
         prestacoes.append({
             'tipo_prestacao': 'Final',
             'numero_prestacao': 1,
@@ -905,18 +929,22 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
         
     elif portaria in portarias_trimestral_semestral:
         # Portarias 121 e 140: Trimestral + Semestral + Final
+        # COM TRANSIÇÃO: após data_transicao, NÃO gerar mais trimestrais
         
-        # Gerar prestações trimestrais
+        # === TRIMESTRAIS ===
+        # Só gera até a data de transição (se houver)
+        data_limite_trimestral = data_transicao - relativedelta(days=1) if data_transicao else data_termino
+        
         numero_prestacao = 1
         data_atual = data_inicio
         
-        while data_atual < data_termino:
+        while data_atual < data_limite_trimestral:
             # Calcular fim do trimestre (3 meses)
             data_fim_trimestre = data_atual + relativedelta(months=3) - relativedelta(days=1)
             
-            # Se passou do término, ajustar
-            if data_fim_trimestre > data_termino:
-                data_fim_trimestre = data_termino
+            # Se passou do limite trimestral, ajustar para parar antes da transição
+            if data_fim_trimestre > data_limite_trimestral:
+                data_fim_trimestre = data_limite_trimestral
             
             prestacoes.append({
                 'tipo_prestacao': 'Trimestral',
@@ -928,10 +956,12 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
             numero_prestacao += 1
             data_atual = data_fim_trimestre + relativedelta(days=1)
             
-            if data_atual > data_termino:
+            if data_atual >= data_limite_trimestral:
                 break
         
-        # Gerar prestações semestrais
+        # === SEMESTRAIS ===
+        # Gera para TODO o período (antes E depois da transição)
+        # REGRA: Não gerar semestral parcial no final (menor que 6 meses)
         numero_semestral = 1
         data_atual = data_inicio
         
@@ -939,9 +969,11 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
             # Calcular fim do semestre (6 meses)
             data_fim_semestre = data_atual + relativedelta(months=6) - relativedelta(days=1)
             
-            # Se passou do término, ajustar
+            # Se passou do término, verificar se é semestre completo
             if data_fim_semestre > data_termino:
-                data_fim_semestre = data_termino
+                # Esta seria uma semestral parcial - NÃO gerar
+                # A prestação Final já cobre todo o período
+                break
             
             prestacoes.append({
                 'tipo_prestacao': 'Semestral',
@@ -966,6 +998,8 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
         
     else:
         # Outras portarias: Trimestral + Final
+        
+        # Gerar prestações trimestrais
         numero_prestacao = 1
         data_atual = data_inicio
         
@@ -1238,11 +1272,6 @@ def atualizar_prestacoes():
         LEFT JOIN public.termos_rescisao tr ON p.numero_termo = tr.numero_termo
         WHERE p.inicio IS NOT NULL 
         AND p.final IS NOT NULL
-        AND p.numero_termo NOT ILIKE '%TCL%'
-        AND p.numero_termo NOT ILIKE '%COSAN%'
-        AND p.numero_termo NOT ILIKE '%ACP%'
-        AND p.numero_termo NOT ILIKE '%TCC%'
-        AND p.numero_termo NOT ILIKE '%TCP%'
         ORDER BY p.numero_termo DESC
     """
     

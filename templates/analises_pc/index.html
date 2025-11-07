@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check-list de Análise de Prestação de Contas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 30px;
+            padding-bottom: 50px;
+        }
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section-title {
+            color: #0d6efd;
+            border-bottom: 2px solid #0d6efd;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            margin-top: 30px;
+        }
+        .info-box {
+            background-color: #e7f3ff;
+            border-left: 4px solid #0d6efd;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .checklist-item {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+            transition: background-color 0.3s;
+        }
+        .checklist-item:hover {
+            background-color: #e9ecef;
+        }
+        .checklist-item.checked {
+            background-color: #d1e7dd;
+            border-color: #198754;
+        }
+        .checklist-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            cursor: pointer;
+        }
+        .checklist-item label {
+            margin: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        .recurso-section {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        .recurso-title {
+            color: #856404;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        #checklistArea {
+            display: none;
+        }
+        .btn-action {
+            margin: 5px;
+        }
+        .form-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <h2 class="text-center mb-4">Check-list de Análise de Prestação de Contas</h2>
+
+        <!-- Botão Voltar -->
+        <div class="mb-4">
+            <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+                ← Voltar
+            </a>
+        </div>
+
+        <!-- Seção de Configuração Inicial -->
+        <div id="configSection" class="form-section">
+            <h4 class="section-title">Dados Iniciais</h4>
+            
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label for="numeroTermo" class="form-label">Número do Termo *</label>
+                    <select id="numeroTermo" class="form-select" required>
+                        <option value="">Selecione...</option>
+                        {% for termo in termos %}
+                        <option value="{{ termo.numero_termo }}">{{ termo.numero_termo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <label for="mesesAnalisados" class="form-label">Meses em Análise *</label>
+                    <select id="mesesAnalisados" class="form-select" required disabled>
+                        <option value="">Selecione um termo primeiro...</option>
+                    </select>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="novoMes" onchange="toggleNovoMes()">
+                        <label class="form-check-label" for="novoMes">
+                            Adicionar novo período
+                        </label>
+                    </div>
+                    <input type="text" class="form-control mt-2" id="mesesAnalisadosNovo" 
+                           placeholder="Ex: 01/2024" style="display: none;">
+                    <small class="text-muted">Formato: MM/AAAA</small>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <label for="analistas" class="form-label">Analista(s) Responsável(is) *</label>
+                    <select id="analistas" class="form-select" multiple required>
+                        {% for analista in analistas %}
+                        <option value="{{ analista.nome_analista }}">{{ analista.nome_analista }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="text-center mt-3">
+                <button class="btn btn-primary btn-lg" onclick="carregarChecklist()">
+                    Prosseguir
+                </button>
+            </div>
+        </div>
+
+        <!-- Seção do Checklist (inicialmente oculta) -->
+        <div id="checklistArea">
+            <div class="info-box">
+                <strong>Termo:</strong> <span id="infoTermo"></span> | 
+                <strong>Meses:</strong> <span id="infoMeses"></span> | 
+                <strong>Analista(s):</strong> <span id="infoAnalistas"></span>
+            </div>
+
+            <h4 class="section-title">Checklist de Etapas</h4>
+            
+            <!-- Checklist Principal -->
+            <div id="checklistPrincipal">
+                <div class="checklist-item" data-order="1">
+                    <input type="checkbox" id="check_avaliacao_celebracao" onchange="handleCheckboxChange(this)">
+                    <label for="check_avaliacao_celebracao">Avaliação do processo de celebração</label>
+                </div>
+                
+                <div class="checklist-item" data-order="2">
+                    <input type="checkbox" id="check_avaliacao_prestacao_contas" onchange="handleCheckboxChange(this)">
+                    <label for="check_avaliacao_prestacao_contas">Avaliação do processo de prestação de contas / pagamento</label>
+                </div>
+                
+                <div class="checklist-item" data-order="3">
+                    <input type="checkbox" id="check_preenchimento_dados_base" onchange="handleCheckboxChange(this)">
+                    <label for="check_preenchimento_dados_base">Preenchimento de dados base</label>
+                </div>
+                
+                <div class="checklist-item" data-order="4">
+                    <input type="checkbox" id="check_preenchimento_orcamento_anual" onchange="handleCheckboxChange(this)">
+                    <label for="check_preenchimento_orcamento_anual">Preenchimento de orçamento anual</label>
+                </div>
+                
+                <div class="checklist-item" data-order="5">
+                    <input type="checkbox" id="check_preenchimento_conciliacao_bancaria" onchange="handleCheckboxChange(this)">
+                    <label for="check_preenchimento_conciliacao_bancaria">Preenchimento da conciliação bancária</label>
+                </div>
+                
+                <div class="checklist-item" data-order="6">
+                    <input type="checkbox" id="check_avaliacao_dados_bancarios" onchange="handleCheckboxChange(this)">
+                    <label for="check_avaliacao_dados_bancarios">Avaliação dos dados bancários</label>
+                </div>
+                
+                <div class="checklist-item" data-order="7">
+                    <input type="checkbox" id="check_documentos_sei_1" onchange="handleCheckboxChange(this)">
+                    <label for="check_documentos_sei_1">Extração, inclusão e encaminhamento de documentos no SEI</label>
+                </div>
+                
+                <div class="checklist-item" data-order="8">
+                    <input type="checkbox" id="check_avaliacao_resposta_inconsistencia" onchange="handleCheckboxChange(this)">
+                    <label for="check_avaliacao_resposta_inconsistencia">Avaliação das respostas de inconsistências da organização (se houver)</label>
+                </div>
+                
+                <div class="checklist-item" data-order="9">
+                    <input type="checkbox" id="check_emissao_parecer" onchange="handleCheckboxChange(this)">
+                    <label for="check_emissao_parecer">Emissão de parecer ou manifestação cabível</label>
+                </div>
+                
+                <div class="checklist-item" data-order="10">
+                    <input type="checkbox" id="check_documentos_sei_2" onchange="handleCheckboxChange(this)">
+                    <label for="check_documentos_sei_2">Extração, inclusão e encaminhamento de documentos no SEI</label>
+                </div>
+            </div>
+
+            <!-- Seção de Recursos -->
+            <h4 class="section-title mt-4">Fases Recursais (se houver)</h4>
+            <div id="recursosContainer"></div>
+            
+            <div class="text-center mt-3">
+                <button class="btn btn-warning" onclick="adicionarRecurso()">
+                    + Incluir Fase Recursal
+                </button>
+            </div>
+
+            <!-- Checklist Final -->
+            <h4 class="section-title mt-4">Etapas Finais</h4>
+            <div id="checklistFinal">
+                <div class="checklist-item" data-order="11">
+                    <input type="checkbox" id="check_tratativas_restituicao" onchange="handleCheckboxChange(this)">
+                    <label for="check_tratativas_restituicao">Tratativas de restituição</label>
+                </div>
+                
+                <div class="checklist-item" data-order="12">
+                    <input type="checkbox" id="check_encaminhamento_encerramento" onchange="handleCheckboxChange(this)">
+                    <label for="check_encaminhamento_encerramento">Encaminhamentos para encerramento, CADIN ou prescrição</label>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="d-flex justify-content-center mt-4">
+                <button class="btn btn-success btn-lg btn-action" onclick="salvarChecklist()">
+                    💾 Salvar Avanços
+                </button>
+                <button class="btn btn-secondary btn-action" onclick="voltarConfig()">
+                    ← Voltar para Configuração
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    <script>
+        let recursosCount = 0;
+        let checklistOrdem = [
+            'avaliacao_celebracao',
+            'avaliacao_prestacao_contas',
+            'preenchimento_dados_base',
+            'preenchimento_orcamento_anual',
+            'preenchimento_conciliacao_bancaria',
+            'avaliacao_dados_bancarios',
+            'documentos_sei_1',
+            'avaliacao_resposta_inconsistencia',
+            'emissao_parecer',
+            'documentos_sei_2',
+            'tratativas_restituicao',
+            'encaminhamento_encerramento'
+        ];
+
+        // Inicializar Select2
+        $(document).ready(function() {
+            $('#numeroTermo').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Selecione um termo...',
+                allowClear: true
+            });
+            
+            // Quando selecionar um termo, buscar meses disponíveis
+            $('#numeroTermo').on('change', function() {
+                const numeroTermo = $(this).val();
+                if (numeroTermo) {
+                    buscarMesesDisponiveis(numeroTermo);
+                } else {
+                    $('#mesesAnalisados').prop('disabled', true).html('<option value="">Selecione um termo primeiro...</option>');
+                    $('#novoMes').prop('checked', false);
+                    $('#mesesAnalisadosNovo').hide();
+                }
+            });
+
+            $('#analistas').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Selecione um ou mais analistas...',
+                allowClear: true
+            });
+            
+            $('#mesesAnalisados').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Selecione o período...',
+                allowClear: true
+            });
+        });
+        
+        async function buscarMesesDisponiveis(numeroTermo) {
+            try {
+                const response = await fetch('/analises_pc/api/buscar_meses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo
+                    })
+                });
+                const data = await response.json();
+                
+                const selectMeses = $('#mesesAnalisados');
+                selectMeses.html('');
+                
+                if (data.meses && data.meses.length > 0) {
+                    selectMeses.append('<option value="">Selecione o período...</option>');
+                    data.meses.forEach(mes => {
+                        selectMeses.append(`<option value="${mes}">${mes} (existente)</option>`);
+                    });
+                    selectMeses.prop('disabled', false);
+                } else {
+                    selectMeses.append('<option value="">Nenhum período encontrado</option>');
+                    selectMeses.prop('disabled', true);
+                    // Marcar automaticamente "novo período"
+                    $('#novoMes').prop('checked', true);
+                    toggleNovoMes();
+                }
+                
+                // Reinicializar Select2
+                selectMeses.select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Selecione o período...',
+                    allowClear: true
+                });
+                
+            } catch (error) {
+                console.error('Erro ao buscar meses:', error);
+                alert('Erro ao buscar períodos disponíveis');
+            }
+        }
+        
+        function toggleNovoMes() {
+            const checkbox = $('#novoMes');
+            const inputNovo = $('#mesesAnalisadosNovo');
+            const selectExistente = $('#mesesAnalisados');
+            
+            if (checkbox.is(':checked')) {
+                inputNovo.show();
+                selectExistente.prop('disabled', true);
+                selectExistente.val('').trigger('change');
+            } else {
+                inputNovo.hide();
+                inputNovo.val('');
+                if ($('#numeroTermo').val()) {
+                    selectExistente.prop('disabled', false);
+                }
+            }
+        }
+
+        async function carregarChecklist() {
+            const numeroTermo = $('#numeroTermo').val();
+            let mesesAnalisados;
+            
+            // Verificar se está usando novo período ou existente
+            if ($('#novoMes').is(':checked')) {
+                mesesAnalisados = $('#mesesAnalisadosNovo').val();
+            } else {
+                mesesAnalisados = $('#mesesAnalisados').val();
+            }
+            
+            const analistas = $('#analistas').val();
+
+            if (!numeroTermo || !mesesAnalisados || !analistas || analistas.length === 0) {
+                alert('Por favor, preencha todos os campos obrigatórios!');
+                return;
+            }
+
+            try {
+                const response = await fetch('/analises_pc/api/carregar_checklist', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        meses_analisados: mesesAnalisados
+                    })
+                });
+
+                const data = await response.json();
+
+                // Atualizar informações
+                $('#infoTermo').text(numeroTermo);
+                $('#infoMeses').text(mesesAnalisados);
+                $('#infoAnalistas').text(analistas.join(', '));
+
+                // Limpar checkboxes
+                $('input[type="checkbox"]').prop('checked', false);
+                $('.checklist-item').removeClass('checked');
+
+                // Preencher checklist se existir
+                if (data.checklist) {
+                    Object.keys(data.checklist).forEach(key => {
+                        const checkbox = $(`#check_${key}`);
+                        if (checkbox.length && data.checklist[key]) {
+                            checkbox.prop('checked', true);
+                            checkbox.closest('.checklist-item').addClass('checked');
+                        }
+                    });
+                }
+
+                // Carregar recursos
+                recursosCount = 0;
+                $('#recursosContainer').empty();
+                if (data.recursos && data.recursos.length > 0) {
+                    data.recursos.forEach(recurso => {
+                        adicionarRecurso(recurso);
+                    });
+                }
+
+                // Mostrar checklist
+                $('#configSection').hide();
+                $('#checklistArea').show();
+
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao carregar checklist!');
+            }
+        }
+
+        function adicionarRecurso(recursoData = null) {
+            recursosCount++;
+            const tipoRecurso = recursoData ? recursoData.tipo_recurso : recursosCount;
+            
+            const recursoHtml = `
+                <div class="recurso-section" data-tipo="${tipoRecurso}">
+                    <div class="recurso-title">
+                        Recurso ${tipoRecurso}
+                        <button class="btn btn-sm btn-danger float-end" onclick="removerRecurso(this)">
+                            ✖ Remover
+                        </button>
+                    </div>
+                    
+                    <div class="checklist-item">
+                        <input type="checkbox" id="recurso_${tipoRecurso}_resposta" 
+                               ${recursoData && recursoData.avaliacao_resposta_recursal ? 'checked' : ''}>
+                        <label for="recurso_${tipoRecurso}_resposta">
+                            Avaliação das respostas recursais da organização
+                        </label>
+                    </div>
+                    
+                    <div class="checklist-item">
+                        <input type="checkbox" id="recurso_${tipoRecurso}_parecer"
+                               ${recursoData && recursoData.emissao_parecer_recursal ? 'checked' : ''}>
+                        <label for="recurso_${tipoRecurso}_parecer">
+                            Emissão de parecer ou manifestação cabível
+                        </label>
+                    </div>
+                    
+                    <div class="checklist-item">
+                        <input type="checkbox" id="recurso_${tipoRecurso}_documentos"
+                               ${recursoData && recursoData.documentos_sei ? 'checked' : ''}>
+                        <label for="recurso_${tipoRecurso}_documentos">
+                            Extração, inclusão e encaminhamento de documentos no SEI
+                        </label>
+                    </div>
+                </div>
+            `;
+            
+            $('#recursosContainer').append(recursoHtml);
+        }
+
+        function removerRecurso(btn) {
+            if (confirm('Tem certeza que deseja remover esta fase recursal?')) {
+                $(btn).closest('.recurso-section').remove();
+            }
+        }
+
+        function handleCheckboxChange(checkbox) {
+            const item = $(checkbox).closest('.checklist-item');
+            
+            if (checkbox.checked) {
+                item.addClass('checked');
+                
+                // Marcar todas as anteriores automaticamente
+                const order = parseInt(item.data('order'));
+                if (order) {
+                    $('.checklist-item').each(function() {
+                        const itemOrder = parseInt($(this).data('order'));
+                        if (itemOrder && itemOrder < order) {
+                            $(this).find('input[type="checkbox"]').prop('checked', true);
+                            $(this).addClass('checked');
+                        }
+                    });
+                }
+            } else {
+                item.removeClass('checked');
+            }
+        }
+
+        async function salvarChecklist() {
+            const numeroTermo = $('#infoTermo').text();
+            const mesesAnalisados = $('#infoMeses').text();
+            const analistas = $('#analistas').val();
+
+            // Coletar dados do checklist principal
+            const checklistData = {};
+            checklistOrdem.forEach(item => {
+                const checkbox = $(`#check_${item}`);
+                checklistData[item] = checkbox.prop('checked') || false;
+            });
+
+            // Coletar dados dos recursos
+            const recursos = [];
+            $('.recurso-section').each(function() {
+                const tipoRecurso = parseInt($(this).data('tipo'));
+                recursos.push({
+                    tipo_recurso: tipoRecurso,
+                    avaliacao_resposta_recursal: $(`#recurso_${tipoRecurso}_resposta`).prop('checked') || false,
+                    emissao_parecer_recursal: $(`#recurso_${tipoRecurso}_parecer`).prop('checked') || false,
+                    documentos_sei: $(`#recurso_${tipoRecurso}_documentos`).prop('checked') || false
+                });
+            });
+
+            try {
+                const response = await fetch('/analises_pc/api/salvar_checklist', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        meses_analisados: mesesAnalisados,
+                        nome_analista: analistas[0], // Para compatibilidade
+                        analistas: analistas,
+                        checklist: checklistData,
+                        recursos: recursos
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✓ Checklist salvo com sucesso!');
+                } else {
+                    alert('Erro ao salvar: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao salvar checklist!');
+            }
+        }
+
+        function voltarConfig() {
+            if (confirm('Deseja voltar para a configuração? Certifique-se de salvar seus avanços antes.')) {
+                $('#checklistArea').hide();
+                $('#configSection').show();
+            }
+        }
+    </script>
+</body>
+</html>

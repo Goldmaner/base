@@ -9,6 +9,36 @@ from utils import login_required
 listas_bp = Blueprint('listas', __name__, url_prefix='/listas')
 
 
+def converter_valor_para_db(valor, campo, config):
+    """
+    Converte valores do frontend para o formato do banco de dados
+    """
+    # Se o campo for 'status' e valor for string, converter para boolean
+    if campo == 'status' and isinstance(valor, str):
+        return valor.lower() in ['ativo', 'true', '1', 'sim']
+    
+    # Se o campo for 'status_pg' e valor for string, manter string
+    if campo == 'status_pg':
+        return valor
+    
+    # Se o campo for 'status_c' e valor for string, manter string
+    if campo == 'status_c':
+        return valor
+    
+    return valor
+
+
+def converter_valor_para_frontend(valor, campo):
+    """
+    Converte valores do banco de dados para o formato do frontend
+    """
+    # Se o campo for 'status' e valor for boolean, converter para string
+    if campo == 'status' and isinstance(valor, bool):
+        return 'Ativo' if valor else 'Inativo'
+    
+    return valor
+
+
 # Configuração das tabelas gerenciáveis
 TABELAS_CONFIG = {
     'c_analistas': {
@@ -86,6 +116,25 @@ TABELAS_CONFIG = {
         'colunas_editaveis': ['orgao', 'unidade', 'descricao'],
         'labels': {'orgao': 'Órgão', 'unidade': 'Unidade', 'descricao': 'Descrição'},
         'ordem': 'orgao, unidade'
+    },
+    'c_analistas_dgp': {
+        'nome': 'Agentes DGP',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['nome_analista', 'rf', 'email', 'status'],
+        'labels': {
+            'nome_analista': 'Nome do Agente',
+            'rf': 'R.F.',
+            'email': 'E-mail',
+            'status': 'Status'
+        },
+        'colunas_filtro': ['nome_analista', 'rf', 'email', 'status'],
+        'ordem': 'nome_analista',
+        'tipos_campo': {
+            'status': 'select',
+            'opcoes_status': ['Ativo', 'Inativo']
+        },
+        'inline_edit': True,
+        'inline_columns': ['status']
     }
 }
 
@@ -145,7 +194,9 @@ def obter_dados(tabela):
         for row in dados:
             item = {'id': row['id']}
             for col in config['colunas_editaveis']:
-                item[col] = row[col]
+                # Converter valores booleanos para formato frontend
+                valor = row[col]
+                item[col] = converter_valor_para_frontend(valor, col)
             resultado.append(item)
         
         # Se for pessoa_gestora, adicionar contagem de pareceres e parcerias
@@ -226,7 +277,9 @@ def criar_registro(tabela):
         # Montar query de inserção
         colunas = config['colunas_editaveis']
         placeholders = ', '.join(['%s'] * len(colunas))
-        valores = [dados[col] for col in colunas]
+        
+        # Converter valores para formato do banco de dados
+        valores = [converter_valor_para_db(dados[col], col, config) for col in colunas]
         
         query = f"""
             INSERT INTO {schema}.{tabela} ({', '.join(colunas)})
@@ -284,8 +337,10 @@ def atualizar_registro(tabela, id):
             # Verificar se o campo está nas colunas editáveis
             if campo in config['colunas_editaveis']:
                 colunas_validas.append(campo)
-                valores.append(valor)
-                print(f"[DEBUG atualizar_registro] Campo válido: {campo} = {valor}")
+                # Converter valor para formato do banco de dados
+                valor_convertido = converter_valor_para_db(valor, campo, config)
+                valores.append(valor_convertido)
+                print(f"[DEBUG atualizar_registro] Campo válido: {campo} = {valor} -> {valor_convertido}")
         
         if not colunas_validas:
             return jsonify({'erro': 'Nenhum campo válido para atualizar'}), 400

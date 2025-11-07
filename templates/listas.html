@@ -226,17 +226,25 @@
               };
               
               // Pegar opções do tipos_campo
-              if (configAtual.tipos_campo && configAtual.tipos_campo[col]) {
-                const opcoes = configAtual.tipos_campo[col];
-                for (const opcao of opcoes) {
-                  const option = document.createElement('option');
-                  option.value = opcao;
-                  option.textContent = opcao;
-                  if (registro[col] === opcao) {
-                    option.selected = true;
-                  }
-                  select.appendChild(option);
+              let opcoes = [];
+              if (configAtual.tipos_campo) {
+                // Tentar pegar opções específicas (ex: opcoes_status)
+                const nomeOpcoes = `opcoes_${col}`;
+                if (configAtual.tipos_campo[nomeOpcoes]) {
+                  opcoes = configAtual.tipos_campo[nomeOpcoes];
+                } else if (Array.isArray(configAtual.tipos_campo[col])) {
+                  opcoes = configAtual.tipos_campo[col];
                 }
+              }
+              
+              for (const opcao of opcoes) {
+                const option = document.createElement('option');
+                option.value = opcao;
+                option.textContent = opcao;
+                if (registro[col] === opcao) {
+                  option.selected = true;
+                }
+                select.appendChild(option);
               }
               
               td.appendChild(select);

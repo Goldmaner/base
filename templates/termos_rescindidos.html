@@ -104,19 +104,18 @@
       <form method="POST" action="{% if rescisao_editando %}{{ url_for('parcerias.editar_rescisao', id=rescisao_editando.id) }}{% else %}{{ url_for('parcerias.salvar_rescisao') }}{% endif %}">
         <div class="row g-3">
           <!-- Número do Termo -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label for="numero_termo" class="form-label">
               <i class="bi bi-file-text"></i> Número do Termo *
             </label>
             <select class="form-select" id="numero_termo" name="numero_termo" required 
                     {% if rescisao_editando %}disabled{% endif %}>
-              <option value="">Selecione o termo...</option>
-              {% for termo in termos_disponiveis %}
-                <option value="{{ termo }}" 
-                        {% if rescisao_editando and rescisao_editando.numero_termo == termo %}selected{% endif %}>
-                  {{ termo }}
+              <option value="">Digite para buscar...</option>
+              {% if rescisao_editando %}
+                <option value="{{ rescisao_editando.numero_termo }}" selected>
+                  {{ rescisao_editando.numero_termo }}
                 </option>
-              {% endfor %}
+              {% endif %}
             </select>
             {% if rescisao_editando %}
               <input type="hidden" name="numero_termo" value="{{ rescisao_editando.numero_termo }}">
@@ -125,7 +124,7 @@
           </div>
 
           <!-- Data de Rescisão -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label for="data_rescisao" class="form-label">
               <i class="bi bi-calendar-x"></i> Data de Rescisão *
             </label>
@@ -135,7 +134,7 @@
           </div>
 
           <!-- SEI da Rescisão -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label for="sei_rescisao" class="form-label">
               <i class="bi bi-hash"></i> SEI da Rescisão *
             </label>
@@ -147,6 +146,22 @@
                    maxlength="30"
                    required>
             <small class="text-muted">Digite apenas números e caracteres de formatação (. - /)</small>
+          </div>
+
+          <!-- Responsável pela Rescisão -->
+          <div class="col-md-3">
+            <label for="responsavel_rescisao" class="form-label">
+              <i class="bi bi-person-badge"></i> Responsável *
+            </label>
+            <select class="form-select" id="responsavel_rescisao" name="responsavel_rescisao" required>
+              <option value="">-- Selecione --</option>
+              {% for analista in analistas_dgp %}
+                <option value="{{ analista }}" 
+                        {% if rescisao_editando and rescisao_editando.responsavel_rescisao == analista %}selected{% endif %}>
+                  {{ analista }}
+                </option>
+              {% endfor %}
+            </select>
           </div>
         </div>
 
@@ -177,18 +192,17 @@
           <table class="table table-hover table-striped">
             <thead>
               <tr>
-                <th style="width: 5%;">ID</th>
-                <th style="width: 25%;">Número do Termo</th>
-                <th style="width: 15%;">Data Rescisão</th>
-                <th style="width: 25%;">SEI Rescisão</th>
-                <th style="width: 20%;">OSC</th>
+                <th style="width: 20%;">Número do Termo</th>
+                <th style="width: 12%;">Data Rescisão</th>
+                <th style="width: 18%;">SEI Rescisão</th>
+                <th style="width: 18%;">Responsável</th>
+                <th style="width: 22%;">OSC</th>
                 <th style="width: 10%;" class="text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
               {% for rescisao in rescisoes %}
                 <tr>
-                  <td>{{ rescisao.id }}</td>
                   <td><strong>{{ rescisao.numero_termo }}</strong></td>
                   <td>
                     {% if rescisao.data_rescisao %}
@@ -198,6 +212,13 @@
                     {% endif %}
                   </td>
                   <td class="sei-formatted">{{ rescisao.sei_rescisao or '-' }}</td>
+                  <td>
+                    {% if rescisao.responsavel_rescisao %}
+                      <span class="badge bg-info">{{ rescisao.responsavel_rescisao }}</span>
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
                   <td class="text-muted small">
                     {% if rescisao.osc_nome %}
                       {{ rescisao.osc_nome }}
@@ -264,13 +285,40 @@
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script>
-    // Inicializar Select2 no dropdown de termos
+    // Inicializar Select2 no dropdown de termos com AJAX
     $(document).ready(function() {
+      {% if not rescisao_editando %}
       $('#numero_termo').select2({
         theme: 'bootstrap-5',
         placeholder: 'Digite para buscar o termo...',
         allowClear: true,
+        minimumInputLength: 2, // Só busca após 2 caracteres
+        ajax: {
+          url: '{{ url_for("parcerias.api_termos_disponiveis") }}',
+          dataType: 'json',
+          delay: 250, // Delay de 250ms para evitar muitas requisições
+          data: function(params) {
+            return {
+              q: params.term // termo de busca
+            };
+          },
+          processResults: function(data) {
+            // Transformar array de strings em array de objetos {id, text}
+            return {
+              results: data.map(function(termo) {
+                return {
+                  id: termo,
+                  text: termo
+                };
+              })
+            };
+          },
+          cache: true
+        },
         language: {
+          inputTooShort: function() {
+            return "Digite pelo menos 2 caracteres para buscar";
+          },
           noResults: function() {
             return "Nenhum termo encontrado";
           },
@@ -279,6 +327,13 @@
           }
         }
       });
+      {% else %}
+      // Se estiver editando, não precisa do AJAX
+      $('#numero_termo').select2({
+        theme: 'bootstrap-5',
+        disabled: true
+      });
+      {% endif %}
     });
 
     // Função para confirmar exclusão

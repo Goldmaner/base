@@ -1328,32 +1328,74 @@ def termos_rescindidos():
     """
     cur = get_cursor()
     
-    # Buscar termos já rescindidos
+    # Buscar termos já rescindidos com responsável
     cur.execute("""
-        SELECT tr.id, tr.numero_termo, tr.data_rescisao, tr.sei_rescisao, p.osc as osc_nome
+        SELECT tr.id, tr.numero_termo, tr.data_rescisao, tr.sei_rescisao, 
+               tr.responsavel_rescisao, p.osc as osc_nome
         FROM public.termos_rescisao tr
         LEFT JOIN public.parcerias p ON tr.numero_termo = p.numero_termo
         ORDER BY tr.data_rescisao DESC NULLS LAST, tr.id DESC
     """)
     rescisoes = cur.fetchall()
     
-    # Buscar termos disponíveis (não rescindidos)
+    # Buscar lista de analistas DGP (ativos e inativos)
     cur.execute("""
-        SELECT DISTINCT p.numero_termo
-        FROM public.parcerias p
-        WHERE p.numero_termo NOT IN (
-            SELECT numero_termo FROM public.termos_rescisao
-        )
-        ORDER BY p.numero_termo
+        SELECT nome_analista
+        FROM categoricas.c_analistas_dgp
+        ORDER BY nome_analista
     """)
-    termos_disponiveis = [row['numero_termo'] for row in cur.fetchall()]
+    analistas_dgp = [row['nome_analista'] for row in cur.fetchall()]
     
     cur.close()
     
+    # NÃO carregar todos os termos aqui - usar API de autocomplete
     return render_template('termos_rescindidos.html',
                          rescisoes=rescisoes,
-                         termos_disponiveis=termos_disponiveis,
+                         analistas_dgp=analistas_dgp,
                          rescisao_editando=None)
+
+
+@parcerias_bp.route("/api/termos-disponiveis", methods=["GET"])
+@login_required
+def api_termos_disponiveis():
+    """
+    API para autocomplete de termos disponíveis (não rescindidos)
+    Busca termos que começam com o texto digitado
+    """
+    try:
+        # Obter termo de busca (texto digitado pelo usuário)
+        query = request.args.get('q', '').strip().upper()
+        
+        # Limitar a 50 resultados para performance
+        limite = 50
+        
+        cur = get_cursor()
+        
+        if query:
+            # Buscar termos que começam com o texto digitado
+            cur.execute("""
+                SELECT DISTINCT p.numero_termo
+                FROM public.parcerias p
+                WHERE p.numero_termo NOT IN (
+                    SELECT numero_termo FROM public.termos_rescisao
+                )
+                AND UPPER(p.numero_termo) LIKE %s
+                ORDER BY p.numero_termo
+                LIMIT %s
+            """, (f"{query}%", limite))
+        else:
+            # Se não há busca, retornar vazio (não carregar todos)
+            cur.close()
+            return jsonify([])
+        
+        termos = [row['numero_termo'] for row in cur.fetchall()]
+        cur.close()
+        
+        return jsonify(termos)
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar termos disponíveis: {str(e)}")
+        return jsonify({'erro': str(e)}), 500
 
 
 @parcerias_bp.route("/rescisao/salvar", methods=["POST"])
@@ -1365,6 +1407,7 @@ def salvar_rescisao():
     numero_termo = request.form.get('numero_termo', '').strip()
     data_rescisao = request.form.get('data_rescisao', '').strip()
     sei_rescisao = request.form.get('sei_rescisao', '').strip()
+    responsavel_rescisao = request.form.get('responsavel_rescisao', '').strip()
     
     # Validações
     if not numero_termo:
@@ -1377,6 +1420,10 @@ def salvar_rescisao():
     
     if not sei_rescisao:
         flash('SEI da rescisão é obrigatório!', 'danger')
+        return redirect(url_for('parcerias.termos_rescindidos'))
+    
+    if not responsavel_rescisao:
+        flash('Responsável pela rescisão é obrigatório!', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
     
     cur = get_cursor()
@@ -1400,9 +1447,9 @@ def salvar_rescisao():
         
         # Inserir rescisão
         cur.execute("""
-            INSERT INTO public.termos_rescisao (numero_termo, data_rescisao, sei_rescisao)
-            VALUES (%s, %s, %s)
-        """, (numero_termo, data_rescisao, sei_rescisao))
+            INSERT INTO public.termos_rescisao (numero_termo, data_rescisao, sei_rescisao, responsavel_rescisao)
+            VALUES (%s, %s, %s, %s)
+        """, (numero_termo, data_rescisao, sei_rescisao, responsavel_rescisao))
         
         get_db().commit()
         cur.close()
@@ -1431,18 +1478,19 @@ def editar_rescisao(id):
         # Processar atualização
         data_rescisao = request.form.get('data_rescisao', '').strip()
         sei_rescisao = request.form.get('sei_rescisao', '').strip()
+        responsavel_rescisao = request.form.get('responsavel_rescisao', '').strip()
         numero_termo = request.form.get('numero_termo', '').strip()  # Hidden field
         
-        if not data_rescisao or not sei_rescisao:
+        if not data_rescisao or not sei_rescisao or not responsavel_rescisao:
             flash('Todos os campos são obrigatórios!', 'danger')
             return redirect(url_for('parcerias.editar_rescisao', id=id))
         
         try:
             cur.execute("""
                 UPDATE public.termos_rescisao
-                SET data_rescisao = %s, sei_rescisao = %s
+                SET data_rescisao = %s, sei_rescisao = %s, responsavel_rescisao = %s
                 WHERE id = %s
-            """, (data_rescisao, sei_rescisao, id))
+            """, (data_rescisao, sei_rescisao, responsavel_rescisao, id))
             
             get_db().commit()
             cur.close()
@@ -1471,12 +1519,21 @@ def editar_rescisao(id):
     
     # Buscar todas as rescisões para a tabela
     cur.execute("""
-        SELECT tr.id, tr.numero_termo, tr.data_rescisao, tr.sei_rescisao, p.osc as osc_nome
+        SELECT tr.id, tr.numero_termo, tr.data_rescisao, tr.sei_rescisao, 
+               tr.responsavel_rescisao, p.osc as osc_nome
         FROM public.termos_rescisao tr
         LEFT JOIN public.parcerias p ON tr.numero_termo = p.numero_termo
         ORDER BY tr.data_rescisao DESC NULLS LAST, tr.id DESC
     """)
     rescisoes = cur.fetchall()
+    
+    # Buscar lista de analistas DGP (ativos e inativos)
+    cur.execute("""
+        SELECT nome_analista
+        FROM categoricas.c_analistas_dgp
+        ORDER BY nome_analista
+    """)
+    analistas_dgp = [row['nome_analista'] for row in cur.fetchall()]
     
     # Termos disponíveis (vazio pois está editando)
     termos_disponiveis = [rescisao_editando['numero_termo']]
@@ -1485,6 +1542,7 @@ def editar_rescisao(id):
     
     return render_template('termos_rescindidos.html',
                          rescisoes=rescisoes,
+                         analistas_dgp=analistas_dgp,
                          termos_disponiveis=termos_disponiveis,
                          rescisao_editando=rescisao_editando)
 
