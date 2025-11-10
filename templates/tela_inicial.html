@@ -116,6 +116,11 @@
                     <option value="Externo">Externo</option>
                   </select>
                 </div>
+                <div class="mb-3">
+                  <label for="novoDUsuario" class="form-label">Registro do Usuário</label>
+                  <input type="text" class="form-control" id="novoDUsuario" maxlength="20" placeholder="Ex: DAC, DGP, DP...">
+                  <small class="text-muted">Campo opcional. Máximo 20 caracteres.</small>
+                </div>
                 <div class="d-flex gap-2">
                   <button type="submit" class="btn btn-success">
                     <i class="bi bi-check-circle me-2"></i>Criar
@@ -177,7 +182,7 @@
         
         let html = '<div class="table-responsive"><table class="table table-hover">';
         html += '<thead class="table-dark"><tr>';
-        html += '<th>ID</th><th>E-mail</th><th>Tipo</th><th>Data Criação</th><th class="text-center">Ações</th>';
+        html += '<th>ID</th><th>E-mail</th><th>Tipo</th><th>D. Usuário</th><th>Data Criação</th><th class="text-center">Ações</th>';
         html += '</tr></thead><tbody>';
         
         usuarios.forEach(user => {
@@ -192,12 +197,13 @@
           else if (user.tipo_usuario === 'Externo') badgeClass = 'bg-warning text-dark';
           
           html += `<td><span class="badge ${badgeClass}">${user.tipo_usuario}</span></td>`;
+          html += `<td>${user.d_usuario || '<span class="text-muted">-</span>'}</td>`;
           html += `<td>${new Date(user.data_criacao).toLocaleDateString('pt-BR')}</td>`;
           html += `<td class="text-center">
             <button class="btn btn-sm btn-info me-1" onclick="resetarSenha(${user.id}, '${user.email}')" title="Resetar Senha">
               <i class="bi bi-key"></i>
             </button>
-            <button class="btn btn-sm btn-warning me-1" onclick="editarUsuario(${user.id}, '${user.email}', '${user.tipo_usuario}')" title="Editar Tipo">
+            <button class="btn btn-sm btn-warning me-1" onclick="editarUsuario(${user.id}, '${user.email}', '${user.tipo_usuario}', '${user.d_usuario || ''}')" title="Editar">
               <i class="bi bi-pencil"></i>
             </button>
             <button class="btn btn-sm btn-danger" onclick="excluirUsuario(${user.id}, '${user.email}')" title="Excluir">
@@ -226,12 +232,13 @@
       const email = document.getElementById('novoEmail').value;
       const senha = document.getElementById('novaSenha').value;
       const tipo = document.getElementById('novoTipo').value;
+      const d_usuario = document.getElementById('novoDUsuario').value;
       
       try {
         const response = await fetch('/api/usuarios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, senha, tipo_usuario: tipo })
+          body: JSON.stringify({ email, senha, tipo_usuario: tipo, d_usuario })
         });
         
         const result = await response.json();
@@ -249,47 +256,75 @@
       }
     }
 
-    async function editarUsuario(id, email, tipo) {
-      const opcoes = `Alterar tipo de usuário de "${email}":
-
-1 - Agente Público (Admin)
-2 - Agente DAC
-3 - Agente DGP
-4 - Agente DP
-5 - Externo
-
-Digite o número correspondente:`;
+    async function editarUsuario(id, email, tipo, d_usuario) {
+      // Criar formulário modal usando Bootstrap
+      const modalHtml = `
+        <div class="modal fade" id="modalEditarUsuario" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar Usuário: ${email}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">Tipo de Usuário</label>
+                  <select class="form-select" id="editTipo">
+                    <option value="Agente Público" ${tipo === 'Agente Público' ? 'selected' : ''}>Agente Público (Admin)</option>
+                    <option value="Agente DAC" ${tipo === 'Agente DAC' ? 'selected' : ''}>Agente DAC</option>
+                    <option value="Agente DGP" ${tipo === 'Agente DGP' ? 'selected' : ''}>Agente DGP</option>
+                    <option value="Agente DP" ${tipo === 'Agente DP' ? 'selected' : ''}>Agente DP</option>
+                    <option value="Externo" ${tipo === 'Externo' ? 'selected' : ''}>Externo</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Registro do Usuário</label>
+                  <input type="text" class="form-control" id="editDUsuario" value="${d_usuario}" maxlength="20" placeholder="Ex: DAC, DGP, DP...">
+                  <small class="text-muted">Máximo 20 caracteres</small>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="salvarEdicao(${id})">
+                  <i class="bi bi-check-circle me-2"></i>Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
       
-      const novoTipo = prompt(opcoes, '1');
+      // Remover modal antigo se existir
+      const oldModal = document.getElementById('modalEditarUsuario');
+      if (oldModal) oldModal.remove();
       
-      if (novoTipo === null) return;
+      // Adicionar novo modal ao body
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
       
-      const tipos = {
-        '1': 'Agente Público',
-        '2': 'Agente DAC',
-        '3': 'Agente DGP',
-        '4': 'Agente DP',
-        '5': 'Externo'
-      };
-      
-      const tipoFinal = tipos[novoTipo];
-      
-      if (!tipoFinal) {
-        alert('Opção inválida!');
-        return;
-      }
+      // Mostrar modal
+      const modal = new bootstrap.Modal(document.getElementById('modalEditarUsuario'));
+      modal.show();
+    }
+    
+    async function salvarEdicao(id) {
+      const novoTipo = document.getElementById('editTipo').value;
+      const novoDUsuario = document.getElementById('editDUsuario').value.trim();
       
       try {
         const response = await fetch(`/api/usuarios/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tipo_usuario: tipoFinal })
+          body: JSON.stringify({ 
+            tipo_usuario: novoTipo,
+            d_usuario: novoDUsuario
+          })
         });
         
         const result = await response.json();
         
         if (response.ok) {
           alert('Usuário atualizado com sucesso!');
+          bootstrap.Modal.getInstance(document.getElementById('modalEditarUsuario')).hide();
           carregarUsuarios();
         } else {
           alert('Erro: ' + result.erro);

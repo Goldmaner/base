@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Modelos - Análise de Prestação de Contas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 30px 0;
+        }
+        .container-central {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header-central {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+        }
+        .card-modelo {
+            height: 100%;
+            border: 2px solid #dee2e6;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card-modelo:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 25px rgba(13, 110, 253, 0.25);
+            border-color: #0d6efd;
+        }
+        .card-modelo .card-body {
+            padding: 30px;
+            text-align: center;
+        }
+        .icone-modelo {
+            font-size: 80px;
+            margin-bottom: 20px;
+            display: block;
+        }
+        .nome-modelo {
+            font-size: 18px;
+            font-weight: bold;
+            color: #212529;
+            margin-bottom: 10px;
+        }
+        .descricao-modelo {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 20px;
+            min-height: 40px;
+        }
+        .btn-download {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-download:hover {
+            background-color: #0a58ca;
+            color: white;
+            transform: scale(1.05);
+        }
+        .badge-tipo {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 11px;
+            padding: 5px 10px;
+        }
+        .grid-modelos {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        @media (max-width: 992px) {
+            .grid-modelos {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 576px) {
+            .grid-modelos {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container container-central">
+        <!-- Header -->
+        <div class="header-central">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-2">📁 Central de Modelos</h2>
+                    <p class="mb-0">Documentos-padrão para Análise de Prestação de Contas</p>
+                </div>
+                <a href="{{ url_for('main.index') }}" class="btn btn-light btn-lg">
+                    <i class="bi bi-arrow-left me-2"></i>Voltar
+                </a>
+            </div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="alert alert-info mb-4">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <strong>Instruções:</strong> Clique no botão "Baixar" para fazer download do modelo desejado. 
+            Todos os arquivos estão no formato original (.pdf ou .xlsx).
+        </div>
+
+        <!-- Upload de Modelos (Apenas Agente Público) -->
+        {% if session.get('tipo_usuario') == 'Agente Público' %}
+        <div class="card border-success mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-cloud-upload-fill me-2"></i>Upload de Modelos (Administrador)
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="formUpload" enctype="multipart/form-data">
+                    <div class="row align-items-end">
+                        <div class="col-md-8">
+                            <label class="form-label"><strong>Selecione o arquivo modelo (.pdf ou .xlsx):</strong></label>
+                            <input type="file" class="form-control" id="arquivoModelo" name="arquivo" 
+                                   accept=".pdf,.xlsx" required>
+                            <small class="text-muted">
+                                Tipos aceitos: PDF, XLSX | Tamanho máximo: 10MB
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-upload me-2"></i>Fazer Upload
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div id="uploadStatus" class="mt-3"></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Grid de Modelos -->
+        <div class="grid-modelos">
+            {% for modelo in modelos %}
+            <div class="card card-modelo">
+                <div class="card-body position-relative">
+                    <!-- Badge do tipo de arquivo -->
+                    <span class="badge badge-tipo 
+                        {% if modelo.arquivo.endswith('.pdf') %}bg-danger{% else %}bg-success{% endif %}">
+                        {% if modelo.arquivo.endswith('.pdf') %}PDF{% else %}XLSX{% endif %}
+                    </span>
+                    
+                    <!-- Ícone -->
+                    <span class="icone-modelo">{{ modelo.icone }}</span>
+                    
+                    <!-- Nome -->
+                    <div class="nome-modelo">{{ modelo.nome }}</div>
+                    
+                    <!-- Descrição -->
+                    <div class="descricao-modelo">{{ modelo.descricao }}</div>
+                    
+                    <!-- Botão de Download -->
+                    <a href="{{ url_for('analises_pc.download_modelo', filename=modelo.arquivo) }}" 
+                       class="btn btn-download">
+                        <i class="bi bi-download me-2"></i>Baixar
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Footer Info -->
+        <div class="card border-primary mb-4">
+            <div class="card-body">
+                <h5 class="card-title text-primary">
+                    <i class="bi bi-lightbulb-fill me-2"></i>Sobre os Modelos
+                </h5>
+                <p class="card-text mb-2">
+                    <strong>Documentos essenciais incluídos:</strong>
+                </p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="mb-0">
+                            <li><strong>Termo celebrado</strong> - Base do convênio/parceria</li>
+                            <li><strong>Solicitações de alterações</strong> - Pedidos de modificação de cláusulas</li>
+                            <li><strong>Aditamentos</strong> - Alterações formais de valores, prazos ou escopo</li>
+                            <li><strong>Apostilamentos</strong> - Ajustes sem modificação do objeto</li>
+                            <li><strong>Manifestações</strong> - Pareceres que impactem o plano de trabalho</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="mb-0">
+                            <li><strong>Cronograma de desembolso</strong> - Datas e valores de liberação</li>
+                            <li><strong>Plano de trabalho</strong> - Detalhamento das atividades e metas</li>
+                            <li><strong>Orçamento anual</strong> - Previsão de receitas e despesas</li>
+                            <li><strong>FACC</strong> - Atualização cadastral de credores</li>
+                            <li><strong>Memória de cálculo</strong> - Justificativas de valores</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="text-center text-muted">
+            <small>
+                <i class="bi bi-github me-1"></i>
+                Os modelos são versionados via Git e mantidos atualizados conforme legislação vigente.
+            </small>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Upload de modelos
+        document.getElementById('formUpload')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const arquivo = document.getElementById('arquivoModelo').files[0];
+            
+            if (!arquivo) {
+                mostrarStatus('Selecione um arquivo!', 'danger');
+                return;
+            }
+            
+            // Validar tamanho (10MB)
+            if (arquivo.size > 10 * 1024 * 1024) {
+                mostrarStatus('Arquivo muito grande! Máximo 10MB.', 'danger');
+                return;
+            }
+            
+            // Validar extensão
+            const extensao = arquivo.name.split('.').pop().toLowerCase();
+            if (!['pdf', 'xlsx'].includes(extensao)) {
+                mostrarStatus('Apenas arquivos PDF ou XLSX são permitidos!', 'danger');
+                return;
+            }
+            
+            formData.append('arquivo', arquivo);
+            
+            mostrarStatus('Enviando arquivo...', 'info');
+            
+            try {
+                const response = await fetch('{{ url_for("analises_pc.upload_modelo") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    mostrarStatus(
+                        `✅ ${result.mensagem}<br><small>Arquivo: ${result.filename}</small>`, 
+                        'success'
+                    );
+                    document.getElementById('formUpload').reset();
+                    
+                    // Recarregar página após 2 segundos para mostrar novo modelo
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    mostrarStatus(`❌ Erro: ${result.error}`, 'danger');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarStatus('❌ Erro ao fazer upload. Verifique o console.', 'danger');
+            }
+        });
+        
+        function mostrarStatus(mensagem, tipo) {
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.innerHTML = `
+                <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+                    ${mensagem}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

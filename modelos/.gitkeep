@@ -1,0 +1,2 @@
+# Este arquivo garante que a pasta modelos/ seja rastreada pelo Git
+# Mesmo que esteja vazia, a pasta será incluída no repositório

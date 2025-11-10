@@ -44,8 +44,8 @@ TABELAS_CONFIG = {
     'c_analistas': {
         'nome': 'Analistas',
         'schema': 'categoricas',
-        'colunas_editaveis': ['nome_analista', 'status'],
-        'labels': {'nome_analista': 'Nome do Analista', 'status': 'Status'},
+        'colunas_editaveis': ['nome_analista', 'd_usuario', 'status'],
+        'labels': {'nome_analista': 'Nome do Analista', 'd_usuario': 'R.F.', 'status': 'Status'},
         'ordem': 'nome_analista',
         'tipos_campo': {
             'status': ['Ativo', 'Inativo']

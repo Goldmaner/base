@@ -74,7 +74,7 @@ def listar_usuarios():
         print("[DEBUG] Executando query para listar usuários...")
         cur = get_cursor()
         cur.execute("""
-            SELECT id, email, tipo_usuario, data_criacao 
+            SELECT id, email, tipo_usuario, d_usuario, data_criacao 
             FROM usuarios 
             ORDER BY data_criacao DESC
         """)
@@ -90,6 +90,7 @@ def listar_usuarios():
                 "id": user["id"],
                 "email": user["email"],
                 "tipo_usuario": user["tipo_usuario"],
+                "d_usuario": user["d_usuario"],
                 "data_criacao": user["data_criacao"].isoformat() if user["data_criacao"] else None
             })
         
@@ -117,10 +118,14 @@ def criar_usuario():
         email = data.get("email", "").strip().lower()
         senha = data.get("senha", "").strip()
         tipo_usuario = data.get("tipo_usuario", "").strip()
+        d_usuario = data.get("d_usuario", "").strip()
         
         # Validações
         if not email or not senha or not tipo_usuario:
             return jsonify({"erro": "Email, senha e tipo de usuário são obrigatórios"}), 400
+        
+        if d_usuario and len(d_usuario) > 20:
+            return jsonify({"erro": "Departamento do usuário deve ter no máximo 20 caracteres"}), 400
         
         tipos_validos = ["Agente Público", "Agente DAC", "Agente DGP", "Agente DP", "Externo"]
         if tipo_usuario not in tipos_validos:
@@ -133,10 +138,10 @@ def criar_usuario():
         cur = get_cursor()
         try:
             cur.execute("""
-                INSERT INTO usuarios (email, senha, tipo_usuario)
-                VALUES (%s, %s, %s)
+                INSERT INTO usuarios (email, senha, tipo_usuario, d_usuario)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id
-            """, (email, senha_hash, tipo_usuario))
+            """, (email, senha_hash, tipo_usuario, d_usuario if d_usuario else None))
             
             novo_id = cur.fetchone()["id"]
             get_db().commit()
@@ -161,7 +166,7 @@ def criar_usuario():
 @login_required
 def atualizar_usuario(user_id):
     """
-    API para atualizar tipo de usuário (apenas para Agente Público)
+    API para atualizar tipo de usuário e departamento (apenas para Agente Público)
     """
     # Verificar se é Agente Público
     if session.get("tipo_usuario") != "Agente Público":
@@ -170,19 +175,41 @@ def atualizar_usuario(user_id):
     try:
         data = request.get_json()
         tipo_usuario = data.get("tipo_usuario", "").strip()
+        d_usuario = data.get("d_usuario", "").strip()
         
         # Validações
         tipos_validos = ["Agente Público", "Agente DAC", "Agente DGP", "Agente DP", "Externo"]
-        if tipo_usuario not in tipos_validos:
+        if tipo_usuario and tipo_usuario not in tipos_validos:
             return jsonify({"erro": "Tipo de usuário inválido"}), 400
+        
+        if d_usuario and len(d_usuario) > 20:
+            return jsonify({"erro": "Departamento do usuário deve ter no máximo 20 caracteres"}), 400
         
         # Atualizar no banco
         cur = get_cursor()
-        cur.execute("""
+        
+        # Construir query dinâmica baseado nos campos fornecidos
+        updates = []
+        params = []
+        
+        if tipo_usuario:
+            updates.append("tipo_usuario = %s")
+            params.append(tipo_usuario)
+        
+        if "d_usuario" in data:  # Permite enviar vazio para limpar
+            updates.append("d_usuario = %s")
+            params.append(d_usuario if d_usuario else None)
+        
+        if not updates:
+            return jsonify({"erro": "Nenhum campo para atualizar"}), 400
+        
+        params.append(user_id)
+        
+        cur.execute(f"""
             UPDATE usuarios 
-            SET tipo_usuario = %s 
+            SET {', '.join(updates)}
             WHERE id = %s
-        """, (tipo_usuario, user_id))
+        """, params)
         
         if cur.rowcount == 0:
             cur.close()

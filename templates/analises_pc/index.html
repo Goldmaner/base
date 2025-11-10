@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Check-list de Análise de Prestação de Contas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <style>
@@ -85,17 +86,78 @@
             border-radius: 8px;
             margin-bottom: 20px;
         }
+        .info-badge {
+            display: inline-block;
+            margin-left: 10px;
+            cursor: pointer;
+            background-color: #0d6efd;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 13px;
+            font-weight: bold;
+            vertical-align: middle;
+            transition: all 0.3s;
+        }
+        .info-badge:hover {
+            background-color: #0a58ca;
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.4);
+        }
+        .modal-instrucao .modal-body {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .instrucao-content {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #0d6efd;
+            margin-bottom: 20px;
+            line-height: 1.8;
+        }
+        .instrucao-content ol,
+        .instrucao-content ul {
+            margin: 10px 0;
+            padding-left: 30px;
+        }
+        .instrucao-content li {
+            margin: 8px 0;
+            font-size: 12pt;
+        }
+        .instrucao-content ul[type="circle"] {
+            list-style-type: circle;
+        }
+        .sei-box {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #0d6efd;
+        }
+        .sei-box strong {
+            color: #0d6efd;
+        }
     </style>
 </head>
 <body>
     <div class="container main-container">
         <h2 class="text-center mb-4">Check-list de Análise de Prestação de Contas</h2>
 
-        <!-- Botão Voltar -->
-        <div class="mb-4">
-            <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
-                ← Voltar
-            </a>
+        <!-- Botões de Navegação -->
+        <div class="mb-4 d-flex justify-content-between align-items-center">
+            <div>
+                <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+                    ← Voltar
+                </a>
+            </div>
+            <div>
+                <a href="{{ url_for('analises_pc.meus_processos') }}" class="btn btn-info">
+                    <i class="bi bi-person-check"></i> Meus Processos
+                </a>
+                <a href="{{ url_for('analises_pc.central_modelos') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-file-earmark-text"></i> Central de Modelos
+                </a>
+            </div>
         </div>
 
         <!-- Seção de Configuração Inicial -->
@@ -160,7 +222,12 @@
             <div id="checklistPrincipal">
                 <div class="checklist-item" data-order="1">
                     <input type="checkbox" id="check_avaliacao_celebracao" onchange="handleCheckboxChange(this)">
-                    <label for="check_avaliacao_celebracao">Avaliação do processo de celebração</label>
+                    <label for="check_avaliacao_celebracao">
+                        Avaliação do processo de celebração
+                        <span class="info-badge" onclick="abrirModalInstrucao()">
+                            📋 Ver Instrução
+                        </span>
+                    </label>
                 </div>
                 
                 <div class="checklist-item" data-order="2">
@@ -245,6 +312,47 @@
         </div>
     </div>
 
+    <!-- Modal de Instrução -->
+    <div class="modal fade modal-instrucao" id="modalInstrucao" tabindex="-1" aria-labelledby="modalInstrucaoLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalInstrucaoLabel">
+                        📋 Instrução: Avaliação do Processo de Celebração
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Processo SEI de Celebração -->
+                    <div class="sei-box mb-4">
+                        <strong>📄 Processo SEI de Celebração:</strong>
+                        <div id="seiCelebInfo" class="mt-2 fs-5">
+                            <span class="spinner-border spinner-border-sm me-2"></span>Carregando...
+                        </div>
+                    </div>
+                    
+                    <!-- Instrução -->
+                    <div>
+                        <h6 class="text-primary mb-3">📖 Instrução Completa:</h6>
+                        <div class="instrucao-content" id="instrucaoTexto">
+                            <div class="text-center text-muted">
+                                <span class="spinner-border spinner-border-sm me-2"></span>Carregando instrução...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="{{ url_for('analises_pc.central_modelos') }}" class="btn btn-primary me-auto" target="_blank">
+                        📁 Acessar Central de Modelos
+                    </a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        ✖ Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -297,7 +405,80 @@
                 placeholder: 'Selecione o período...',
                 allowClear: true
             });
+            
+            // Verificar se há parâmetros de URL (vindos de "Meus Processos")
+            const urlParams = new URLSearchParams(window.location.search);
+            const termoParam = urlParams.get('termo');
+            const mesesParam = urlParams.get('meses');
+            const autoLoad = urlParams.get('autoload') === 'true'; // Flag para carregar automaticamente
+            
+            if (termoParam && mesesParam) {
+                // Aguardar um pouco para garantir que o Select2 foi inicializado
+                setTimeout(async () => {
+                    // Selecionar o termo
+                    $('#numeroTermo').val(termoParam).trigger('change');
+                    
+                    // Aguardar carregar os meses
+                    await buscarMesesDisponiveis(termoParam);
+                    
+                    // Selecionar o mês
+                    setTimeout(async () => {
+                        $('#mesesAnalisados').val(mesesParam).trigger('change');
+                        
+                        if (autoLoad) {
+                            // Carregar analistas do checklist existente e depois carregar automaticamente
+                            setTimeout(async () => {
+                                await carregarChecklistAutomatico(termoParam, mesesParam);
+                            }, 800);
+                        } else {
+                            // Apenas rolar para o formulário
+                            $('html, body').animate({
+                                scrollTop: $('#configSection').offset().top - 20
+                            }, 500);
+                        }
+                    }, 500);
+                }, 300);
+            }
         });
+        
+        async function carregarChecklistAutomatico(numeroTermo, mesesAnalisados) {
+            try {
+                // Primeiro, buscar os analistas do checklist
+                const response = await fetch('/analises_pc/api/carregar_checklist', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        meses_analisados: mesesAnalisados
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.analistas && data.analistas.length > 0) {
+                    // Selecionar os analistas
+                    $('#analistas').val(data.analistas).trigger('change');
+                    
+                    // Aguardar um pouco e depois carregar o checklist
+                    setTimeout(() => {
+                        carregarChecklist();
+                    }, 300);
+                } else {
+                    // Se não houver analistas, apenas rolar para o formulário
+                    $('html, body').animate({
+                        scrollTop: $('#configSection').offset().top - 20
+                    }, 500);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar checklist automaticamente:', error);
+                // Em caso de erro, apenas rolar para o formulário
+                $('html, body').animate({
+                    scrollTop: $('#configSection').offset().top - 20
+                }, 500);
+            }
+        }
         
         async function buscarMesesDisponiveis(numeroTermo) {
             try {
@@ -424,11 +605,67 @@
                 // Mostrar checklist
                 $('#configSection').hide();
                 $('#checklistArea').show();
+                
+                // Buscar e armazenar informações adicionais (instrução + SEI)
+                await carregarInfoAdicional(numeroTermo);
 
             } catch (error) {
                 console.error('Erro:', error);
                 alert('Erro ao carregar checklist!');
             }
+        }
+        
+        // Variáveis globais para armazenar dados da instrução
+        let dadosInstrucao = {
+            instrucao: null,
+            sei_celeb: null
+        };
+        
+        async function carregarInfoAdicional(numeroTermo) {
+            try {
+                const response = await fetch('/analises_pc/api/buscar_info_adicional', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Armazenar dados globalmente
+                dadosInstrucao.instrucao = data.instrucao;
+                dadosInstrucao.sei_celeb = data.sei_celeb;
+                
+            } catch (error) {
+                console.error('Erro ao carregar informações adicionais:', error);
+                dadosInstrucao.instrucao = null;
+                dadosInstrucao.sei_celeb = null;
+            }
+        }
+        
+        function abrirModalInstrucao() {
+            // Preencher SEI de Celebração
+            const seiElement = document.getElementById('seiCelebInfo');
+            if (dadosInstrucao.sei_celeb) {
+                seiElement.innerHTML = `<strong class="text-primary fs-4">${dadosInstrucao.sei_celeb}</strong>`;
+            } else {
+                seiElement.innerHTML = `<em class="text-muted">Processo SEI não informado no cadastro do termo</em>`;
+            }
+            
+            // Preencher Instrução
+            const instrucaoElement = document.getElementById('instrucaoTexto');
+            if (dadosInstrucao.instrucao) {
+                instrucaoElement.innerHTML = dadosInstrucao.instrucao;
+            } else {
+                instrucaoElement.innerHTML = `<em class="text-muted">Instrução não cadastrada no sistema</em>`;
+            }
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('modalInstrucao'));
+            modal.show();
         }
 
         function adicionarRecurso(recursoData = null) {

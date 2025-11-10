@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meus Processos - Análise de Prestação de Contas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 30px;
+            padding-bottom: 50px;
+        }
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-section {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .table-processos {
+            margin-top: 20px;
+        }
+        .table-processos tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        .badge-status {
+            font-size: 0.9rem;
+            padding: 6px 12px;
+        }
+        .btn-acao {
+            margin: 2px;
+        }
+        .progress {
+            background-color: #e9ecef;
+            border: 1px solid #dee2e6;
+        }
+        .progress-bar {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+        .empty-state i {
+            font-size: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <!-- Header -->
+        <div class="header-section">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-2">
+                        <i class="bi bi-clipboard-check me-2"></i>Meus Processos
+                    </h2>
+                    <p class="mb-0">Checklists de Análise de Prestação de Contas atribuídos a você</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('analises_pc.index') }}" class="btn btn-light me-2">
+                        <i class="bi bi-plus-circle me-2"></i>Novo Checklist
+                    </a>
+                    <a href="{{ url_for('analises_pc.index') }}" class="btn btn-outline-light">
+                        <i class="bi bi-arrow-left me-2"></i>Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensagem de erro ou info -->
+        {% if mensagem %}
+        <div class="alert alert-{% if 'Visualizando' in mensagem %}info{% else %}warning{% endif %}">
+            <i class="bi bi-{% if 'Visualizando' in mensagem %}info-circle{% else %}exclamation-triangle{% endif %}-fill me-2"></i>
+            {{ mensagem }}
+        </div>
+        {% endif %}
+
+        <!-- Filtro de Analista (apenas para Admin) -->
+        {% if is_admin %}
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-funnel me-2"></i>Filtros (Admin)
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('analises_pc.meus_processos') }}" id="formFiltros">
+                    <div class="row g-3">
+                        <!-- Tipo de visualização -->
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Visualizar:</strong></label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipo_vis" id="visAtribuidos" 
+                                       value="atribuidos" {% if not mostrar_nao_atribuidos %}checked{% endif %}
+                                       onchange="toggleFiltros()">
+                                <label class="form-check-label" for="visAtribuidos">
+                                    Processos Atribuídos
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipo_vis" id="visNaoAtribuidos" 
+                                       value="nao_atribuidos" {% if mostrar_nao_atribuidos %}checked{% endif %}
+                                       onchange="toggleFiltros()">
+                                <label class="form-check-label" for="visNaoAtribuidos">
+                                    Processos Não Atribuídos
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Filtro de Analista (apenas para processos atribuídos) -->
+                        <div class="col-md-6" id="filtroAnalista">
+                            <label for="analistaFiltro" class="form-label"><strong>Analista:</strong></label>
+                            <select id="analistaFiltro" name="analista" class="form-select">
+                                <option value="">Meus processos (baseado no meu R.F.)</option>
+                                {% for analista in todos_analistas %}
+                                <option value="{{ analista.nome_analista }}" {% if analista_selecionado == analista.nome_analista %}selected{% endif %}>
+                                    {{ analista.nome_analista }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Filtros para processos não atribuídos -->
+                        <div class="col-md-12" id="filtrosNaoAtribuidos" style="display: none;">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="ocultar_encerrados" 
+                                               id="ocultarEncerrados" value="true" {% if ocultar_encerrados %}checked{% endif %}>
+                                        <label class="form-check-label" for="ocultarEncerrados">
+                                            <i class="bi bi-eye-slash"></i> Ocultar processos encerrados
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="responsabilidadeFiltro" class="form-label"><strong>Responsabilidade:</strong></label>
+                                    <select id="responsabilidadeFiltro" name="responsabilidade" class="form-select">
+                                        <option value="">Todas</option>
+                                        <option value="1" {% if responsabilidade_filtro == '1' %}selected{% endif %}>DP</option>
+                                        <option value="2" {% if responsabilidade_filtro == '2' %}selected{% endif %}>Compartilhada</option>
+                                        <option value="3" {% if responsabilidade_filtro == '3' %}selected{% endif %}>Pessoa Gestora</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="filtroTermo" class="form-label"><strong>Nº do Termo:</strong></label>
+                                    <input type="text" class="form-control" id="filtroTermo" name="filtro_termo" 
+                                           placeholder="Digite o número do termo" value="{{ filtro_termo }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Filtro de termo para processos atribuídos -->
+                        <div class="col-md-6" id="filtroTermoAtribuidos">
+                            <label for="filtroTermoAtrib" class="form-label"><strong>Nº do Termo:</strong></label>
+                            <input type="text" class="form-control" id="filtroTermoAtrib" name="filtro_termo" 
+                                   placeholder="Digite o número do termo" value="{{ filtro_termo }}">
+                        </div>
+                        
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-2"></i>Aplicar Filtros
+                            </button>
+                            <a href="{{ url_for('analises_pc.meus_processos') }}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Limpar
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden input para manter o estado -->
+                    <input type="hidden" name="nao_atribuidos" id="hiddenNaoAtribuidos" value="{% if mostrar_nao_atribuidos %}true{% else %}false{% endif %}">
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Tabela de Processos -->
+        {% if processos and processos|length > 0 %}
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-task me-2"></i>Processos Atribuídos
+                    <span class="badge bg-light text-primary ms-2">{{ processos|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-processos mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="20%">Número do Termo</th>
+                                <th width="12%">SEI PC</th>
+                                <th width="10%">Meses</th>
+                                {% if not mostrar_nao_atribuidos %}
+                                <th width="15%">Analistas</th>
+                                {% else %}
+                                <th width="15%">Responsável Prévio</th>
+                                {% endif %}
+                                <th width="10%" class="text-center">Notificado</th>
+                                <th width="10%" class="text-center">Parecer</th>
+                                <th width="10%" class="text-center">Encerramento</th>
+                                <th width="13%" class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for processo in processos %}
+                            <tr>
+                                <td>
+                                    <strong class="text-primary">{{ processo.numero_termo }}</strong>
+                                </td>
+                                <td>
+                                    {% if processo.sei_pc %}
+                                    <span class="badge bg-secondary">{{ processo.sei_pc }}</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if processo.meses_analisados %}
+                                    <span class="badge bg-info text-white">{{ processo.meses_analisados }}</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not mostrar_nao_atribuidos %}
+                                    <small class="text-muted">
+                                        {{ processo.analistas }}
+                                        {% if processo.total_analistas > 1 %}
+                                        <span class="badge bg-secondary ms-1">{{ processo.total_analistas }}</span>
+                                        {% endif %}
+                                    </small>
+                                    {% else %}
+                                    <small class="text-muted">
+                                        {{ processo.responsavel_previo if processo.responsavel_previo else '-' }}
+                                    </small>
+                                    {% endif %}
+                                </td>
+                                <!-- Notificado e Enviado -->
+                                <td class="text-center">
+                                    {% if processo.documentos_sei_1 %}
+                                    <span class="badge bg-success" style="font-size: 1rem; padding: 8px 16px;">
+                                        <i class="bi bi-check-circle-fill"></i> Sim
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary" style="font-size: 1rem; padding: 8px 16px;">
+                                        <i class="bi bi-circle"></i> Não
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <!-- Emissão de Parecer -->
+                                <td class="text-center">
+                                    {% if processo.emissao_parecer %}
+                                    <span class="badge bg-success" style="font-size: 1rem; padding: 8px 16px;">
+                                        <i class="bi bi-check-circle-fill"></i> Sim
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary" style="font-size: 1rem; padding: 8px 16px;">
+                                        <i class="bi bi-circle"></i> Não
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <!-- Encaminhamento para Encerramento -->
+                                <td class="text-center">
+                                    {% if processo.encaminhamento_encerramento %}
+                                    <span class="badge bg-success" style="font-size: 1rem; padding: 8px 16px;">
+                                        <i class="bi bi-check-circle-fill"></i> Sim
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary" style="font-size: 1rem; padding: 8px 16px;">
+                                        <i class="bi bi-circle"></i> Não
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <!-- Botão Ações -->
+                                <td class="text-center">
+                                    {% if mostrar_nao_atribuidos and is_admin %}
+                                    <!-- Botão Atribuir para processos não atribuídos -->
+                                    <button class="btn btn-sm btn-success" 
+                                            onclick="abrirModalAtribuir('{{ processo.numero_termo }}')"
+                                            title="Atribuir Analistas">
+                                        <i class="bi bi-person-plus-fill"></i> Atribuir
+                                    </button>
+                                    {% else %}
+                                    <!-- Botão Abrir para processos atribuídos -->
+                                    <button class="btn btn-sm btn-primary" 
+                                            onclick="abrirChecklist('{{ processo.numero_termo }}', '{{ processo.meses_analisados }}')"
+                                            title="Abrir Checklist">
+                                        <i class="bi bi-box-arrow-up-right"></i> Abrir
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Informações adicionais -->
+        <div class="alert alert-info mt-4">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <strong>Legenda:</strong> 
+            <span class="badge bg-success ms-2"><i class="bi bi-check-circle-fill"></i> Sim</span> = Etapa concluída | 
+            <span class="badge bg-secondary ms-2"><i class="bi bi-circle"></i> Não</span> = Etapa pendente
+            <br><br>
+            <strong>Dica:</strong> Clique em "Abrir" para carregar automaticamente o checklist completo.
+        </div>
+
+        {% else %}
+        <!-- Estado vazio -->
+        <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <h4>Nenhum processo atribuído</h4>
+            <p class="text-muted">
+                Você ainda não possui processos de análise de prestação de contas atribuídos.<br>
+                Entre em contato com o coordenador para ser incluído como analista em um processo.
+            </p>
+            <a href="{{ url_for('analises_pc.index') }}" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-circle me-2"></i>Criar Novo Checklist
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Modal de Atribuição de Processo -->
+    <div class="modal fade" id="modalAtribuir" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-person-plus-fill me-2"></i>Atribuir Processo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formAtribuir">
+                        <input type="hidden" id="atribuirNumeroTermo">
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Número do Termo:</strong></label>
+                            <input type="text" class="form-control" id="atribuirNumeroTermoDisplay" readonly>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="atribuirMeses" class="form-label"><strong>Meses Analisados *</strong></label>
+                            <input type="text" class="form-control" id="atribuirMeses" 
+                                   placeholder="Ex: 1-12, 13-24, 1-7" required>
+                            <small class="form-text text-muted">Formato: 1-12 ou 13-24 ou 1-7, etc.</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="atribuirAnalistas" class="form-label"><strong>Analistas *</strong></label>
+                            <select id="atribuirAnalistas" class="form-select" multiple required>
+                                {% for analista in todos_analistas %}
+                                <option value="{{ analista.nome_analista }}">{{ analista.nome_analista }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Selecione um ou mais analistas (Ctrl+Click)</small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="confirmarAtribuicao()">
+                        <i class="bi bi-check-circle me-2"></i>Atribuir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Inicializar Select2 no filtro de analista
+            $('#analistaFiltro').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Selecione um analista...',
+                allowClear: true
+            });
+            
+            // Inicializar Select2 no modal de atribuição
+            $('#atribuirAnalistas').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Selecione um ou mais analistas...',
+                closeOnSelect: false,
+                width: '100%'
+            });
+            
+            // Toggle dos filtros baseado no tipo de visualização
+            toggleFiltros();
+        });
+        
+        function toggleFiltros() {
+            const naoAtribuidos = document.getElementById('visNaoAtribuidos').checked;
+            document.getElementById('hiddenNaoAtribuidos').value = naoAtribuidos ? 'true' : 'false';
+            
+            // Mostrar/esconder filtros apropriados
+            document.getElementById('filtroAnalista').style.display = naoAtribuidos ? 'none' : 'block';
+            document.getElementById('filtroTermoAtribuidos').style.display = naoAtribuidos ? 'none' : 'block';
+            document.getElementById('filtrosNaoAtribuidos').style.display = naoAtribuidos ? 'block' : 'none';
+        }
+        
+        function abrirModalAtribuir(numeroTermo) {
+            document.getElementById('atribuirNumeroTermo').value = numeroTermo;
+            document.getElementById('atribuirNumeroTermoDisplay').value = numeroTermo;
+            document.getElementById('atribuirMeses').value = '';
+            $('#atribuirAnalistas').val(null).trigger('change');
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalAtribuir'));
+            modal.show();
+        }
+        
+        async function confirmarAtribuicao() {
+            const numeroTermo = document.getElementById('atribuirNumeroTermo').value;
+            const meses = document.getElementById('atribuirMeses').value.trim();
+            const analistas = $('#atribuirAnalistas').val();
+            
+            if (!meses) {
+                alert('Por favor, preencha os meses analisados!');
+                return;
+            }
+            
+            if (!analistas || analistas.length === 0) {
+                alert('Por favor, selecione pelo menos um analista!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/analises_pc/api/atribuir_processo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        meses_analisados: meses,
+                        analistas: analistas
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('✓ ' + data.message);
+                    // Fechar modal
+                    bootstrap.Modal.getInstance(document.getElementById('modalAtribuir')).hide();
+                    // Recarregar página
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao atribuir processo!');
+            }
+        }
+        
+        function abrirChecklist(numeroTermo, mesesAnalisados) {
+            // Redirecionar para a página do checklist com parâmetros pré-preenchidos e autoload
+            const url = `{{ url_for('analises_pc.index') }}?termo=${encodeURIComponent(numeroTermo)}&meses=${encodeURIComponent(mesesAnalisados)}&autoload=true`;
+            window.location.href = url;
+        }
+    </script>
+</body>
+</html>
