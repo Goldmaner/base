@@ -98,11 +98,23 @@
             font-weight: bold;
             vertical-align: middle;
             transition: all 0.3s;
+            pointer-events: auto;
+            z-index: 10;
+            position: relative;
+            border: none;
+            outline: none;
         }
         .info-badge:hover {
             background-color: #0a58ca;
             transform: scale(1.05);
             box-shadow: 0 2px 8px rgba(13, 110, 253, 0.4);
+        }
+        .info-badge:active {
+            transform: scale(0.98);
+        }
+        .info-badge:focus {
+            outline: 2px solid #0a58ca;
+            outline-offset: 2px;
         }
         .modal-instrucao .modal-body {
             max-height: 70vh;
@@ -136,6 +148,24 @@
         }
         .sei-box strong {
             color: #0d6efd;
+        }
+        .section-title-modal {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            margin: 25px -15px 20px -15px;
+            font-weight: bold;
+            color: #495057;
+            border-left: 4px solid #0d6efd;
+        }
+        #modalDadosBase .form-label {
+            font-size: 0.95rem;
+        }
+        #modalDadosBase input[readonly],
+        #modalDadosBase textarea[readonly],
+        #modalDadosBase select[disabled] {
+            background-color: #f8f9fa;
+            border-color: #dee2e6;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -224,20 +254,30 @@
                     <input type="checkbox" id="check_avaliacao_celebracao" onchange="handleCheckboxChange(this)">
                     <label for="check_avaliacao_celebracao">
                         Avaliação do processo de celebração
-                        <span class="info-badge" onclick="abrirModalInstrucao()">
-                            📋 Ver Instrução
-                        </span>
                     </label>
+                    <button type="button" class="info-badge" onclick="abrirModalInstrucao(); return false;">
+                        📋 Ver Instrução
+                    </button>
                 </div>
                 
                 <div class="checklist-item" data-order="2">
                     <input type="checkbox" id="check_avaliacao_prestacao_contas" onchange="handleCheckboxChange(this)">
-                    <label for="check_avaliacao_prestacao_contas">Avaliação do processo de prestação de contas / pagamento</label>
+                    <label for="check_avaliacao_prestacao_contas">
+                        Avaliação do processo de prestação de contas / pagamento
+                    </label>
+                    <button type="button" class="info-badge" onclick="abrirModalInstrucaoPC(); return false;">
+                        📋 Ver Instrução
+                    </button>
                 </div>
                 
                 <div class="checklist-item" data-order="3">
                     <input type="checkbox" id="check_preenchimento_dados_base" onchange="handleCheckboxChange(this)">
-                    <label for="check_preenchimento_dados_base">Preenchimento de dados base</label>
+                    <label for="check_preenchimento_dados_base">
+                        Preenchimento de dados base
+                    </label>
+                    <button type="button" class="info-badge" onclick="abrirModalDadosBase(); return false;">
+                        ✏️ Conferir e/ou concluir preenchimento
+                    </button>
                 </div>
                 
                 <div class="checklist-item" data-order="4">
@@ -345,8 +385,225 @@
                     <a href="{{ url_for('analises_pc.central_modelos') }}" class="btn btn-primary me-auto" target="_blank">
                         📁 Acessar Central de Modelos
                     </a>
+                    <button type="button" class="btn btn-success" onclick="criarPastaModelo()" id="btnCriarPasta">
+                        <i class="bi bi-folder-plus"></i> Criar Pasta Modelo
+                    </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         ✖ Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Instrução de Prestação de Contas -->
+    <div class="modal fade modal-instrucao" id="modalInstrucaoPC" tabindex="-1" aria-labelledby="modalInstrucaoPCLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="modalInstrucaoPCLabel">
+                        📋 Instrução: Avaliação do Processo de Prestação de Contas
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Processo SEI de Prestação de Contas -->
+                    <div class="sei-box mb-4">
+                        <strong>📄 Processo SEI de Prestação de Contas / Pagamento:</strong>
+                        <div id="seiPCInfo" class="mt-2 fs-5">
+                            <span class="spinner-border spinner-border-sm me-2"></span>Carregando...
+                        </div>
+                    </div>
+                    
+                    <!-- Instrução -->
+                    <div>
+                        <h6 class="text-success mb-3">📖 Instrução Completa:</h6>
+                        <div class="instrucao-content" id="instrucaoPCTexto">
+                            <div class="text-center text-muted">
+                                <span class="spinner-border spinner-border-sm me-2"></span>Carregando instrução...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="{{ url_for('analises_pc.central_modelos') }}" class="btn btn-primary me-auto" target="_blank">
+                        📁 Acessar Central de Modelos
+                    </a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        ✖ Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Dados Base -->
+    <div class="modal fade" id="modalDadosBase" tabindex="-1" aria-labelledby="modalDadosBaseLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title" id="modalDadosBaseLabel">
+                        ✏️ Dados Base da Parceria
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Alerta de termo rescindido -->
+                    <div id="alertaRescisao" class="alert alert-danger d-none mb-4" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <strong>ATENÇÃO:</strong> Este termo consta como <strong>RESCINDIDO</strong> no sistema.
+                    </div>
+
+                    <form id="formDadosBase">
+                        <!-- Seção: Identificação -->
+                        <div class="section-title-modal">IDENTIFICAÇÃO DO TERMO</div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="db_numero_termo" class="form-label fw-bold">Número do Termo</label>
+                                <input type="text" class="form-control" id="db_numero_termo" name="numero_termo" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="db_tipo_termo" class="form-label fw-bold">Tipo de Termo</label>
+                                <input type="text" class="form-control" id="db_tipo_termo" name="tipo_termo">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="db_osc" class="form-label fw-bold">OSC (Organização da Sociedade Civil)</label>
+                            <input type="text" class="form-control" id="db_osc" name="osc">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="db_projeto" class="form-label fw-bold">Projeto</label>
+                            <textarea class="form-control" id="db_projeto" name="projeto" rows="2"></textarea>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="db_portaria" class="form-label fw-bold">Portaria Aplicada</label>
+                                <select class="form-select" id="db_portaria" name="portaria">
+                                    <option value="">Selecione a portaria...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="db_cnpj" class="form-label fw-bold">CNPJ</label>
+                                <input type="text" class="form-control" id="db_cnpj" name="cnpj">
+                            </div>
+                        </div>
+
+                        <!-- Seção: Vigência e Valores -->
+                        <div class="section-title-modal">VIGÊNCIA E VALORES</div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="db_inicio" class="form-label fw-bold">Data de Início</label>
+                                <input type="date" class="form-control" id="db_inicio" name="inicio">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="db_final" class="form-label fw-bold">Data de Término</label>
+                                <input type="date" class="form-control" id="db_final" name="final">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="db_meses" class="form-label fw-bold">Meses</label>
+                                <input type="number" class="form-control" id="db_meses" name="meses" readonly style="background-color: #e9ecef;">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="db_total_previsto" class="form-label fw-bold">Total Previsto (R$)</label>
+                                <input type="text" class="form-control" id="db_total_previsto" name="total_previsto">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="db_total_pago" class="form-label fw-bold">Total Pago (R$)</label>
+                                <input type="text" class="form-control" id="db_total_pago" name="total_pago">
+                            </div>
+                        </div>
+
+                        <!-- Seção: Dados Bancários e Características -->
+                        <div class="section-title-modal">DADOS BANCÁRIOS E CARACTERÍSTICAS</div>
+
+                        <div class="mb-3">
+                            <label for="db_conta" class="form-label fw-bold">Conta</label>
+                            <input type="text" class="form-control" id="db_conta" name="conta">
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">É transição de Portaria?</label>
+                                <div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="transicao" id="db_transicao_sim" value="1">
+                                        <label class="form-check-label" for="db_transicao_sim">Sim</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="transicao" id="db_transicao_nao" value="0">
+                                        <label class="form-check-label" for="db_transicao_nao">Não</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Tem contrapartida?</label>
+                                <div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="contrapartida" id="db_contrapartida_sim" value="1">
+                                        <label class="form-check-label" for="db_contrapartida_sim">Sim</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="contrapartida" id="db_contrapartida_nao" value="0">
+                                        <label class="form-check-label" for="db_contrapartida_nao">Não</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seção: Processos SEI -->
+                        <div class="section-title-modal">PROCESSOS SEI</div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="db_sei_celeb" class="form-label fw-bold">SEI de Celebração</label>
+                                <input type="text" class="form-control" id="db_sei_celeb" name="sei_celeb">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="db_sei_pc" class="form-label fw-bold">SEI de Pagamento/Prestação de Contas</label>
+                                <input type="text" class="form-control" id="db_sei_pc" name="sei_pc">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="db_sei_plano" class="form-label fw-bold">Documento SEI do Plano de Trabalho</label>
+                                <input type="text" class="form-control" id="db_sei_plano" name="sei_plano">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="db_sei_orcamento" class="form-label fw-bold">Documento SEI de Orçamento Anual</label>
+                                <input type="text" class="form-control" id="db_sei_orcamento" name="sei_orcamento">
+                            </div>
+                        </div>
+
+                        <!-- Seção: Pessoa Gestora -->
+                        <div class="section-title-modal">PESSOA GESTORA</div>
+
+                        <div class="mb-3">
+                            <label for="db_nome_pg" class="form-label fw-bold">Nome da Pessoa Gestora</label>
+                            <select class="form-select" id="db_nome_pg" name="nome_pg">
+                                <option value="">Carregando...</option>
+                            </select>
+                            <small class="text-muted">Se não houver pessoa gestora cadastrada, selecione uma da lista</small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger me-auto" onclick="exportarDadosBasePDF()">
+                        <i class="bi bi-file-pdf"></i> Exportar PDF
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        ✖ Cancelar
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="salvarDadosBase()">
+                        💾 Salvar Alterações
                     </button>
                 </div>
             </div>
@@ -618,7 +875,9 @@
         // Variáveis globais para armazenar dados da instrução
         let dadosInstrucao = {
             instrucao: null,
-            sei_celeb: null
+            sei_celeb: null,
+            instrucao_pc: null,
+            sei_pc: null
         };
         
         async function carregarInfoAdicional(numeroTermo) {
@@ -638,11 +897,15 @@
                 // Armazenar dados globalmente
                 dadosInstrucao.instrucao = data.instrucao;
                 dadosInstrucao.sei_celeb = data.sei_celeb;
+                dadosInstrucao.instrucao_pc = data.instrucao_pc;
+                dadosInstrucao.sei_pc = data.sei_pc;
                 
             } catch (error) {
                 console.error('Erro ao carregar informações adicionais:', error);
                 dadosInstrucao.instrucao = null;
                 dadosInstrucao.sei_celeb = null;
+                dadosInstrucao.instrucao_pc = null;
+                dadosInstrucao.sei_pc = null;
             }
         }
         
@@ -666,6 +929,272 @@
             // Abrir modal
             const modal = new bootstrap.Modal(document.getElementById('modalInstrucao'));
             modal.show();
+        }
+        
+        function abrirModalInstrucaoPC() {
+            // Preencher SEI de Prestação de Contas
+            const seiElement = document.getElementById('seiPCInfo');
+            if (dadosInstrucao.sei_pc) {
+                seiElement.innerHTML = `<strong class="text-success fs-4">${dadosInstrucao.sei_pc}</strong>`;
+            } else {
+                seiElement.innerHTML = `<em class="text-muted">Processo SEI não informado no cadastro do termo</em>`;
+            }
+            
+            // Preencher Instrução
+            const instrucaoElement = document.getElementById('instrucaoPCTexto');
+            if (dadosInstrucao.instrucao_pc) {
+                instrucaoElement.innerHTML = dadosInstrucao.instrucao_pc;
+            } else {
+                instrucaoElement.innerHTML = `<em class="text-muted">Instrução não cadastrada no sistema</em>`;
+            }
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('modalInstrucaoPC'));
+            modal.show();
+        }
+        
+        // Função para abrir modal de dados base
+        async function abrirModalDadosBase() {
+            console.log('[DEBUG] abrirModalDadosBase chamada');
+            
+            const numeroTermo = document.getElementById('numeroTermo').value;
+            console.log('[DEBUG] Número do termo:', numeroTermo);
+            
+            if (!numeroTermo) {
+                alert('Selecione um termo primeiro!');
+                return;
+            }
+            
+            try {
+                console.log('[DEBUG] Fazendo fetch para buscar_dados_base...');
+                
+                // Buscar dados da parceria
+                const response = await fetch('/analises_pc/api/buscar_dados_base', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo
+                    })
+                });
+                
+                console.log('[DEBUG] Response recebida:', response.status);
+                
+                const data = await response.json();
+                console.log('[DEBUG] Data recebida:', data);
+                
+                if (data.error) {
+                    alert('Erro ao carregar dados: ' + data.error);
+                    return;
+                }
+                
+                // Mostrar alerta se termo é rescindido
+                if (data.is_rescindido) {
+                    document.getElementById('alertaRescisao').classList.remove('d-none');
+                } else {
+                    document.getElementById('alertaRescisao').classList.add('d-none');
+                }
+                
+                console.log('[DEBUG] Preenchendo formulário...');
+                // Preencher formulário
+                preencherFormularioDadosBase(data.parceria);
+                
+                console.log('[DEBUG] Carregando portarias...');
+                // Carregar lista de portarias
+                await carregarListaPortarias(data.parceria.portaria);
+                
+                console.log('[DEBUG] Carregando pessoas gestoras...');
+                // Carregar lista de pessoas gestoras
+                await carregarListaPessoasGestoras(data.nome_pg);
+                
+                console.log('[DEBUG] Abrindo modal...');
+                // Abrir modal
+                const modal = new bootstrap.Modal(document.getElementById('modalDadosBase'));
+                modal.show();
+                console.log('[DEBUG] Modal aberta!');
+                
+            } catch (error) {
+                console.error('[ERRO] Erro ao carregar dados base:', error);
+                alert('Erro ao carregar dados da parceria: ' + error.message);
+            }
+        }
+        
+        // Função para preencher o formulário
+        function preencherFormularioDadosBase(parceria) {
+            // Função auxiliar para verificar se o valor é vazio/nulo/NaN
+            function isValorVazio(valor) {
+                return valor === null || valor === undefined || valor === '' || 
+                       (typeof valor === 'number' && isNaN(valor)) ||
+                       (typeof valor === 'string' && valor.toLowerCase() === 'nan');
+            }
+            
+            // Preencher campos de texto
+            const campos = [
+                'numero_termo', 'tipo_termo', 'osc', 'projeto', 
+                'cnpj', 'inicio', 'final', 'meses', 'total_previsto', 'total_pago',
+                'conta', 'sei_celeb', 'sei_pc', 'sei_plano', 'sei_orcamento'
+            ];
+            
+            campos.forEach(campo => {
+                const elemento = document.getElementById(`db_${campo}`);
+                if (elemento) {
+                    const valor = parceria[campo];
+                    
+                    // Definir valor
+                    if (campo === 'inicio' || campo === 'final') {
+                        // Formatar datas
+                        elemento.value = valor && !isValorVazio(valor) ? valor.split('T')[0] : '';
+                    } else {
+                        elemento.value = valor && !isValorVazio(valor) ? valor : '';
+                    }
+                    
+                    // Definir se é readonly baseado em se tem valor
+                    if (campo !== 'numero_termo' && campo !== 'meses') {
+                        if (!isValorVazio(valor)) {
+                            elemento.setAttribute('readonly', 'readonly');
+                            elemento.style.backgroundColor = '#f8f9fa';
+                            elemento.style.cursor = 'not-allowed';
+                        } else {
+                            elemento.removeAttribute('readonly');
+                            elemento.style.backgroundColor = 'white';
+                            elemento.style.cursor = 'text';
+                        }
+                    }
+                }
+            });
+            
+            // Preencher radio buttons - SEMPRE EDITÁVEIS
+            if (parceria.transicao !== null && parceria.transicao !== undefined) {
+                const transicaoValue = parceria.transicao;
+                if (transicaoValue === 1 || transicaoValue === '1') {
+                    document.getElementById('db_transicao_sim').checked = true;
+                } else {
+                    document.getElementById('db_transicao_nao').checked = true;
+                }
+            }
+            
+            if (parceria.contrapartida !== null && parceria.contrapartida !== undefined) {
+                const contrapartidaValue = parceria.contrapartida;
+                if (contrapartidaValue === 1 || contrapartidaValue === '1') {
+                    document.getElementById('db_contrapartida_sim').checked = true;
+                } else {
+                    document.getElementById('db_contrapartida_nao').checked = true;
+                }
+            }
+        }
+        
+        // Função para carregar lista de portarias
+        async function carregarListaPortarias(portariaAtual) {
+            try {
+                const response = await fetch('/analises_pc/api/listar_portarias');
+                const data = await response.json();
+                
+                const select = document.getElementById('db_portaria');
+                select.innerHTML = '<option value="">Selecione a portaria...</option>';
+                
+                if (data.portarias && data.portarias.length > 0) {
+                    data.portarias.forEach(port => {
+                        const option = document.createElement('option');
+                        option.value = port.lei;
+                        option.textContent = port.lei;
+                        if (portariaAtual && port.lei === portariaAtual) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar portarias:', error);
+            }
+        }
+        
+        // Função para carregar lista de pessoas gestoras
+        async function carregarListaPessoasGestoras(nomePgAtual) {
+            try {
+                const response = await fetch('/analises_pc/api/listar_pessoas_gestoras');
+                const data = await response.json();
+                
+                const select = document.getElementById('db_nome_pg');
+                select.innerHTML = '<option value="">Selecione uma pessoa gestora</option>';
+                
+                if (data.pessoas_gestoras && data.pessoas_gestoras.length > 0) {
+                    data.pessoas_gestoras.forEach(pg => {
+                        const option = document.createElement('option');
+                        option.value = pg.nome_pg;
+                        option.textContent = pg.nome_pg;
+                        if (nomePgAtual && pg.nome_pg === nomePgAtual) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Erro ao carregar pessoas gestoras:', error);
+            }
+        }
+        
+        // Função para salvar dados base
+        async function salvarDadosBase() {
+            const numeroTermo = document.getElementById('db_numero_termo').value;
+            const formData = new FormData(document.getElementById('formDadosBase'));
+            
+            const dados = {};
+            formData.forEach((value, key) => {
+                dados[key] = value;
+            });
+            
+            try {
+                const response = await fetch('/analises_pc/api/salvar_dados_base', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        dados: dados
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Dados salvos com sucesso!');
+                    bootstrap.Modal.getInstance(document.getElementById('modalDadosBase')).hide();
+                } else {
+                    alert('Erro ao salvar: ' + (result.error || 'Erro desconhecido'));
+                }
+                
+            } catch (error) {
+                console.error('Erro ao salvar dados base:', error);
+                alert('Erro ao salvar dados');
+            }
+        }
+
+        // Função para exportar dados base para PDF
+        function exportarDadosBasePDF() {
+            const numeroTermo = document.getElementById('db_numero_termo').value;
+            
+            if (!numeroTermo) {
+                alert('Nenhum termo selecionado para exportar.');
+                return;
+            }
+            
+            // Mostrar indicador de carregamento
+            const btnExportar = event.target.closest('button');
+            const textoOriginal = btnExportar.innerHTML;
+            btnExportar.disabled = true;
+            btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Gerando PDF...';
+            
+            // Fazer requisição para a API de exportação
+            window.location.href = `/analises_pc/api/exportar_dados_base_pdf?numero_termo=${encodeURIComponent(numeroTermo)}`;
+            
+            // Restaurar botão após um tempo
+            setTimeout(() => {
+                btnExportar.disabled = false;
+                btnExportar.innerHTML = textoOriginal;
+            }, 2000);
         }
 
         function adicionarRecurso(recursoData = null) {
@@ -795,6 +1324,46 @@
             if (confirm('Deseja voltar para a configuração? Certifique-se de salvar seus avanços antes.')) {
                 $('#checklistArea').hide();
                 $('#configSection').show();
+            }
+        }
+
+        async function criarPastaModelo() {
+            const numeroTermo = $('#numeroTermo').val();
+            
+            if (!numeroTermo) {
+                alert('❌ Por favor, selecione um termo primeiro!');
+                return;
+            }
+
+            const btn = document.getElementById('btnCriarPasta');
+            const btnOriginalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Criando pastas...';
+
+            try {
+                const response = await fetch('/analises_pc/api/criar_pasta_modelo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✅ ' + data.message + '\n\n📁 Pasta criada em:\n' + data.caminho);
+                } else {
+                    alert('❌ Erro: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao criar pasta modelo!');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = btnOriginalHTML;
             }
         }
     </script>

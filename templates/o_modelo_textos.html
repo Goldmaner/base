@@ -69,11 +69,58 @@
       overflow-y: auto;
       font-family: Calibri, Arial, sans-serif;
       font-size: 11pt;
+      line-height: 1.15; /* Espaçamento padrão */
+    }
+    #editorRico * {
+      line-height: inherit; /* Herdar espaçamento para todos os elementos */
     }
     #editorRico:focus {
       outline: none;
       border-color: #5568d3;
       box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
+    }
+    /* Tamanhos de fonte personalizados com consistência */
+    #editorRico font[size="1"] { font-size: 8pt !important; }
+    #editorRico font[size="2"] { font-size: 10pt !important; }
+    #editorRico font[size="3"] { font-size: 11pt !important; }
+    #editorRico font[size="4"] { font-size: 14pt !important; }
+    #editorRico font[size="5"] { font-size: 18pt !important; }
+    #editorRico font[size="6"] { font-size: 24pt !important; }
+    #editorRico font[size="7"] { font-size: 36pt !important; }
+    /* Estilização de listas numeradas e com marcadores */
+    #editorRico ol {
+      list-style-type: decimal;
+      padding-left: 30px;
+      margin: 10px 0;
+    }
+    #editorRico ol ol {
+      list-style-type: lower-alpha;
+      padding-left: 25px;
+    }
+    #editorRico ol ol ol {
+      list-style-type: lower-roman;
+      padding-left: 25px;
+    }
+    #editorRico ul {
+      list-style-type: disc;
+      padding-left: 30px;
+      margin: 10px 0;
+    }
+    #editorRico ul ul {
+      list-style-type: circle;
+      padding-left: 25px;
+    }
+    #editorRico ul ul ul {
+      list-style-type: square;
+      padding-left: 25px;
+    }
+    #editorRico li {
+      margin: 5px 0;
+      font-size: inherit; /* Herdar tamanho da fonte */
+    }
+    /* Garantir que marcadores (::marker) herdem o tamanho da fonte */
+    #editorRico li::marker {
+      font-size: inherit;
     }
     .editor-toolbar {
       background: #f8f9fa;
@@ -81,9 +128,20 @@
       border-radius: 5px;
       padding: 8px;
       margin-bottom: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
     }
     .editor-toolbar button {
       margin: 0 2px;
+    }
+    .editor-toolbar select {
+      margin: 0 5px;
+    }
+    .editor-toolbar span {
+      color: #dee2e6;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -160,6 +218,7 @@
                 <div class="tab-pane fade show active" id="pane-rico" role="tabpanel">
                   <label class="form-label fw-bold">Conteúdo Formatado</label>
                   <div class="editor-toolbar">
+                    <!-- Formatação de texto -->
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('bold');" title="Negrito">
                       <strong>B</strong>
                     </button>
@@ -169,6 +228,48 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('underline');" title="Sublinhado">
                       <u>U</u>
                     </button>
+                    
+                    <span class="mx-1">|</span>
+                    
+                    <!-- Tamanho da fonte -->
+                    <select class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="mudarTamanhoFonte(this.value)" title="Tamanho da fonte">
+                      <option value="">Tamanho</option>
+                      <option value="1">Muito pequeno</option>
+                      <option value="2">Pequeno</option>
+                      <option value="3" selected>Normal</option>
+                      <option value="4">Grande</option>
+                      <option value="5">Muito grande</option>
+                      <option value="6">Enorme</option>
+                    </select>
+                    
+                    <!-- Espaçamento entre linhas -->
+                    <select class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="mudarEspacamento(this.value)" title="Espaçamento entre linhas">
+                      <option value="">Espaçamento</option>
+                      <option value="1">Simples</option>
+                      <option value="1.15" selected>1.15 (Padrão)</option>
+                      <option value="1.5">1.5</option>
+                      <option value="2">Duplo</option>
+                    </select>
+                    
+                    <span class="mx-1">|</span>
+                    
+                    <!-- Listas e numeração -->
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('insertOrderedList');" title="Lista numerada">
+                      1. 2. 3.
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('insertUnorderedList');" title="Lista com marcadores">
+                      • • •
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('indent');" title="Aumentar recuo (Tab)">
+                      ➡ Recuo
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('outdent');" title="Diminuir recuo">
+                      ⬅ Recuo
+                    </button>
+                    
+                    <span class="mx-1">|</span>
+                    
+                    <!-- Alinhamento -->
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('justifyLeft');" title="Alinhar à esquerda">
                       ⬅
                     </button>
@@ -178,7 +279,11 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('justifyRight');" title="Alinhar à direita">
                       ➡
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('editorRico').innerHTML = '';" title="Limpar tudo">
+                    
+                    <span class="mx-1">|</span>
+                    
+                    <!-- Limpar -->
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="limparEditor();" title="Limpar tudo">
                       🗑️
                     </button>
                   </div>
@@ -186,7 +291,7 @@
                     <p>Cole aqui o conteúdo formatado do SEI ou digite livremente...</p>
                 </div>
                 <small class="text-muted d-block mt-1">
-                  💡 Cole diretamente do SEI (Ctrl+V) e a formatação será preservada
+                  💡 Cole diretamente do SEI (Ctrl+V) e a formatação será preservada. Use Tab para criar subitens em listas.
                 </small>
               </div>
 
@@ -219,6 +324,69 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    // Funções auxiliares do editor
+    function mudarTamanhoFonte(tamanho) {
+      if (tamanho) {
+        document.execCommand('fontSize', false, tamanho);
+        
+        // Forçar atualização dos marcadores de lista
+        const editor = document.getElementById('editorRico');
+        const listas = editor.querySelectorAll('li');
+        listas.forEach(li => {
+          li.style.fontSize = 'inherit';
+        });
+      }
+    }
+    
+    function mudarEspacamento(valor) {
+      if (valor) {
+        const editor = document.getElementById('editorRico');
+        editor.style.lineHeight = valor;
+        
+        // Aplicar também em todos os elementos filhos para garantir
+        const todosElementos = editor.querySelectorAll('*');
+        todosElementos.forEach(el => {
+          el.style.lineHeight = 'inherit';
+        });
+      }
+    }
+
+    function limparEditor() {
+      if (confirm('Deseja realmente limpar todo o conteúdo do editor?')) {
+        document.getElementById('editorRico').innerHTML = '';
+      }
+    }
+
+    // Configurar editor rico para suportar Tab em listas
+    document.addEventListener('DOMContentLoaded', function() {
+      const editor = document.getElementById('editorRico');
+      
+      // Interceptar tecla Tab para criar subitens em listas
+      editor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          
+          // Verificar se está dentro de uma lista
+          const selection = window.getSelection();
+          const node = selection.anchorNode;
+          const listItem = node.nodeType === 3 ? node.parentElement.closest('li') : node.closest('li');
+          
+          if (listItem) {
+            // Se shift+tab, diminuir recuo
+            if (e.shiftKey) {
+              document.execCommand('outdent');
+            } else {
+              // Aumentar recuo (criar sublista)
+              document.execCommand('indent');
+            }
+          } else {
+            // Se não está em lista, apenas adicionar espaços
+            document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+          }
+        }
+      });
+    });
+
     // Aguardar DOM estar completamente carregado
     document.addEventListener('DOMContentLoaded', function() {
       const isAdmin = {{ 'true' if is_admin else 'false' }};

@@ -300,7 +300,8 @@
                                     {% else %}
                                     <!-- Botão Abrir para processos atribuídos -->
                                     <button class="btn btn-sm btn-primary" 
-                                            onclick="abrirChecklist('{{ processo.numero_termo }}', '{{ processo.meses_analisados }}')"
+                                            id="btnAbrir{{ loop.index }}"
+                                            onclick="abrirChecklist('{{ processo.numero_termo }}', '{{ processo.meses_analisados }}', {{ loop.index }})"
                                             title="Abrir Checklist">
                                         <i class="bi bi-box-arrow-up-right"></i> Abrir
                                     </button>
@@ -476,7 +477,13 @@
             }
         }
         
-        function abrirChecklist(numeroTermo, mesesAnalisados) {
+        function abrirChecklist(numeroTermo, mesesAnalisados, btnIndex) {
+            // Mostrar loading no botão
+            const btn = document.getElementById(`btnAbrir${btnIndex}`);
+            const btnOriginalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Carregando...';
+            
             // Redirecionar para a página do checklist com parâmetros pré-preenchidos e autoload
             const url = `{{ url_for('analises_pc.index') }}?termo=${encodeURIComponent(numeroTermo)}&meses=${encodeURIComponent(mesesAnalisados)}&autoload=true`;
             window.location.href = url;

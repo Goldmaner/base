@@ -184,7 +184,7 @@ def listar_analistas_ativos():
         query = """
             SELECT nome_analista
             FROM categoricas.c_analistas
-            WHERE status = 'Ativo'
+            WHERE status NOT IN ('Inativo', 'false') OR status IS NULL
             ORDER BY nome_analista
         """
         
