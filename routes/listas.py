@@ -135,6 +135,21 @@ TABELAS_CONFIG = {
         },
         'inline_edit': True,
         'inline_columns': ['status']
+    },
+    'c_documentos_dp': {
+        'nome': 'Tipos de Documento',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['tipo_documento', 'descricao', 'orgao_emissor'],
+        'labels': {
+            'tipo_documento': 'Tipo de Documento',
+            'descricao': 'Descrição',
+            'orgao_emissor': 'Órgão Emissor'
+        },
+        'colunas_filtro': ['tipo_documento', 'orgao_emissor'],
+        'ordem': 'tipo_documento',
+        'tipos_campo': {
+            'descricao': 'textarea'
+        }
     }
 }
 

@@ -427,6 +427,141 @@ def termos_por_categoria(categoria):
         return jsonify({"error": f"Erro ao buscar termos: {str(e)}"}), 500
 
 
+@orcamento_bp.route("/exportar-termo-csv", methods=["GET"])
+@login_required
+def exportar_termo_csv():
+    """
+    Exporta os dados de orçamento preenchidos de UM termo específico para CSV
+    """
+    try:
+        # Obter número do termo e aditivo da query string
+        numero_termo = request.args.get('numero_termo', '').strip()
+        aditivo = request.args.get('aditivo', 0, type=int)
+        
+        if not numero_termo:
+            return "Número do termo não informado", 400
+        
+        cur = get_cursor()
+        
+        # Buscar dados da parceria
+        cur.execute("""
+            SELECT total_previsto, sei_celeb, tipo_termo
+            FROM Parcerias 
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        parceria = cur.fetchone()
+        
+        if not parceria:
+            cur.close()
+            return "Termo não encontrado", 404
+        
+        # Buscar despesas do termo com o aditivo selecionado
+        cur.execute("""
+            SELECT 
+                rubrica,
+                quantidade,
+                categoria_despesa,
+                mes,
+                valor
+            FROM Parcerias_Despesas
+            WHERE numero_termo = %s AND COALESCE(aditivo, 0) = %s
+            ORDER BY rubrica, categoria_despesa, mes
+        """, (numero_termo, aditivo))
+        
+        despesas = cur.fetchall()
+        cur.close()
+        
+        # Criar arquivo CSV em memória com BOM UTF-8 para Excel
+        output = StringIO()
+        # Adicionar BOM UTF-8 para que Excel reconheça acentuação corretamente
+        output.write('\ufeff')
+        writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+        
+        # Cabeçalho do arquivo
+        writer.writerow(['ORÇAMENTO ANUAL - ' + numero_termo])
+        writer.writerow([f'Aditivo: {"Base" if aditivo == 0 else f"Aditivo {aditivo}"}'])
+        writer.writerow([f'Total Previsto: R$ {float(parceria["total_previsto"] or 0):,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')])
+        if parceria['sei_celeb']:
+            writer.writerow([f'SEI Celebração: {parceria["sei_celeb"]}'])
+        writer.writerow([])  # Linha em branco
+        
+        # Agrupar despesas por rubrica, quantidade e categoria
+        # Estrutura: {(rubrica, quantidade, categoria): {mes: valor}}
+        from collections import defaultdict
+        dados_agrupados = defaultdict(dict)
+        todos_meses = set()
+        
+        for despesa in despesas:
+            rubrica = despesa['rubrica'] or ''
+            categoria = despesa['categoria_despesa'] or ''
+            mes = despesa['mes'] or ''
+            valor = float(despesa['valor'] or 0)
+            quantidade = despesa['quantidade'] if despesa['quantidade'] is not None else 0
+            
+            chave = (rubrica, quantidade, categoria)
+            dados_agrupados[chave][mes] = valor
+            todos_meses.add(mes)
+        
+        # Ordenar meses (assumindo formato "Mês 1", "Mês 2", etc.)
+        meses_ordenados = sorted(todos_meses, key=lambda x: int(str(x).split()[-1]) if x and isinstance(x, str) and 'Mês' in x else 0)
+        
+        # Cabeçalho dos dados
+        cabecalho = ['Rubrica', 'Quantidade', 'Categoria de Despesa'] + meses_ordenados + ['Total']
+        writer.writerow(cabecalho)
+        
+        # Escrever dados agrupados (uma linha por rubrica+quantidade+categoria)
+        total_geral = 0
+        for (rubrica, quantidade, categoria) in sorted(dados_agrupados.keys()):
+            valores_meses = dados_agrupados[(rubrica, quantidade, categoria)]
+            
+            # Calcular total da linha
+            total_linha = sum(valores_meses.values())
+            total_geral += total_linha
+            
+            # Montar linha com valores de cada mês
+            linha = [rubrica, quantidade, categoria]
+            
+            # Adicionar valor de cada mês na ordem
+            for mes in meses_ordenados:
+                valor = valores_meses.get(mes, 0)
+                valor_formatado = f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                linha.append(valor_formatado)
+            
+            # Adicionar total da linha
+            total_formatado = f"R$ {total_linha:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            linha.append(total_formatado)
+            
+            writer.writerow(linha)
+        
+        # Linha de total
+        writer.writerow([])
+        writer.writerow([
+            'TOTAL GERAL',
+            '',
+            '',
+            '',
+            f"R$ {total_geral:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        ])
+        
+        # Preparar resposta
+        output.seek(0)
+        data_atual = datetime.now().strftime('%Y%m%d_%H%M%S')
+        aditivo_str = 'base' if aditivo == 0 else f'aditivo{aditivo}'
+        filename = f'orcamento_{numero_termo.replace("/", "-")}_{aditivo_str}_{data_atual}.csv'
+        
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+    except Exception as e:
+        return f"Erro ao exportar CSV: {str(e)}", 500
+
+
 @orcamento_bp.route("/exportar-csv", methods=["GET"])
 @login_required
 def exportar_csv():

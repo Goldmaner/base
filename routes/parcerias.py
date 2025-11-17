@@ -316,7 +316,14 @@ def nova():
                 
                 print("[DEBUG NOVA] Enviando flash de sucesso e redirecionando...")
                 flash("Parceria criada com sucesso!", "success")
-                return redirect(url_for('parcerias.nova'))
+                
+                # Verificar se veio da página de conferência
+                origem = request.form.get('origem_conferencia')
+                if origem == 'conferencia':
+                    # Redirecionar para conferência e atualizar
+                    return redirect(url_for('parcerias.conferencia_pos_insercao'))
+                else:
+                    return redirect(url_for('parcerias.nova'))
             else:
                 print("[DEBUG NOVA] FALHA no INSERT! execute_query retornou False")
                 flash("Erro ao criar parceria no banco de dados!", "danger")
@@ -589,6 +596,20 @@ def editar(numero_termo):
         if rf_result:
             rf_pessoa_gestora = rf_result['numero_rf']
     
+    # Buscar informações de rescisão
+    cur.execute("""
+        SELECT data_rescisao 
+        FROM public.termos_rescisao 
+        WHERE TRIM(numero_termo) = TRIM(%s)
+    """, (numero_termo,))
+    rescisao_result = cur.fetchone()
+    
+    data_rescisao = None
+    termo_rescindido = False
+    if rescisao_result and rescisao_result['data_rescisao']:
+        termo_rescindido = True
+        data_rescisao = rescisao_result['data_rescisao']
+    
     cur.close()
     
     return render_template("parcerias_form.html", 
@@ -596,7 +617,9 @@ def editar(numero_termo):
                          tipos_contrato=tipos_contrato,
                          legislacoes=legislacoes,
                          pessoas_gestoras=pessoas_gestoras,
-                         rf_pessoa_gestora=rf_pessoa_gestora)
+                         rf_pessoa_gestora=rf_pessoa_gestora,
+                         termo_rescindido=termo_rescindido,
+                         data_rescisao=data_rescisao)
 
 
 @parcerias_bp.route("/api/oscs", methods=["GET"])
@@ -1116,6 +1139,44 @@ def atualizar_conferencia():
     except Exception as e:
         flash(f"Erro ao atualizar conferência: {str(e)}", "danger")
         return redirect(url_for('parcerias.conferencia'))
+
+
+@parcerias_bp.route("/conferencia/pos-insercao", methods=["GET"])
+@login_required
+def conferencia_pos_insercao():
+    """
+    Rota intermediária após inserção de parceria vinda da conferência.
+    Executa atualização automática e redireciona para a conferência.
+    """
+    import subprocess
+    import os
+    
+    try:
+        # Caminho do script
+        script_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'import_conferencia.py')
+        
+        if os.path.exists(script_path):
+            # Executa o script para atualizar a conferência
+            result = subprocess.run(
+                ['python', script_path],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                flash("Parceria importada com sucesso! Conferência atualizada automaticamente. ✓", "success")
+            else:
+                flash("Parceria importada, mas houve erro ao atualizar a conferência.", "warning")
+        else:
+            flash("Parceria importada com sucesso!", "success")
+        
+    except subprocess.TimeoutExpired:
+        flash("Parceria importada, mas a atualização da conferência excedeu o tempo limite.", "warning")
+    except Exception as e:
+        flash(f"Parceria importada, mas houve erro ao atualizar conferência: {str(e)}", "warning")
+    
+    return redirect(url_for('parcerias.conferencia'))
 
 
 @parcerias_bp.route("/dicionario-oscs", methods=["GET"])

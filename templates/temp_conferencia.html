@@ -107,7 +107,7 @@
               <button class="btn btn-sm btn-outline-primary me-1" onclick="copiarTermo('{{ termo }}')">
                 <i class="bi bi-clipboard"></i> Copiar
               </button>
-              <a href="{{ url_for('parcerias.nova', numero_termo=termo) }}" class="btn btn-sm btn-success">
+              <a href="{{ url_for('parcerias.nova', numero_termo=termo, origem='conferencia') }}" class="btn btn-sm btn-success">
                 <i class="bi bi-plus-circle"></i> Importar
               </a>
             </td>

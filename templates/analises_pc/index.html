@@ -116,6 +116,13 @@
             outline: 2px solid #0a58ca;
             outline-offset: 2px;
         }
+        .info-badge.warning {
+            background-color: #dc3545;
+        }
+        .info-badge.warning:hover {
+            background-color: #bb2d3b;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.4);
+        }
         .modal-instrucao .modal-body {
             max-height: 70vh;
             overflow-y: auto;
@@ -283,6 +290,9 @@
                 <div class="checklist-item" data-order="4">
                     <input type="checkbox" id="check_preenchimento_orcamento_anual" onchange="handleCheckboxChange(this)">
                     <label for="check_preenchimento_orcamento_anual">Preenchimento de orçamento anual</label>
+                    <button type="button" class="info-badge" id="badgeOrcamento" onclick="abrirOrcamento(); return false;">
+                        📊 Conferir, modificar e/ou preencher orçamento
+                    </button>
                 </div>
                 
                 <div class="checklist-item" data-order="5">
@@ -495,6 +505,19 @@
                         <!-- Seção: Vigência e Valores -->
                         <div class="section-title-modal">VIGÊNCIA E VALORES</div>
 
+                        <!-- Alerta de Termo Rescindido -->
+                        <div id="alertaRescindido" class="alert alert-danger d-none mb-3" role="alert">
+                            <div class="d-flex align-items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-exclamation-triangle-fill flex-shrink-0 me-2" viewBox="0 0 16 16">
+                                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                                </svg>
+                                <div>
+                                    <strong>⚠️ ATENÇÃO: TERMO RESCINDIDO</strong><br>
+                                    Este termo de parceria foi rescindido em <strong id="dataRescisaoTexto"></strong>.
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="row mb-3">
                             <div class="col-md-4">
                                 <label for="db_inicio" class="form-label fw-bold">Data de Início</label>
@@ -507,6 +530,17 @@
                             <div class="col-md-4">
                                 <label for="db_meses" class="form-label fw-bold">Meses</label>
                                 <input type="number" class="form-control" id="db_meses" name="meses" readonly style="background-color: #e9ecef;">
+                            </div>
+                        </div>
+
+                        <!-- Campo de Data de Rescisão (aparece apenas se termo for rescindido) -->
+                        <div class="row mb-3 d-none" id="rowDataRescisao">
+                            <div class="col-md-12">
+                                <label for="db_data_rescisao" class="form-label fw-bold">
+                                    <span class="badge bg-danger">Data de Rescisão</span>
+                                </label>
+                                <input type="date" class="form-control border-danger" id="db_data_rescisao" name="data_rescisao" 
+                                       readonly style="background-color: #f8d7da; font-weight: bold;">
                             </div>
                         </div>
 
@@ -989,11 +1023,23 @@
                     return;
                 }
                 
-                // Mostrar alerta se termo é rescindido
-                if (data.is_rescindido) {
-                    document.getElementById('alertaRescisao').classList.remove('d-none');
+                // Mostrar alerta e campo se termo é rescindido
+                if (data.is_rescindido && data.data_rescisao) {
+                    // Mostrar alerta
+                    document.getElementById('alertaRescindido').classList.remove('d-none');
+                    
+                    // Formatar data para exibição no alerta (DD/MM/YYYY)
+                    const dataRescisao = new Date(data.data_rescisao);
+                    const dataFormatada = dataRescisao.toLocaleDateString('pt-BR');
+                    document.getElementById('dataRescisaoTexto').textContent = dataFormatada;
+                    
+                    // Mostrar campo de data de rescisão
+                    document.getElementById('rowDataRescisao').classList.remove('d-none');
+                    document.getElementById('db_data_rescisao').value = data.data_rescisao;
                 } else {
-                    document.getElementById('alertaRescisao').classList.add('d-none');
+                    // Esconder alerta e campo
+                    document.getElementById('alertaRescindido').classList.add('d-none');
+                    document.getElementById('rowDataRescisao').classList.add('d-none');
                 }
                 
                 console.log('[DEBUG] Preenchendo formulário...');
@@ -1195,6 +1241,64 @@
                 btnExportar.disabled = false;
                 btnExportar.innerHTML = textoOriginal;
             }, 2000);
+        }
+
+        // Função para verificar e abrir orçamento anual
+        async function abrirOrcamento() {
+            const numeroTermo = document.getElementById('numeroTermo').value;
+            
+            if (!numeroTermo) {
+                alert('Selecione um termo primeiro!');
+                return;
+            }
+            
+            try {
+                // Verificar se existe orçamento
+                const response = await fetch('/analises_pc/api/verificar_orcamento', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('Erro ao verificar orçamento: ' + data.error);
+                    return;
+                }
+                
+                const badge = document.getElementById('badgeOrcamento');
+                
+                if (!data.tem_orcamento) {
+                    // Não tem orçamento - badge vermelha
+                    badge.classList.add('warning');
+                    
+                    // Mostrar alerta
+                    const confirmacao = confirm(
+                        '⚠️ O orçamento anual dessa parceria deve ser preenchido.\n\n' +
+                        'Deseja abrir a página de orçamento para preencher agora?'
+                    );
+                    
+                    if (confirmacao) {
+                        // Abrir em nova aba
+                        window.open(data.url_orcamento, '_blank');
+                    }
+                } else {
+                    // Tem orçamento - badge azul
+                    badge.classList.remove('warning');
+                    
+                    // Abrir em nova aba para visualizar/editar
+                    window.open(data.url_orcamento, '_blank');
+                }
+                
+            } catch (error) {
+                console.error('Erro ao verificar orçamento:', error);
+                alert('Erro ao verificar orçamento do termo');
+            }
         }
 
         function adicionarRecurso(recursoData = null) {

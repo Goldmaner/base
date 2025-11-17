@@ -40,9 +40,15 @@
           {% endif %}
         </div>
         <div>
+          {% if request.args.get('origem') == 'conferencia' %}
+          <a href="{{ url_for('parcerias.conferencia') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar para Conferência
+          </a>
+          {% else %}
           <a href="{{ url_for('parcerias.listar') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Voltar
           </a>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -88,6 +94,11 @@
       {% endif %}
 
       <form method="post" action="{{ url_for('parcerias.nova') if modo_importacao or not parceria else url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
+        
+        <!-- Campo hidden para preservar origem da conferência -->
+        {% if request.args.get('origem') == 'conferencia' %}
+        <input type="hidden" name="origem_conferencia" value="conferencia">
+        {% endif %}
         
         <!-- Seção: Identificação -->
         <div class="section-title">IDENTIFICAÇÃO DO TERMO</div>
@@ -146,24 +157,56 @@
         <!-- Seção: Período e Valores -->
         <div class="section-title">PERÍODO E VALORES</div>
 
+        {% if termo_rescindido %}
+        <!-- Alerta de Termo Rescindido -->
+        <div class="alert alert-danger d-flex align-items-center mb-3" role="alert">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-exclamation-triangle-fill flex-shrink-0 me-2" viewBox="0 0 16 16">
+            <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+          </svg>
+          <div>
+            <strong>⚠️ ATENÇÃO: TERMO RESCINDIDO</strong><br>
+            Este termo de parceria foi rescindido em 
+            <strong>{{ data_rescisao.strftime('%d/%m/%Y') if data_rescisao else 'data não informada' }}</strong>.
+          </div>
+        </div>
+        {% endif %}
+
         <div class="row mb-3">
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label for="inicio" class="form-label">Data de Início</label>
             <input type="date" class="form-control" id="inicio" name="inicio" 
                    value="{{ parceria.get('inicio', '') if parceria else '' }}">
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label for="final" class="form-label">Data de Término</label>
             <input type="date" class="form-control" id="final" name="final" 
                    value="{{ parceria.get('final', '') if parceria else '' }}">
           </div>
-          <div class="col-md-4">
+          {% if termo_rescindido %}
+          <div class="col-md-3">
+            <label for="data_rescisao" class="form-label">
+              <span class="badge bg-danger">Data de Rescisão</span>
+            </label>
+            <input type="date" class="form-control border-danger" id="data_rescisao" name="data_rescisao" 
+                   value="{{ data_rescisao.strftime('%Y-%m-%d') if data_rescisao else '' }}"
+                   readonly style="background-color: #f8d7da; font-weight: bold;">
+          </div>
+          <div class="col-md-3">
             <label for="meses" class="form-label">Meses do Projeto</label>
             <input type="number" class="form-control" id="meses" name="meses" 
                    value="{{ parceria.get('meses', '') if parceria else '' }}"
                    readonly style="background-color: #e9ecef;">
             <small class="text-muted">Calculado automaticamente</small>
           </div>
+          {% else %}
+          <div class="col-md-6">
+            <label for="meses" class="form-label">Meses do Projeto</label>
+            <input type="number" class="form-control" id="meses" name="meses" 
+                   value="{{ parceria.get('meses', '') if parceria else '' }}"
+                   readonly style="background-color: #e9ecef;">
+            <small class="text-muted">Calculado automaticamente</small>
+          </div>
+          {% endif %}
         </div>
 
         <div class="row mb-3">
@@ -321,9 +364,15 @@
           <button type="button" class="btn btn-danger" onclick="exportarPDF()">
             <i class="bi bi-file-pdf"></i> Exportar PDF
           </button>
+          {% if request.args.get('origem') == 'conferencia' %}
+          <a href="{{ url_for('parcerias.conferencia') }}" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </a>
+          {% else %}
           <a href="{{ url_for('parcerias.listar') }}" class="btn btn-secondary">
             <i class="bi bi-x-circle"></i> Cancelar
           </a>
+          {% endif %}
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-circle"></i> Salvar Alterações
           </button>

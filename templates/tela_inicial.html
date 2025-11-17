@@ -89,6 +89,46 @@
             </button>
           </div>
 
+          <!-- Filtros de Usuários -->
+          <div class="card mb-3">
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label for="filtroEmail" class="form-label">
+                    <i class="bi bi-search me-1"></i>Buscar por E-mail
+                  </label>
+                  <input type="text" class="form-control" id="filtroEmail" 
+                         placeholder="Digite o e-mail..." 
+                         onkeyup="filtrarUsuarios()">
+                </div>
+                <div class="col-md-4">
+                  <label for="filtroTipo" class="form-label">
+                    <i class="bi bi-funnel me-1"></i>Filtrar por Tipo
+                  </label>
+                  <select class="form-select" id="filtroTipo" onchange="filtrarUsuarios()">
+                    <option value="">Todos os tipos</option>
+                    <option value="Agente Público">Agente Público</option>
+                    <option value="Agente DAC">Agente DAC</option>
+                    <option value="Agente DGP">Agente DGP</option>
+                    <option value="Agente DP">Agente DP</option>
+                    <option value="Externo">Externo</option>
+                  </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                  <button class="btn btn-outline-secondary w-100" onclick="limparFiltros()">
+                    <i class="bi bi-x-circle me-1"></i>Limpar
+                  </button>
+                </div>
+              </div>
+              <div class="mt-2">
+                <small class="text-muted">
+                  <i class="bi bi-info-circle me-1"></i>
+                  <span id="contadorUsuarios">Carregando...</span>
+                </small>
+              </div>
+            </div>
+          </div>
+
           <!-- Formulário de Novo Usuário (inicialmente oculto) -->
           <div id="formNovoUsuario" class="card mb-3" style="display: none;">
             <div class="card-header bg-success text-white">
@@ -141,6 +181,23 @@
               </div>
             </div>
           </div>
+
+          <!-- Paginação -->
+          <div id="paginacaoUsuarios" class="mt-3 d-flex justify-content-between align-items-center" style="display: none !important;">
+            <div>
+              <select class="form-select form-select-sm d-inline-block w-auto" id="itensPorPagina" onchange="alterarItensPorPagina()">
+                <option value="10">10 por página</option>
+                <option value="20">20 por página</option>
+                <option value="50">50 por página</option>
+                <option value="999999">Todos</option>
+              </select>
+            </div>
+            <nav>
+              <ul class="pagination pagination-sm mb-0" id="listaPaginacao">
+                <!-- Páginas serão inseridas aqui -->
+              </ul>
+            </nav>
+          </div>
         </div>
       </div>
     </div>
@@ -148,6 +205,12 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    // Variáveis globais para armazenar usuários e controle de paginação
+    let todosUsuarios = [];
+    let usuariosFiltrados = [];
+    let paginaAtual = 1;
+    let itensPorPagina = 10;
+
     // Carregar usuários quando o modal é aberto
     document.getElementById('modalUsuarios').addEventListener('shown.bs.modal', function () {
       carregarUsuarios();
@@ -160,6 +223,159 @@
     function cancelarFormNovo() {
       document.getElementById('formNovoUsuario').style.display = 'none';
       document.getElementById('formCriarUsuario').reset();
+    }
+
+    function limparFiltros() {
+      document.getElementById('filtroEmail').value = '';
+      document.getElementById('filtroTipo').value = '';
+      filtrarUsuarios();
+    }
+
+    function filtrarUsuarios() {
+      const filtroEmail = document.getElementById('filtroEmail').value.toLowerCase();
+      const filtroTipo = document.getElementById('filtroTipo').value;
+
+      usuariosFiltrados = todosUsuarios.filter(user => {
+        const matchEmail = user.email.toLowerCase().includes(filtroEmail);
+        const matchTipo = filtroTipo === '' || user.tipo_usuario === filtroTipo;
+        return matchEmail && matchTipo;
+      });
+
+      paginaAtual = 1; // Resetar para primeira página ao filtrar
+      atualizarExibicao();
+    }
+
+    function alterarItensPorPagina() {
+      itensPorPagina = parseInt(document.getElementById('itensPorPagina').value);
+      paginaAtual = 1;
+      atualizarExibicao();
+    }
+
+    function irParaPagina(pagina) {
+      paginaAtual = pagina;
+      atualizarExibicao();
+    }
+
+    function atualizarExibicao() {
+      const totalUsuarios = usuariosFiltrados.length;
+      const totalPaginas = Math.ceil(totalUsuarios / itensPorPagina);
+      
+      // Atualizar contador
+      document.getElementById('contadorUsuarios').textContent = 
+        `Exibindo ${totalUsuarios} usuário(s)${todosUsuarios.length !== totalUsuarios ? ' (filtrado de ' + todosUsuarios.length + ')' : ''}`;
+
+      // Calcular índices da página atual
+      const inicio = (paginaAtual - 1) * itensPorPagina;
+      const fim = Math.min(inicio + itensPorPagina, totalUsuarios);
+      const usuariosPagina = usuariosFiltrados.slice(inicio, fim);
+
+      // Renderizar tabela
+      renderizarTabela(usuariosPagina);
+
+      // Atualizar paginação
+      renderizarPaginacao(totalPaginas);
+    }
+
+    function renderizarTabela(usuarios) {
+      const listaUsuariosDiv = document.getElementById('listaUsuarios');
+      
+      if (usuarios.length === 0) {
+        listaUsuariosDiv.innerHTML = `
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            Nenhum usuário encontrado com os filtros aplicados.
+          </div>`;
+        return;
+      }
+
+      let html = '<div class="table-responsive"><table class="table table-hover">';
+      html += '<thead class="table-dark"><tr>';
+      html += '<th>ID</th><th>E-mail</th><th>Tipo</th><th>D. Usuário</th><th>Data Criação</th><th class="text-center">Ações</th>';
+      html += '</tr></thead><tbody>';
+      
+      usuarios.forEach(user => {
+        html += '<tr>';
+        html += `<td>${user.id}</td>`;
+        html += `<td>${user.email}</td>`;
+        
+        // Definir cor do badge baseado no tipo
+        let badgeClass = 'bg-secondary';
+        if (user.tipo_usuario === 'Agente Público') badgeClass = 'bg-primary';
+        else if (user.tipo_usuario.startsWith('Agente')) badgeClass = 'bg-info';
+        else if (user.tipo_usuario === 'Externo') badgeClass = 'bg-warning text-dark';
+        
+        html += `<td><span class="badge ${badgeClass}">${user.tipo_usuario}</span></td>`;
+        html += `<td>${user.d_usuario || '<span class="text-muted">-</span>'}</td>`;
+        html += `<td>${new Date(user.data_criacao).toLocaleDateString('pt-BR')}</td>`;
+        html += `<td class="text-center">
+          <button class="btn btn-sm btn-info me-1" onclick="resetarSenha(${user.id}, '${user.email}')" title="Resetar Senha">
+            <i class="bi bi-key"></i>
+          </button>
+          <button class="btn btn-sm btn-warning me-1" onclick="editarUsuario(${user.id}, '${user.email}', '${user.tipo_usuario}', '${user.d_usuario || ''}')" title="Editar">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-danger" onclick="excluirUsuario(${user.id}, '${user.email}')" title="Excluir">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>`;
+        html += '</tr>';
+      });
+      
+      html += '</tbody></table></div>';
+      listaUsuariosDiv.innerHTML = html;
+    }
+
+    function renderizarPaginacao(totalPaginas) {
+      const paginacaoDiv = document.getElementById('paginacaoUsuarios');
+      const listaPaginacao = document.getElementById('listaPaginacao');
+
+      if (totalPaginas <= 1) {
+        paginacaoDiv.style.display = 'none';
+        return;
+      }
+
+      paginacaoDiv.style.display = 'flex';
+      let html = '';
+
+      // Botão Anterior
+      html += `<li class="page-item ${paginaAtual === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="irParaPagina(${paginaAtual - 1}); return false;">Anterior</a>
+      </li>`;
+
+      // Páginas numeradas (mostrar no máximo 5 páginas)
+      let inicioPaginas = Math.max(1, paginaAtual - 2);
+      let fimPaginas = Math.min(totalPaginas, inicioPaginas + 4);
+      
+      if (fimPaginas - inicioPaginas < 4) {
+        inicioPaginas = Math.max(1, fimPaginas - 4);
+      }
+
+      if (inicioPaginas > 1) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="irParaPagina(1); return false;">1</a></li>`;
+        if (inicioPaginas > 2) {
+          html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+      }
+
+      for (let i = inicioPaginas; i <= fimPaginas; i++) {
+        html += `<li class="page-item ${i === paginaAtual ? 'active' : ''}">
+          <a class="page-link" href="#" onclick="irParaPagina(${i}); return false;">${i}</a>
+        </li>`;
+      }
+
+      if (fimPaginas < totalPaginas) {
+        if (fimPaginas < totalPaginas - 1) {
+          html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="irParaPagina(${totalPaginas}); return false;">${totalPaginas}</a></li>`;
+      }
+
+      // Botão Próximo
+      html += `<li class="page-item ${paginaAtual === totalPaginas ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="irParaPagina(${paginaAtual + 1}); return false;">Próximo</a>
+      </li>`;
+
+      listaPaginacao.innerHTML = html;
     }
 
     async function carregarUsuarios() {
@@ -177,44 +393,13 @@
           throw new Error(errorData.erro || 'Erro ao carregar usuários');
         }
         
-        const usuarios = await response.json();
-        console.log('[DEBUG] Usuários recebidos:', usuarios.length);
+        todosUsuarios = await response.json();
+        usuariosFiltrados = [...todosUsuarios]; // Cópia inicial
+        console.log('[DEBUG] Usuários recebidos:', todosUsuarios.length);
         
-        let html = '<div class="table-responsive"><table class="table table-hover">';
-        html += '<thead class="table-dark"><tr>';
-        html += '<th>ID</th><th>E-mail</th><th>Tipo</th><th>D. Usuário</th><th>Data Criação</th><th class="text-center">Ações</th>';
-        html += '</tr></thead><tbody>';
+        paginaAtual = 1;
+        atualizarExibicao();
         
-        usuarios.forEach(user => {
-          html += '<tr>';
-          html += `<td>${user.id}</td>`;
-          html += `<td>${user.email}</td>`;
-          
-          // Definir cor do badge baseado no tipo
-          let badgeClass = 'bg-secondary';
-          if (user.tipo_usuario === 'Agente Público') badgeClass = 'bg-primary';
-          else if (user.tipo_usuario.startsWith('Agente')) badgeClass = 'bg-info';
-          else if (user.tipo_usuario === 'Externo') badgeClass = 'bg-warning text-dark';
-          
-          html += `<td><span class="badge ${badgeClass}">${user.tipo_usuario}</span></td>`;
-          html += `<td>${user.d_usuario || '<span class="text-muted">-</span>'}</td>`;
-          html += `<td>${new Date(user.data_criacao).toLocaleDateString('pt-BR')}</td>`;
-          html += `<td class="text-center">
-            <button class="btn btn-sm btn-info me-1" onclick="resetarSenha(${user.id}, '${user.email}')" title="Resetar Senha">
-              <i class="bi bi-key"></i>
-            </button>
-            <button class="btn btn-sm btn-warning me-1" onclick="editarUsuario(${user.id}, '${user.email}', '${user.tipo_usuario}', '${user.d_usuario || ''}')" title="Editar">
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="excluirUsuario(${user.id}, '${user.email}')" title="Excluir">
-              <i class="bi bi-trash"></i>
-            </button>
-          </td>`;
-          html += '</tr>';
-        });
-        
-        html += '</tbody></table></div>';
-        listaUsuariosDiv.innerHTML = html;
         console.log('[DEBUG] Tabela de usuários renderizada com sucesso');
       } catch (error) {
         console.error('[ERRO] Erro ao carregar usuários:', error);

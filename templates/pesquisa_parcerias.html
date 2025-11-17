@@ -196,9 +196,13 @@
             class="form-control" 
             id="cnpj" 
             name="cnpj"
+            maxlength="18"
             placeholder="Será preenchido automaticamente ao selecionar OSC conhecida"
           >
           <small class="text-muted" id="cnpjHelp">Preenchimento automático</small>
+          <div class="invalid-feedback" id="cnpjError" style="display: none;">
+            CNPJ inválido! Máximo de 18 caracteres permitidos.
+          </div>
         </div>
 
         <!-- Nome do Emissor -->
@@ -362,6 +366,23 @@
       }
     });
 
+    // Validação do CNPJ - máximo 18 caracteres
+    document.getElementById('cnpj').addEventListener('input', function(e) {
+      const cnpjInput = this;
+      const cnpjError = document.getElementById('cnpjError');
+      const cnpjValue = cnpjInput.value;
+      
+      // Validar tamanho
+      if (cnpjValue.length > 18) {
+        cnpjInput.classList.add('is-invalid');
+        cnpjError.style.display = 'block';
+        cnpjError.textContent = `CNPJ inválido! ${cnpjValue.length} caracteres (máximo: 18)`;
+      } else {
+        cnpjInput.classList.remove('is-invalid');
+        cnpjError.style.display = 'none';
+      }
+    });
+
     // Listener para checkbox "Permitir Edição do Número" (apenas para Agente Público)
     const checkboxEdicao = document.getElementById('permitirEdicaoNumero');
     if (checkboxEdicao) {
@@ -384,6 +405,19 @@
     // Função para salvar Para Registro
     async function salvarParaRegistro() {
       const form = document.getElementById('formPesquisa');
+      
+      // Validar CNPJ antes de enviar
+      const cnpjInput = document.getElementById('cnpj');
+      const cnpjValue = cnpjInput.value.trim();
+      
+      if (cnpjValue && cnpjValue.length > 18) {
+        alert(`CNPJ inválido! O CNPJ possui ${cnpjValue.length} caracteres, mas o máximo permitido é 18.\n\nPor favor, corrija o CNPJ antes de salvar.`);
+        cnpjInput.focus();
+        cnpjInput.classList.add('is-invalid');
+        document.getElementById('cnpjError').style.display = 'block';
+        document.getElementById('cnpjError').textContent = `CNPJ inválido! ${cnpjValue.length} caracteres (máximo: 18)`;
+        return;
+      }
       
       // Validar formulário
       if (!form.checkValidity()) {
@@ -442,6 +476,19 @@
     // Função para prosseguir com a pesquisa (gera texto automático)
     async function prosseguirPesquisa() {
       const form = document.getElementById('formPesquisa');
+      
+      // Validar CNPJ antes de enviar
+      const cnpjInput = document.getElementById('cnpj');
+      const cnpjValue = cnpjInput.value.trim();
+      
+      if (cnpjValue && cnpjValue.length > 18) {
+        alert(`CNPJ inválido! O CNPJ possui ${cnpjValue.length} caracteres, mas o máximo permitido é 18.\n\nPor favor, corrija o CNPJ antes de prosseguir.`);
+        cnpjInput.focus();
+        cnpjInput.classList.add('is-invalid');
+        document.getElementById('cnpjError').style.display = 'block';
+        document.getElementById('cnpjError').textContent = `CNPJ inválido! ${cnpjValue.length} caracteres (máximo: 18)`;
+        return;
+      }
       
       if (!form.checkValidity()) {
         form.reportValidity();

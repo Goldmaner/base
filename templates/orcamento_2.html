@@ -159,6 +159,7 @@
       <div class="d-flex gap-2">
         <button id="addLinha" class="btn btn-secondary btn-sm">Adicionar Linha</button>
         <button id="limparBtn" class="btn btn-warning btn-sm">🗑️ Limpar Tudo</button>
+        <button id="exportarCsvBtn" class="btn btn-success btn-sm">📥 Exportar CSV</button>
         <button id="salvarOrc2" class="btn btn-primary ms-auto">
           <span id="salvarText">💾 Salvar</span>
           <span id="salvarSpinner" class="spinner-border spinner-border-sm d-none" role="status">
@@ -932,6 +933,18 @@
       
       // Mensagem de confirmação
       alert('✅ Formulário limpo com sucesso!\n\nPara ver os dados salvos novamente, recarregue a página.');
+    });
+
+    // --- BOTÃO EXPORTAR CSV ---
+    document.getElementById('exportarCsvBtn').addEventListener('click', function(){
+      const numeroTermo = '{{ numero_termo|e }}';
+      const aditivoSelecionado = document.getElementById('aditivoSelect').value || '0';
+      
+      // Construir URL de exportação com query parameters
+      const url = `/orcamento/exportar-termo-csv?numero_termo=${encodeURIComponent(numeroTermo)}&aditivo=${aditivoSelecionado}`;
+      
+      // Abrir em nova janela para fazer download
+      window.open(url, '_blank');
     });
 
     // carregar dados existentes do termo ao inicializar
