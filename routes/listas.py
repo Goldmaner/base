@@ -150,6 +150,47 @@ TABELAS_CONFIG = {
         'tipos_campo': {
             'descricao': 'textarea'
         }
+    },
+    'c_documentos_dp_prazos': {
+        'nome': 'Prazos de Documentos',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['tipo_documento', 'lei', 'prazo_dias', 'prazo_descricao'],
+        'labels': {
+            'tipo_documento': 'Tipo de Documento',
+            'lei': 'Lei/Portaria',
+            'prazo_dias': 'Prazo (dias)',
+            'prazo_descricao': 'Descrição do Prazo'
+        },
+        'colunas_filtro': ['tipo_documento', 'lei'],
+        'ordem': 'tipo_documento, lei',
+        'tipos_campo': {
+            'tipo_documento': 'select_dinamico',
+            'query_tipo_documento': 'SELECT DISTINCT tipo_documento FROM categoricas.c_documentos_dp WHERE tipo_documento IS NOT NULL ORDER BY tipo_documento',
+            'lei': 'select_dinamico',
+            'query_lei': 'SELECT DISTINCT lei FROM categoricas.c_legislacao WHERE lei IS NOT NULL ORDER BY lei',
+            'prazo_descricao': 'textarea',
+            'prazo_dias': 'number'
+        }
+    },
+    'c_despesas_analise': {
+        'nome': 'Despesas de Análise',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['categoria_extra', 'tipo_transacao', 'descricao', 'correspondente'],
+        'colunas_obrigatorias': ['categoria_extra', 'tipo_transacao'],
+        'labels': {
+            'categoria_extra': 'Categoria Extra',
+            'tipo_transacao': 'Tipo de Transação',
+            'descricao': 'Descrição',
+            'correspondente': 'Correspondente'
+        },
+        'colunas_filtro': ['categoria_extra', 'tipo_transacao', 'correspondente'],
+        'ordem': 'categoria_extra',
+        'tipos_campo': {
+            'tipo_transacao': 'select',
+            'opcoes_tipo_transacao': ['Crédito', 'Débito', 'Débito / Crédito'],
+            'descricao': 'textarea',
+            'correspondente': 'text'
+        }
     }
 }
 
@@ -284,20 +325,21 @@ def criar_registro(tabela):
         schema = config['schema']
         dados = request.json
         
-        # Validar que todos os campos necessários foram enviados
-        for col in config['colunas_editaveis']:
-            if col not in dados:
+        # Validar campos obrigatórios
+        colunas_obrigatorias = config.get('colunas_obrigatorias', config['colunas_editaveis'])
+        for col in colunas_obrigatorias:
+            if col not in dados or dados[col] is None or str(dados[col]).strip() == '':
                 return jsonify({'erro': f'Campo {col} é obrigatório'}), 400
         
-        # Montar query de inserção
-        colunas = config['colunas_editaveis']
-        placeholders = ', '.join(['%s'] * len(colunas))
+        # Montar query de inserção apenas com campos enviados
+        colunas_a_inserir = [col for col in config['colunas_editaveis'] if col in dados]
+        placeholders = ', '.join(['%s'] * len(colunas_a_inserir))
         
         # Converter valores para formato do banco de dados
-        valores = [converter_valor_para_db(dados[col], col, config) for col in colunas]
+        valores = [converter_valor_para_db(dados[col], col, config) for col in colunas_a_inserir]
         
         query = f"""
-            INSERT INTO {schema}.{tabela} ({', '.join(colunas)})
+            INSERT INTO {schema}.{tabela} ({', '.join(colunas_a_inserir)})
             VALUES ({placeholders})
         """
         

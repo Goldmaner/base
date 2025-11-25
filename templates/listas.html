@@ -411,8 +411,8 @@
         }
         
         input.id = `campo_${col}`;
-        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c'];
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição e correspondente
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
@@ -531,8 +531,8 @@
         }
         
         input.id = `campo_${col}`;
-        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c'];
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição e correspondente
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
@@ -548,8 +548,8 @@
       const dados = {};
       for (const col of configAtual.colunas_editaveis) {
         const input = document.getElementById(`campo_${col}`);
-        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c'];
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição e correspondente
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente'];
         if (!input.value.trim() && !camposOpcionais.includes(col)) {
           alert(`O campo ${configAtual.labels[col]} é obrigatório`);
           return;

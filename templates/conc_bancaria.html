@@ -1,0 +1,2271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conciliação Bancária - Análise PC - FAF</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<style>
+    .conc-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .table-conc {
+        font-size: 0.9rem;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    
+    .table-conc thead th {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 12px 8px;
+        border: none;
+        text-align: center;
+        vertical-align: middle;
+    }
+    
+    .table-conc tbody td {
+        padding: 8px;
+        vertical-align: middle;
+        border: 1px solid #dee2e6;
+    }
+    
+    .table-conc tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    /* Células de entrada */
+    .cell-input {
+        width: 100%;
+        border: none;
+        padding: 6px;
+        text-align: center;
+        background: transparent;
+    }
+    
+    .cell-input:focus {
+        outline: 2px solid #667eea;
+        background: #f0f4ff;
+    }
+    
+    /* Células monetárias */
+    .cell-money {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+    }
+    
+    /* Input de competência com erro */
+    .competencia-input.is-invalid {
+        border-color: #dc3545;
+        padding-right: calc(1.5em + 0.75rem);
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+    }
+    
+    .invalid-feedback {
+        font-size: 0.75rem;
+        color: #dc3545;
+        margin-top: 0.25rem;
+    }
+    
+    /* Células mescladas */
+    .cell-merged {
+        background: linear-gradient(to bottom, #fff 0%, #f0f4ff 100%);
+        border-left: 3px solid #667eea !important;
+        position: relative;
+    }
+    
+    .cell-merged::before {
+        content: '↕';
+        position: absolute;
+        left: 2px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #667eea;
+        font-size: 12px;
+    }
+    
+    /* Botões de ação */
+    .btn-action {
+        padding: 4px 8px;
+        font-size: 0.85rem;
+    }
+    
+    .btn-move {
+        padding: 2px 6px;
+        font-size: 0.75rem;
+    }
+    
+    /* Container com scroll */
+    .table-container {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+    
+    /* Botão save no menu superior */
+    .btn-save-top {
+        min-width: 200px;
+    }
+    
+    /* Headers clicáveis com ícone de info */
+    .tooltip-header {
+        cursor: pointer;
+        position: relative;
+    }
+    
+    .tooltip-header .info-icon {
+        color: #667eea;
+        font-size: 0.9rem;
+        margin-left: 5px;
+    }
+    
+    .tooltip-header:hover .info-icon {
+        color: #4c63d2;
+    }
+    
+    /* Garantir que thead não cubra modais */
+    .table-conc thead {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .table-conc thead th {
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Células mescladas verticalmente */
+    .cell-merged-group {
+        border-left: 4px solid #667eea !important;
+        background: linear-gradient(to right, #f0f4ff 0%, #fff 10%);
+    }
+    
+    .cell-merged-first {
+        border-top: 2px solid #667eea !important;
+    }
+    
+    .cell-merged-last {
+        border-bottom: 2px solid #667eea !important;
+    }
+    
+    .merged-cell-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+    }
+    
+    .merged-indicator {
+        font-size: 0.75rem;
+        color: #667eea;
+        margin-left: 5px;
+    }
+    
+    /* Loading indicator */
+    .loading {
+        display: none;
+        text-align: center;
+        padding: 20px;
+    }
+    
+    /* Cores das linhas baseado na avaliação */
+    .avaliacao-avaliado td {
+        background-color: #c6efce !important;
+    }
+    
+    .avaliacao-aguardando td {
+        background-color: #f2ceef !important;
+    }
+    
+    .avaliacao-pessoa-gestora td {
+        background-color: #c0e4f5 !important;
+    }
+    
+    .avaliacao-glosar td {
+        background-color: #fbe2d5 !important;
+    }
+    
+    /* Célula desabilitada - Seletor mais específico para sobrepor cores de avaliação */
+    td.cell-disabled,
+    .avaliacao-avaliado td.cell-disabled,
+    .avaliacao-aguardando td.cell-disabled,
+    .avaliacao-pessoa-gestora td.cell-disabled,
+    .avaliacao-glosar td.cell-disabled {
+        background-color: #e9ecef !important;
+        cursor: not-allowed;
+    }
+</style>
+</head>
+<body>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-bank me-2"></i>Conciliação Bancária</h2>
+        <div>
+            <button class="btn btn-outline-danger me-2" onclick="limparTabela()">
+                <i class="bi bi-trash me-2"></i>Limpar
+            </button>
+            <a href="/analises_pc" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- Seleção de Termo -->
+    <div class="conc-card">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="numeroTermo" class="form-label"><strong>Número do Termo</strong></label>
+                <select class="form-select" id="numeroTermo" onchange="carregarExtrato()">
+                    <option value="">Selecione um termo...</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="bancoExtrato" class="form-label"><strong>Banco do Extrato</strong></label>
+                <select class="form-select" id="bancoExtrato">
+                    <option value="">Selecione o banco...</option>
+                    <option value="Banco do Brasil">Banco do Brasil</option>
+                    <option value="Itaú Unibanco">Itaú Unibanco</option>
+                    <option value="Bradesco">Bradesco</option>
+                    <option value="Caixa Econômica Federal">Caixa Econômica Federal</option>
+                    <option value="Santander">Santander</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label"><strong>Mostrar Linhas</strong></label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-primary" onclick="setLimite(100)">100</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="setLimite(200)">200</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="setLimite('todas')">Todas</button>
+                </div>
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-success w-100" onclick="adicionarLinha()">
+                    <i class="bi bi-plus-circle me-2"></i>Linha
+                </button>
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-info w-100" onclick="adicionarLinhasDinamico()">
+                    <i class="bi bi-plus-square me-2"></i>Add
+                </button>
+            </div>
+            <div class="col-md-1">
+                <input type="number" class="form-control" id="quantidadeLinhas" value="20" min="1" max="500" placeholder="Qtd">
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-outline-info w-100" onclick="toggleFiltros()" id="btnToggleFiltros">
+                    <i class="bi bi-funnel me-1"></i>Filtros
+                </button>
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-primary w-100 btn-save-top" onclick="salvarConciliacao()" id="btnSalvar" style="display: none;">
+                    <i class="bi bi-save me-2"></i>Salvar
+                </button>
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-outline-secondary w-100" onclick="renderizarTabela()" title="Atualizar visualização">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Avançados -->
+    <div class="conc-card" id="filtrosAvancados" style="display: none;">
+        <div class="row g-3">
+            <div class="col-md-2">
+                <label for="filtroData" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Data (Mês/Ano)</strong></label>
+                <select class="form-select" id="filtroData" multiple size="4" onchange="aplicarFiltros()">
+                    <option value="">Todas as datas</option>
+                </select>
+                <small class="text-muted">Ctrl+Click para múltipla seleção</small>
+            </div>
+            <div class="col-md-2">
+                <label for="filtroCompetencia" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Competência</strong></label>
+                <select class="form-select" id="filtroCompetencia" multiple size="4" onchange="aplicarFiltros()">
+                    <option value="">Todas as competências</option>
+                </select>
+                <small class="text-muted">Ctrl+Click para múltipla seleção</small>
+            </div>
+            <div class="col-md-3">
+                <label for="filtroCategoria" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Categoria</strong></label>
+                <select class="form-select" id="filtroCategoria" multiple size="4" onchange="aplicarFiltros()">
+                    <option value="">Todas as categorias</option>
+                </select>
+                <small class="text-muted">Ctrl+Click para múltipla seleção</small>
+            </div>
+            <div class="col-md-2">
+                <label for="filtroOrigemDestino" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Origem/Destino</strong></label>
+                <select class="form-select" id="filtroOrigemDestino" multiple size="4" onchange="aplicarFiltros()">
+                    <option value="">Todas as origens/destinos</option>
+                </select>
+                <small class="text-muted">Ctrl+Click para múltipla seleção</small>
+            </div>
+            <div class="col-md-2">
+                <label for="filtroAvaliacao" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Avaliação</strong></label>
+                <select class="form-select" id="filtroAvaliacao" multiple size="4" onchange="aplicarFiltros()">
+                    <option value="">Todas as avaliações</option>
+                    <option value="Avaliado">Avaliado</option>
+                    <option value="Aguardando resposta">Aguardando resposta</option>
+                    <option value="Pessoa Gestora">Pessoa Gestora</option>
+                    <option value="Glosar">Glosar</option>
+                </select>
+                <small class="text-muted">Ctrl+Click para múltipla seleção</small>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-secondary w-100" onclick="limparFiltros()">
+                    <i class="bi bi-x-circle me-2"></i>Limpar Filtros
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loadingIndicator">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Carregando...</span>
+        </div>
+        <p class="mt-2">Carregando dados...</p>
+    </div>
+
+    <!-- Tabela de Conciliação -->
+    <div class="conc-card">
+        <div class="table-container">
+            <table class="table table-conc table-sm" id="tabelaConciliacao">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;" class="tooltip-header" onclick="mostrarInfo('indice')">
+                            Índice <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 140px;" class="tooltip-header" onclick="mostrarInfo('data')">
+                            Data <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 180px;" class="tooltip-header" onclick="mostrarInfo('credito')">
+                            Crédito (R$) <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 180px;" class="tooltip-header" onclick="mostrarInfo('debito')">
+                            Débito (R$) <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 200px;" class="tooltip-header" onclick="mostrarInfo('composicao')">
+                            Composição do Valor (R$) <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 220px;" class="tooltip-header" onclick="mostrarInfo('categoria')">
+                            Categoria de Transação <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 130px;" class="tooltip-header" onclick="mostrarInfo('competencia')">
+                            Competência <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 200px;" class="tooltip-header" onclick="mostrarInfo('origem_destino')">
+                            Origem ou Destino <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 180px;" class="tooltip-header" onclick="mostrarInfo('avaliacao')">
+                            Avaliação <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 180px;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyConciliacao">
+                    <!-- Linhas serão inseridas via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Datalist para Origem/Destino (auto-alimentado) -->
+<datalist id="datalistOrigemDestino">
+</datalist>
+
+<!-- Datalist para Avaliações -->
+<datalist id="datalistAvaliacoes">
+    <option value="Avaliado">Avaliado</option>
+    <option value="Aguardando resposta">Aguardando resposta</option>
+    <option value="Pessoa Gestora">Pessoa Gestora</option>
+    <option value="Glosar">Glosar</option>
+</datalist>
+
+<!-- Modal de Informação -->
+<div class="modal fade" id="modalInfo" tabindex="-1" aria-labelledby="modalInfoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalInfoLabel">
+                    <i class="bi bi-info-circle me-2"></i>Informação
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="modalInfoBody">
+                <!-- Conteúdo será inserido via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let linhas = [];
+    let limiteAtual = 100;
+    let proximoIndice = 1;
+    
+    // Textos informativos
+    const infos = {
+        'indice': 'Número sequencial que define a ordem dos lançamentos. Garante ordenação correta mesmo com inserções posteriores.',
+        'data': 'Data da movimentação conforme consta no extrato bancário.',
+        'credito': 'Valores positivos de entrada na conta. Somente valores de crédito no extrato. Se preencher este campo, o campo Débito será bloqueado.',
+        'debito': 'Valores negativos de saída da conta. Somente valores de débito no extrato. Se preencher este campo, o campo Crédito será bloqueado.',
+        'composicao': 'Valores que compõem o crédito ou débito. Útil quando uma movimentação é composta por múltiplas transações. Para mesclar valores iguais consecutivos, use o botão de mesclagem.',
+        'categoria': 'Categoria da transação baseada nas despesas do termo e nas categorias de análise. As opções são filtradas automaticamente de acordo com o tipo de movimentação (crédito ou débito).',
+        'competencia': 'Mês e ano da competência da transação (formato: mai/2025). É preenchida automaticamente com base na data do lançamento. Deve estar dentro do período do projeto com tolerância de 2 meses antes do início e 6 meses após o término.',
+        'origem_destino': 'Origem do crédito (de onde veio o recurso) ou destino do débito (para onde foi o pagamento). Campo de texto livre para descrever a contraparte da transação.',
+        'avaliacao': 'Status da avaliação da transação. Avaliado (verde) = aprovado, Aguardando resposta (rosa) = pendente, Pessoa Gestora (azul) = responsabilidade da PG, Glosar (laranja) = reprovar. A cor se aplica à linha inteira. Transações com Banco do Brasil ou Administração Pública são automaticamente avaliadas.'
+    };
+    
+    let categoriasDespesas = [];
+    let categoriasAnalise = [];
+    let periodoTermo = { inicio: null, final: null }; // Período do projeto
+    let bancoAtual = ''; // Banco do extrato
+    let origensDestinosUnicos = new Set(); // Lista dinâmica de origens/destinos já utilizados
+    
+    function toggleFiltros() {
+        const filtros = document.getElementById('filtrosAvancados');
+        const btn = document.getElementById('btnToggleFiltros');
+        
+        if (filtros.style.display === 'none') {
+            filtros.style.display = 'block';
+            btn.classList.remove('btn-outline-info');
+            btn.classList.add('btn-info');
+        } else {
+            filtros.style.display = 'none';
+            btn.classList.remove('btn-info');
+            btn.classList.add('btn-outline-info');
+        }
+    }
+    
+    function mostrarInfo(campo) {
+        const modalBody = document.getElementById('modalInfoBody');
+        modalBody.innerHTML = `<p class="mb-0">${infos[campo]}</p>`;
+        
+        const modal = new bootstrap.Modal(document.getElementById('modalInfo'));
+        modal.show();
+    }
+
+    // Carregar termos ao iniciar
+    document.addEventListener('DOMContentLoaded', function() {
+        carregarTermos();
+    });
+
+    async function carregarTermos() {
+        try {
+            console.log('Carregando termos...');
+            const response = await fetch('/conc_bancaria/api/termos');
+            if (!response.ok) throw new Error('Erro ao carregar termos');
+            
+            const termos = await response.json();
+            console.log('Termos recebidos:', termos);
+            const select = document.getElementById('numeroTermo');
+            
+            termos.forEach(termo => {
+                const option = document.createElement('option');
+                option.value = termo;
+                option.textContent = termo;
+                select.appendChild(option);
+            });
+            
+            // Verificar se há termo na URL (vindo da página de análises)
+            const urlParams = new URLSearchParams(window.location.search);
+            const termoUrl = urlParams.get('termo');
+            console.log('Termo da URL:', termoUrl);
+            
+            if (termoUrl && termos.includes(termoUrl)) {
+                console.log('Selecionando termo:', termoUrl);
+                select.value = termoUrl;
+                await carregarExtrato();
+            }
+            
+        } catch (error) {
+            console.error('Erro ao carregar termos:', error);
+            alert('Erro ao carregar lista de termos');
+        }
+    }
+
+    async function carregarExtrato() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) {
+            linhas = [];
+            renderizarTabela();
+            document.getElementById('btnSalvar').style.display = 'none';
+            return;
+        }
+
+        try {
+            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            // Carregar categorias e período do termo em paralelo
+            await Promise.all([
+                carregarCategoriasDespesas(numeroTermo),
+                carregarCategoriasAnalise(),
+                carregarPeriodoTermo(numeroTermo)
+            ]);
+            
+            // Carregar banco do termo
+            await carregarBancoTermo(numeroTermo);
+            
+            const params = new URLSearchParams({
+                numero_termo: numeroTermo,
+                limite: limiteAtual
+            });
+            
+            const response = await fetch('/conc_bancaria/api/extrato?' + params.toString());
+            if (!response.ok) throw new Error('Erro ao carregar extrato');
+            
+            const dados = await response.json();
+            
+            if (dados.length > 0) {
+                // Mapear campos do backend para o frontend
+                linhas = dados.map(item => ({
+                    id: item.id,
+                    indice: item.indice,
+                    data: item.data,
+                    credito: item.credito,
+                    debito: item.debito,
+                    discriminacao: item.discriminacao,
+                    cat_transacao: item.cat_transacao,
+                    competencia: item.competencia,
+                    origem_destino: item.origem_destino,
+                    cat_avaliacao: item.cat_avaliacao,
+                    mesclado_com: item.mesclado_com || []
+                }));
+                proximoIndice = Math.max(...linhas.map(l => l.indice || 0)) + 1;
+            } else {
+                // Se não houver dados, iniciar com 20 linhas vazias
+                linhas = [];
+                adicionarLinhas(20);
+            }
+            
+            renderizarTabela();
+            document.getElementById('btnSalvar').style.display = 'block';
+            
+        } catch (error) {
+            console.error('Erro ao carregar extrato:', error);
+            alert('Erro ao carregar extrato');
+        } finally {
+            document.getElementById('loadingIndicator').style.display = 'none';
+        }
+    }
+
+    function setLimite(limite) {
+        limiteAtual = limite;
+        carregarExtrato();
+    }
+    
+    async function carregarCategoriasDespesas(numeroTermo) {
+        try {
+            const response = await fetch(`/conc_bancaria/api/categorias-despesas?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            if (!response.ok) throw new Error('Erro ao carregar categorias de despesas');
+            categoriasDespesas = await response.json();
+        } catch (error) {
+            console.error('Erro ao carregar categorias de despesas:', error);
+            categoriasDespesas = [];
+        }
+    }
+    
+    async function carregarCategoriasAnalise() {
+        try {
+            const response = await fetch('/conc_bancaria/api/categorias-analise');
+            if (!response.ok) throw new Error('Erro ao carregar categorias de análise');
+            categoriasAnalise = await response.json();
+        } catch (error) {
+            console.error('Erro ao carregar categorias de análise:', error);
+            categoriasAnalise = [];
+        }
+    }
+    
+    function obterCategoriasFiltradas(linha) {
+        const categorias = [];
+        const temCredito = linha.credito && linha.credito > 0;
+        const temDebito = linha.debito && linha.debito > 0;
+        
+        // Adicionar categorias de despesas do termo
+        categoriasDespesas.forEach(cat => {
+            categorias.push({
+                valor: cat.categoria_despesa,
+                label: cat.categoria_despesa,
+                tipo: 'despesa'
+            });
+        });
+        
+        // Adicionar categorias de análise filtradas por tipo de transação
+        categoriasAnalise.forEach(cat => {
+            const tipo = cat.tipo_transacao;
+            let adicionar = false;
+            
+            if (tipo === 'Débito / Crédito') {
+                adicionar = true; // Sempre adicionar
+            } else if (temCredito && tipo === 'Crédito') {
+                adicionar = true;
+            } else if (temDebito && tipo === 'Débito') {
+                adicionar = true;
+            }
+            
+            if (adicionar) {
+                categorias.push({
+                    valor: cat.categoria_extra,
+                    label: cat.categoria_extra,
+                    tipo: 'analise'
+                });
+            }
+        });
+        
+        // Remover duplicatas
+        return categorias.filter((cat, index, self) => 
+            index === self.findIndex(c => c.valor === cat.valor)
+        );
+    }
+    
+    async function carregarPeriodoTermo(numeroTermo) {
+        try {
+            const response = await fetch(`/conc_bancaria/api/periodo-termo?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            if (!response.ok) throw new Error('Erro ao carregar período do termo');
+            const dados = await response.json();
+            periodoTermo = dados;
+        } catch (error) {
+            console.error('Erro ao carregar período do termo:', error);
+            periodoTermo = { inicio: null, final: null };
+        }
+    }
+    
+    async function carregarBancoTermo(numeroTermo) {
+        try {
+            const response = await fetch(`/conc_bancaria/api/banco?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            if (!response.ok) throw new Error('Erro ao carregar banco');
+            const dados = await response.json();
+            
+            if (dados.banco_extrato) {
+                document.getElementById('bancoExtrato').value = dados.banco_extrato;
+                bancoAtual = dados.banco_extrato;
+            } else {
+                document.getElementById('bancoExtrato').value = '';
+                bancoAtual = '';
+            }
+        } catch (error) {
+            console.error('Erro ao carregar banco do termo:', error);
+            document.getElementById('bancoExtrato').value = '';
+            bancoAtual = '';
+        }
+    }
+    
+    function validarCompetencia(competenciaStr) {
+        if (!competenciaStr || !periodoTermo.inicio || !periodoTermo.final) {
+            return { valido: true, mensagem: '' };
+        }
+        
+        // Converter competencia (formato: AAAA-MM-DD onde DD=01) para Date
+        const competencia = new Date(competenciaStr);
+        const inicio = new Date(periodoTermo.inicio);
+        const final = new Date(periodoTermo.final);
+        
+        // Calcular limites com tolerância
+        const limiteInicio = new Date(inicio);
+        limiteInicio.setMonth(limiteInicio.getMonth() - 2); // 2 meses antes
+        
+        const limiteFinal = new Date(final);
+        limiteFinal.setMonth(limiteFinal.getMonth() + 6); // 6 meses depois
+        
+        if (competencia < limiteInicio || competencia > limiteFinal) {
+            const mesInicio = (limiteInicio.getMonth() + 1).toString().padStart(2, '0');
+            const anoInicio = limiteInicio.getFullYear();
+            const mesFinal = (limiteFinal.getMonth() + 1).toString().padStart(2, '0');
+            const anoFinal = limiteFinal.getFullYear();
+            
+            return {
+                valido: false,
+                mensagem: `Competência fora do período permitido (${mesInicio}/${anoInicio} a ${mesFinal}/${anoFinal})`
+            };
+        }
+        
+        return { valido: true, mensagem: '' };
+    }
+    
+    function formatarCompetenciaParaExibicao(dataStr) {
+        if (!dataStr) return '';
+        // Parse manual para evitar problemas com timezone: "2025-05-01" -> [2025, 05, 01]
+        const partes = dataStr.split('-');
+        const ano = partes[0];
+        const mes = parseInt(partes[1]) - 1; // Mês é 0-indexed
+        const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        return `${meses[mes]}/${ano}`;
+    }
+    
+    function calcularCompetenciaAutomatica(dataStr) {
+        if (!dataStr) return null;
+        // Parse manual: "2025-05-15" -> [2025, 05, 15]
+        const partes = dataStr.split('-');
+        const ano = partes[0];
+        const mes = partes[1]; // Já está com zero-padding
+        // Retornar sempre o dia 01 do mês/ano
+        return `${ano}-${mes}-01`;
+    }
+    
+    function parseCompetencia(competenciaStr) {
+        // Aceita formatos: MM/AAAA ou DD/MM/AAAA
+        if (!competenciaStr) return null;
+        
+        const partes = competenciaStr.trim().split('/');
+        
+        if (partes.length === 2) {
+            // Formato: MM/AAAA ou MM/AA
+            const mes = parseInt(partes[0]);
+            let ano = parseInt(partes[1]);
+            
+            // Se ano tem 2 dígitos, converter para 4 (assumir 20XX se >= 00 e <= 99)
+            if (ano >= 0 && ano <= 99) {
+                ano = 2000 + ano;
+            }
+            
+            if (mes >= 1 && mes <= 12 && ano > 1900) {
+                return `${ano}-${mes.toString().padStart(2, '0')}-01`;
+            }
+        } else if (partes.length === 3) {
+            // Formato: DD/MM/AAAA ou DD/MM/AA - ignorar dia, sempre usar 01
+            const mes = parseInt(partes[1]);
+            let ano = parseInt(partes[2]);
+            
+            // Se ano tem 2 dígitos, converter para 4
+            if (ano >= 0 && ano <= 99) {
+                ano = 2000 + ano;
+            }
+            
+            if (mes >= 1 && mes <= 12 && ano > 1900) {
+                return `${ano}-${mes.toString().padStart(2, '0')}-01`;
+            }
+        }
+        
+        return null;
+    }
+
+    function atualizarCompetencia(index, valorInput) {
+        // Parse do input do usuário
+        const competenciaParsed = parseCompetencia(valorInput);
+        
+        if (!competenciaParsed) {
+            linhas[index].competencia = null;
+            linhas[index].competencia_valida = false;
+            linhas[index].competencia_erro = 'Formato inválido. Use MM/AAAA';
+            renderizarTabela();
+            return;
+        }
+        
+        // Validar contra período do termo
+        const validacao = validarCompetencia(competenciaParsed);
+        
+        linhas[index].competencia = competenciaParsed;
+        linhas[index].competencia_valida = validacao.valido;
+        linhas[index].competencia_erro = validacao.valido ? null : validacao.mensagem;
+        
+        renderizarTabela();
+    }
+
+    function formatarExibicaoCompetencia(index, input) {
+        // Ao sair do campo, formatar para exibição (mai/2025)
+        if (linhas[index].competencia && linhas[index].competencia_valida !== false) {
+            input.value = formatarCompetenciaParaExibicao(linhas[index].competencia);
+        }
+    }
+
+    function adicionarLinha() {
+        const linha = {
+            id: null,
+            indice: proximoIndice++,
+            data: '',
+            credito: null,
+            debito: null,
+            discriminacao: null,
+            cat_transacao: null,
+            competencia: null,
+            origem_destino: null,
+            cat_avaliacao: null,
+            mesclado_com: [],
+            _novo: true
+        };
+        
+        linhas.push(linha);
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+
+    function adicionarLinhaAcima(index) {
+        const novaLinha = {
+            id: null,
+            indice: 0, // Será recalculado
+            data: '',
+            credito: null,
+            debito: null,
+            discriminacao: null,
+            cat_transacao: null,
+            competencia: null,
+            origem_destino: null,
+            cat_avaliacao: null,
+            mesclado_com: [],
+            _novo: true
+        };
+        
+        linhas.splice(index, 0, novaLinha);
+        recalcularIndices();
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+
+    function adicionarLinhaAbaixo(index) {
+        const novaLinha = {
+            id: null,
+            indice: 0, // Será recalculado
+            data: '',
+            credito: null,
+            debito: null,
+            discriminacao: null,
+            cat_transacao: null,
+            competencia: null,
+            origem_destino: null,
+            cat_avaliacao: null,
+            mesclado_com: [],
+            _novo: true
+        };
+        
+        linhas.splice(index + 1, 0, novaLinha);
+        recalcularIndices();
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+
+    function adicionarLinhas(quantidade) {
+        for (let i = 0; i < quantidade; i++) {
+            adicionarLinha();
+        }
+    }
+    
+    function adicionarLinhasDinamico() {
+        const quantidade = parseInt(document.getElementById('quantidadeLinhas').value) || 20;
+        if (quantidade < 1 || quantidade > 500) {
+            alert('Por favor, insira um número entre 1 e 500');
+            return;
+        }
+        adicionarLinhas(quantidade);
+    }
+
+    function renderizarTabela() {
+        const tbody = document.getElementById('tbodyConciliacao');
+        tbody.innerHTML = '';
+
+        linhas.forEach((linha, index) => {
+            const tr = document.createElement('tr');
+            tr.dataset.index = index;
+            
+            // Verificar grupo de mesclagem
+            const grupoMesclagem = getGrupoMesclagem(index);
+            const estaMescladaSecundaria = linhaEstaMescladaComoSecundaria(index);
+            
+            let classesMesclagem = '';
+            if (grupoMesclagem) {
+                classesMesclagem = 'cell-merged-group cell-merged-first';
+                if (grupoMesclagem.indices[grupoMesclagem.indices.length - 1] === index) {
+                    classesMesclagem += ' cell-merged-last';
+                }
+            } else if (estaMescladaSecundaria) {
+                classesMesclagem = 'cell-merged-group';
+            }
+            
+            // Remover classes de cor anteriores
+            tr.classList.remove('avaliacao-avaliado', 'avaliacao-aguardando', 'avaliacao-pessoa-gestora', 'avaliacao-glosar');
+            
+            // Aplicar classe de cor baseado na avaliação
+            if (linha.cat_avaliacao === 'Avaliado') {
+                tr.classList.add('avaliacao-avaliado');
+            } else if (linha.cat_avaliacao === 'Aguardando resposta') {
+                tr.classList.add('avaliacao-aguardando');
+            } else if (linha.cat_avaliacao === 'Pessoa Gestora') {
+                tr.classList.add('avaliacao-pessoa-gestora');
+            } else if (linha.cat_avaliacao === 'Glosar') {
+                tr.classList.add('avaliacao-glosar');
+            }
+            
+            // Renderizar célula de crédito
+            let htmlCredito = '';
+            if (linha.credito) {
+                if (estaMescladaSecundaria) {
+                    // Linha mesclada secundária - não mostra input, apenas indicador
+                    htmlCredito = `
+                        <td class="${classesMesclagem} ${linha.debito ? 'cell-disabled' : ''}">
+                            <div class="merged-cell-content">
+                                <span class="merged-indicator">Crédito composto</span>
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    htmlCredito = `
+                        <td class="${classesMesclagem} ${linha.debito ? 'cell-disabled' : ''}">
+                            <input type="text" class="cell-input cell-money" 
+                                   value="${formatarMoeda(linha.credito)}" 
+                                   ${linha.debito ? 'disabled' : ''}
+                                   onchange="atualizarValor(${index}, 'credito', this.value)"
+                                   onblur="blurCondicional(${index}, this)"
+                                   onkeydown="navegarCelula(event, ${index}, 1)">
+                        </td>
+                    `;
+                }
+            } else {
+                htmlCredito = `
+                    <td class="${linha.debito ? 'cell-disabled' : ''}">
+                        <input type="text" class="cell-input cell-money" 
+                               value="${formatarMoeda(linha.credito)}" 
+                               ${linha.debito ? 'disabled' : ''}
+                               onchange="atualizarValor(${index}, 'credito', this.value)"
+                               onblur="blurCondicional(${index}, this)"
+                               onkeydown="navegarCelula(event, ${index}, 1)">
+                    </td>
+                `;
+            }
+            
+            // Renderizar célula de débito
+            let htmlDebito = '';
+            if (linha.debito) {
+                if (estaMescladaSecundaria) {
+                    htmlDebito = `
+                        <td class="${classesMesclagem} ${linha.credito ? 'cell-disabled' : ''}">
+                            <div class="merged-cell-content">
+                                <span class="merged-indicator">Débito composto</span>
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    htmlDebito = `
+                        <td class="${classesMesclagem} ${linha.credito ? 'cell-disabled' : ''}">
+                            <input type="text" class="cell-input cell-money" 
+                                   value="${formatarMoeda(linha.debito)}" 
+                                   ${linha.credito ? 'disabled' : ''}
+                                   onchange="atualizarValor(${index}, 'debito', this.value)"
+                                   onblur="blurCondicional(${index}, this)"
+                                   onkeydown="navegarCelula(event, ${index}, 2)">
+                        </td>
+                    `;
+                }
+            } else {
+                htmlDebito = `
+                    <td class="${linha.credito ? 'cell-disabled' : ''}">
+                        <input type="text" class="cell-input cell-money" 
+                               value="${formatarMoeda(linha.debito)}" 
+                               ${linha.credito ? 'disabled' : ''}
+                               onchange="atualizarValor(${index}, 'debito', this.value)"
+                               onblur="blurCondicional(${index}, this)"
+                               onkeydown="navegarCelula(event, ${index}, 2)">
+                    </td>
+                `;
+            }
+            
+            // Renderizar input com datalist de categoria (busca sugestiva)
+            const categoriasFiltradas = obterCategoriasFiltradas(linha);
+            const datalistId = `datalist-cat-${index}`;
+            let htmlCategoria = `
+                <input type="text" 
+                       class="form-control form-control-sm cell-input" 
+                       list="${datalistId}"
+                       value="${linha.cat_transacao || ''}" 
+                       onchange="atualizarCampo(${index}, 'cat_transacao', this.value)"
+                       onblur="blurCondicionalCategoria(${index})"
+                       onkeydown="navegarCelula(event, ${index}, 4)"
+                       placeholder="Digite para buscar..."
+                       autocomplete="off">
+                <datalist id="${datalistId}">
+            `;
+            categoriasFiltradas.forEach(cat => {
+                htmlCategoria += `<option value="${cat.valor}">${cat.label}</option>`;
+            });
+            htmlCategoria += '</datalist>';
+            
+            tr.innerHTML = `
+                <td class="text-center">${linha.indice || ''}</td>
+                <td>
+                    <input type="text" 
+                           class="cell-input" 
+                           value="${linha.data ? formatarDataParaExibicao(linha.data) : ''}" 
+                           onchange="atualizarCampoData(${index}, this.value)"
+                           onkeydown="navegarCelulaData(event, ${index})"
+                           placeholder="dd/mm/aaaa"
+                           maxlength="10">
+                </td>
+                ${htmlCredito}
+                ${htmlDebito}
+                <td>
+                    <input type="text" class="cell-input cell-money" 
+                           value="${formatarMoeda(linha.discriminacao)}" 
+                           onchange="atualizarValor(${index}, 'discriminacao', this.value)"
+                           onblur="blurCondicional(${index}, this)"
+                           onkeydown="navegarCelula(event, ${index}, 3)">
+                </td>
+                <td>${htmlCategoria}</td>
+                <td>
+                    <input type="text" 
+                           class="cell-input competencia-input ${linha.competencia_valida === false ? 'is-invalid' : ''}" 
+                           value="${linha.competencia ? formatarCompetenciaParaExibicao(linha.competencia) : ''}" 
+                           onchange="atualizarCompetencia(${index}, this.value)"
+                           onblur="formatarExibicaoCompetencia(${index}, this)"
+                           onkeydown="navegarCelula(event, ${index}, 5)"
+                           placeholder="MM/AAAA"
+                           autocomplete="off">
+                    ${linha.competencia_erro ? `<div class="invalid-feedback d-block">${linha.competencia_erro}</div>` : ''}
+                </td>
+                <td>
+                    <input type="text" 
+                           class="cell-input" 
+                           list="datalistOrigemDestino"
+                           value="${linha.origem_destino || ''}" 
+                           onchange="atualizarCampo(${index}, 'origem_destino', this.value)"
+                           onkeydown="navegarCelula(event, ${index}, 6)"
+                           placeholder="Origem ou destino..."
+                           autocomplete="off">
+                </td>
+                <td>
+                    <input type="text" 
+                           class="cell-input" 
+                           list="datalistAvaliacoes"
+                           value="${linha.cat_avaliacao || ''}" 
+                           onchange="atualizarCampo(${index}, 'cat_avaliacao', this.value)"
+                           onblur="aplicarCorLinha(${index})"
+                           onkeydown="navegarCelula(event, ${index}, 7)"
+                           placeholder="Selecione..."
+                           autocomplete="off">
+                </td>
+                <td class="text-center text-nowrap">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-three-dots-vertical"></i> Ações
+                        </button>
+                        <ul class="dropdown-menu">
+                            <!-- Adicionar Linhas -->
+                            <li><h6 class="dropdown-header"><i class="bi bi-plus-circle"></i> Adicionar</h6></li>
+                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); adicionarLinhaAcima(${index})">
+                                <i class="bi bi-arrow-up-circle me-2"></i>Adicionar linha acima
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); adicionarLinhaAbaixo(${index})">
+                                <i class="bi bi-arrow-down-circle me-2"></i>Adicionar linha abaixo
+                            </a></li>
+                            
+                            <!-- Mesclagem Manual -->
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="bi bi-link-45deg"></i> Mesclagem</h6></li>
+                            
+                            ${grupoMesclagem ? `
+                                <li><a class="dropdown-item text-warning" href="#" onclick="event.preventDefault(); desmesclarLinha(${index})">
+                                    <i class="bi bi-scissors me-2"></i>Desmesclar
+                                </a></li>
+                            ` : `
+                                ${(linha.credito || linha.debito) ? `
+                                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); mesclarLinhasEmLote(${index})">
+                                        <i class="bi bi-clipboard-check me-2"></i>Mesclagem em lote
+                                    </a></li>
+                                ` : ''}
+                                ${index > 0 && podeMesclar(index - 1, index) ? `
+                                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); mesclarLinhas(${index - 1}, ${index})">
+                                        <i class="bi bi-arrow-up me-2"></i>Mesclar com linha acima
+                                    </a></li>
+                                ` : ''}
+                                ${index < linhas.length - 1 && podeMesclar(index, index + 1) ? `
+                                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); mesclarLinhas(${index}, ${index + 1})">
+                                        <i class="bi bi-arrow-down me-2"></i>Mesclar com linha abaixo
+                                    </a></li>
+                                ` : ''}
+                            `}
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="bi bi-arrows-move"></i> Movimentação</h6></li>
+                            <li><a class="dropdown-item ${index === 0 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); moverLinha(${index}, -1)">
+                                <i class="bi bi-arrow-up me-2"></i>Mover para cima
+                            </a></li>
+                            <li><a class="dropdown-item ${index === linhas.length - 1 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); moverLinha(${index}, 1)">
+                                <i class="bi bi-arrow-down me-2"></i>Mover para baixo
+                            </a></li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="bi bi-gear"></i> Outras Ações</h6></li>
+                            <li><a class="dropdown-item ${index === 0 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); copiarDataAcima(${index})">
+                                <i class="bi bi-calendar-plus me-2"></i>Copiar data acima
+                            </a></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); excluirLinha(${index})">
+                                <i class="bi bi-trash me-2"></i>Excluir linha
+                            </a></li>
+                        </ul>
+                    </div>
+                </td>
+            `;
+            
+            tbody.appendChild(tr);
+        });
+        
+        // Atualizar filtros e datalist após renderizar
+        popularFiltros();
+        atualizarDatalistOrigemDestino();
+    }
+    
+    // Adicionar listener para colar do Excel
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('tabelaConciliacao').addEventListener('paste', function(e) {
+            const target = e.target;
+            
+            // Verificar se está em um input da tabela
+            if (!target.classList.contains('cell-input') && !target.classList.contains('cell-money')) {
+                return;
+            }
+            
+            e.preventDefault();
+            
+            // Pegar dados do clipboard
+            const clipboardData = e.clipboardData || window.clipboardData;
+            const pastedData = clipboardData.getData('Text');
+            
+            if (!pastedData) return;
+            
+            // Encontrar índice da linha e coluna atual
+            const tr = target.closest('tr');
+            const linhaIndex = parseInt(tr.dataset.index);
+            
+            // Determinar coluna atual
+            const td = target.closest('td');
+            const allTds = Array.from(tr.children);
+            const tdIndex = allTds.indexOf(td);
+            
+            // Mapear índice de TD para campo
+            // 0=índice, 1=data, 2=crédito, 3=débito, 4=composição, 5=categoria, 6=competência, 7=origem, 8=avaliação, 9=ações
+            const colunaMap = {
+                1: 'data',
+                2: 'credito',
+                3: 'debito',
+                4: 'discriminacao',
+                5: 'cat_transacao',
+                6: 'competencia',
+                7: 'origem_destino',
+                8: 'cat_avaliacao'
+            };
+            
+            const colunaInicial = colunaMap[tdIndex];
+            if (!colunaInicial) return;
+            
+            // Parse dos dados (Excel copia com \t para colunas e \n para linhas)
+            const linhasPaste = pastedData.split('\n').map(l => l.split('\t'));
+            
+            // Garantir que temos linhas suficientes
+            const linhasNecessarias = linhaIndex + linhasPaste.length;
+            while (linhas.length < linhasNecessarias) {
+                adicionarLinha();
+            }
+            
+            // Distribuir dados
+            const colunasOrdem = ['data', 'credito', 'debito', 'discriminacao', 'cat_transacao', 'competencia', 'origem_destino', 'cat_avaliacao'];
+            const colunaInicialIdx = colunasOrdem.indexOf(colunaInicial);
+            
+            linhasPaste.forEach((dadosLinha, rowOffset) => {
+                const targetLinhaIdx = linhaIndex + rowOffset;
+                if (targetLinhaIdx >= linhas.length) return;
+                
+                dadosLinha.forEach((valor, colOffset) => {
+                    const colunaIdx = colunaInicialIdx + colOffset;
+                    if (colunaIdx >= colunasOrdem.length) return;
+                    
+                    const campo = colunasOrdem[colunaIdx];
+                    valor = valor.trim();
+                    
+                    if (campo === 'credito' || campo === 'debito' || campo === 'discriminacao') {
+                        // Converter para número
+                        const valorNumerico = parseMoeda(valor);
+                        linhas[targetLinhaIdx][campo] = valorNumerico;
+                    } else if (campo === 'data') {
+                        // Tentar converter data (dd/mm/aaaa)
+                        if (valor.includes('/')) {
+                            const partes = valor.split('/');
+                            if (partes.length === 3) {
+                                linhas[targetLinhaIdx][campo] = `${partes[2]}-${partes[1]}-${partes[0]}`;
+                            }
+                        } else {
+                            linhas[targetLinhaIdx][campo] = valor;
+                        }
+                    } else {
+                        linhas[targetLinhaIdx][campo] = valor;
+                    }
+                });
+            });
+            
+            renderizarTabela();
+            document.getElementById('btnSalvar').style.display = 'block';
+            
+            alert(`✓ ${linhasPaste.length} linha(s) e ${linhasPaste[0].length} coluna(s) coladas com sucesso!`);
+        });
+    });
+
+    function verificarMesclagem(index) {
+        if (index === 0) return false;
+        
+        const linhaAtual = linhas[index];
+        const linhaAnterior = linhas[index - 1];
+        
+        // Verifica se tem o mesmo valor de débito ou crédito
+        const mesmoDebito = linhaAtual.debito && linhaAnterior.debito && 
+                           parseFloat(linhaAtual.debito) === parseFloat(linhaAnterior.debito);
+        const mesmoCredito = linhaAtual.credito && linhaAnterior.credito && 
+                            parseFloat(linhaAtual.credito) === parseFloat(linhaAnterior.credito);
+        
+        return mesmoDebito || mesmoCredito;
+    }
+    
+    function getGrupoMesclagem(index) {
+        // Sistema manual de mesclagem: verifica array mesclado_com
+        const linha = linhas[index];
+        if (!linha.mesclado_com || linha.mesclado_com.length === 0) return null;
+        
+        // Esta linha é a principal (primeira) do grupo
+        return {
+            inicio: index,
+            fim: Math.max(...linha.mesclado_com),
+            tamanho: linha.mesclado_com.length + 1,
+            isPrimeira: true,
+            isUltima: false,
+            indices: [index, ...linha.mesclado_com]
+        };
+    }
+    
+    function linhaEstaMescladaComoSecundaria(index) {
+        // Verifica se esta linha está mesclada como secundária (parte de outro grupo)
+        return linhas.some((l, i) => i < index && l.mesclado_com && l.mesclado_com.includes(index));
+    }
+
+    function atualizarCampo(index, campo, valor) {
+        linhas[index][campo] = valor;
+        
+        // Auto-preencher competência quando mudar a data
+        if (campo === 'data' && valor) {
+            const competenciaAuto = calcularCompetenciaAutomatica(valor);
+            if (competenciaAuto && !linhas[index].competencia) {
+                linhas[index].competencia = competenciaAuto;
+                renderizarTabela();
+            }
+        }
+    }
+    
+    function atualizarCampoData(index, valor) {
+        // Converter dd/mm/aaaa para aaaa-mm-dd
+        let dataFormatada = valor;
+        
+        if (valor && valor.includes('/')) {
+            const partes = valor.split('/');
+            if (partes.length === 3) {
+                const dia = partes[0].padStart(2, '0');
+                const mes = partes[1].padStart(2, '0');
+                let ano = partes[2];
+                
+                // Converter ano de 2 dígitos para 4
+                if (ano.length === 2) {
+                    ano = '20' + ano;
+                }
+                
+                dataFormatada = `${ano}-${mes}-${dia}`;
+            }
+        }
+        
+        atualizarCampo(index, 'data', dataFormatada);
+    }
+    
+    function navegarCelulaData(event, linhaIndex) {
+        const input = event.target;
+        
+        // Enter: vai para baixo
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            
+            // Formatar data antes de sair (se tiver valor parcial)
+            const valor = input.value;
+            if (valor && !valor.includes('-')) {
+                atualizarCampoData(linhaIndex, valor);
+            }
+            
+            focarCelula(linhaIndex + 1, 0);
+            return;
+        }
+        
+        // Tab: vai para direita
+        if (event.key === 'Tab' && !event.ctrlKey) {
+            event.preventDefault();
+            
+            // Formatar data antes de sair
+            const valor = input.value;
+            if (valor && !valor.includes('-')) {
+                atualizarCampoData(linhaIndex, valor);
+            }
+            
+            focarCelula(linhaIndex, 1);
+            return;
+        }
+        
+        // Ctrl+Tab: vai para esquerda
+        if (event.key === 'Tab' && event.ctrlKey) {
+            event.preventDefault();
+            focarCelula(linhaIndex, -1);
+            return;
+        }
+        
+        // Auto-adicionar barras ao digitar data
+        if (event.key >= '0' && event.key <= '9') {
+            const valor = input.value.replace(/\D/g, '');
+            if (valor.length === 2 || valor.length === 4) {
+                setTimeout(() => {
+                    const atual = input.value.replace(/\D/g, '');
+                    if (atual.length === 2) {
+                        input.value = atual.slice(0, 2) + '/';
+                    } else if (atual.length === 4) {
+                        input.value = atual.slice(0, 2) + '/' + atual.slice(2, 4) + '/';
+                    }
+                }, 10);
+            }
+        }
+    }
+
+    function atualizarValor(index, campo, valor) {
+        const valorNumerico = parseMoeda(valor);
+        linhas[index][campo] = valorNumerico;
+        // Não renderizar toda tabela no onchange, apenas no onblur
+    }
+    
+    function verificarAutoPreenchimento(index) {
+        // Auto-preencher/atualizar composição se for crédito ou débito
+        const linha = linhas[index];
+        const credito = linha.credito;
+        const debito = linha.debito;
+        
+        if ((credito && credito > 0) || (debito && debito > 0)) {
+            // Verificar se é uma composição 1-1 (não está mesclada com outras linhas)
+            const grupo = getGrupoMesclagem(index);
+            const eh1para1 = !grupo || grupo.tamanho === 1;
+            
+            if (eh1para1) {
+                // Se for 1-1, sempre sincronizar discriminacao com o valor
+                const valorAtual = credito || debito;
+                if (linha.discriminacao !== valorAtual) {
+                    linha.discriminacao = valorAtual;
+                }
+            } else if (!linha.discriminacao) {
+                // Se for mesclada e não tiver discriminacao, preencher inicial
+                linha.discriminacao = credito || debito;
+            }
+        }
+        
+        // Renderizar apenas uma vez após todas as atualizações
+        renderizarTabela();
+    }
+    
+    function verificarAutoPreenchimentoCategoria(index) {
+        const linha = linhas[index];
+        const categoria = linha.cat_transacao;
+        
+        if (categoria) {
+            // Buscar correspondente da categoria selecionada
+            const categoriaObj = categoriasAnalise.find(cat => cat.categoria_extra === categoria);
+            if (categoriaObj && categoriaObj.correspondente) {
+                let origemDestino = categoriaObj.correspondente;
+                
+                // Se o correspondente for "Banco", substituir pelo banco atual do termo
+                if (origemDestino === 'Banco' && bancoAtual) {
+                    origemDestino = bancoAtual;
+                }
+                
+                // Preencher apenas se o campo estiver vazio
+                if (!linha.origem_destino) {
+                    linha.origem_destino = origemDestino;
+                }
+            }
+        }
+        
+        // Renderizar após atualização
+        renderizarTabela();
+    }
+
+    function formatarMoeda(valor) {
+        if (!valor || valor === 0) return '';
+        return new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(valor);
+    }
+
+    function formatarCampoMoeda(input) {
+        const valor = parseMoeda(input.value);
+        if (valor !== null && valor !== 0) {
+            input.value = formatarMoeda(valor);
+        }
+    }
+
+    function parseMoeda(valor) {
+        if (!valor) return null;
+        // Remove tudo exceto números, vírgula e ponto
+        const numero = String(valor).replace(/[^\d,.-]/g, '').replace(',', '.');
+        return parseFloat(numero) || null;
+    }
+    
+    function blurCondicional(index, input) {
+        // Sempre formatar a moeda
+        formatarCampoMoeda(input);
+        
+        // Apenas atualizar dados, SEM renderizar
+        const linha = linhas[index];
+        const credito = linha.credito;
+        const debito = linha.debito;
+        
+        if ((credito && credito > 0) || (debito && debito > 0)) {
+            const grupo = getGrupoMesclagem(index);
+            const eh1para1 = !grupo || grupo.tamanho === 1;
+            
+            if (eh1para1) {
+                const valorAtual = credito || debito;
+                if (linha.discriminacao !== valorAtual) {
+                    linha.discriminacao = valorAtual;
+                }
+            } else if (!linha.discriminacao) {
+                linha.discriminacao = credito || debito;
+            }
+        }
+        
+        // NÃO renderizar aqui - deixar para o usuário sair completamente da tabela
+    }
+    
+    function blurCondicionalCategoria(index) {
+        // Apenas atualizar dados, SEM renderizar
+        const linha = linhas[index];
+        const categoria = linha.cat_transacao;
+        
+        if (categoria) {
+            const categoriaObj = categoriasAnalise.find(cat => cat.categoria_extra === categoria);
+            if (categoriaObj && categoriaObj.correspondente) {
+                let origemDestino = categoriaObj.correspondente;
+                
+                if (origemDestino === 'Banco' && bancoAtual) {
+                    origemDestino = bancoAtual;
+                }
+                
+                if (!linha.origem_destino) {
+                    linha.origem_destino = origemDestino;
+                }
+            }
+        }
+        
+        // NÃO renderizar aqui
+    }
+    
+    function aplicarCorLinha(index) {
+        // Aplicar cor à linha sem re-renderizar toda a tabela
+        const tbody = document.getElementById('tbodyConciliacao');
+        const tr = tbody.children[index];
+        
+        if (!tr) return;
+        
+        const linha = linhas[index];
+        
+        // Remover todas as classes de cor
+        tr.classList.remove('avaliacao-avaliado', 'avaliacao-aguardando', 'avaliacao-pessoa-gestora', 'avaliacao-glosar');
+        
+        // Aplicar nova classe baseado na avaliação
+        if (linha.cat_avaliacao === 'Avaliado') {
+            tr.classList.add('avaliacao-avaliado');
+        } else if (linha.cat_avaliacao === 'Aguardando resposta') {
+            tr.classList.add('avaliacao-aguardando');
+        } else if (linha.cat_avaliacao === 'Pessoa Gestora') {
+            tr.classList.add('avaliacao-pessoa-gestora');
+        } else if (linha.cat_avaliacao === 'Glosar') {
+            tr.classList.add('avaliacao-glosar');
+        }
+    }
+
+    function navegarCelula(event, linhaIndex, colunaAtual) {
+        // Enter: vai para baixo (mesma coluna, próxima linha)
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            focarCelula(linhaIndex + 1, colunaAtual);
+            return;
+        }
+        
+        // Tab: vai para direita (próxima coluna, mesma linha)
+        if (event.key === 'Tab' && !event.ctrlKey) {
+            event.preventDefault();
+            focarCelula(linhaIndex, colunaAtual + 1);
+            return;
+        }
+        
+        // Ctrl+Tab: vai para esquerda (coluna anterior, mesma linha)
+        if (event.key === 'Tab' && event.ctrlKey) {
+            event.preventDefault();
+            focarCelula(linhaIndex, colunaAtual - 1);
+            return;
+        }
+    }
+
+    function focarCelula(linhaIndex, colunaIndex) {
+        // Validar se a linha existe
+        if (linhaIndex < 0 || linhaIndex >= linhas.length) {
+            return;
+        }
+        
+        // Mapeamento de colunas editáveis (índices baseados na ordem visual)
+        // 0: data, 1: credito, 2: debito, 3: discriminacao, 4: categoria, 5: competencia, 6: origem_destino, 7: avaliacao
+        const colunasEditaveis = ['data', 'credito', 'debito', 'discriminacao', 'categoria', 'competencia', 'origem_destino', 'avaliacao'];
+        
+        // Validar coluna
+        if (colunaIndex < 0 || colunaIndex >= colunasEditaveis.length) {
+            return;
+        }
+        
+        // Usar requestAnimationFrame para garantir que o DOM esteja pronto
+        requestAnimationFrame(() => {
+            const tbody = document.getElementById('tbodyConciliacao');
+            const linhaElement = tbody.children[linhaIndex];
+            
+            if (!linhaElement) return;
+            
+            // Encontrar o input correspondente
+            let inputSelector;
+            const coluna = colunasEditaveis[colunaIndex];
+            
+            switch(coluna) {
+                case 'data':
+                    inputSelector = 'input[placeholder="dd/mm/aaaa"]';
+                    break;
+                case 'credito':
+                case 'debito':
+                case 'discriminacao':
+                    // Pegar todos inputs tipo texto que são de moeda
+                    const inputs = linhaElement.querySelectorAll('input.cell-money');
+                    let targetInput;
+                    if (coluna === 'credito') targetInput = inputs[0];
+                    else if (coluna === 'debito') targetInput = inputs[1];
+                    else if (coluna === 'discriminacao') targetInput = inputs[2];
+                    
+                    if (targetInput && !targetInput.disabled) {
+                        targetInput.focus();
+                        targetInput.select();
+                    }
+                    return;
+                case 'categoria':
+                    // Categoria usa datalist dinâmico, pegar o input que não é de avaliações nem origem/destino
+                    const catInputs = linhaElement.querySelectorAll('input[type="text"][list]');
+                    for (let inp of catInputs) {
+                        const listId = inp.getAttribute('list');
+                        if (listId && listId.startsWith('datalist-cat-')) {
+                            if (!inp.disabled) {
+                                inp.focus();
+                                inp.select();
+                            }
+                            return;
+                        }
+                    }
+                    return;
+                case 'competencia':
+                    inputSelector = 'input.competencia-input';
+                    break;
+                case 'origem_destino':
+                    // Pegar o último input de texto simples (não money, não list, não competencia)
+                    const allInputs = linhaElement.querySelectorAll('input[type="text"]:not(.cell-money):not([list]):not(.competencia-input)');
+                    const origemInput = allInputs[allInputs.length - 1];
+                    if (origemInput && !origemInput.disabled) {
+                        origemInput.focus();
+                        origemInput.select();
+                    }
+                    return;
+                case 'avaliacao':
+                    inputSelector = 'input[list="datalistAvaliacoes"]';
+                    break;
+            }
+            
+            if (inputSelector) {
+                const input = linhaElement.querySelector(inputSelector);
+                if (input && !input.disabled) {
+                    input.focus();
+                    input.select();
+                }
+            }
+        });
+    }
+
+    function podeMesclar(index1, index2) {
+        // Sistema manual: sempre pode mesclar se estiverem na mesma coluna (crédito com crédito OU débito com débito)
+        if (index1 < 0 || index2 < 0 || index1 >= linhas.length || index2 >= linhas.length) return false;
+        if (index1 === index2) return false;
+        
+        const linha1 = linhas[index1];
+        const linha2 = linhas[index2];
+        
+        // Não pode mesclar linhas já mescladas
+        if (linha1.mesclado_com && linha1.mesclado_com.length > 0) return false;
+        if (linha2.mesclado_com && linha2.mesclado_com.length > 0) return false;
+        if (linhaEstaMescladaComoSecundaria(index1) || linhaEstaMescladaComoSecundaria(index2)) return false;
+        
+        // Pode mesclar se ambas tiverem crédito OU ambas tiverem débito
+        const ambasCredito = linha1.credito && linha2.credito;
+        const ambasDebito = linha1.debito && linha2.debito;
+        
+        return ambasCredito || ambasDebito;
+    }
+
+    function mesclarLinhas(index1, index2) {
+        if (!podeMesclar(index1, index2)) {
+            alert('Não é possível mesclar estas linhas. Certifique-se de que ambas têm valores na mesma coluna (crédito com crédito OU débito com débito).');
+            return;
+        }
+        
+        const linha1 = linhas[index1];
+        const linha2 = linhas[index2];
+        const tipo = linha1.credito ? 'crédito' : 'débito';
+        
+        if (!confirm(`Mesclar linha ${index1 + 1} com linha ${index2 + 1} (${tipo})?`)) {
+            return;
+        }
+        
+        // Adicionar index2 ao array mesclado_com de index1
+        if (!linha1.mesclado_com) linha1.mesclado_com = [];
+        if (!linha1.mesclado_com.includes(index2)) {
+            linha1.mesclado_com.push(index2);
+            linha1.mesclado_com.sort((a, b) => a - b); // Manter ordenado
+        }
+        
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function desmesclarLinha(index) {
+        const linha = linhas[index];
+        
+        if (!linha.mesclado_com || linha.mesclado_com.length === 0) {
+            alert('Esta linha não está mesclada.');
+            return;
+        }
+        
+        if (!confirm(`Desmesclar linha ${index + 1}?`)) {
+            return;
+        }
+        
+        // Limpar array de mesclagem
+        linha.mesclado_com = [];
+        
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function mesclarLinhasEmLote(indexOrigem) {
+        const linhaOrigem = linhas[indexOrigem];
+        
+        if (!linhaOrigem.credito && !linhaOrigem.debito) {
+            alert('A linha de origem não possui valor de crédito ou débito.');
+            return;
+        }
+        
+        if (linhaOrigem.mesclado_com && linhaOrigem.mesclado_com.length > 0) {
+            alert('Esta linha já está mesclada. Desmescle primeiro para criar uma nova mesclagem.');
+            return;
+        }
+        
+        const tipo = linhaOrigem.credito ? 'crédito' : 'débito';
+        const valor = linhaOrigem.credito || linhaOrigem.debito;
+        
+        const input = prompt(
+            `Mesclagem em Lote - Linha ${indexOrigem + 1} (${tipo}: ${formatarMoeda(valor)})\n\n` +
+            `Digite os ÍNDICES das linhas para mesclar.\n` +
+            `Aceita vírgulas e intervalos:\n` +
+            `  - Vírgulas: 5,7,9,12\n` +
+            `  - Intervalos: 11-19\n` +
+            `  - Misto: 5,11-19,25\n\n` +
+            `ATENÇÃO: Só é permitido mesclar linhas com ${tipo}.\n\n` +
+            `Índices para mesclar:`
+        );
+        
+        if (!input || input.trim() === '') return;
+        
+        // Parse dos índices (suporta vírgulas e intervalos)
+        const indices = [];
+        const partes = input.replace(/\s+/g, '').split(',');
+        
+        for (let parte of partes) {
+            if (parte.includes('-')) {
+                // Intervalo: 11-19
+                const [inicio, fim] = parte.split('-').map(n => parseInt(n));
+                
+                if (isNaN(inicio) || isNaN(fim)) {
+                    alert(`Intervalo inválido: "${parte}". Use o formato: número-número (ex: 11-19)`);
+                    return;
+                }
+                
+                if (inicio > fim) {
+                    alert(`Intervalo inválido: "${parte}". O início (${inicio}) não pode ser maior que o fim (${fim}).`);
+                    return;
+                }
+                
+                if (inicio < 1 || fim > linhas.length) {
+                    alert(`Intervalo ${parte} fora do intervalo válido (1-${linhas.length}).`);
+                    return;
+                }
+                
+                // Adicionar todos os índices do intervalo
+                for (let i = inicio; i <= fim; i++) {
+                    indices.push(i - 1); // Converter para 0-based
+                }
+            } else {
+                // Número individual: 5
+                const num = parseInt(parte);
+                
+                if (isNaN(num)) {
+                    alert(`Índice inválido: "${parte}". Use apenas números.`);
+                    return;
+                }
+                
+                if (num < 1 || num > linhas.length) {
+                    alert(`Índice ${num} fora do intervalo válido (1-${linhas.length}).`);
+                    return;
+                }
+                
+                indices.push(num - 1); // Converter para 0-based
+            }
+        }
+        
+        // Remover duplicatas e ordenar
+        const indicesUnicos = [...new Set(indices)].sort((a, b) => a - b);
+        
+        if (indicesUnicos.length === 0) {
+            alert('Nenhum índice válido especificado.');
+            return;
+        }
+        
+        if (indicesUnicos.length === 1) {
+            alert('É necessário pelo menos 2 linhas para mesclar.');
+            return;
+        }
+        
+        // A primeira linha do grupo será a "origem" (linha principal)
+        const linhaPrincipal = indicesUnicos[0];
+        const linhasSecundarias = indicesUnicos.slice(1);
+        
+        // Validar que a linha principal tem crédito ou débito
+        const linhaPrincipalObj = linhas[linhaPrincipal];
+        const tipoMesclagem = linhaPrincipalObj.credito ? 'crédito' : (linhaPrincipalObj.debito ? 'débito' : null);
+        
+        if (!tipoMesclagem) {
+            alert(`Linha ${linhaPrincipal + 1} (primeira do grupo) não tem crédito nem débito.`);
+            return;
+        }
+        
+        // Validar que todas as linhas têm o mesmo tipo
+        for (let idx of indicesUnicos) {
+            const linha = linhas[idx];
+            
+            // Verificar se já está mesclada
+            if (linha.mesclado_com && linha.mesclado_com.length > 0) {
+                alert(`Linha ${idx + 1} já está mesclada. Desmescle primeiro.`);
+                return;
+            }
+            if (linhaEstaMescladaComoSecundaria(idx)) {
+                alert(`Linha ${idx + 1} já faz parte de outra mesclagem. Desmescle primeiro.`);
+                return;
+            }
+            
+            // Validar mesmo tipo
+            if (tipoMesclagem === 'crédito' && !linha.credito) {
+                alert(`ERRO: Linha ${idx + 1} não tem crédito. Só é permitido mesclar crédito com crédito.`);
+                return;
+            }
+            if (tipoMesclagem === 'débito' && !linha.debito) {
+                alert(`ERRO: Linha ${idx + 1} não tem débito. Só é permitido mesclar débito com débito.`);
+                return;
+            }
+        }
+        
+        // Confirmar
+        const resumo = indicesUnicos.map(i => i + 1).join(', ');
+        if (!confirm(
+            `Mesclar ${indicesUnicos.length} linhas?\n\n` +
+            `Tipo: ${tipoMesclagem}\n` +
+            `Linhas: ${resumo}\n` +
+            `Principal: Linha ${linhaPrincipal + 1}\n` +
+            `Secundárias: ${linhasSecundarias.map(i => i + 1).join(', ')}`
+        )) {
+            return;
+        }
+        
+        // Aplicar mesclagem
+        linhas[linhaPrincipal].mesclado_com = linhasSecundarias;
+        
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+        
+        alert(`✓ ${indicesUnicos.length} linha(s) mesclada(s) com sucesso!`);
+    }
+
+    function copiarDataAcima(index) {
+        if (index === 0) {
+            alert('Esta é a primeira linha, não há data acima para copiar.');
+            return;
+        }
+        
+        // Encontrar a última linha com data preenchida (de trás para frente a partir da linha anterior)
+        let linhaReferencia = -1;
+        for (let i = index - 1; i >= 0; i--) {
+            if (linhas[i].data) {
+                linhaReferencia = i;
+                break;
+            }
+        }
+        
+        if (linhaReferencia === -1) {
+            alert('Não há nenhuma data preenchida nas linhas acima.');
+            return;
+        }
+        
+        const dataReferencia = linhas[linhaReferencia].data;
+        const linhasAfetadas = index - linhaReferencia;
+        
+        // Preencher todas as linhas entre a referência e a atual
+        for (let i = linhaReferencia + 1; i <= index; i++) {
+            linhas[i].data = dataReferencia;
+            
+            // Auto-preencher competência baseada na data copiada
+            if (!linhas[i].competencia) {
+                linhas[i].competencia = calcularCompetenciaAutomatica(dataReferencia);
+            }
+        }
+        
+        renderizarTabela();
+    }
+    
+    function formatarDataParaExibicao(dataStr) {
+        if (!dataStr) return '';
+        // Converter aaaa-mm-dd para dd/mm/aaaa
+        const partes = dataStr.split('-');
+        if (partes.length === 3) {
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+        return dataStr;
+    }
+
+    function popularFiltros() {
+        // Popular filtro de datas (por mês/ano)
+        const selectData = document.getElementById('filtroData');
+        const datasUnicas = new Set();
+        
+        linhas.forEach(linha => {
+            if (linha.data) {
+                // Extrair mês/ano (formato: aaaa-mm-dd -> mm/aaaa)
+                const partes = linha.data.split('-');
+                if (partes.length === 3) {
+                    const mesAno = `${partes[1]}/${partes[0]}`;
+                    datasUnicas.add(mesAno);
+                }
+            }
+        });
+        
+        selectData.innerHTML = '<option value="">Todas as datas</option>';
+        [...datasUnicas].sort().forEach(data => {
+            const option = document.createElement('option');
+            option.value = data;
+            option.textContent = data;
+            selectData.appendChild(option);
+        });
+        
+        // Popular filtro de competências
+        const selectCompetencia = document.getElementById('filtroCompetencia');
+        const competenciasUnicas = new Set();
+        
+        linhas.forEach(linha => {
+            if (linha.competencia) {
+                const competenciaFormatada = formatarCompetenciaParaExibicao(linha.competencia);
+                competenciasUnicas.add(competenciaFormatada);
+            }
+        });
+        
+        selectCompetencia.innerHTML = '<option value="">Todas as competências</option>';
+        [...competenciasUnicas].sort().forEach(comp => {
+            const option = document.createElement('option');
+            option.value = comp;
+            option.textContent = comp;
+            selectCompetencia.appendChild(option);
+        });
+        
+        // Popular filtro de categorias
+        const selectCategoria = document.getElementById('filtroCategoria');
+        const categoriasUnicas = new Set();
+        
+        linhas.forEach(linha => {
+            if (linha.cat_transacao) {
+                categoriasUnicas.add(linha.cat_transacao);
+            }
+        });
+        
+        selectCategoria.innerHTML = '<option value="">Todas as categorias</option>';
+        [...categoriasUnicas].sort().forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat;
+            selectCategoria.appendChild(option);
+        });
+        
+        // Popular filtro de origem/destino
+        const selectOrigemDestino = document.getElementById('filtroOrigemDestino');
+        const origensUnicas = new Set();
+        
+        linhas.forEach(linha => {
+            if (linha.origem_destino) {
+                origensUnicas.add(linha.origem_destino);
+            }
+        });
+        
+        selectOrigemDestino.innerHTML = '<option value="">Todas as origens/destinos</option>';
+        [...origensUnicas].sort().forEach(origem => {
+            const option = document.createElement('option');
+            option.value = origem;
+            option.textContent = origem;
+            selectOrigemDestino.appendChild(option);
+        });
+    }
+    
+    function aplicarFiltros() {
+        const selectData = document.getElementById('filtroData');
+        const selectCompetencia = document.getElementById('filtroCompetencia');
+        const selectCategoria = document.getElementById('filtroCategoria');
+        const selectOrigemDestino = document.getElementById('filtroOrigemDestino');
+        const selectAvaliacao = document.getElementById('filtroAvaliacao');
+        
+        const datasSelecionadas = Array.from(selectData.selectedOptions)
+            .map(opt => opt.value)
+            .filter(val => val !== '');
+        
+        const competenciasSelecionadas = Array.from(selectCompetencia.selectedOptions)
+            .map(opt => opt.value)
+            .filter(val => val !== '');
+        
+        const categoriasSelecionadas = Array.from(selectCategoria.selectedOptions)
+            .map(opt => opt.value)
+            .filter(val => val !== '');
+        
+        const origensSelecionadas = Array.from(selectOrigemDestino.selectedOptions)
+            .map(opt => opt.value)
+            .filter(val => val !== '');
+        
+        const avaliacoesSelecionadas = Array.from(selectAvaliacao.selectedOptions)
+            .map(opt => opt.value)
+            .filter(val => val !== '');
+        
+        const tbody = document.getElementById('tbodyConciliacao');
+        const rows = tbody.getElementsByTagName('tr');
+        
+        linhas.forEach((linha, index) => {
+            const row = rows[index];
+            if (!row) return;
+            
+            let mostrar = true;
+            
+            // Filtrar por data (mês/ano)
+            if (datasSelecionadas.length > 0) {
+                let mesAnoLinha = '';
+                if (linha.data) {
+                    const partes = linha.data.split('-');
+                    if (partes.length === 3) {
+                        mesAnoLinha = `${partes[1]}/${partes[0]}`;
+                    }
+                }
+                mostrar = mostrar && datasSelecionadas.includes(mesAnoLinha);
+            }
+            
+            // Filtrar por competência
+            if (competenciasSelecionadas.length > 0) {
+                const competenciaLinha = linha.competencia ? formatarCompetenciaParaExibicao(linha.competencia) : '';
+                mostrar = mostrar && competenciasSelecionadas.includes(competenciaLinha);
+            }
+            
+            // Filtrar por categoria
+            if (categoriasSelecionadas.length > 0) {
+                mostrar = mostrar && categoriasSelecionadas.includes(linha.cat_transacao);
+            }
+            
+            // Filtrar por origem/destino
+            if (origensSelecionadas.length > 0) {
+                mostrar = mostrar && origensSelecionadas.includes(linha.origem_destino);
+            }
+            
+            // Filtrar por avaliação
+            if (avaliacoesSelecionadas.length > 0) {
+                mostrar = mostrar && avaliacoesSelecionadas.includes(linha.cat_avaliacao);
+            }
+            
+            row.style.display = mostrar ? '' : 'none';
+        });
+    }
+    
+    function atualizarDatalistOrigemDestino() {
+        // Atualizar lista de origens/destinos únicos
+        linhas.forEach(linha => {
+            if (linha.origem_destino) {
+                origensDestinosUnicos.add(linha.origem_destino);
+            }
+        });
+        
+        // Atualizar datalist
+        const datalist = document.getElementById('datalistOrigemDestino');
+        datalist.innerHTML = '';
+        
+        [...origensDestinosUnicos].sort().forEach(origem => {
+            const option = document.createElement('option');
+            option.value = origem;
+            datalist.appendChild(option);
+        });
+    }
+
+    function filtrarPorData() {
+        const dataFiltro = prompt('Digite a data para filtrar (dd/mm/aaaa) ou deixe vazio para ver todas:');
+        
+        if (dataFiltro === null) return; // Cancelou
+        
+        const tbody = document.getElementById('tbodyConciliacao');
+        const rows = tbody.getElementsByTagName('tr');
+        
+        if (!dataFiltro || dataFiltro.trim() === '') {
+            // Mostrar todas
+            for (let row of rows) {
+                row.style.display = '';
+            }
+            return;
+        }
+        
+        // Converter dd/mm/aaaa para aaaa-mm-dd
+        const partes = dataFiltro.split('/');
+        if (partes.length !== 3) {
+            alert('Formato inválido! Use dd/mm/aaaa');
+            return;
+        }
+        
+        const dataFormatada = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
+        
+        // Filtrar linhas
+        linhas.forEach((linha, index) => {
+            const row = rows[index];
+            if (row) {
+                row.style.display = linha.data === dataFormatada ? '' : 'none';
+            }
+        });
+    }
+    
+    function filtrarPorCategoria() {
+        const categoriaFiltro = prompt('Digite a categoria para filtrar (ou parte dela) ou deixe vazio para ver todas:');
+        
+        if (categoriaFiltro === null) return; // Cancelou
+        
+        const tbody = document.getElementById('tbodyConciliacao');
+        const rows = tbody.getElementsByTagName('tr');
+        
+        if (!categoriaFiltro || categoriaFiltro.trim() === '') {
+            // Mostrar todas
+            for (let row of rows) {
+                row.style.display = '';
+            }
+            return;
+        }
+        
+        const filtroLower = categoriaFiltro.toLowerCase();
+        
+        // Filtrar linhas (ALIKE - busca parcial case-insensitive)
+        linhas.forEach((linha, index) => {
+            const row = rows[index];
+            if (row) {
+                const categoria = linha.cat_transacao || '';
+                const match = categoria.toLowerCase().includes(filtroLower);
+                row.style.display = match ? '' : 'none';
+            }
+        });
+    }
+    
+    function limparFiltros() {
+        // Limpar seleções dos filtros
+        document.getElementById('filtroData').selectedIndex = -1;
+        document.getElementById('filtroCompetencia').selectedIndex = -1;
+        document.getElementById('filtroCategoria').selectedIndex = -1;
+        document.getElementById('filtroOrigemDestino').selectedIndex = -1;
+        
+        const tbody = document.getElementById('tbodyConciliacao');
+        const rows = tbody.getElementsByTagName('tr');
+        
+        // Mostrar todas as linhas
+        for (let row of rows) {
+            row.style.display = '';
+        }
+    }
+
+    function moverLinha(index, direcao) {
+        if (index + direcao < 0 || index + direcao >= linhas.length) return;
+        
+        // Trocar posições
+        const temp = linhas[index];
+        linhas[index] = linhas[index + direcao];
+        linhas[index + direcao] = temp;
+        
+        // Recalcular índices
+        recalcularIndices();
+        renderizarTabela();
+    }
+
+    function excluirLinha(index) {
+        if (!confirm('Deseja realmente excluir esta linha?')) return;
+        
+        linhas.splice(index, 1);
+        recalcularIndices();
+        renderizarTabela();
+    }
+
+    function recalcularIndices() {
+        linhas.forEach((linha, i) => {
+            linha.indice = i + 1;
+        });
+        proximoIndice = linhas.length + 1;
+    }
+
+    function limparTabela() {
+        if (!confirm('Tem certeza que deseja limpar toda a tabela? Esta ação não pode ser desfeita.')) {
+            return;
+        }
+        
+        linhas = [];
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'none';
+    }
+
+    async function salvarConciliacao() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        const bancoExtrato = document.getElementById('bancoExtrato').value;
+        
+        if (!numeroTermo) {
+            alert('Selecione um número de termo');
+            return;
+        }
+
+        // Filtrar linhas com pelo menos um campo preenchido
+        const linhasParaSalvar = linhas.filter(linha => {
+            return linha.data || linha.credito || linha.debito || linha.discriminacao;
+        }).map(linha => {
+            // Auto-preencher competência se estiver vazia mas tiver data
+            let competencia = linha.competencia;
+            if (!competencia && linha.data) {
+                competencia = calcularCompetenciaAutomatica(linha.data);
+            }
+            
+            // Auto-preencher origem_destino se estiver vazia mas tiver categoria
+            let origemDestino = linha.origem_destino;
+            if (!origemDestino && linha.cat_transacao) {
+                const categoria = categoriasAnalise.find(cat => cat.categoria_extra === linha.cat_transacao);
+                if (categoria && categoria.correspondente) {
+                    origemDestino = categoria.correspondente;
+                    
+                    // Se o correspondente for "Banco", substituir pelo banco atual do termo
+                    if (origemDestino === 'Banco' && bancoAtual) {
+                        origemDestino = bancoAtual;
+                    }
+                }
+            }
+            
+            // Auto-classificar avaliação baseado em origem/destino
+            let avaliacaoAuto = linha.cat_avaliacao;
+            if (!avaliacaoAuto && origemDestino) {
+                const origemNormalizada = origemDestino.toLowerCase().trim();
+                if (origemNormalizada === 'banco do brasil' || origemNormalizada === 'administração pública' || origemNormalizada === 'administração publica') {
+                    avaliacaoAuto = 'Avaliado';
+                }
+            }
+            
+            return {
+                id: linha.id,
+                indice: linha.indice,
+                data: linha.data,
+                credito: linha.credito,
+                debito: linha.debito,
+                discriminacao: linha.discriminacao,
+                cat_transacao: linha.cat_transacao,
+                competencia: competencia,
+                origem_destino: origemDestino,
+                cat_avaliacao: avaliacaoAuto,
+                mesclado_com: linha.mesclado_com || []
+            };
+        });
+
+        if (linhasParaSalvar.length === 0) {
+            if (!confirm('Não há dados para salvar. Deseja salvar mesmo assim (limpar todos os dados existentes)?')) {
+                return;
+            }
+        }
+
+        try {
+            document.getElementById('btnSalvar').disabled = true;
+            document.getElementById('btnSalvar').innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Salvando...';
+
+            // Salvar extrato
+            const response = await fetch('/conc_bancaria/api/extrato', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    numero_termo: numeroTermo,
+                    linhas: linhasParaSalvar
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.erro || 'Erro ao salvar extrato');
+            }
+
+            // Salvar banco (se preenchido)
+            if (bancoExtrato) {
+                const bancResponse = await fetch('/conc_bancaria/api/banco', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        banco_extrato: bancoExtrato
+                    })
+                });
+
+                if (!bancResponse.ok) {
+                    console.warn('Aviso: Não foi possível salvar o banco');
+                }
+            }
+
+            const resultado = await response.json();
+            alert(resultado.mensagem);
+            
+            // Recarregar dados
+            await carregarExtrato();
+
+        } catch (error) {
+            console.error('Erro ao salvar:', error);
+            alert('Erro ao salvar conciliação: ' + error.message);
+        } finally {
+            document.getElementById('btnSalvar').disabled = false;
+            document.getElementById('btnSalvar').innerHTML = '<i class="bi bi-save me-2"></i>Salvar Conciliação';
+        }
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

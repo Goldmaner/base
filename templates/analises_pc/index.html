@@ -298,6 +298,9 @@
                 <div class="checklist-item" data-order="5">
                     <input type="checkbox" id="check_preenchimento_conciliacao_bancaria" onchange="handleCheckboxChange(this)">
                     <label for="check_preenchimento_conciliacao_bancaria">Preenchimento da conciliação bancária</label>
+                    <button class="btn btn-sm btn-info action-btn ms-3" onclick="abrirConciliacaoBancaria()" title="Construir e/ou consultar conciliações bancárias">
+                        <i class="bi bi-bank me-1"></i>Construir e/ou consultar conciliações bancárias existentes
+                    </button>
                 </div>
                 
                 <div class="checklist-item" data-order="6">
@@ -1299,6 +1302,19 @@
                 console.error('Erro ao verificar orçamento:', error);
                 alert('Erro ao verificar orçamento do termo');
             }
+        }
+
+        function abrirConciliacaoBancaria() {
+            const numeroTermo = document.getElementById('numeroTermo').value;
+            
+            if (!numeroTermo) {
+                alert('Selecione um termo primeiro!');
+                return;
+            }
+            
+            // Abrir página de conciliação bancária em nova aba com o termo pré-selecionado
+            const url = `/conc_bancaria/?termo=${encodeURIComponent(numeroTermo)}`;
+            window.open(url, '_blank');
         }
 
         function adicionarRecurso(recursoData = null) {
