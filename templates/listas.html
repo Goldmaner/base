@@ -248,6 +248,15 @@
               }
               
               td.appendChild(select);
+            } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox') {
+              // Renderizar checkbox
+              td.className = 'text-center';
+              const checkbox = document.createElement('input');
+              checkbox.type = 'checkbox';
+              checkbox.className = 'form-check-input';
+              checkbox.checked = registro[col] === true || registro[col] === 't' || registro[col] === 'true';
+              checkbox.disabled = true; // Apenas visualização na tabela (editar via modal)
+              td.appendChild(checkbox);
             } else {
               td.textContent = registro[col] || '-';
             }
@@ -394,6 +403,26 @@
           
           div.appendChild(label);
           div.appendChild(input);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox') {
+          // Checkbox
+          const checkDiv = document.createElement('div');
+          checkDiv.className = 'form-check';
+          
+          input = document.createElement('input');
+          input.type = 'checkbox';
+          input.className = 'form-check-input';
+          input.checked = false; // Default false para novos registros
+          
+          const checkLabel = document.createElement('label');
+          checkLabel.className = 'form-check-label';
+          checkLabel.textContent = configAtual.labels[col];
+          
+          input.id = `campo_${col}`;
+          checkLabel.setAttribute('for', input.id);
+          
+          checkDiv.appendChild(input);
+          checkDiv.appendChild(checkLabel);
+          div.appendChild(checkDiv);
         } else if (col === 'descricao') {
           input = document.createElement('textarea');
           input.rows = 3;
@@ -512,6 +541,26 @@
           
           div.appendChild(label);
           div.appendChild(input);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox') {
+          // Checkbox
+          const checkDiv = document.createElement('div');
+          checkDiv.className = 'form-check';
+          
+          input = document.createElement('input');
+          input.type = 'checkbox';
+          input.className = 'form-check-input';
+          input.checked = registro[col] === true || registro[col] === 't' || registro[col] === 'true';
+          
+          const checkLabel = document.createElement('label');
+          checkLabel.className = 'form-check-label';
+          checkLabel.textContent = configAtual.labels[col];
+          
+          input.id = `campo_${col}`;
+          checkLabel.setAttribute('for', input.id);
+          
+          checkDiv.appendChild(input);
+          checkDiv.appendChild(checkLabel);
+          div.appendChild(checkDiv);
         } else if (col === 'descricao') {
           input = document.createElement('textarea');
           input.rows = 3;
@@ -548,13 +597,19 @@
       const dados = {};
       for (const col of configAtual.colunas_editaveis) {
         const input = document.getElementById(`campo_${col}`);
-        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição e correspondente
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente'];
-        if (!input.value.trim() && !camposOpcionais.includes(col)) {
-          alert(`O campo ${configAtual.labels[col]} é obrigatório`);
-          return;
+        
+        // Verificar se é checkbox
+        if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox') {
+          dados[col] = input.checked;
+        } else {
+          // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente e aplicacao
+          const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'aplicacao'];
+          if (!input.value.trim() && !camposOpcionais.includes(col)) {
+            alert(`O campo ${configAtual.labels[col]} é obrigatório`);
+            return;
+          }
+          dados[col] = input.value.trim();
         }
-        dados[col] = input.value.trim();
       }
       
       // Validação especial: RF não pode ser duplicado (exceto se vazio)

@@ -175,19 +175,21 @@ TABELAS_CONFIG = {
     'c_despesas_analise': {
         'nome': 'Despesas de Análise',
         'schema': 'categoricas',
-        'colunas_editaveis': ['categoria_extra', 'tipo_transacao', 'descricao', 'correspondente'],
+        'colunas_editaveis': ['categoria_extra', 'tipo_transacao', 'descricao', 'correspondente', 'aplicacao'],
         'colunas_obrigatorias': ['categoria_extra', 'tipo_transacao'],
         'labels': {
             'categoria_extra': 'Categoria Extra',
             'tipo_transacao': 'Tipo de Transação',
             'descricao': 'Descrição',
-            'correspondente': 'Correspondente'
+            'correspondente': 'Correspondente',
+            'aplicacao': 'Aplicação'
         },
-        'colunas_filtro': ['categoria_extra', 'tipo_transacao', 'correspondente'],
+        'colunas_filtro': ['categoria_extra', 'tipo_transacao', 'correspondente', 'aplicacao'],
         'ordem': 'categoria_extra',
         'tipos_campo': {
             'tipo_transacao': 'select',
             'opcoes_tipo_transacao': ['Crédito', 'Débito', 'Débito / Crédito'],
+            'aplicacao': 'checkbox',
             'descricao': 'textarea',
             'correspondente': 'text'
         }

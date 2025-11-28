@@ -17,17 +17,15 @@
     
     .table-conc {
         font-size: 0.9rem;
-        border-collapse: separate;
-        border-spacing: 0;
+        border-collapse: collapse;
+        margin-bottom: 0;
+        width: 100%;
     }
     
     .table-conc thead th {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         font-weight: 600;
-        position: sticky;
-        top: 0;
-        z-index: 10;
         padding: 12px 8px;
         border: none;
         text-align: center;
@@ -201,6 +199,11 @@
         background-color: #fbe2d5 !important;
     }
     
+    /* Linha de separação entre meses */
+    tr.mudanca-mes {
+        border-top: 4px solid #007bff !important;
+    }
+    
     /* Célula desabilitada - Seletor mais específico para sobrepor cores de avaliação */
     td.cell-disabled,
     .avaliacao-avaliado td.cell-disabled,
@@ -210,6 +213,43 @@
         background-color: #e9ecef !important;
         cursor: not-allowed;
     }
+    
+    /* Validação de composição - composição diferente do valor */
+    td.composicao-invalida input {
+        background-color: #ffcccc !important;
+        border: 2px solid #ff0000 !important;
+    }
+    
+    /* Validação de CNPJ - laranja se não tiver 14 dígitos */
+    td.cnpj-invalido input {
+        background-color: #ffe0b3 !important;
+        border: 2px solid #ff9800 !important;
+    }
+    
+    /* Cabeçalhos das colunas de Notas Fiscais */
+    .table-conc thead th.th-notas-fiscais {
+        background: linear-gradient(135deg, #5a3e8c 0%, #3d2861 100%);
+    }
+    
+    /* Cabeçalhos das colunas de Documentos */
+    .table-conc thead th.th-documentos {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    }
+    
+    /* Indicador de autosave fixo */
+    #autosaveStatus {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 1050;
+        padding: 8px 15px;
+        background-color: #28a745;
+        color: white;
+        border-radius: 5px;
+        font-size: 0.85rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        display: none;
+    }
 </style>
 </head>
 <body>
@@ -218,6 +258,65 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="bi bi-bank me-2"></i>Conciliação Bancária</h2>
         <div>
+            <button class="btn btn-outline-primary me-2" id="btnMenuSecoes" onclick="toggleMenuSecoes()">
+                <i class="bi bi-list-check me-2"></i>Seções
+            </button>
+            <button class="btn btn-outline-warning me-2" id="btnUndo" onclick="desfazerAlteracao()" style="display: none;">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Desfazer
+            </button>
+            <div class="btn-group me-2">
+                <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-pencil-square me-1"></i>Adicionar ou Excluir Linhas
+                </button>
+                <ul class="dropdown-menu p-3" style="min-width: 320px;">
+                    <!-- Adicionar Linhas -->
+                    <li>
+                        <h6 class="dropdown-header text-primary"><i class="bi bi-plus-circle"></i> Adicionar Linhas</h6>
+                    </li>
+                    <li class="px-2 mb-3">
+                        <div class="input-group input-group-sm">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="inputAdicionarLinhas" 
+                                   placeholder="Quantidade"
+                                   min="1"
+                                   value="1">
+                            <button class="btn btn-primary" onclick="adicionarLinhasEmLote()">
+                                <i class="bi bi-plus-lg me-1"></i>Adicionar
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-1">Adiciona linhas vazias no final</small>
+                    </li>
+                    
+                    <li><hr class="dropdown-divider"></li>
+                    
+                    <!-- Excluir Linhas -->
+                    <li>
+                        <h6 class="dropdown-header text-danger"><i class="bi bi-trash"></i> Excluir Linhas</h6>
+                    </li>
+                    <li class="px-2">
+                        <div class="input-group input-group-sm">
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="inputExcluirLinhas" 
+                                   placeholder="Ex: 114-120 ou 5,10,15">
+                            <button class="btn btn-danger" onclick="excluirLinhasPorIntervalo()">
+                                <i class="bi bi-trash me-1"></i>Excluir
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-1">Use intervalos (1-5) ou índices (2,4,6)</small>
+                    </li>
+                </ul>
+            </div>
+            <button class="btn btn-success me-2" onclick="exportarCSV()">
+                <i class="bi bi-download me-2"></i>Exportar CSV
+            </button>
+            <button class="btn btn-danger me-2" onclick="abrirModalPDF()" data-bs-toggle="modal" data-bs-target="#modalExportarPDF">
+                <i class="bi bi-file-pdf me-2"></i>Exportar PDF
+            </button>
+            <button class="btn btn-info me-2" onclick="baixarModelo()">
+                <i class="bi bi-file-earmark-arrow-down me-2"></i>Modelo Importação
+            </button>
             <button class="btn btn-outline-danger me-2" onclick="limparTabela()">
                 <i class="bi bi-trash me-2"></i>Limpar
             </button>
@@ -256,19 +355,6 @@
                 </div>
             </div>
             <div class="col-md-1">
-                <button class="btn btn-success w-100" onclick="adicionarLinha()">
-                    <i class="bi bi-plus-circle me-2"></i>Linha
-                </button>
-            </div>
-            <div class="col-md-1">
-                <button class="btn btn-info w-100" onclick="adicionarLinhasDinamico()">
-                    <i class="bi bi-plus-square me-2"></i>Add
-                </button>
-            </div>
-            <div class="col-md-1">
-                <input type="number" class="form-control" id="quantidadeLinhas" value="20" min="1" max="500" placeholder="Qtd">
-            </div>
-            <div class="col-md-1">
                 <button class="btn btn-outline-info w-100" onclick="toggleFiltros()" id="btnToggleFiltros">
                     <i class="bi bi-funnel me-1"></i>Filtros
                 </button>
@@ -279,9 +365,45 @@
                 </button>
             </div>
             <div class="col-md-1">
+                <button class="btn btn-outline-secondary w-100" onclick="irParaUltimaLinha()" title="Ir para a última linha">
+                    <i class="bi bi-arrow-down-circle"></i>
+                </button>
+            </div>
+            <div class="col-md-1">
                 <button class="btn btn-outline-secondary w-100" onclick="renderizarTabela()" title="Atualizar visualização">
                     <i class="bi bi-arrow-clockwise"></i>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu de Seções -->
+    <div class="conc-card" id="menuSecoes" style="display: none;">
+        <h5 class="mb-3"><i class="bi bi-list-check me-2"></i>Seções Disponíveis</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="secaoExtrato" checked disabled>
+                    <label class="form-check-label" for="secaoExtrato">
+                        <strong>1. Conciliação do Extrato</strong> (10 colunas) - Sempre visível
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="secaoNotasFiscais" onchange="toggleSecaoNotasFiscais()">
+                    <label class="form-check-label" for="secaoNotasFiscais">
+                        <strong>2. Notas Fiscais</strong> (3 colunas) - Número, Chave de Acesso, CNPJ
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="secaoDocumentos" onchange="toggleSecaoDocumentos()">
+                    <label class="form-check-label" for="secaoDocumentos">
+                        <strong>3. Documentos a serem avaliados</strong> (4 colunas) - Guia, Comprovante, Contratos, Fora Município
+                    </label>
+                </div>
             </div>
         </div>
     </div>
@@ -293,6 +415,7 @@
                 <label for="filtroData" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Data (Mês/Ano)</strong></label>
                 <select class="form-select" id="filtroData" multiple size="4" onchange="aplicarFiltros()">
                     <option value="">Todas as datas</option>
+                    <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
                 </select>
                 <small class="text-muted">Ctrl+Click para múltipla seleção</small>
             </div>
@@ -300,6 +423,7 @@
                 <label for="filtroCompetencia" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Competência</strong></label>
                 <select class="form-select" id="filtroCompetencia" multiple size="4" onchange="aplicarFiltros()">
                     <option value="">Todas as competências</option>
+                    <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
                 </select>
                 <small class="text-muted">Ctrl+Click para múltipla seleção</small>
             </div>
@@ -307,6 +431,7 @@
                 <label for="filtroCategoria" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Categoria</strong></label>
                 <select class="form-select" id="filtroCategoria" multiple size="4" onchange="aplicarFiltros()">
                     <option value="">Todas as categorias</option>
+                    <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
                 </select>
                 <small class="text-muted">Ctrl+Click para múltipla seleção</small>
             </div>
@@ -314,6 +439,7 @@
                 <label for="filtroOrigemDestino" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Origem/Destino</strong></label>
                 <select class="form-select" id="filtroOrigemDestino" multiple size="4" onchange="aplicarFiltros()">
                     <option value="">Todas as origens/destinos</option>
+                    <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
                 </select>
                 <small class="text-muted">Ctrl+Click para múltipla seleção</small>
             </div>
@@ -321,6 +447,7 @@
                 <label for="filtroAvaliacao" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Avaliação</strong></label>
                 <select class="form-select" id="filtroAvaliacao" multiple size="4" onchange="aplicarFiltros()">
                     <option value="">Todas as avaliações</option>
+                    <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
                     <option value="Avaliado">Avaliado</option>
                     <option value="Aguardando resposta">Aguardando resposta</option>
                     <option value="Pessoa Gestora">Pessoa Gestora</option>
@@ -328,9 +455,12 @@
                 </select>
                 <small class="text-muted">Ctrl+Click para múltipla seleção</small>
             </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button class="btn btn-secondary w-100" onclick="limparFiltros()">
-                    <i class="bi bi-x-circle me-2"></i>Limpar Filtros
+            <div class="col-md-1 d-flex flex-column justify-content-end">
+                <button class="btn btn-secondary mb-2" onclick="limparFiltros()">
+                    <i class="bi bi-x-circle me-1"></i>Limpar
+                </button>
+                <button class="btn btn-outline-primary" onclick="expandirFiltros()" title="Expandir filtros">
+                    <i class="bi bi-arrows-angle-expand"></i>
                 </button>
             </div>
         </div>
@@ -351,33 +481,59 @@
                 <thead>
                     <tr>
                         <th style="width: 60px;" class="tooltip-header" onclick="mostrarInfo('indice')">
-                            Índice <i class="bi bi-info-circle info-icon"></i>
+                            1. Índice <i class="bi bi-info-circle info-icon"></i>
                         </th>
                         <th style="width: 140px;" class="tooltip-header" onclick="mostrarInfo('data')">
-                            Data <i class="bi bi-info-circle info-icon"></i>
+                            2. Data <i class="bi bi-info-circle info-icon"></i>
                         </th>
-                        <th style="width: 180px;" class="tooltip-header" onclick="mostrarInfo('credito')">
-                            Crédito (R$) <i class="bi bi-info-circle info-icon"></i>
+                        <th style="width: 140px;" class="tooltip-header" onclick="mostrarInfo('credito')">
+                            3. Crédito (R$) <i class="bi bi-info-circle info-icon"></i>
                         </th>
-                        <th style="width: 180px;" class="tooltip-header" onclick="mostrarInfo('debito')">
-                            Débito (R$) <i class="bi bi-info-circle info-icon"></i>
+                        <th style="width: 140px;" class="tooltip-header" onclick="mostrarInfo('debito')">
+                            4. Débito (R$) <i class="bi bi-info-circle info-icon"></i>
                         </th>
-                        <th style="width: 200px;" class="tooltip-header" onclick="mostrarInfo('composicao')">
-                            Composição do Valor (R$) <i class="bi bi-info-circle info-icon"></i>
+                        <th style="width: 150px;" class="tooltip-header" onclick="mostrarInfo('composicao')">
+                            5. Composição do Valor (R$) <i class="bi bi-info-circle info-icon"></i>
                         </th>
-                        <th style="width: 220px;" class="tooltip-header" onclick="mostrarInfo('categoria')">
-                            Categoria de Transação <i class="bi bi-info-circle info-icon"></i>
+                        <th style="width: 260px;" class="tooltip-header" onclick="mostrarInfo('categoria')">
+                            6. Categoria de Transação <i class="bi bi-info-circle info-icon"></i>
                         </th>
                         <th style="width: 130px;" class="tooltip-header" onclick="mostrarInfo('competencia')">
-                            Competência <i class="bi bi-info-circle info-icon"></i>
+                            7. Competência <i class="bi bi-info-circle info-icon"></i>
                         </th>
-                        <th style="width: 200px;" class="tooltip-header" onclick="mostrarInfo('origem_destino')">
-                            Origem ou Destino <i class="bi bi-info-circle info-icon"></i>
+                        <th style="width: 240px;" class="tooltip-header" onclick="mostrarInfo('origem_destino')">
+                            8. Origem ou Destino <i class="bi bi-info-circle info-icon"></i>
                         </th>
                         <th style="width: 180px;" class="tooltip-header" onclick="mostrarInfo('avaliacao')">
-                            Avaliação <i class="bi bi-info-circle info-icon"></i>
+                            9. Avaliação <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 250px;" class="tooltip-header" onclick="mostrarInfo('observacoes')">
+                            10. Observações <i class="bi bi-info-circle info-icon"></i>
                         </th>
                         <th style="width: 180px;">Ações</th>
+                        <!-- Colunas de Notas Fiscais (Seção 2) -->
+                        <th style="width: 150px; display: none;" class="th-notas-fiscais col-nf" id="thNumeroNota">
+                            11. Número da Nota
+                        </th>
+                        <th style="width: 250px; display: none;" class="th-notas-fiscais col-nf" id="thChaveAcesso">
+                            12. Chave de Acesso
+                        </th>
+                        <th style="width: 180px; display: none;" class="th-notas-fiscais col-nf" id="thCnpjNota">
+                            13. CNPJ
+                        </th>
+                        <!-- Colunas de Documentos (Seção 3) -->
+                        <th style="width: 100px; display: none;" class="th-documentos col-doc tooltip-header" id="thGuia" onclick="mostrarInfo('guia')">
+                            14. Guia <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 150px; display: none;" class="th-documentos col-doc tooltip-header" id="thComprovante" onclick="mostrarInfo('comprovante')">
+                            15. Comprovante <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 120px; display: none;" class="th-documentos col-doc tooltip-header" id="thContratos" onclick="mostrarInfo('contratos')">
+                            16. Contratos <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th style="width: 150px; display: none;" class="th-documentos col-doc tooltip-header" id="thForaMunicipio" onclick="mostrarInfo('fora_municipio')">
+                            17. Fora Município <i class="bi bi-info-circle info-icon"></i>
+                        </th>
                     </tr>
                 </thead>
                 <tbody id="tbodyConciliacao">
@@ -420,10 +576,163 @@
     </div>
 </div>
 
+<!-- Modal de Exportação PDF -->
+<div class="modal fade" id="modalExportarPDF" tabindex="-1" aria-labelledby="modalExportarPDFLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="modalExportarPDFLabel">
+                    <i class="bi bi-file-pdf me-2"></i>Exportar para PDF
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3"><strong>Selecione as colunas que deseja incluir na exportação:</strong></p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="indice" id="checkIndice" checked>
+                            <label class="form-check-label" for="checkIndice">1. Índice</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="data" id="checkData" checked>
+                            <label class="form-check-label" for="checkData">2. Data</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="credito" id="checkCredito" checked>
+                            <label class="form-check-label" for="checkCredito">3. Crédito (R$)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="debito" id="checkDebito" checked>
+                            <label class="form-check-label" for="checkDebito">4. Débito (R$)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="discriminacao" id="checkDiscriminacao" checked>
+                            <label class="form-check-label" for="checkDiscriminacao">5. Composição do Valor (R$)</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="cat_transacao" id="checkCategoria" checked>
+                            <label class="form-check-label" for="checkCategoria">6. Categoria de Transação</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="competencia" id="checkCompetencia" checked>
+                            <label class="form-check-label" for="checkCompetencia">7. Competência</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="origem_destino" id="checkOrigemDestino" checked>
+                            <label class="form-check-label" for="checkOrigemDestino">8. Origem ou Destino</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="cat_avaliacao" id="checkAvaliacao" checked>
+                            <label class="form-check-label" for="checkAvaliacao">9. Avaliação</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="avaliacao_analista" id="checkObservacoes" checked>
+                            <label class="form-check-label" for="checkObservacoes">10. Observações</label>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selecionarTodasColunas()">
+                        <i class="bi bi-check-all me-1"></i>Selecionar Todas
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodasColunas()">
+                        <i class="bi bi-x-circle me-1"></i>Desmarcar Todas
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="exportarPDF()">
+                    <i class="bi bi-file-pdf me-2"></i>Gerar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Filtros Expandidos -->
+<div class="modal fade" id="modalFiltrosExpandidos" tabindex="-1" aria-labelledby="modalFiltrosExpandidosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalFiltrosExpandidosLabel">
+                    <i class="bi bi-funnel me-2"></i>Filtros Avançados - Visualização Expandida
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <label for="filtroDataExpandido" class="form-label fw-bold"><i class="bi bi-calendar3 me-1"></i>Data (Mês/Ano)</label>
+                        <select class="form-select" id="filtroDataExpandido" multiple size="12" onchange="sincronizarFiltro('filtroData', 'filtroDataExpandido')">
+                            <option value="">Todas as datas</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filtroCompetenciaExpandido" class="form-label fw-bold"><i class="bi bi-calendar-range me-1"></i>Competência</label>
+                        <select class="form-select" id="filtroCompetenciaExpandido" multiple size="12" onchange="sincronizarFiltro('filtroCompetencia', 'filtroCompetenciaExpandido')">
+                            <option value="">Todas as competências</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filtroCategoriaExpandido" class="form-label fw-bold"><i class="bi bi-tags me-1"></i>Categoria</label>
+                        <select class="form-select" id="filtroCategoriaExpandido" multiple size="12" onchange="sincronizarFiltro('filtroCategoria', 'filtroCategoriaExpandido')">
+                            <option value="">Todas as categorias</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="filtroOrigemDestinoExpandido" class="form-label fw-bold"><i class="bi bi-arrow-left-right me-1"></i>Origem/Destino</label>
+                        <select class="form-select" id="filtroOrigemDestinoExpandido" multiple size="12" onchange="sincronizarFiltro('filtroOrigemDestino', 'filtroOrigemDestinoExpandido')">
+                            <option value="">Todas as origens/destinos</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="filtroAvaliacaoExpandido" class="form-label fw-bold"><i class="bi bi-clipboard-check me-1"></i>Avaliação</label>
+                        <select class="form-select" id="filtroAvaliacaoExpandido" multiple size="12" onchange="sincronizarFiltro('filtroAvaliacao', 'filtroAvaliacaoExpandido')">
+                            <option value="">Todas as avaliações</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                            <option value="Avaliado">Avaliado</option>
+                            <option value="Aguardando resposta">Aguardando resposta</option>
+                            <option value="Pessoa Gestora">Pessoa Gestora</option>
+                            <option value="Glosar">Glosar</option>
+                        </select>
+                    </div>
+                </div>
+                <hr>
+                <p class="text-muted mb-0"><small><i class="bi bi-info-circle me-1"></i>Use Ctrl+Click para selecionar múltiplos itens. As seleções são sincronizadas automaticamente.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="limparFiltrosExpandidos()">
+                    <i class="bi bi-x-circle me-2"></i>Limpar Todos
+                </button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                    <i class="bi bi-check-circle me-2"></i>Aplicar e Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     let linhas = [];
+    let notasFiscais = {}; // Objeto indexado por conc_extrato_id
+    let documentosAnalise = {}; // Objeto indexado por conc_extrato_id
+    let categoriasAplicabilidade = {}; // Dicionário { categoria: aplicacao (true/false) }
+    let categoriasRubricas = {}; // Dicionário { categoria: rubrica }
+    let secaoNotasFiscaisAtiva = false;
+    let secaoDocumentosAtiva = false;
     let limiteAtual = 100;
     let proximoIndice = 1;
+    let historicoAlteracoes = []; // Histórico para Undo (máximo 20 estados)
+    const MAX_HISTORICO = 20;
     
     // Textos informativos
     const infos = {
@@ -435,7 +744,16 @@
         'categoria': 'Categoria da transação baseada nas despesas do termo e nas categorias de análise. As opções são filtradas automaticamente de acordo com o tipo de movimentação (crédito ou débito).',
         'competencia': 'Mês e ano da competência da transação (formato: mai/2025). É preenchida automaticamente com base na data do lançamento. Deve estar dentro do período do projeto com tolerância de 2 meses antes do início e 6 meses após o término.',
         'origem_destino': 'Origem do crédito (de onde veio o recurso) ou destino do débito (para onde foi o pagamento). Campo de texto livre para descrever a contraparte da transação.',
-        'avaliacao': 'Status da avaliação da transação. Avaliado (verde) = aprovado, Aguardando resposta (rosa) = pendente, Pessoa Gestora (azul) = responsabilidade da PG, Glosar (laranja) = reprovar. A cor se aplica à linha inteira. Transações com Banco do Brasil ou Administração Pública são automaticamente avaliadas.'
+        'avaliacao': 'Status da avaliação da transação. Avaliado (verde) = aprovado, Aguardando resposta (rosa) = pendente, Pessoa Gestora (azul) = responsabilidade da PG, Glosar (laranja) = reprovar. A cor se aplica à linha inteira. Transações com Banco do Brasil ou Administração Pública são automaticamente avaliadas.',
+        'observacoes': 'Campo livre para anotações e observações do analista sobre a transação. Útil para registrar informações adicionais, justificativas ou pendências relacionadas à análise.'
+    };
+    
+    // Textos informativos das colunas de documentos
+    const infosDocumentos = {
+        'guia': 'Holerites, notas fiscais, cupons fiscais, recibos ou demonstrativos que contenham informações como: categoria de despesa, competência e prestador / fornecedor.',
+        'comprovante': 'Comprovações bancárias ou possibilidade de identificação do destinatário de forma legível em extrato bancário da conta corrente.',
+        'contratos': 'Contratos dos prestadores de serviço ou locação do imóvel, se houver.',
+        'fora_municipio': 'Se a contratação do prestador ou houve obtenções de fornecedores que não estão no município de São Paulo, sem justificativa.'
     };
     
     let categoriasDespesas = [];
@@ -443,6 +761,74 @@
     let periodoTermo = { inicio: null, final: null }; // Período do projeto
     let bancoAtual = ''; // Banco do extrato
     let origensDestinosUnicos = new Set(); // Lista dinâmica de origens/destinos já utilizados
+    
+    // Regras de avaliação automática (editável)
+    const regrasAvaliacao = {
+        // Categorias que devem ser automaticamente marcadas como "Glosar" (prioridade máxima)
+        glosar: [
+            'Taxas Bancárias'
+            // Adicione outras categorias aqui que devem ser glosadas automaticamente
+            // Exemplo: 'Multas', 'Juros de Atraso'
+        ],
+        // Origens/Destinos que devem ser automaticamente marcados como "Avaliado" (prioridade baixa)
+        avaliado: [
+            'banco do brasil',
+            'administração pública',
+            'administração publica'
+        ]
+    };
+    
+    // Autosave no cache (localStorage)
+    let autosaveTimer = null;
+    
+    function salvarNoCache() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) return;
+        
+        const cacheKey = `autosave_conc_${numeroTermo}`;
+        const dataToSave = {
+            timestamp: Date.now(),
+            linhas: linhas
+        };
+        
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify(dataToSave));
+            console.log('✓ Autosave realizado');
+            
+            // Mostrar indicador visual
+            const status = document.getElementById('autosaveStatus');
+            if (status) {
+                status.style.display = 'block';
+                status.textContent = '💾 Salvo em cache';
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 2000);
+            }
+        } catch (error) {
+            console.error('Erro ao salvar cache:', error);
+        }
+    }
+    
+    function limparCache() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) return;
+        
+        const cacheKey = `autosave_conc_${numeroTermo}`;
+        localStorage.removeItem(cacheKey);
+        console.log('Cache limpo');
+    }
+    
+    function agendarAutosave() {
+        // Cancelar timer anterior
+        if (autosaveTimer) {
+            clearTimeout(autosaveTimer);
+        }
+        
+        // Agendar novo autosave para 3 segundos após última alteração
+        autosaveTimer = setTimeout(() => {
+            salvarNoCache();
+        }, 3000);
+    }
     
     function toggleFiltros() {
         const filtros = document.getElementById('filtrosAvancados');
@@ -459,9 +845,63 @@
         }
     }
     
+    function toggleMenuSecoes() {
+        const menu = document.getElementById('menuSecoes');
+        const btn = document.getElementById('btnMenuSecoes');
+        
+        if (menu.style.display === 'none') {
+            menu.style.display = 'block';
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-primary');
+        } else {
+            menu.style.display = 'none';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-outline-primary');
+        }
+    }
+    
+    async function toggleSecaoNotasFiscais() {
+        const checkbox = document.getElementById('secaoNotasFiscais');
+        secaoNotasFiscaisAtiva = checkbox.checked;
+        
+        // Mostrar/ocultar colunas de notas fiscais
+        const colunasNF = document.querySelectorAll('.col-nf');
+        colunasNF.forEach(col => {
+            col.style.display = secaoNotasFiscaisAtiva ? '' : 'none';
+        });
+        
+        // Carregar dados apenas ao ativar a seção
+        if (secaoNotasFiscaisAtiva) {
+            await carregarNotasFiscais();
+        }
+        
+        // Re-renderizar tabela
+        renderizarTabela();
+    }
+    
+    async function toggleSecaoDocumentos() {
+        const checkbox = document.getElementById('secaoDocumentos');
+        secaoDocumentosAtiva = checkbox.checked;
+        
+        // Mostrar/ocultar colunas de documentos
+        const colunasDoc = document.querySelectorAll('.col-doc');
+        colunasDoc.forEach(col => {
+            col.style.display = secaoDocumentosAtiva ? '' : 'none';
+        });
+        
+        // Carregar dados apenas ao ativar a seção
+        if (secaoDocumentosAtiva) {
+            await carregarDocumentosAnalise();
+        }
+        
+        // Re-renderizar tabela
+        renderizarTabela();
+    }
+    
     function mostrarInfo(campo) {
         const modalBody = document.getElementById('modalInfoBody');
-        modalBody.innerHTML = `<p class="mb-0">${infos[campo]}</p>`;
+        const texto = infos[campo] || infosDocumentos[campo] || 'Informação não disponível.';
+        modalBody.innerHTML = `<p class="mb-0">${texto}</p>`;
         
         const modal = new bootstrap.Modal(document.getElementById('modalInfo'));
         modal.show();
@@ -522,7 +962,9 @@
             await Promise.all([
                 carregarCategoriasDespesas(numeroTermo),
                 carregarCategoriasAnalise(),
-                carregarPeriodoTermo(numeroTermo)
+                carregarPeriodoTermo(numeroTermo),
+                carregarCategoriasAplicabilidade(),
+                carregarCategoriasRubricas(numeroTermo)
             ]);
             
             // Carregar banco do termo
@@ -538,30 +980,60 @@
             
             const dados = await response.json();
             
-            if (dados.length > 0) {
-                // Mapear campos do backend para o frontend
-                linhas = dados.map(item => ({
-                    id: item.id,
-                    indice: item.indice,
-                    data: item.data,
-                    credito: item.credito,
-                    debito: item.debito,
-                    discriminacao: item.discriminacao,
-                    cat_transacao: item.cat_transacao,
-                    competencia: item.competencia,
-                    origem_destino: item.origem_destino,
-                    cat_avaliacao: item.cat_avaliacao,
-                    mesclado_com: item.mesclado_com || []
-                }));
-                proximoIndice = Math.max(...linhas.map(l => l.indice || 0)) + 1;
-            } else {
-                // Se não houver dados, iniciar com 20 linhas vazias
-                linhas = [];
-                adicionarLinhas(20);
+            // Verificar se há autosave no cache para este termo
+            const cacheKey = `autosave_conc_${numeroTermo}`;
+            const autosaveData = localStorage.getItem(cacheKey);
+            let usarAutosave = false;
+            
+            if (autosaveData) {
+                const { timestamp, linhas: linhasCache } = JSON.parse(autosaveData);
+                const minutosPassados = (Date.now() - timestamp) / 1000 / 60;
+                
+                if (minutosPassados < 60) { // Cache válido por 1 hora
+                    usarAutosave = confirm(`Há alterações não salvas de ${Math.round(minutosPassados)} minutos atrás. Deseja recuperá-las?`);
+                    
+                    if (usarAutosave) {
+                        linhas = linhasCache;
+                        proximoIndice = Math.max(...linhas.map(l => l.indice || 0)) + 1;
+                    } else {
+                        // Limpar cache se usuário recusar
+                        localStorage.removeItem(cacheKey);
+                    }
+                }
+            }
+            
+            if (!usarAutosave) {
+                if (dados.length > 0) {
+                    // Mapear campos do backend para o frontend
+                    linhas = dados.map(item => ({
+                        id: item.id,
+                        indice: item.indice,
+                        data: item.data,
+                        credito: item.credito,
+                        debito: item.debito,
+                        discriminacao: item.discriminacao,
+                        cat_transacao: item.cat_transacao,
+                        competencia: item.competencia,
+                        origem_destino: item.origem_destino,
+                        cat_avaliacao: item.cat_avaliacao,
+                        avaliacao_analista: item.avaliacao_analista,
+                        mesclado_com: item.mesclado_com || []
+                    }));
+                    proximoIndice = Math.max(...linhas.map(l => l.indice || 0)) + 1;
+                } else {
+                    // Se não houver dados, iniciar com 20 linhas vazias
+                    linhas = [];
+                    adicionarLinhas(20);
+                }
             }
             
             renderizarTabela();
             document.getElementById('btnSalvar').style.display = 'block';
+            
+            // Se seção de Notas Fiscais está ativa, carregar os dados
+            if (secaoNotasFiscaisAtiva) {
+                await carregarNotasFiscais();
+            }
             
         } catch (error) {
             console.error('Erro ao carregar extrato:', error);
@@ -595,6 +1067,121 @@
         } catch (error) {
             console.error('Erro ao carregar categorias de análise:', error);
             categoriasAnalise = [];
+        }
+    }
+    
+    async function carregarCategoriasAplicabilidade() {
+        try {
+            const response = await fetch('/conc_bancaria/api/categorias-aplicabilidade');
+            if (!response.ok) throw new Error('Erro ao carregar aplicabilidade');
+            categoriasAplicabilidade = await response.json();
+            console.log('Aplicabilidade carregada:', categoriasAplicabilidade);
+        } catch (error) {
+            console.error('Erro ao carregar aplicabilidade:', error);
+            categoriasAplicabilidade = {};
+        }
+    }
+    
+    async function carregarCategoriasRubricas(numeroTermo) {
+        try {
+            const response = await fetch(`/conc_bancaria/api/categorias-rubricas?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            if (!response.ok) throw new Error('Erro ao carregar rubricas');
+            categoriasRubricas = await response.json();
+            console.log('Rubricas carregadas:', categoriasRubricas);
+        } catch (error) {
+            console.error('Erro ao carregar rubricas:', error);
+            categoriasRubricas = {};
+        }
+    }
+    
+    async function carregarNotasFiscais() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) return;
+        
+        try {
+            const response = await fetch(`/conc_bancaria/api/notas-fiscais?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            if (!response.ok) throw new Error('Erro ao carregar notas fiscais');
+            
+            const notas = await response.json();
+            
+            // Indexar por conc_extrato_id
+            notasFiscais = {};
+            notas.forEach(nota => {
+                notasFiscais[nota.conc_extrato_id] = {
+                    id: nota.id,
+                    numero_nota: nota.numero_nota || '',
+                    chave_acesso: nota.chave_acesso || '',
+                    cnpj_nota: nota.cnpj_nota || ''
+                };
+            });
+            
+            console.log(`Notas fiscais carregadas: ${notas.length}`);
+            console.log('Mapeamento notasFiscais:', notasFiscais);
+            
+            // Debug: mostrar quais linhas têm ID correspondente
+            if (notas.length > 0) {
+                console.log('IDs das linhas do extrato:', linhas.map((l, i) => `Índice ${l.indice}: ID=${l.id}`));
+                notas.forEach(nf => {
+                    const linhaCorrespondente = linhas.find(l => l.id === nf.conc_extrato_id);
+                    if (linhaCorrespondente) {
+                        console.log(`✓ NF encontrada: Nota ${nf.numero_nota} está na linha com índice ${linhaCorrespondente.indice} (ID=${nf.conc_extrato_id})`);
+                    } else {
+                        console.warn(`⚠ NF órfã: Nota ${nf.numero_nota} tem conc_extrato_id=${nf.conc_extrato_id}, mas não há linha com esse ID`);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Erro ao carregar notas fiscais:', error);
+            notasFiscais = {};
+        }
+    }
+    
+    async function carregarDocumentosAnalise() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) return;
+        
+        try {
+            const response = await fetch(`/conc_bancaria/api/documentos-analise?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            if (!response.ok) throw new Error('Erro ao carregar documentos de análise');
+            
+            const documentos = await response.json();
+            
+            // Indexar por conc_extrato_id e fazer migração de dados antigos SOMENTE no carregamento
+            documentosAnalise = {};
+            documentos.forEach(doc => {
+                // Migração de valores antigos para novos (só acontece aqui, uma vez)
+                let valorGuia = doc.avaliacao_guia || '';
+                if (valorGuia === 'aprovado') valorGuia = 'Guia apresentada';
+                else if (valorGuia === 'pendente') valorGuia = 'Não apresentada';
+                // Valores já migrados ou novos permanecem como estão
+                
+                let valorComprovante = doc.avaliacao_comprovante || '';
+                if (valorComprovante === 'aprovado') valorComprovante = 'Apresentado corretamente';
+                else if (valorComprovante === 'pendente') valorComprovante = 'Não apresentado';
+                // Valores já migrados permanecem como estão
+                
+                let valorContratos = doc.avaliacao_contratos || '';
+                if (valorContratos === 'aprovado') valorContratos = 'Contratos apresentados';
+                // Outros valores permanecem como estão
+                
+                let valorForaMunicipio = doc.avaliacao_fora_municipio || '';
+                if (valorForaMunicipio === 'aprovado') valorForaMunicipio = 'São Paulo';
+                // Outros valores permanecem como estão
+                
+                documentosAnalise[doc.conc_extrato_id] = {
+                    id: doc.id,
+                    avaliacao_guia: valorGuia,
+                    avaliacao_comprovante: valorComprovante,
+                    avaliacao_contratos: valorContratos,
+                    avaliacao_fora_municipio: valorForaMunicipio
+                };
+            });
+            
+            console.log(`Documentos de análise carregados: ${documentos.length}`);
+            
+        } catch (error) {
+            console.error('Erro ao carregar documentos de análise:', error);
+            documentosAnalise = {};
         }
     }
     
@@ -790,7 +1377,22 @@
         }
     }
 
-    function adicionarLinha() {
+    async function adicionarLinha() {
+        // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
+        // para evitar conflitos de índice com linhas que existem no banco
+        if (limiteAtual !== 'todas') {
+            const confirmar = confirm(
+                'Para adicionar novas linhas com segurança, o sistema precisa carregar TODAS as linhas disponíveis.\n\n' +
+                'Deseja continuar?'
+            );
+            
+            if (!confirmar) return;
+            
+            // Carregar todas as linhas
+            limiteAtual = 'todas';
+            await carregarExtrato();
+        }
+        
         const linha = {
             id: null,
             indice: proximoIndice++,
@@ -802,6 +1404,7 @@
             competencia: null,
             origem_destino: null,
             cat_avaliacao: null,
+            avaliacao_analista: null,
             mesclado_com: [],
             _novo: true
         };
@@ -811,7 +1414,21 @@
         document.getElementById('btnSalvar').style.display = 'block';
     }
 
-    function adicionarLinhaAcima(index) {
+    async function adicionarLinhaAcima(index) {
+        // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
+        if (limiteAtual !== 'todas') {
+            const confirmar = confirm(
+                'Para adicionar novas linhas com segurança, o sistema precisa carregar TODAS as linhas disponíveis.\n\n' +
+                'Deseja continuar?'
+            );
+            
+            if (!confirmar) return;
+            
+            // Carregar todas as linhas
+            limiteAtual = 'todas';
+            await carregarExtrato();
+        }
+        
         const novaLinha = {
             id: null,
             indice: 0, // Será recalculado
@@ -823,6 +1440,7 @@
             competencia: null,
             origem_destino: null,
             cat_avaliacao: null,
+            avaliacao_analista: null,
             mesclado_com: [],
             _novo: true
         };
@@ -833,7 +1451,84 @@
         document.getElementById('btnSalvar').style.display = 'block';
     }
 
-    function adicionarLinhaAbaixo(index) {
+    async function adicionarLinhasEmLote() {
+        // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
+        if (limiteAtual !== 'todas') {
+            const confirmar = confirm(
+                'Para adicionar novas linhas com segurança, o sistema precisa carregar TODAS as linhas disponíveis.\n\n' +
+                'Deseja continuar?'
+            );
+            
+            if (!confirmar) return;
+            
+            // Carregar todas as linhas
+            limiteAtual = 'todas';
+            await carregarExtrato();
+        }
+        
+        const input = document.getElementById('inputAdicionarLinhas');
+        const quantidade = parseInt(input.value);
+        
+        if (isNaN(quantidade) || quantidade < 1) {
+            alert('Digite uma quantidade válida (mínimo 1)');
+            return;
+        }
+        
+        if (quantidade > 100) {
+            if (!confirm(`Você está adicionando ${quantidade} linhas. Isso pode deixar a página lenta. Continuar?`)) {
+                return;
+            }
+        }
+        
+        // Salvar estado antes de adicionar
+        salvarEstadoNoHistorico();
+        
+        // Adicionar múltiplas linhas vazias
+        for (let i = 0; i < quantidade; i++) {
+            const novaLinha = {
+                id: null,
+                indice: 0, // Será recalculado
+                data: '',
+                credito: null,
+                debito: null,
+                discriminacao: null,
+                cat_transacao: null,
+                competencia: null,
+                origem_destino: null,
+                cat_avaliacao: null,
+                avaliacao_analista: null,
+                mesclado_com: [],
+                _novo: true
+            };
+            linhas.push(novaLinha);
+        }
+        
+        recalcularIndices();
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+        
+        // Resetar input
+        input.value = '1';
+        
+        // Feedback
+        alert(`${quantidade} linha(s) adicionada(s) no final da tabela`);
+    }
+
+    async function adicionarLinhaAbaixo(index) {
+        // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
+        if (limiteAtual !== 'todas') {
+            const confirmar = confirm(
+                'Para adicionar novas linhas com segurança, o sistema precisa carregar TODAS as linhas disponíveis.\n\n' +
+                'Deseja continuar?'
+            );
+            
+            if (!confirmar) return;
+            
+            // Carregar todas as linhas
+            limiteAtual = 'todas';
+            await carregarExtrato();
+        }
+        
         const novaLinha = {
             id: null,
             indice: 0, // Será recalculado
@@ -845,6 +1540,7 @@
             competencia: null,
             origem_destino: null,
             cat_avaliacao: null,
+            avaliacao_analista: null,
             mesclado_com: [],
             _novo: true
         };
@@ -855,45 +1551,55 @@
         document.getElementById('btnSalvar').style.display = 'block';
     }
 
-    function adicionarLinhas(quantidade) {
-        for (let i = 0; i < quantidade; i++) {
-            adicionarLinha();
+    function duplicarLinha(index, direcao) {
+        const linhaOriginal = linhas[index];
+        
+        // Criar cópia da linha (sem id para forçar INSERT)
+        const linhaDuplicada = {
+            id: null, // Sem ID = nova linha no banco
+            indice: 0, // Será recalculado
+            data: linhaOriginal.data,
+            credito: linhaOriginal.credito,
+            debito: linhaOriginal.debito,
+            discriminacao: linhaOriginal.discriminacao,
+            cat_transacao: linhaOriginal.cat_transacao,
+            competencia: linhaOriginal.competencia,
+            origem_destino: linhaOriginal.origem_destino,
+            cat_avaliacao: linhaOriginal.cat_avaliacao,
+            avaliacao_analista: linhaOriginal.avaliacao_analista,
+            mesclado_com: [],
+            _novo: true
+        };
+        
+        // Inserir acima ou abaixo
+        if (direcao === 'acima') {
+            linhas.splice(index, 0, linhaDuplicada);
+        } else {
+            linhas.splice(index + 1, 0, linhaDuplicada);
         }
-    }
-    
-    function adicionarLinhasDinamico() {
-        const quantidade = parseInt(document.getElementById('quantidadeLinhas').value) || 20;
-        if (quantidade < 1 || quantidade > 500) {
-            alert('Por favor, insira um número entre 1 e 500');
-            return;
-        }
-        adicionarLinhas(quantidade);
+        
+        recalcularIndices();
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
     }
 
     function renderizarTabela() {
         const tbody = document.getElementById('tbodyConciliacao');
-        tbody.innerHTML = '';
+        
+        // OTIMIZAÇÃO 1: Usar DocumentFragment para construir DOM antes de inserir
+        // Reduz reflows de N para 1 (melhoria de 50-70% em tabelas grandes)
+        const fragment = document.createDocumentFragment();
+        
+        // OTIMIZAÇÃO 2: Cachear identificação de grupos de composição
+        // Evita recalcular O(n²) → O(n) - cada linha só é processada uma vez
+        const gruposComposicaoCache = new Map();
+        linhas.forEach((_, idx) => {
+            gruposComposicaoCache.set(idx, identificarGrupoComposicao(idx));
+        });
 
         linhas.forEach((linha, index) => {
             const tr = document.createElement('tr');
             tr.dataset.index = index;
-            
-            // Verificar grupo de mesclagem
-            const grupoMesclagem = getGrupoMesclagem(index);
-            const estaMescladaSecundaria = linhaEstaMescladaComoSecundaria(index);
-            
-            let classesMesclagem = '';
-            if (grupoMesclagem) {
-                classesMesclagem = 'cell-merged-group cell-merged-first';
-                if (grupoMesclagem.indices[grupoMesclagem.indices.length - 1] === index) {
-                    classesMesclagem += ' cell-merged-last';
-                }
-            } else if (estaMescladaSecundaria) {
-                classesMesclagem = 'cell-merged-group';
-            }
-            
-            // Remover classes de cor anteriores
-            tr.classList.remove('avaliacao-avaliado', 'avaliacao-aguardando', 'avaliacao-pessoa-gestora', 'avaliacao-glosar');
             
             // Aplicar classe de cor baseado na avaliação
             if (linha.cat_avaliacao === 'Avaliado') {
@@ -906,21 +1612,51 @@
                 tr.classList.add('avaliacao-glosar');
             }
             
+            // Detectar mudança de mês: se há linha anterior e o mês mudou
+            // Aplicar borda na linha ATUAL (que inicia o novo mês)
+            if (index > 0) {
+                const linhaAnterior = linhas[index - 1];
+                if (linha.data && linhaAnterior.data) {
+                    // Parse manual para evitar problemas de timezone
+                    const partesAtual = linha.data.split('-'); // "2017-08-01" -> ["2017", "08", "01"]
+                    const partesAnterior = linhaAnterior.data.split('-');
+                    
+                    const anoAtual = parseInt(partesAtual[0]);
+                    const mesAtual = parseInt(partesAtual[1]);
+                    const anoAnterior = parseInt(partesAnterior[0]);
+                    const mesAnterior = parseInt(partesAnterior[1]);
+                    
+                    // Se mudou o mês ou ano, adicionar classe de separação na linha ATUAL
+                    if (mesAtual !== mesAnterior || anoAtual !== anoAnterior) {
+                        tr.classList.add('mudanca-mes');
+                    }
+                }
+            }
+            
+            // OTIMIZAÇÃO: Usar grupo de composição do cache (pré-calculado)
+            const grupoInfo = gruposComposicaoCache.get(index);
+            
+            // Célula de índice simples
+            tr.innerHTML = `
+                <td class="text-center">${linha.indice || ''}</td>
+            `;
+            
             // Renderizar célula de crédito
             let htmlCredito = '';
             if (linha.credito) {
-                if (estaMescladaSecundaria) {
-                    // Linha mesclada secundária - não mostra input, apenas indicador
+                if (grupoInfo.ehGrupo && grupoInfo.tipo === 'credito' && !grupoInfo.ehPrimeira) {
+                    // Linha secundária de grupo de composição de crédito
                     htmlCredito = `
-                        <td class="${classesMesclagem} ${linha.debito ? 'cell-disabled' : ''}">
-                            <div class="merged-cell-content">
-                                <span class="merged-indicator">Crédito composto</span>
+                        <td class="${linha.debito ? 'cell-disabled' : ''}" style="background-color: #e8f5e9;">
+                            <div style="text-align: center; padding: 6px; color: #2e7d32; font-style: italic;">
+                                Crédito composto
                             </div>
                         </td>
                     `;
                 } else {
+                    // Linha normal ou primeira do grupo
                     htmlCredito = `
-                        <td class="${classesMesclagem} ${linha.debito ? 'cell-disabled' : ''}">
+                        <td class="${linha.debito ? 'cell-disabled' : ''}">
                             <input type="text" class="cell-input cell-money" 
                                    value="${formatarMoeda(linha.credito)}" 
                                    ${linha.debito ? 'disabled' : ''}
@@ -946,17 +1682,19 @@
             // Renderizar célula de débito
             let htmlDebito = '';
             if (linha.debito) {
-                if (estaMescladaSecundaria) {
+                if (grupoInfo.ehGrupo && grupoInfo.tipo === 'debito' && !grupoInfo.ehPrimeira) {
+                    // Linha secundária de grupo de composição de débito
                     htmlDebito = `
-                        <td class="${classesMesclagem} ${linha.credito ? 'cell-disabled' : ''}">
-                            <div class="merged-cell-content">
-                                <span class="merged-indicator">Débito composto</span>
+                        <td class="${linha.credito ? 'cell-disabled' : ''}" style="background-color: #ffebee;">
+                            <div style="text-align: center; padding: 6px; color: #c62828; font-style: italic;">
+                                Débito composto
                             </div>
                         </td>
                     `;
                 } else {
+                    // Linha normal ou primeira do grupo
                     htmlDebito = `
-                        <td class="${classesMesclagem} ${linha.credito ? 'cell-disabled' : ''}">
+                        <td class="${linha.credito ? 'cell-disabled' : ''}">
                             <input type="text" class="cell-input cell-money" 
                                    value="${formatarMoeda(linha.debito)}" 
                                    ${linha.credito ? 'disabled' : ''}
@@ -999,8 +1737,7 @@
             });
             htmlCategoria += '</datalist>';
             
-            tr.innerHTML = `
-                <td class="text-center">${linha.indice || ''}</td>
+            tr.innerHTML += `
                 <td>
                     <input type="text" 
                            class="cell-input" 
@@ -1012,7 +1749,7 @@
                 </td>
                 ${htmlCredito}
                 ${htmlDebito}
-                <td>
+                <td class="${!validarComposicao(index) ? 'composicao-invalida' : ''}">
                     <input type="text" class="cell-input cell-money" 
                            value="${formatarMoeda(linha.discriminacao)}" 
                            onchange="atualizarValor(${index}, 'discriminacao', this.value)"
@@ -1037,7 +1774,7 @@
                            list="datalistOrigemDestino"
                            value="${linha.origem_destino || ''}" 
                            onchange="atualizarCampo(${index}, 'origem_destino', this.value)"
-                           onkeydown="navegarCelula(event, ${index}, 6)"
+                           onkeydown="navegarCelulaOrigemDestino(event, ${index})"
                            placeholder="Origem ou destino..."
                            autocomplete="off">
                 </td>
@@ -1050,6 +1787,15 @@
                            onblur="aplicarCorLinha(${index})"
                            onkeydown="navegarCelula(event, ${index}, 7)"
                            placeholder="Selecione..."
+                           autocomplete="off">
+                </td>
+                <td>
+                    <input type="text" 
+                           class="cell-input" 
+                           value="${linha.avaliacao_analista || ''}" 
+                           onchange="atualizarCampo(${index}, 'avaliacao_analista', this.value)"
+                           onkeydown="navegarCelula(event, ${index}, 8)"
+                           placeholder="Observações..."
                            autocomplete="off">
                 </td>
                 <td class="text-center text-nowrap">
@@ -1066,32 +1812,12 @@
                             <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); adicionarLinhaAbaixo(${index})">
                                 <i class="bi bi-arrow-down-circle me-2"></i>Adicionar linha abaixo
                             </a></li>
-                            
-                            <!-- Mesclagem Manual -->
-                            <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header"><i class="bi bi-link-45deg"></i> Mesclagem</h6></li>
-                            
-                            ${grupoMesclagem ? `
-                                <li><a class="dropdown-item text-warning" href="#" onclick="event.preventDefault(); desmesclarLinha(${index})">
-                                    <i class="bi bi-scissors me-2"></i>Desmesclar
-                                </a></li>
-                            ` : `
-                                ${(linha.credito || linha.debito) ? `
-                                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); mesclarLinhasEmLote(${index})">
-                                        <i class="bi bi-clipboard-check me-2"></i>Mesclagem em lote
-                                    </a></li>
-                                ` : ''}
-                                ${index > 0 && podeMesclar(index - 1, index) ? `
-                                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); mesclarLinhas(${index - 1}, ${index})">
-                                        <i class="bi bi-arrow-up me-2"></i>Mesclar com linha acima
-                                    </a></li>
-                                ` : ''}
-                                ${index < linhas.length - 1 && podeMesclar(index, index + 1) ? `
-                                    <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); mesclarLinhas(${index}, ${index + 1})">
-                                        <i class="bi bi-arrow-down me-2"></i>Mesclar com linha abaixo
-                                    </a></li>
-                                ` : ''}
-                            `}
+                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); duplicarLinha(${index}, 'acima')">
+                                <i class="bi bi-files me-2"></i>Duplicar linha acima
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); duplicarLinha(${index}, 'abaixo')">
+                                <i class="bi bi-files me-2"></i>Duplicar linha abaixo
+                            </a></li>
                             
                             <li><hr class="dropdown-divider"></li>
                             <li><h6 class="dropdown-header"><i class="bi bi-arrows-move"></i> Movimentação</h6></li>
@@ -1115,8 +1841,132 @@
                 </td>
             `;
             
-            tbody.appendChild(tr);
+            // OTIMIZAÇÃO 2: Lazy loading para Notas Fiscais
+            // Só processar se linha tem ID (linha salva no banco), evita lookup desnecessário
+            if (secaoNotasFiscaisAtiva) {
+                const nf = linha.id && notasFiscais[linha.id] ? notasFiscais[linha.id] : { numero_nota: '', chave_acesso: '', cnpj_nota: '' };
+                const cnpjInvalido = nf.cnpj_nota && nf.cnpj_nota.replace(/\D/g, '').length !== 14;
+                
+                tr.innerHTML += `
+                    <!-- Coluna 11: Número da Nota -->
+                    <td class="col-nf">
+                        <input type="number" 
+                               class="cell-input" 
+                               value="${nf.numero_nota || ''}" 
+                               onchange="atualizarCampoNF(${index}, 'numero_nota', this.value)"
+                               onkeydown="navegarCelulaNF(event, ${index}, 0)"
+                               placeholder="Número..."
+                               autocomplete="off">
+                    </td>
+                    <!-- Coluna 12: Chave de Acesso -->
+                    <td class="col-nf">
+                        <input type="text" 
+                               class="cell-input" 
+                               value="${nf.chave_acesso || ''}" 
+                               onchange="atualizarCampoNF(${index}, 'chave_acesso', this.value)"
+                               onkeydown="navegarCelulaNF(event, ${index}, 1)"
+                               placeholder="Chave de acesso..."
+                               autocomplete="off">
+                    </td>
+                    <!-- Coluna 13: CNPJ -->
+                    <td class="col-nf ${cnpjInvalido ? 'cnpj-invalido' : ''}">
+                        <input type="text" 
+                               class="cell-input" 
+                               value="${nf.cnpj_nota || ''}" 
+                               onchange="atualizarCampoNF(${index}, 'cnpj_nota', this.value)"
+                               onkeydown="navegarCelulaNF(event, ${index}, 2)"
+                               placeholder="00.000.000/0001-00"
+                               autocomplete="off">
+                    </td>
+                `;
+            }
+            
+            // OTIMIZAÇÃO 2: Lazy loading para Documentos
+            // Só processar se linha tem ID, calcular regras sob demanda apenas quando necessário
+            if (secaoDocumentosAtiva) {
+                const doc = linha.id && documentosAnalise[linha.id] ? documentosAnalise[linha.id] : {};
+                
+                // Calcular aplicabilidade apenas se linha tem categoria
+                const categoria = linha.cat_transacao || '';
+                const naoAplicavelGeral = categoria ? (categoriasAplicabilidade[categoria] === true) : false;
+                
+                // Calcular regras específicas apenas se necessário
+                const rubrica = categoria && categoriasRubricas[categoria] ? categoriasRubricas[categoria] : '';
+                
+                // REGRA: "Fora do Município" - não aplicável para Pessoal e Administrativas
+                const naoAplicavelForaMunicipio = naoAplicavelGeral || 
+                    rubrica === 'Pessoal' || rubrica === 'Administrativas';
+                
+                // REGRA: "Contratos" - não aplicável para Pessoal, Materiais, Implantação e Imobilizado
+                const rubricasSemContrato = ['Pessoal', 'Materiais', 'Implantação', 'Imobilizado'];
+                const naoAplicavelContratos = naoAplicavelGeral || rubricasSemContrato.includes(rubrica);
+                
+                // Usar valores direto do objeto documentosAnalise (já migrados no carregamento)
+                // MAS: se categoria não aplicável, forçar vazio para mostrar "Selecione..."
+                const valorGuia = naoAplicavelGeral ? '' : (doc.avaliacao_guia || '');
+                const valorComprovante = naoAplicavelGeral ? '' : (doc.avaliacao_comprovante || '');
+                const valorContratos = naoAplicavelContratos ? '' : (doc.avaliacao_contratos || '');
+                const valorForaMunicipio = naoAplicavelForaMunicipio ? '' : (doc.avaliacao_fora_municipio || '');
+                
+                tr.innerHTML += `
+                    <!-- Coluna 14: Guia -->
+                    <td class="col-doc ${naoAplicavelGeral ? 'cell-disabled' : ''}">
+                        <select class="form-select form-select-sm" 
+                                ${naoAplicavelGeral ? 'disabled' : ''}
+                                onchange="atualizarCampoDoc(${index}, 'avaliacao_guia', this.value)"
+                                style="cursor: ${naoAplicavelGeral ? 'not-allowed' : 'pointer'}; font-size: 0.875rem;">
+                            <option value="" ${!valorGuia || valorGuia === '' ? 'selected' : ''}>Selecione...</option>
+                            <option value="Guia apresentada" ${valorGuia === 'Guia apresentada' ? 'selected' : ''}>Guia apresentada</option>
+                            <option value="Guia apresentada (cliente divergente)" ${valorGuia === 'Guia apresentada (cliente divergente)' ? 'selected' : ''}>Guia apresentada (cliente divergente)</option>
+                            <option value="Não apresentada" ${valorGuia === 'Não apresentada' ? 'selected' : ''}>Não apresentada</option>
+                        </select>
+                    </td>
+                    <!-- Coluna 15: Comprovante -->
+                    <td class="col-doc ${naoAplicavelGeral ? 'cell-disabled' : ''}">
+                        <select class="form-select form-select-sm" 
+                                ${naoAplicavelGeral ? 'disabled' : ''}
+                                onchange="atualizarCampoDoc(${index}, 'avaliacao_comprovante', this.value)"
+                                style="cursor: ${naoAplicavelGeral ? 'not-allowed' : 'pointer'}; font-size: 0.875rem;">
+                            <option value="" ${!valorComprovante || valorComprovante === '' ? 'selected' : ''}>Selecione...</option>
+                            <option value="Apresentado corretamente" ${valorComprovante === 'Apresentado corretamente' ? 'selected' : ''}>Apresentado corretamente</option>
+                            <option value="Não apresentado" ${valorComprovante === 'Não apresentado' ? 'selected' : ''}>Não apresentado</option>
+                            <option value="Cartão de Crédito" ${valorComprovante === 'Cartão de Crédito' ? 'selected' : ''}>Cartão de Crédito</option>
+                            <option value="Pago em Espécie" ${valorComprovante === 'Pago em Espécie' ? 'selected' : ''}>Pago em Espécie</option>
+                            <option value="Pago em Cheque" ${valorComprovante === 'Pago em Cheque' ? 'selected' : ''}>Pago em Cheque</option>
+                        </select>
+                    </td>
+                    <!-- Coluna 16: Contratos -->
+                    <td class="col-doc ${naoAplicavelContratos ? 'cell-disabled' : ''}">
+                        <select class="form-select form-select-sm" 
+                                ${naoAplicavelContratos ? 'disabled' : ''}
+                                onchange="atualizarCampoDoc(${index}, 'avaliacao_contratos', this.value)"
+                                style="cursor: ${naoAplicavelContratos ? 'not-allowed' : 'pointer'}; font-size: 0.875rem;">
+                            <option value="" ${!valorContratos || valorContratos === '' ? 'selected' : ''}>Selecione...</option>
+                            <option value="Contratos apresentados" ${valorContratos === 'Contratos apresentados' ? 'selected' : ''}>Contratos apresentados</option>
+                            <option value="Não apresentado" ${valorContratos === 'Não apresentado' ? 'selected' : ''}>Não apresentado</option>
+                        </select>
+                    </td>
+                    <!-- Coluna 17: Fora Município -->
+                    <td class="col-doc ${naoAplicavelForaMunicipio ? 'cell-disabled' : ''}">
+                        <select class="form-select form-select-sm" 
+                                ${naoAplicavelForaMunicipio ? 'disabled' : ''}
+                                onchange="atualizarCampoDoc(${index}, 'avaliacao_fora_municipio', this.value)"
+                                style="cursor: ${naoAplicavelForaMunicipio ? 'not-allowed' : 'pointer'}; font-size: 0.875rem;">
+                            <option value="" ${!valorForaMunicipio || valorForaMunicipio === '' ? 'selected' : ''}>Selecione...</option>
+                            <option value="São Paulo" ${valorForaMunicipio === 'São Paulo' ? 'selected' : ''}>São Paulo</option>
+                            <option value="Fora do município" ${valorForaMunicipio === 'Fora do município' ? 'selected' : ''}>Fora do município</option>
+                        </select>
+                    </td>
+                `;
+            }
+            
+            // OTIMIZAÇÃO: Adicionar ao fragment (não dispara reflow)
+            fragment.appendChild(tr);
         });
+        
+        // OTIMIZAÇÃO: Limpar tbody e adicionar fragment de uma vez (1 único reflow)
+        tbody.innerHTML = '';
+        tbody.appendChild(fragment);
         
         // Atualizar filtros e datalist após renderizar
         popularFiltros();
@@ -1150,8 +2000,60 @@
             const allTds = Array.from(tr.children);
             const tdIndex = allTds.indexOf(td);
             
-            // Mapear índice de TD para campo
-            // 0=índice, 1=data, 2=crédito, 3=débito, 4=composição, 5=categoria, 6=competência, 7=origem, 8=avaliação, 9=ações
+            // Verificar se está em coluna de Notas Fiscais
+            if (td.classList.contains('col-nf')) {
+                // PASTE em colunas de NF
+                const colunasNF = ['numero_nota', 'chave_acesso', 'cnpj_nota'];
+                const inputsNF = Array.from(tr.querySelectorAll('.col-nf input'));
+                const colunaInicialNF = inputsNF.indexOf(target);
+                
+                if (colunaInicialNF === -1) return;
+                
+                // Parse dos dados
+                const linhasPaste = pastedData
+                    .split('\n')
+                    .filter(l => l !== '')  // Remover apenas linhas completamente vazias (não trim!)
+                    .map(l => l.split('\t'));  // Split preserva células vazias como ''
+                
+                if (linhasPaste.length === 0) return;
+                
+                // Salvar estado antes de modificar
+                salvarEstadoNoHistorico();
+                
+                // Garantir linhas suficientes
+                const linhasNecessarias = linhaIndex + linhasPaste.length;
+                while (linhas.length < linhasNecessarias) {
+                    adicionarLinha();
+                }
+                
+                // Distribuir dados de NF
+                linhasPaste.forEach((dadosLinha, rowOffset) => {
+                    const targetLinhaIdx = linhaIndex + rowOffset;
+                    const linha = linhas[targetLinhaIdx];
+                    
+                    if (!linha.id) return; // Pular se linha não salva ainda
+                    
+                    if (!notasFiscais[linha.id]) {
+                        notasFiscais[linha.id] = { numero_nota: '', chave_acesso: '', cnpj_nota: '' };
+                    }
+                    
+                    dadosLinha.forEach((valor, colOffset) => {
+                        const colunaIdx = colunaInicialNF + colOffset;
+                        if (colunaIdx < colunasNF.length) {
+                            const campo = colunasNF[colunaIdx];
+                            notasFiscais[linha.id][campo] = valor.trim();
+                        }
+                    });
+                });
+                
+                renderizarTabela();
+                agendarAutosave();
+                alert(`✓ ${linhasPaste.length} linha(s) de NF coladas!`);
+                return;
+            }
+            
+            // Mapear índice de TD para campo (EXTRATO)
+            // 0=índice, 1=data, 2=crédito, 3=débito, 4=composição, 5=categoria, 6=competência, 7=origem, 8=avaliação, 9=observações, 10=ações
             const colunaMap = {
                 1: 'data',
                 2: 'credito',
@@ -1160,14 +2062,24 @@
                 5: 'cat_transacao',
                 6: 'competencia',
                 7: 'origem_destino',
-                8: 'cat_avaliacao'
+                8: 'cat_avaliacao',
+                9: 'avaliacao_analista'
             };
             
             const colunaInicial = colunaMap[tdIndex];
             if (!colunaInicial) return;
             
+            // Salvar estado antes de modificar
+            salvarEstadoNoHistorico();
+            
             // Parse dos dados (Excel copia com \t para colunas e \n para linhas)
-            const linhasPaste = pastedData.split('\n').map(l => l.split('\t'));
+            const linhasPaste = pastedData
+                .split('\n')
+                .filter(l => l !== '')  // Remover apenas linhas completamente vazias (não trim!)
+                .map(l => l.split('\t'));  // Split preserva células vazias como ''
+            
+            // Se não há linhas válidas, retornar
+            if (linhasPaste.length === 0) return;
             
             // Garantir que temos linhas suficientes
             const linhasNecessarias = linhaIndex + linhasPaste.length;
@@ -1176,7 +2088,7 @@
             }
             
             // Distribuir dados
-            const colunasOrdem = ['data', 'credito', 'debito', 'discriminacao', 'cat_transacao', 'competencia', 'origem_destino', 'cat_avaliacao'];
+            const colunasOrdem = ['data', 'credito', 'debito', 'discriminacao', 'cat_transacao', 'competencia', 'origem_destino', 'cat_avaliacao', 'avaliacao_analista'];
             const colunaInicialIdx = colunasOrdem.indexOf(colunaInicial);
             
             linhasPaste.forEach((dadosLinha, rowOffset) => {
@@ -1191,18 +2103,44 @@
                     valor = valor.trim();
                     
                     if (campo === 'credito' || campo === 'debito' || campo === 'discriminacao') {
-                        // Converter para número
-                        const valorNumerico = parseMoeda(valor);
+                        // Converter para número (ou null se vazio)
+                        const valorNumerico = valor ? parseMoeda(valor) : null;
                         linhas[targetLinhaIdx][campo] = valorNumerico;
                     } else if (campo === 'data') {
-                        // Tentar converter data (dd/mm/aaaa)
-                        if (valor.includes('/')) {
+                        // Tentar converter data (dd/mm/aaaa ou dd/mm/aa)
+                        if (valor && valor.includes('/')) {
                             const partes = valor.split('/');
                             if (partes.length === 3) {
-                                linhas[targetLinhaIdx][campo] = `${partes[2]}-${partes[1]}-${partes[0]}`;
+                                let dia = partes[0].padStart(2, '0');
+                                let mes = partes[1].padStart(2, '0');
+                                let ano = partes[2];
+                                
+                                // Converter ano de 2 dígitos para 4
+                                if (ano.length === 2) {
+                                    ano = '20' + ano;
+                                }
+                                
+                                // Formato aaaa-mm-dd
+                                linhas[targetLinhaIdx][campo] = `${ano}-${mes}-${dia}`;
+                            } else {
+                                linhas[targetLinhaIdx][campo] = valor;
                             }
                         } else {
-                            linhas[targetLinhaIdx][campo] = valor;
+                            // Se vazio ou não tem '/', atribuir vazio ou o valor original
+                            linhas[targetLinhaIdx][campo] = valor || '';
+                        }
+                    } else if (campo === 'competencia') {
+                        // Parse competência (mai/2025, 05/2025, 01/06/2017, etc)
+                        if (valor) {
+                            const competenciaParsed = parseCompetencia(valor);
+                            if (competenciaParsed) {
+                                linhas[targetLinhaIdx][campo] = competenciaParsed;
+                            } else {
+                                linhas[targetLinhaIdx][campo] = valor;
+                            }
+                        } else {
+                            // Célula vazia - atribuir vazio
+                            linhas[targetLinhaIdx][campo] = '';
                         }
                     } else {
                         linhas[targetLinhaIdx][campo] = valor;
@@ -1212,6 +2150,7 @@
             
             renderizarTabela();
             document.getElementById('btnSalvar').style.display = 'block';
+            agendarAutosave();
             
             alert(`✓ ${linhasPaste.length} linha(s) e ${linhasPaste[0].length} coluna(s) coladas com sucesso!`);
         });
@@ -1264,6 +2203,8 @@
                 renderizarTabela();
             }
         }
+        
+        agendarAutosave();
     }
     
     function atualizarCampoData(index, valor) {
@@ -1343,34 +2284,354 @@
         }
     }
 
+    function navegarCelulaOrigemDestino(event, linhaIndex) {
+        // Enter: vai para próxima linha, mesma coluna (Origem/Destino)
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            focarCelula(linhaIndex + 1, 6);
+            return;
+        }
+        
+        // Tab: vai para direita (Avaliação)
+        if (event.key === 'Tab' && !event.ctrlKey) {
+            event.preventDefault();
+            focarCelula(linhaIndex, 7);
+            return;
+        }
+        
+        // Ctrl+Tab: vai para esquerda (Competência)
+        if (event.key === 'Tab' && event.ctrlKey) {
+            event.preventDefault();
+            focarCelula(linhaIndex, 5);
+            return;
+        }
+    }
+    
+    function atualizarCampoNF(index, campo, valor) {
+        const linha = linhas[index];
+        if (!linha.id) {
+            console.warn('Linha não salva ainda - NF será criada após salvar extrato');
+            return;
+        }
+        
+        // Criar objeto NF se não existir
+        if (!notasFiscais[linha.id]) {
+            notasFiscais[linha.id] = {
+                numero_nota: '',
+                chave_acesso: '',
+                cnpj_nota: ''
+            };
+        }
+        
+        notasFiscais[linha.id][campo] = valor;
+        
+        // Re-renderizar para validar CNPJ
+        if (campo === 'cnpj_nota') {
+            renderizarTabela();
+        }
+        
+        agendarAutosave();
+    }
+    
+    function atualizarCampoDoc(index, campo, valorDropdown) {
+        const linha = linhas[index];
+        if (!linha.id) {
+            console.warn('Linha não salva ainda - Documentos serão criados após salvar extrato');
+            return;
+        }
+        
+        // Criar objeto Documentos se não existir
+        if (!documentosAnalise[linha.id]) {
+            documentosAnalise[linha.id] = {
+                avaliacao_guia: '',
+                avaliacao_comprovante: '',
+                avaliacao_contratos: '',
+                avaliacao_fora_municipio: ''
+            };
+        }
+        
+        // Atualizar campo com valor do dropdown (texto direto)
+        documentosAnalise[linha.id][campo] = valorDropdown || '';
+        
+        agendarAutosave();
+    }
+    
+    function navegarCelulaNF(event, linhaIndex, colunaAtual) {
+        // colunaAtual: 0 = numero_nota, 1 = chave_acesso, 2 = cnpj_nota
+        
+        // Enter: vai para baixo na mesma coluna
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            if (linhaIndex < linhas.length - 1) {
+                const proximaLinha = linhaIndex + 1;
+                const inputs = document.querySelectorAll(`tr[data-index="${proximaLinha}"] .col-nf input`);
+                if (inputs[colunaAtual]) {
+                    inputs[colunaAtual].focus();
+                    inputs[colunaAtual].select();
+                }
+            }
+            return;
+        }
+        
+        // Tab: vai para direita
+        if (event.key === 'Tab' && !event.ctrlKey) {
+            event.preventDefault();
+            const inputs = document.querySelectorAll(`tr[data-index="${linhaIndex}"] .col-nf input`);
+            if (colunaAtual < 2) {
+                // Próxima coluna de NF
+                inputs[colunaAtual + 1].focus();
+                inputs[colunaAtual + 1].select();
+            } else {
+                // Última coluna NF - ir para próxima linha, primeira coluna NF
+                if (linhaIndex < linhas.length - 1) {
+                    const proximaLinha = linhaIndex + 1;
+                    const inputsProxima = document.querySelectorAll(`tr[data-index="${proximaLinha}"] .col-nf input`);
+                    if (inputsProxima[0]) {
+                        inputsProxima[0].focus();
+                        inputsProxima[0].select();
+                    }
+                }
+            }
+            return;
+        }
+        
+        // Ctrl+Tab: vai para esquerda
+        if (event.key === 'Tab' && event.ctrlKey) {
+            event.preventDefault();
+            const inputs = document.querySelectorAll(`tr[data-index="${linhaIndex}"] .col-nf input`);
+            if (colunaAtual > 0) {
+                // Coluna anterior de NF
+                inputs[colunaAtual - 1].focus();
+                inputs[colunaAtual - 1].select();
+            } else {
+                // Primeira coluna NF - voltar para última coluna do extrato (Observações)
+                focarCelula(linhaIndex, 8);
+            }
+            return;
+        }
+    }
+
+    function identificarGrupoComposicao(index) {
+        // Identifica se a linha faz parte de um grupo de composição
+        // Retorna: { ehGrupo: boolean, ehPrimeira: boolean, inicioGrupo: number, fimGrupo: number, tipo: 'credito'|'debito' }
+        
+        const linha = linhas[index];
+        const valorReferencia = linha.credito || linha.debito;
+        
+        if (!valorReferencia) {
+            return { ehGrupo: false };
+        }
+        
+        // Se composição = valor (débito/crédito), não faz parte de grupo composto
+        const composicao = linha.discriminacao || 0;
+        if (Math.abs(composicao - valorReferencia) < 0.01) {
+            return { ehGrupo: false };
+        }
+        
+        const data = linha.data;
+        const tipo = linha.credito ? 'credito' : 'debito';
+        
+        // Buscar início do grupo (para trás)
+        // Apenas linhas com composição DIFERENTE do valor principal
+        let inicioGrupo = index;
+        for (let i = index - 1; i >= 0; i--) {
+            const linhaAnterior = linhas[i];
+            const valorAnterior = tipo === 'credito' ? linhaAnterior.credito : linhaAnterior.debito;
+            const composicaoAnterior = linhaAnterior.discriminacao || 0;
+            
+            // Verificar: mesma data, mesmo valor, composição ≠ valor
+            if (linhaAnterior.data === data && 
+                Math.abs((valorAnterior || 0) - valorReferencia) < 0.01 &&
+                Math.abs(composicaoAnterior - valorReferencia) >= 0.01) {
+                inicioGrupo = i;
+            } else {
+                break;
+            }
+        }
+        
+        // Buscar fim do grupo (para frente)
+        // Apenas linhas com composição DIFERENTE do valor principal
+        let fimGrupo = index;
+        for (let i = index + 1; i < linhas.length; i++) {
+            const linhaPosterior = linhas[i];
+            const valorPosterior = tipo === 'credito' ? linhaPosterior.credito : linhaPosterior.debito;
+            const composicaoPosterior = linhaPosterior.discriminacao || 0;
+            
+            // Verificar: mesma data, mesmo valor, composição ≠ valor
+            if (linhaPosterior.data === data && 
+                Math.abs((valorPosterior || 0) - valorReferencia) < 0.01 &&
+                Math.abs(composicaoPosterior - valorReferencia) >= 0.01) {
+                fimGrupo = i;
+            } else {
+                break;
+            }
+        }
+        
+        // Se há apenas 1 linha, não é grupo
+        if (inicioGrupo === fimGrupo) {
+            return { ehGrupo: false };
+        }
+        
+        // É um grupo válido!
+        // (composições podem ser iguais ou diferentes, o importante é que composição ≠ valor)
+        return {
+            ehGrupo: true,
+            ehPrimeira: index === inicioGrupo,
+            inicioGrupo: inicioGrupo,
+            fimGrupo: fimGrupo,
+            tipo: tipo
+        };
+    }
+
+    function validarComposicao(index) {
+        // Validar composição com base em grupos (exclui linhas onde composição = valor)
+        
+        const linha = linhas[index];
+        const valorReferencia = linha.credito || linha.debito;
+        const composicao = linha.discriminacao;
+        
+        if (!valorReferencia) {
+            return true; // Sem valor de referência, não validar
+        }
+        
+        if (!composicao) {
+            return true; // Sem composição ainda, não invalidar
+        }
+        
+        // Se composição = valor, validação individual simples
+        if (Math.abs(composicao - valorReferencia) < 0.01) {
+            return true; // Composição igual ao valor é sempre válida
+        }
+        
+        // Usar função de identificação de grupo (que já exclui linhas com composição = valor)
+        const grupoInfo = identificarGrupoComposicao(index);
+        
+        if (!grupoInfo.ehGrupo) {
+            // Linha individual com composição ≠ valor
+            // Pode ser válida se houver linhas adjacentes com mesmo valor/data (grupo em formação)
+            // Validar como grupo potencial antes de invalidar
+            const data = linha.data;
+            const tipo = linha.credito ? 'credito' : 'debito';
+            
+            // Verificar se há linhas adjacentes com mesmo valor e data (grupo potencial)
+            let temAdjacentes = false;
+            
+            // Verificar linha anterior
+            if (index > 0) {
+                const linhaAnt = linhas[index - 1];
+                const valorAnt = tipo === 'credito' ? linhaAnt.credito : linhaAnt.debito;
+                if (linhaAnt.data === data && Math.abs((valorAnt || 0) - valorReferencia) < 0.01) {
+                    temAdjacentes = true;
+                }
+            }
+            
+            // Verificar linha posterior
+            if (index < linhas.length - 1) {
+                const linhaPost = linhas[index + 1];
+                const valorPost = tipo === 'credito' ? linhaPost.credito : linhaPost.debito;
+                if (linhaPost.data === data && Math.abs((valorPost || 0) - valorReferencia) < 0.01) {
+                    temAdjacentes = true;
+                }
+            }
+            
+            // Se tem adjacentes, considerar válida (grupo em formação)
+            // Se não tem adjacentes, considerar inválida (composição diferente sem grupo)
+            return temAdjacentes;
+        }
+        
+        // Linha faz parte de grupo: somar todas as composições do grupo
+        const composicoesGrupo = [];
+        for (let i = grupoInfo.inicioGrupo; i <= grupoInfo.fimGrupo; i++) {
+            composicoesGrupo.push(linhas[i].discriminacao || 0);
+        }
+        
+        const somaComposicoes = composicoesGrupo.reduce((acc, val) => acc + val, 0);
+        const diferenca = Math.abs(valorReferencia - somaComposicoes);
+        
+        return diferenca <= 0.02;
+    }
+
+    function validarComposicao_OLD_BACKUP(index) {
+        // BACKUP da lógica antiga - manter para referência
+        const linha = linhas[index];
+        const valorReferencia = linha.credito || linha.debito;
+        const composicao = linha.discriminacao;
+        
+        if (!valorReferencia) {
+            return true;
+        }
+        
+        if (!composicao) {
+            return true;
+        }
+        
+        const data = linha.data;
+        const tipo = linha.credito ? 'credito' : 'debito';
+        
+        // Buscar início do grupo (para trás)
+        let inicioGrupo = index;
+        for (let i = index - 1; i >= 0; i--) {
+            const linhaAnterior = linhas[i];
+            const valorAnterior = tipo === 'credito' ? linhaAnterior.credito : linhaAnterior.debito;
+            
+            // Se for mesma data e mesmo valor, faz parte do grupo
+            if (linhaAnterior.data === data && Math.abs((valorAnterior || 0) - valorReferencia) < 0.01) {
+                inicioGrupo = i;
+            } else {
+                break; // Linha diferente, fim do grupo
+            }
+        }
+        
+        // Buscar fim do grupo (para frente)
+        let fimGrupo = index;
+        for (let i = index + 1; i < linhas.length; i++) {
+            const linhaPosterior = linhas[i];
+            const valorPosterior = tipo === 'credito' ? linhaPosterior.credito : linhaPosterior.debito;
+            
+            // Se for mesma data e mesmo valor, faz parte do grupo
+            if (linhaPosterior.data === data && Math.abs((valorPosterior || 0) - valorReferencia) < 0.01) {
+                fimGrupo = i;
+            } else {
+                break; // Linha diferente, fim do grupo
+            }
+        }
+        
+        // Se há apenas 1 linha no grupo, validar normalmente (1-1)
+        if (inicioGrupo === fimGrupo) {
+            const diferenca = Math.abs(valorReferencia - composicao);
+            return diferenca <= 0.02;
+        }
+        
+        // Grupo com 2+ linhas: verificar se as composições são DIFERENTES
+        const composicoesGrupo = [];
+        for (let i = inicioGrupo; i <= fimGrupo; i++) {
+            composicoesGrupo.push(linhas[i].discriminacao || 0);
+        }
+        
+        // Se todas composições forem iguais, validar como 1-1
+        const todasIguais = composicoesGrupo.every(comp => Math.abs(comp - composicoesGrupo[0]) < 0.01);
+        if (todasIguais) {
+            const diferenca = Math.abs(valorReferencia - composicao);
+            return diferenca <= 0.02;
+        }
+        
+        // Composições diferentes: somar e validar o total
+        const somaComposicoes = composicoesGrupo.reduce((acc, val) => acc + val, 0);
+        const diferenca = Math.abs(valorReferencia - somaComposicoes);
+        
+        return diferenca <= 0.02;
+    }
+
     function atualizarValor(index, campo, valor) {
         const valorNumerico = parseMoeda(valor);
         linhas[index][campo] = valorNumerico;
         // Não renderizar toda tabela no onchange, apenas no onblur
+        agendarAutosave();
     }
     
     function verificarAutoPreenchimento(index) {
-        // Auto-preencher/atualizar composição se for crédito ou débito
-        const linha = linhas[index];
-        const credito = linha.credito;
-        const debito = linha.debito;
-        
-        if ((credito && credito > 0) || (debito && debito > 0)) {
-            // Verificar se é uma composição 1-1 (não está mesclada com outras linhas)
-            const grupo = getGrupoMesclagem(index);
-            const eh1para1 = !grupo || grupo.tamanho === 1;
-            
-            if (eh1para1) {
-                // Se for 1-1, sempre sincronizar discriminacao com o valor
-                const valorAtual = credito || debito;
-                if (linha.discriminacao !== valorAtual) {
-                    linha.discriminacao = valorAtual;
-                }
-            } else if (!linha.discriminacao) {
-                // Se for mesclada e não tiver discriminacao, preencher inicial
-                linha.discriminacao = credito || debito;
-            }
-        }
+        // DESABILITADO: Auto-preenchimento de composição
+        // O usuário tem controle manual total dos valores
         
         // Renderizar apenas uma vez após todas as atualizações
         renderizarTabela();
@@ -1419,33 +2680,45 @@
 
     function parseMoeda(valor) {
         if (!valor) return null;
-        // Remove tudo exceto números, vírgula e ponto
-        const numero = String(valor).replace(/[^\d,.-]/g, '').replace(',', '.');
-        return parseFloat(numero) || null;
+        
+        // Converter para string e remover símbolos de moeda e espaços
+        let valorStr = String(valor).trim();
+        
+        // Detectar formato brasileiro (1.234,56) vs americano (1,234.56)
+        // Se houver vírgula E ponto, o último caractere define o decimal
+        const temVirgula = valorStr.includes(',');
+        const temPonto = valorStr.includes('.');
+        
+        if (temVirgula && temPonto) {
+            // Tem ambos: descobrir qual é o decimal pelo último
+            const ultimaVirgula = valorStr.lastIndexOf(',');
+            const ultimoPonto = valorStr.lastIndexOf('.');
+            
+            if (ultimaVirgula > ultimoPonto) {
+                // Formato brasileiro: 1.234,56
+                valorStr = valorStr.replace(/\./g, '').replace(',', '.');
+            } else {
+                // Formato americano: 1,234.56
+                valorStr = valorStr.replace(/,/g, '');
+            }
+        } else if (temVirgula) {
+            // Só vírgula: assumir formato brasileiro
+            valorStr = valorStr.replace(/\./g, '').replace(',', '.');
+        }
+        // Se só tem ponto, já está no formato correto
+        
+        // Remover tudo exceto números, ponto e sinal negativo
+        valorStr = valorStr.replace(/[^\d.-]/g, '');
+        
+        return parseFloat(valorStr) || null;
     }
     
     function blurCondicional(index, input) {
-        // Sempre formatar a moeda
+        // Apenas formatar a moeda
         formatarCampoMoeda(input);
         
-        // Apenas atualizar dados, SEM renderizar
-        const linha = linhas[index];
-        const credito = linha.credito;
-        const debito = linha.debito;
-        
-        if ((credito && credito > 0) || (debito && debito > 0)) {
-            const grupo = getGrupoMesclagem(index);
-            const eh1para1 = !grupo || grupo.tamanho === 1;
-            
-            if (eh1para1) {
-                const valorAtual = credito || debito;
-                if (linha.discriminacao !== valorAtual) {
-                    linha.discriminacao = valorAtual;
-                }
-            } else if (!linha.discriminacao) {
-                linha.discriminacao = credito || debito;
-            }
-        }
+        // REMOVIDO: Auto-preenchimento de composição
+        // O usuário terá controle total sobre os valores
         
         // NÃO renderizar aqui - deixar para o usuário sair completamente da tabela
     }
@@ -1527,8 +2800,8 @@
         }
         
         // Mapeamento de colunas editáveis (índices baseados na ordem visual)
-        // 0: data, 1: credito, 2: debito, 3: discriminacao, 4: categoria, 5: competencia, 6: origem_destino, 7: avaliacao
-        const colunasEditaveis = ['data', 'credito', 'debito', 'discriminacao', 'categoria', 'competencia', 'origem_destino', 'avaliacao'];
+        // 0: data, 1: credito, 2: debito, 3: discriminacao, 4: categoria, 5: competencia, 6: origem_destino, 7: avaliacao, 8: observacoes
+        const colunasEditaveis = ['data', 'credito', 'debito', 'discriminacao', 'categoria', 'competencia', 'origem_destino', 'avaliacao', 'observacoes'];
         
         // Validar coluna
         if (colunaIndex < 0 || colunaIndex >= colunasEditaveis.length) {
@@ -1583,16 +2856,13 @@
                     inputSelector = 'input.competencia-input';
                     break;
                 case 'origem_destino':
-                    // Pegar o último input de texto simples (não money, não list, não competencia)
-                    const allInputs = linhaElement.querySelectorAll('input[type="text"]:not(.cell-money):not([list]):not(.competencia-input)');
-                    const origemInput = allInputs[allInputs.length - 1];
-                    if (origemInput && !origemInput.disabled) {
-                        origemInput.focus();
-                        origemInput.select();
-                    }
-                    return;
+                    inputSelector = 'input[list="datalistOrigemDestino"]';
+                    break;
                 case 'avaliacao':
                     inputSelector = 'input[list="datalistAvaliacoes"]';
+                    break;
+                case 'observacoes':
+                    inputSelector = 'input[placeholder="Observações..."]';
                     break;
             }
             
@@ -1606,51 +2876,6 @@
         });
     }
 
-    function podeMesclar(index1, index2) {
-        // Sistema manual: sempre pode mesclar se estiverem na mesma coluna (crédito com crédito OU débito com débito)
-        if (index1 < 0 || index2 < 0 || index1 >= linhas.length || index2 >= linhas.length) return false;
-        if (index1 === index2) return false;
-        
-        const linha1 = linhas[index1];
-        const linha2 = linhas[index2];
-        
-        // Não pode mesclar linhas já mescladas
-        if (linha1.mesclado_com && linha1.mesclado_com.length > 0) return false;
-        if (linha2.mesclado_com && linha2.mesclado_com.length > 0) return false;
-        if (linhaEstaMescladaComoSecundaria(index1) || linhaEstaMescladaComoSecundaria(index2)) return false;
-        
-        // Pode mesclar se ambas tiverem crédito OU ambas tiverem débito
-        const ambasCredito = linha1.credito && linha2.credito;
-        const ambasDebito = linha1.debito && linha2.debito;
-        
-        return ambasCredito || ambasDebito;
-    }
-
-    function mesclarLinhas(index1, index2) {
-        if (!podeMesclar(index1, index2)) {
-            alert('Não é possível mesclar estas linhas. Certifique-se de que ambas têm valores na mesma coluna (crédito com crédito OU débito com débito).');
-            return;
-        }
-        
-        const linha1 = linhas[index1];
-        const linha2 = linhas[index2];
-        const tipo = linha1.credito ? 'crédito' : 'débito';
-        
-        if (!confirm(`Mesclar linha ${index1 + 1} com linha ${index2 + 1} (${tipo})?`)) {
-            return;
-        }
-        
-        // Adicionar index2 ao array mesclado_com de index1
-        if (!linha1.mesclado_com) linha1.mesclado_com = [];
-        if (!linha1.mesclado_com.includes(index2)) {
-            linha1.mesclado_com.push(index2);
-            linha1.mesclado_com.sort((a, b) => a - b); // Manter ordenado
-        }
-        
-        renderizarTabela();
-        document.getElementById('btnSalvar').style.display = 'block';
-    }
-    
     function desmesclarLinha(index) {
         const linha = linhas[index];
         
@@ -1668,153 +2893,7 @@
         
         renderizarTabela();
         document.getElementById('btnSalvar').style.display = 'block';
-    }
-    
-    function mesclarLinhasEmLote(indexOrigem) {
-        const linhaOrigem = linhas[indexOrigem];
-        
-        if (!linhaOrigem.credito && !linhaOrigem.debito) {
-            alert('A linha de origem não possui valor de crédito ou débito.');
-            return;
-        }
-        
-        if (linhaOrigem.mesclado_com && linhaOrigem.mesclado_com.length > 0) {
-            alert('Esta linha já está mesclada. Desmescle primeiro para criar uma nova mesclagem.');
-            return;
-        }
-        
-        const tipo = linhaOrigem.credito ? 'crédito' : 'débito';
-        const valor = linhaOrigem.credito || linhaOrigem.debito;
-        
-        const input = prompt(
-            `Mesclagem em Lote - Linha ${indexOrigem + 1} (${tipo}: ${formatarMoeda(valor)})\n\n` +
-            `Digite os ÍNDICES das linhas para mesclar.\n` +
-            `Aceita vírgulas e intervalos:\n` +
-            `  - Vírgulas: 5,7,9,12\n` +
-            `  - Intervalos: 11-19\n` +
-            `  - Misto: 5,11-19,25\n\n` +
-            `ATENÇÃO: Só é permitido mesclar linhas com ${tipo}.\n\n` +
-            `Índices para mesclar:`
-        );
-        
-        if (!input || input.trim() === '') return;
-        
-        // Parse dos índices (suporta vírgulas e intervalos)
-        const indices = [];
-        const partes = input.replace(/\s+/g, '').split(',');
-        
-        for (let parte of partes) {
-            if (parte.includes('-')) {
-                // Intervalo: 11-19
-                const [inicio, fim] = parte.split('-').map(n => parseInt(n));
-                
-                if (isNaN(inicio) || isNaN(fim)) {
-                    alert(`Intervalo inválido: "${parte}". Use o formato: número-número (ex: 11-19)`);
-                    return;
-                }
-                
-                if (inicio > fim) {
-                    alert(`Intervalo inválido: "${parte}". O início (${inicio}) não pode ser maior que o fim (${fim}).`);
-                    return;
-                }
-                
-                if (inicio < 1 || fim > linhas.length) {
-                    alert(`Intervalo ${parte} fora do intervalo válido (1-${linhas.length}).`);
-                    return;
-                }
-                
-                // Adicionar todos os índices do intervalo
-                for (let i = inicio; i <= fim; i++) {
-                    indices.push(i - 1); // Converter para 0-based
-                }
-            } else {
-                // Número individual: 5
-                const num = parseInt(parte);
-                
-                if (isNaN(num)) {
-                    alert(`Índice inválido: "${parte}". Use apenas números.`);
-                    return;
-                }
-                
-                if (num < 1 || num > linhas.length) {
-                    alert(`Índice ${num} fora do intervalo válido (1-${linhas.length}).`);
-                    return;
-                }
-                
-                indices.push(num - 1); // Converter para 0-based
-            }
-        }
-        
-        // Remover duplicatas e ordenar
-        const indicesUnicos = [...new Set(indices)].sort((a, b) => a - b);
-        
-        if (indicesUnicos.length === 0) {
-            alert('Nenhum índice válido especificado.');
-            return;
-        }
-        
-        if (indicesUnicos.length === 1) {
-            alert('É necessário pelo menos 2 linhas para mesclar.');
-            return;
-        }
-        
-        // A primeira linha do grupo será a "origem" (linha principal)
-        const linhaPrincipal = indicesUnicos[0];
-        const linhasSecundarias = indicesUnicos.slice(1);
-        
-        // Validar que a linha principal tem crédito ou débito
-        const linhaPrincipalObj = linhas[linhaPrincipal];
-        const tipoMesclagem = linhaPrincipalObj.credito ? 'crédito' : (linhaPrincipalObj.debito ? 'débito' : null);
-        
-        if (!tipoMesclagem) {
-            alert(`Linha ${linhaPrincipal + 1} (primeira do grupo) não tem crédito nem débito.`);
-            return;
-        }
-        
-        // Validar que todas as linhas têm o mesmo tipo
-        for (let idx of indicesUnicos) {
-            const linha = linhas[idx];
-            
-            // Verificar se já está mesclada
-            if (linha.mesclado_com && linha.mesclado_com.length > 0) {
-                alert(`Linha ${idx + 1} já está mesclada. Desmescle primeiro.`);
-                return;
-            }
-            if (linhaEstaMescladaComoSecundaria(idx)) {
-                alert(`Linha ${idx + 1} já faz parte de outra mesclagem. Desmescle primeiro.`);
-                return;
-            }
-            
-            // Validar mesmo tipo
-            if (tipoMesclagem === 'crédito' && !linha.credito) {
-                alert(`ERRO: Linha ${idx + 1} não tem crédito. Só é permitido mesclar crédito com crédito.`);
-                return;
-            }
-            if (tipoMesclagem === 'débito' && !linha.debito) {
-                alert(`ERRO: Linha ${idx + 1} não tem débito. Só é permitido mesclar débito com débito.`);
-                return;
-            }
-        }
-        
-        // Confirmar
-        const resumo = indicesUnicos.map(i => i + 1).join(', ');
-        if (!confirm(
-            `Mesclar ${indicesUnicos.length} linhas?\n\n` +
-            `Tipo: ${tipoMesclagem}\n` +
-            `Linhas: ${resumo}\n` +
-            `Principal: Linha ${linhaPrincipal + 1}\n` +
-            `Secundárias: ${linhasSecundarias.map(i => i + 1).join(', ')}`
-        )) {
-            return;
-        }
-        
-        // Aplicar mesclagem
-        linhas[linhaPrincipal].mesclado_com = linhasSecundarias;
-        
-        renderizarTabela();
-        document.getElementById('btnSalvar').style.display = 'block';
-        
-        alert(`✓ ${indicesUnicos.length} linha(s) mesclada(s) com sucesso!`);
+        agendarAutosave();
     }
 
     function copiarDataAcima(index) {
@@ -1988,28 +3067,64 @@
                         mesAnoLinha = `${partes[1]}/${partes[0]}`;
                     }
                 }
-                mostrar = mostrar && datasSelecionadas.includes(mesAnoLinha);
+                // Verificar se "Não preenchido" foi selecionado
+                const naoPreenchidoData = datasSelecionadas.includes('__NAO_PREENCHIDO__');
+                if (naoPreenchidoData && !linha.data) {
+                    mostrar = mostrar && true;
+                } else if (naoPreenchidoData) {
+                    mostrar = mostrar && (datasSelecionadas.includes(mesAnoLinha) || !linha.data);
+                } else {
+                    mostrar = mostrar && datasSelecionadas.includes(mesAnoLinha);
+                }
             }
             
             // Filtrar por competência
             if (competenciasSelecionadas.length > 0) {
                 const competenciaLinha = linha.competencia ? formatarCompetenciaParaExibicao(linha.competencia) : '';
-                mostrar = mostrar && competenciasSelecionadas.includes(competenciaLinha);
+                const naoPreenchidoComp = competenciasSelecionadas.includes('__NAO_PREENCHIDO__');
+                if (naoPreenchidoComp && !linha.competencia) {
+                    mostrar = mostrar && true;
+                } else if (naoPreenchidoComp) {
+                    mostrar = mostrar && (competenciasSelecionadas.includes(competenciaLinha) || !linha.competencia);
+                } else {
+                    mostrar = mostrar && competenciasSelecionadas.includes(competenciaLinha);
+                }
             }
             
             // Filtrar por categoria
             if (categoriasSelecionadas.length > 0) {
-                mostrar = mostrar && categoriasSelecionadas.includes(linha.cat_transacao);
+                const naoPreenchidoCat = categoriasSelecionadas.includes('__NAO_PREENCHIDO__');
+                if (naoPreenchidoCat && (!linha.cat_transacao || linha.cat_transacao.trim() === '')) {
+                    mostrar = mostrar && true;
+                } else if (naoPreenchidoCat) {
+                    mostrar = mostrar && (categoriasSelecionadas.includes(linha.cat_transacao) || !linha.cat_transacao || linha.cat_transacao.trim() === '');
+                } else {
+                    mostrar = mostrar && categoriasSelecionadas.includes(linha.cat_transacao);
+                }
             }
             
             // Filtrar por origem/destino
             if (origensSelecionadas.length > 0) {
-                mostrar = mostrar && origensSelecionadas.includes(linha.origem_destino);
+                const naoPreenchidoOrig = origensSelecionadas.includes('__NAO_PREENCHIDO__');
+                if (naoPreenchidoOrig && (!linha.origem_destino || linha.origem_destino.trim() === '')) {
+                    mostrar = mostrar && true;
+                } else if (naoPreenchidoOrig) {
+                    mostrar = mostrar && (origensSelecionadas.includes(linha.origem_destino) || !linha.origem_destino || linha.origem_destino.trim() === '');
+                } else {
+                    mostrar = mostrar && origensSelecionadas.includes(linha.origem_destino);
+                }
             }
             
             // Filtrar por avaliação
             if (avaliacoesSelecionadas.length > 0) {
-                mostrar = mostrar && avaliacoesSelecionadas.includes(linha.cat_avaliacao);
+                const naoPreenchidoAval = avaliacoesSelecionadas.includes('__NAO_PREENCHIDO__');
+                if (naoPreenchidoAval && (!linha.cat_avaliacao || linha.cat_avaliacao.trim() === '')) {
+                    mostrar = mostrar && true;
+                } else if (naoPreenchidoAval) {
+                    mostrar = mostrar && (avaliacoesSelecionadas.includes(linha.cat_avaliacao) || !linha.cat_avaliacao || linha.cat_avaliacao.trim() === '');
+                } else {
+                    mostrar = mostrar && avaliacoesSelecionadas.includes(linha.cat_avaliacao);
+                }
             }
             
             row.style.display = mostrar ? '' : 'none';
@@ -2033,6 +3148,142 @@
             option.value = origem;
             datalist.appendChild(option);
         });
+    }
+    
+    function excluirLinhasPorIntervalo() {
+        const input = document.getElementById('inputExcluirLinhas').value.trim();
+        
+        if (!input) {
+            alert('Digite o intervalo ou índices para excluir.\nExemplos:\n- Intervalo: 114-120\n- Múltiplos: 5,10,15,20\n- Combinado: 1-5,10,15-20');
+            return;
+        }
+        
+        const indicesParaExcluir = new Set();
+        
+        // Parse do input (aceita intervalos e valores individuais)
+        const partes = input.split(',').map(p => p.trim());
+        
+        for (const parte of partes) {
+            if (parte.includes('-')) {
+                // Intervalo: 114-120
+                const [inicio, fim] = parte.split('-').map(n => parseInt(n.trim()));
+                
+                if (isNaN(inicio) || isNaN(fim)) {
+                    alert(`Intervalo inválido: ${parte}`);
+                    return;
+                }
+                
+                if (inicio > fim) {
+                    alert(`Intervalo inválido: ${parte} (início maior que fim)`);
+                    return;
+                }
+                
+                for (let i = inicio; i <= fim; i++) {
+                    indicesParaExcluir.add(i);
+                }
+            } else {
+                // Valor individual: 5
+                const indice = parseInt(parte);
+                
+                if (isNaN(indice)) {
+                    alert(`Valor inválido: ${parte}`);
+                    return;
+                }
+                
+                indicesParaExcluir.add(indice);
+            }
+        }
+        
+        // Verificar se há índices para excluir
+        if (indicesParaExcluir.size === 0) {
+            alert('Nenhum índice válido para excluir');
+            return;
+        }
+        
+        // Salvar estado antes de modificar
+        salvarEstadoNoHistorico();
+        
+        // Filtrar linhas pelo índice
+        const linhasOriginais = linhas.length;
+        linhas = linhas.filter(linha => !indicesParaExcluir.has(linha.indice));
+        
+        const linhasExcluidas = linhasOriginais - linhas.length;
+        
+        if (linhasExcluidas === 0) {
+            alert('Nenhuma linha foi excluída. Verifique se os índices existem.');
+            return;
+        }
+        
+        // Perguntar confirmação
+        if (!confirm(`${linhasExcluidas} linha(s) serão excluídas. Confirmar?`)) {
+            // Desfazer via histórico
+            desfazerAlteracao();
+            return;
+        }
+        
+        // Recalcular índices
+        recalcularIndices();
+        
+        // Re-renderizar
+        renderizarTabela();
+        
+        // Limpar input
+        document.getElementById('inputExcluirLinhas').value = '';
+        
+        document.getElementById('btnSalvar').style.display = 'block';
+        agendarAutosave();
+        
+        alert(`✓ ${linhasExcluidas} linha(s) excluída(s) com sucesso!`);
+    }
+    
+    function salvarEstadoNoHistorico() {
+        // Salvar snapshot do estado atual
+        const snapshot = {
+            linhas: JSON.parse(JSON.stringify(linhas)),
+            notasFiscais: JSON.parse(JSON.stringify(notasFiscais)),
+            timestamp: Date.now()
+        };
+        
+        historicoAlteracoes.push(snapshot);
+        
+        // Limitar histórico a MAX_HISTORICO estados
+        if (historicoAlteracoes.length > MAX_HISTORICO) {
+            historicoAlteracoes.shift();
+        }
+        
+        // Mostrar botão Undo
+        const btnUndo = document.getElementById('btnUndo');
+        if (btnUndo) {
+            btnUndo.style.display = '';
+            btnUndo.title = `Desfazer (${historicoAlteracoes.length} estado(s) salvos)`;
+        }
+    }
+    
+    function desfazerAlteracao() {
+        if (historicoAlteracoes.length === 0) {
+            alert('Nenhuma alteração para desfazer');
+            return;
+        }
+        
+        // Restaurar último estado
+        const estadoAnterior = historicoAlteracoes.pop();
+        
+        linhas = estadoAnterior.linhas;
+        notasFiscais = estadoAnterior.notasFiscais;
+        
+        renderizarTabela();
+        
+        // Atualizar botão Undo
+        const btnUndo = document.getElementById('btnUndo');
+        if (btnUndo) {
+            if (historicoAlteracoes.length === 0) {
+                btnUndo.style.display = 'none';
+            } else {
+                btnUndo.title = `Desfazer (${historicoAlteracoes.length} estado(s) salvos)`;
+            }
+        }
+        
+        document.getElementById('btnSalvar').style.display = 'block';
     }
 
     function filtrarPorData() {
@@ -2125,6 +3376,7 @@
         // Recalcular índices
         recalcularIndices();
         renderizarTabela();
+        agendarAutosave();
     }
 
     function excluirLinha(index) {
@@ -2133,6 +3385,7 @@
         linhas.splice(index, 1);
         recalcularIndices();
         renderizarTabela();
+        agendarAutosave();
     }
 
     function recalcularIndices() {
@@ -2150,6 +3403,142 @@
         linhas = [];
         renderizarTabela();
         document.getElementById('btnSalvar').style.display = 'none';
+    }
+
+    function exportarCSV() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) {
+            alert('Selecione um termo antes de exportar.');
+            return;
+        }
+        
+        if (linhas.length === 0) {
+            alert('Não há dados para exportar.');
+            return;
+        }
+        
+        // Redirecionar para a rota de exportação
+        window.location.href = `/conc_bancaria/api/exportar-csv?numero_termo=${encodeURIComponent(numeroTermo)}`;
+    }
+    
+    function selecionarTodasColunas() {
+        document.querySelectorAll('#modalExportarPDF input[type="checkbox"]').forEach(cb => {
+            cb.checked = true;
+        });
+    }
+    
+    function desmarcarTodasColunas() {
+        document.querySelectorAll('#modalExportarPDF input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
+    }
+    
+    function expandirFiltros() {
+        // Sincronizar valores dos filtros compactos para os expandidos
+        sincronizarFiltro('filtroDataExpandido', 'filtroData');
+        sincronizarFiltro('filtroCompetenciaExpandido', 'filtroCompetencia');
+        sincronizarFiltro('filtroCategoriaExpandido', 'filtroCategoria');
+        sincronizarFiltro('filtroOrigemDestinoExpandido', 'filtroOrigemDestino');
+        sincronizarFiltro('filtroAvaliacaoExpandido', 'filtroAvaliacao');
+        
+        // Abrir modal
+        const modal = new bootstrap.Modal(document.getElementById('modalFiltrosExpandidos'));
+        modal.show();
+    }
+    
+    function sincronizarFiltro(destino, origem) {
+        const selectOrigem = document.getElementById(origem);
+        const selectDestino = document.getElementById(destino);
+        
+        if (!selectOrigem || !selectDestino) return;
+        
+        // Copiar opções do origem para destino (se ainda não existirem)
+        const opcoesOrigem = Array.from(selectOrigem.options);
+        const valoresDestino = Array.from(selectDestino.options).map(opt => opt.value);
+        
+        opcoesOrigem.forEach(opcao => {
+            if (!valoresDestino.includes(opcao.value)) {
+                const novaOpcao = opcao.cloneNode(true);
+                selectDestino.appendChild(novaOpcao);
+            }
+        });
+        
+        // Sincronizar seleções
+        const selecionadasOrigem = Array.from(selectOrigem.selectedOptions).map(opt => opt.value);
+        Array.from(selectDestino.options).forEach(opt => {
+            opt.selected = selecionadasOrigem.includes(opt.value);
+        });
+        
+        // Aplicar filtros após sincronização
+        aplicarFiltros();
+    }
+    
+    function limparFiltrosExpandidos() {
+        // Limpar todos os filtros expandidos
+        document.getElementById('filtroDataExpandido').selectedIndex = -1;
+        document.getElementById('filtroCompetenciaExpandido').selectedIndex = -1;
+        document.getElementById('filtroCategoriaExpandido').selectedIndex = -1;
+        document.getElementById('filtroOrigemDestinoExpandido').selectedIndex = -1;
+        document.getElementById('filtroAvaliacaoExpandido').selectedIndex = -1;
+        
+        // Sincronizar com filtros compactos
+        sincronizarFiltro('filtroData', 'filtroDataExpandido');
+        sincronizarFiltro('filtroCompetencia', 'filtroCompetenciaExpandido');
+        sincronizarFiltro('filtroCategoria', 'filtroCategoriaExpandido');
+        sincronizarFiltro('filtroOrigemDestino', 'filtroOrigemDestinoExpandido');
+        sincronizarFiltro('filtroAvaliacao', 'filtroAvaliacaoExpandido');
+    }
+    
+    function desmarcarTodasColunas() {
+        document.querySelectorAll('#modalExportarPDF input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
+    }
+    
+    function exportarPDF() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) {
+            alert('Selecione um termo antes de exportar.');
+            return;
+        }
+        
+        if (linhas.length === 0) {
+            alert('Não há dados para exportar.');
+            return;
+        }
+        
+        // Coletar colunas selecionadas
+        const colunasSelecionadas = [];
+        document.querySelectorAll('#modalExportarPDF input[type="checkbox"]:checked').forEach(cb => {
+            colunasSelecionadas.push(cb.value);
+        });
+        
+        if (colunasSelecionadas.length === 0) {
+            alert('Selecione pelo menos uma coluna para exportar.');
+            return;
+        }
+        
+        // Criar query string com colunas selecionadas
+        const colunasParam = colunasSelecionadas.join(',');
+        
+        // Fechar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalExportarPDF'));
+        modal.hide();
+        
+        // Redirecionar para a rota de exportação PDF
+        window.location.href = `/conc_bancaria/api/exportar-pdf?numero_termo=${encodeURIComponent(numeroTermo)}&colunas=${encodeURIComponent(colunasParam)}`;
+    }
+    
+    // DESABILITADO: processarMesclagensAutomaticas
+    // A validação de composição agora é baseada apenas em data/valor, não em mesclado_com
+    /*
+    function processarMesclagensAutomaticas() {
+        ...código comentado...
+    }
+    */
+    
+    function baixarModelo() {
+        window.location.href = '/conc_bancaria/api/modelo-importacao';
     }
 
     async function salvarConciliacao() {
@@ -2185,13 +3574,26 @@
                 }
             }
             
-            // Auto-classificar avaliação baseado em origem/destino
+            // Auto-classificar avaliação baseado em regras (prioridade: categoria > origem/destino)
             let avaliacaoAuto = linha.cat_avaliacao;
+            
+            // Regra prioritária: Categoria de Transação
+            if (!avaliacaoAuto && linha.cat_transacao && regrasAvaliacao.glosar.includes(linha.cat_transacao)) {
+                avaliacaoAuto = 'Glosar';
+            }
+            
+            // Regra secundária: Origem/Destino
             if (!avaliacaoAuto && origemDestino) {
                 const origemNormalizada = origemDestino.toLowerCase().trim();
-                if (origemNormalizada === 'banco do brasil' || origemNormalizada === 'administração pública' || origemNormalizada === 'administração publica') {
+                if (regrasAvaliacao.avaliado.includes(origemNormalizada)) {
                     avaliacaoAuto = 'Avaliado';
                 }
+            }
+            
+            // Auto-preencher composição se estiver vazia
+            let discriminacao = linha.discriminacao;
+            if (!discriminacao && (linha.credito || linha.debito)) {
+                discriminacao = linha.credito || linha.debito;
             }
             
             return {
@@ -2200,11 +3602,12 @@
                 data: linha.data,
                 credito: linha.credito,
                 debito: linha.debito,
-                discriminacao: linha.discriminacao,
+                discriminacao: discriminacao,
                 cat_transacao: linha.cat_transacao,
                 competencia: competencia,
                 origem_destino: origemDestino,
                 cat_avaliacao: avaliacaoAuto,
+                avaliacao_analista: linha.avaliacao_analista,
                 mesclado_com: linha.mesclado_com || []
             };
         });
@@ -2225,7 +3628,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     numero_termo: numeroTermo,
-                    linhas: linhasParaSalvar
+                    linhas: linhasParaSalvar,
+                    modo_completo: limiteAtual === 'todas'  // Só deleta se carregou todas
                 })
             });
 
@@ -2251,10 +3655,96 @@
             }
 
             const resultado = await response.json();
-            alert(resultado.mensagem);
+            // Não mostrar mensagem de sucesso - apenas erros
+            
+            // Salvar Notas Fiscais (se seção ativada)
+            if (secaoNotasFiscaisAtiva && Object.keys(notasFiscais).length > 0) {
+                const notasParaSalvar = Object.entries(notasFiscais)
+                    .filter(([concExtratoId, nf]) => nf.numero_nota) // Só salvar se tiver número da nota
+                    .map(([concExtratoId, nf]) => ({
+                        conc_extrato_id: parseInt(concExtratoId),
+                        numero_nota: nf.numero_nota,
+                        chave_acesso: nf.chave_acesso || null,
+                        cnpj_nota: nf.cnpj_nota || null
+                    }));
+                
+                if (notasParaSalvar.length > 0) {
+                    const nfResponse = await fetch('/conc_bancaria/api/notas-fiscais', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            numero_termo: numeroTermo,
+                            notas: notasParaSalvar
+                        })
+                    });
+                    
+                    if (!nfResponse.ok) {
+                        console.warn('Aviso: Não foi possível salvar notas fiscais');
+                    }
+                }
+            }
+            
+            // Salvar documentos de análise se seção estiver ativa
+            if (secaoDocumentosAtiva) {
+                // Incluir TODAS as linhas salvas (com ID), não apenas as editadas
+                const documentosParaSalvar = linhas
+                    .filter(linha => linha.id) // Apenas linhas já salvas no banco
+                    .map(linha => {
+                        const categoria = linha.cat_transacao || '';
+                        const rubrica = categoriasRubricas[categoria] || '';
+                        const naoAplicavelGeral = categoriasAplicabilidade[categoria] === true;
+                        
+                        // Regras específicas por rubrica
+                        const naoAplicavelForaMunicipio = naoAplicavelGeral || 
+                                                          rubrica === 'Pessoal' || 
+                                                          rubrica === 'Administrativas';
+                        
+                        const naoAplicavelContratos = naoAplicavelGeral || 
+                                                      ['Pessoal', 'Materiais', 'Implantação', 'Imobilizado'].includes(rubrica);
+                        
+                        // Buscar documento existente no objeto indexado
+                        const doc = documentosAnalise[linha.id] || {};
+                        
+                        // SISTEMA DE DROPDOWNS: Enviar valores de texto diretamente
+                        // Se campo não aplicável → enviar string vazia (será ignorado no backend)
+                        // Se campo aplicável → enviar valor selecionado ou vazio se não selecionado
+                        
+                        return {
+                            conc_extrato_id: linha.id,
+                            avaliacao_guia: naoAplicavelGeral ? '' : (doc.avaliacao_guia || ''),
+                            avaliacao_comprovante: naoAplicavelGeral ? '' : (doc.avaliacao_comprovante || ''),
+                            avaliacao_contratos: naoAplicavelContratos ? '' : (doc.avaliacao_contratos || ''),
+                            avaliacao_fora_municipio: naoAplicavelForaMunicipio ? '' : (doc.avaliacao_fora_municipio || '')
+                        };
+                    });
+                
+                if (documentosParaSalvar.length > 0) {
+                    const docResponse = await fetch('/conc_bancaria/api/documentos-analise', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            numero_termo: numeroTermo,
+                            documentos: documentosParaSalvar
+                        })
+                    });
+                    
+                    if (!docResponse.ok) {
+                        console.warn('Aviso: Não foi possível salvar documentos de análise');
+                    }
+                }
+            }
+            
+            // Limpar cache após salvar com sucesso
+            limparCache();
             
             // Recarregar dados
             await carregarExtrato();
+            if (secaoNotasFiscaisAtiva) {
+                await carregarNotasFiscais();
+            }
+            if (secaoDocumentosAtiva) {
+                await carregarDocumentosAnalise();
+            }
 
         } catch (error) {
             console.error('Erro ao salvar:', error);
@@ -2264,7 +3754,18 @@
             document.getElementById('btnSalvar').innerHTML = '<i class="bi bi-save me-2"></i>Salvar Conciliação';
         }
     }
+
+    // Função para ir à última linha da tabela
+    function irParaUltimaLinha() {
+        const tbody = document.getElementById('tbodyConciliacao');
+        if (tbody && tbody.lastElementChild) {
+            tbody.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    }
 </script>
+
+<!-- Indicador de Autosave Fixo -->
+<small id="autosaveStatus">💾 Salvo em cache</small>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

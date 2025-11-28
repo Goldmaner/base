@@ -32,6 +32,9 @@ def api_listar_extrato():
     Query params: numero_termo, limite
     """
     try:
+        import time
+        inicio = time.time()
+        
         cur = get_cursor()
         
         numero_termo = request.args.get('numero_termo', '').strip()
@@ -73,10 +76,16 @@ def api_listar_extrato():
             except ValueError:
                 query += " LIMIT 100"
         
+        tempo_query = time.time()
         cur.execute(query, params)
+        tempo_execute = (time.time() - tempo_query) * 1000
+        
+        tempo_fetch = time.time()
         extrato = cur.fetchall()
+        tempo_fetchall = (time.time() - tempo_fetch) * 1000
         
         # Processar dados
+        tempo_process = time.time()
         resultado = []
         for item in extrato:
             row = dict(item)
@@ -103,6 +112,10 @@ def api_listar_extrato():
             
             resultado.append(row)
         
+        tempo_processing = (time.time() - tempo_process) * 1000
+        tempo_total = (time.time() - inicio) * 1000
+        print(f"[GET EXTRATO] Total: {tempo_total:.2f}ms | Execute: {tempo_execute:.2f}ms | Fetch: {tempo_fetchall:.2f}ms | Process: {tempo_processing:.2f}ms | Linhas: {len(resultado)}")
+        
         return jsonify(resultado), 200
         
     except Exception as e:
@@ -115,9 +128,13 @@ def api_listar_extrato():
 def api_salvar_extrato():
     """API para salvar múltiplas linhas do extrato de uma vez"""
     try:
+        import time
+        inicio = time.time()
+        
         dados = request.get_json()
         linhas = dados.get('linhas', [])
         numero_termo = dados.get('numero_termo')
+        modo_completo = dados.get('modo_completo', False)  # Flag para indicar se está salvando tudo
         
         if not numero_termo:
             return jsonify({'erro': 'Número do termo é obrigatório'}), 400
@@ -125,19 +142,20 @@ def api_salvar_extrato():
         cur = get_cursor()
         db = get_db()
         
-        # Coletar IDs das linhas enviadas para identificar quais manter
+        # Coletar IDs das linhas enviadas
         ids_enviados = [linha.get('id') for linha in linhas if linha.get('id')]
         
-        # Deletar apenas linhas que foram removidas (não estão mais na lista)
-        if ids_enviados:
-            placeholders = ','.join(['%s'] * len(ids_enviados))
-            cur.execute(f"""
-                DELETE FROM analises_pc.conc_extrato 
-                WHERE numero_termo = %s AND id NOT IN ({placeholders})
-            """, [numero_termo] + ids_enviados)
-        else:
-            # Se não há IDs (todas linhas novas), deletar tudo do termo
-            cur.execute("DELETE FROM analises_pc.conc_extrato WHERE numero_termo = %s", (numero_termo,))
+        # DELETAR apenas se modo_completo = True (garantia de que temos todas as linhas)
+        if modo_completo:
+            if ids_enviados:
+                placeholders = ','.join(['%s'] * len(ids_enviados))
+                cur.execute(f"""
+                    DELETE FROM analises_pc.conc_extrato 
+                    WHERE numero_termo = %s AND id NOT IN ({placeholders})
+                """, [numero_termo] + ids_enviados)
+            else:
+                # Se não há IDs (todas linhas novas), deletar tudo do termo
+                cur.execute("DELETE FROM analises_pc.conc_extrato WHERE numero_termo = %s", (numero_termo,))
         
         # UPSERT: UPDATE se existe, INSERT se não existe
         ids_processados = []
@@ -220,6 +238,9 @@ def api_salvar_extrato():
         
         db.commit()
         
+        tempo_total = (time.time() - inicio) * 1000
+        print(f"\n[SAVE] Tempo total: {tempo_total:.2f}ms | Linhas: {len(ids_processados)}")
+        
         return jsonify({
             'mensagem': f'{len(ids_processados)} linhas salvas com sucesso',
             'ids': ids_processados
@@ -255,13 +276,14 @@ def api_excluir_extrato(extrato_id):
 @bp.route('/api/termos', methods=['GET'])
 @login_required
 def api_listar_termos():
-    """API para listar números de termos disponíveis"""
+    """API para listar números de termos que possuem extrato cadastrado"""
     try:
         cur = get_cursor()
         
+        # Buscar apenas termos que têm registros na tabela conc_extrato
         cur.execute("""
             SELECT DISTINCT numero_termo 
-            FROM public.parcerias 
+            FROM analises_pc.conc_extrato 
             WHERE numero_termo IS NOT NULL 
             ORDER BY numero_termo
         """)
@@ -457,3 +479,397 @@ def api_save_banco():
         if get_db():
             get_db().rollback()
         return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/notas-fiscais', methods=['GET'])
+@login_required
+def api_listar_notas_fiscais():
+    """API para listar notas fiscais de um termo"""
+    try:
+        cur = get_cursor()
+        numero_termo = request.args.get('numero_termo', '').strip()
+        
+        if not numero_termo:
+            return jsonify({'erro': 'numero_termo é obrigatório'}), 400
+        
+        query = """
+            SELECT 
+                id,
+                conc_extrato_id,
+                numero_nota,
+                chave_acesso,
+                cnpj_nota,
+                numero_termo
+            FROM analises_pc.conc_extrato_notas_fiscais
+            WHERE numero_termo = %s
+            ORDER BY conc_extrato_id ASC
+        """
+        
+        cur.execute(query, (numero_termo,))
+        notas = cur.fetchall()
+        
+        resultado = [dict(nota) for nota in notas]
+        
+        return jsonify(resultado), 200
+        
+    except Exception as e:
+        print(f"[ERRO] ao listar notas fiscais: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/notas-fiscais', methods=['POST'])
+@login_required
+def api_salvar_notas_fiscais():
+    """API para salvar notas fiscais com UPSERT (UPDATE prioritário)"""
+    try:
+        import time
+        inicio = time.time()
+        
+        dados = request.get_json()
+        notas = dados.get('notas', [])
+        numero_termo = dados.get('numero_termo')
+        
+        if not numero_termo:
+            return jsonify({'erro': 'Número do termo é obrigatório'}), 400
+        
+        cur = get_cursor()
+        db = get_db()
+        
+        ids_processados = []
+        
+        for nota in notas:
+            conc_extrato_id = nota.get('conc_extrato_id')
+            
+            if not conc_extrato_id:
+                continue  # Pular se não tiver FK
+            
+            # Verificar se tem dados preenchidos (não salvar linha vazia)
+            numero_nota = nota.get('numero_nota')
+            chave_acesso = nota.get('chave_acesso') or ''
+            cnpj_nota = nota.get('cnpj_nota') or ''
+            
+            # Strip apenas se não for None
+            chave_acesso = chave_acesso.strip() if chave_acesso else None
+            cnpj_nota = cnpj_nota.strip() if cnpj_nota else None
+            
+            # Se não tem número da nota, deletar registro se existir
+            if not numero_nota:
+                cur.execute("""
+                    DELETE FROM analises_pc.conc_extrato_notas_fiscais
+                    WHERE conc_extrato_id = %s AND numero_termo = %s
+                """, (conc_extrato_id, numero_termo))
+                continue
+            
+            # Verificar se já existe registro para este conc_extrato_id
+            cur.execute("""
+                SELECT id FROM analises_pc.conc_extrato_notas_fiscais
+                WHERE conc_extrato_id = %s AND numero_termo = %s
+            """, (conc_extrato_id, numero_termo))
+            
+            existe = cur.fetchone()
+            
+            if existe:
+                # UPDATE: registro já existe
+                cur.execute("""
+                    UPDATE analises_pc.conc_extrato_notas_fiscais SET
+                        numero_nota = %s,
+                        chave_acesso = %s,
+                        cnpj_nota = %s
+                    WHERE conc_extrato_id = %s AND numero_termo = %s
+                    RETURNING id
+                """, (
+                    numero_nota,
+                    chave_acesso,
+                    cnpj_nota,
+                    conc_extrato_id,
+                    numero_termo
+                ))
+                result = cur.fetchone()
+                if result:
+                    ids_processados.append(result['id'])
+            else:
+                # INSERT: novo registro
+                cur.execute("""
+                    INSERT INTO analises_pc.conc_extrato_notas_fiscais (
+                        conc_extrato_id, numero_nota, chave_acesso, 
+                        cnpj_nota, numero_termo
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    conc_extrato_id,
+                    numero_nota,
+                    chave_acesso,
+                    cnpj_nota,
+                    numero_termo
+                ))
+                novo_id = cur.fetchone()['id']
+                ids_processados.append(novo_id)
+        
+        db.commit()
+        
+        tempo_total = (time.time() - inicio) * 1000
+        print(f"\n[SAVE NF] Tempo total: {tempo_total:.2f}ms | Notas: {len(ids_processados)}")
+        
+        return jsonify({
+            'mensagem': f'{len(ids_processados)} notas fiscais salvas',
+            'ids': ids_processados
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERRO] ao salvar notas fiscais: {e}")
+        if get_db():
+            get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/categorias-aplicabilidade', methods=['GET'])
+@login_required
+def api_categorias_aplicabilidade():
+    """API para buscar aplicabilidade de documentos por categoria"""
+    try:
+        cur = get_cursor()
+        
+        query = """
+            SELECT categoria_extra, COALESCE(aplicacao, false) as aplicacao
+            FROM categoricas.c_despesas_analise
+            WHERE categoria_extra IS NOT NULL
+        """
+        
+        cur.execute(query)
+        categorias = cur.fetchall()
+        
+        # Retornar como dicionário { categoria: aplicacao }
+        resultado = {cat['categoria_extra']: cat['aplicacao'] for cat in categorias}
+        
+        return jsonify(resultado), 200
+        
+    except Exception as e:
+        print(f"[ERRO] ao buscar categorias aplicabilidade: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/categorias-rubricas', methods=['GET'])
+@login_required
+def api_categorias_rubricas():
+    """API para buscar rubricas das categorias por termo"""
+    try:
+        cur = get_cursor()
+        numero_termo = request.args.get('numero_termo', '').strip()
+        
+        if not numero_termo:
+            return jsonify({'erro': 'numero_termo é obrigatório'}), 400
+        
+        query = """
+            SELECT categoria_despesa, rubrica
+            FROM public.parcerias_despesas
+            WHERE numero_termo = %s 
+              AND categoria_despesa IS NOT NULL
+              AND rubrica IS NOT NULL
+        """
+        
+        cur.execute(query, (numero_termo,))
+        categorias = cur.fetchall()
+        
+        # Retornar como dicionário { categoria: rubrica }
+        resultado = {cat['categoria_despesa']: cat['rubrica'] for cat in categorias}
+        
+        return jsonify(resultado), 200
+        
+    except Exception as e:
+        print(f"[ERRO] ao buscar rubricas: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/documentos-analise', methods=['GET'])
+@login_required
+def api_listar_documentos_analise():
+    """API para listar documentos de análise de um termo"""
+    try:
+        cur = get_cursor()
+        numero_termo = request.args.get('numero_termo', '').strip()
+        
+        if not numero_termo:
+            return jsonify({'erro': 'numero_termo é obrigatório'}), 400
+        
+        query = """
+            SELECT 
+                id,
+                conc_extrato_id,
+                COALESCE(avaliacao_guia, 'pendente') as avaliacao_guia,
+                COALESCE(avaliacao_comprovante, 'pendente') as avaliacao_comprovante,
+                COALESCE(avaliacao_contratos, 'pendente') as avaliacao_contratos,
+                COALESCE(avaliacao_fora_municipio, 'pendente') as avaliacao_fora_municipio,
+                numero_termo
+            FROM analises_pc.conc_analise
+            WHERE numero_termo = %s
+            ORDER BY conc_extrato_id ASC
+        """
+        
+        cur.execute(query, (numero_termo,))
+        documentos = cur.fetchall()
+        
+        resultado = [dict(doc) for doc in documentos]
+        
+        return jsonify(resultado), 200
+        
+    except Exception as e:
+        print(f"[ERRO] ao listar documentos de análise: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/documentos-analise', methods=['POST'])
+@login_required
+def api_salvar_documentos_analise():
+    """API para salvar documentos de análise com UPSERT e auto-marcação"""
+    try:
+        import time
+        inicio = time.time()
+        
+        dados = request.get_json()
+        documentos = dados.get('documentos', [])
+        numero_termo = dados.get('numero_termo')
+        
+        if not numero_termo:
+            return jsonify({'erro': 'Número do termo é obrigatório'}), 400
+        
+        cur = get_cursor()
+        db = get_db()
+        
+        ids_processados = []
+        
+        for doc in documentos:
+            conc_extrato_id = doc.get('conc_extrato_id')
+            
+            if not conc_extrato_id:
+                continue
+            
+            # Valores possíveis: textos descritivos ou vazios
+            # Coluna 14 (Guia): "Guia apresentada", "Não apresentada"
+            # Coluna 15 (Comprovante): "Apresentado corretamente", "Cartão de Crédito", "Pago em Espécie", "Pago em Cheque"
+            # Coluna 16 (Contratos): "Contratos apresentados", "Não apresentado"
+            # Coluna 17 (Fora Município): "São Paulo", "Fora do município"
+            avaliacao_guia = doc.get('avaliacao_guia', '')
+            avaliacao_comprovante = doc.get('avaliacao_comprovante', '')
+            avaliacao_contratos = doc.get('avaliacao_contratos', '')
+            avaliacao_fora_municipio = doc.get('avaliacao_fora_municipio', '')
+            
+            # ============================================================
+            # REGRA DE AUTO-MARCAÇÃO:
+            # Se linha está completa E avaliada como "Avaliado",
+            # selecionar automaticamente valores padrão (opções positivas)
+            # MAS SOMENTE se a categoria for aplicável
+            # ============================================================
+            
+            # Buscar dados da linha do extrato + aplicabilidade da categoria
+            cur.execute("""
+                SELECT 
+                    e.data, e.credito, e.debito, e.discriminacao, e.cat_transacao, 
+                    e.competencia, e.origem_destino, e.cat_avaliacao,
+                    ca.aplicacao
+                FROM analises_pc.conc_extrato e
+                LEFT JOIN categoricas.c_despesas_analise ca ON e.cat_transacao = ca.categoria_extra
+                WHERE e.id = %s
+            """, (conc_extrato_id,))
+            
+            linha_extrato = cur.fetchone()
+            
+            if linha_extrato:
+                # Verificar se categoria é não aplicável (aplicacao = true significa NÃO aplicável)
+                categoria_nao_aplicavel = linha_extrato.get('aplicacao') == True
+                
+                # IMPORTANTE: Se categoria não aplicável, LIMPAR todos os valores
+                # (não deve haver valores salvos para categorias não aplicáveis)
+                if categoria_nao_aplicavel:
+                    avaliacao_guia = ''
+                    avaliacao_comprovante = ''
+                    avaliacao_contratos = ''
+                    avaliacao_fora_municipio = ''
+                else:
+                    # Verificar se a linha está completa e avaliada
+                    linha_completa = (
+                        linha_extrato['data'] is not None and
+                        (linha_extrato['credito'] is not None or linha_extrato['debito'] is not None) and
+                        linha_extrato['discriminacao'] is not None and
+                        linha_extrato['cat_transacao'] is not None and linha_extrato['cat_transacao'].strip() != '' and
+                        linha_extrato['competencia'] is not None and
+                        linha_extrato['origem_destino'] is not None and linha_extrato['origem_destino'].strip() != '' and
+                        linha_extrato['cat_avaliacao'] == 'Avaliado'
+                    )
+                    
+                    # Auto-marcar SOMENTE se linha completa E categoria aplicável
+                    if linha_completa:
+                        # Auto-marcar com valores padrão se estiverem vazios
+                        # NÃO modificar se já tiver algum valor selecionado (respeitar escolha do usuário)
+                        if not avaliacao_guia or avaliacao_guia.strip() == '':
+                            avaliacao_guia = 'Guia apresentada'
+                        if not avaliacao_comprovante or avaliacao_comprovante.strip() == '':
+                            avaliacao_comprovante = 'Apresentado corretamente'
+                        if not avaliacao_contratos or avaliacao_contratos.strip() == '':
+                            avaliacao_contratos = 'Contratos apresentados'
+                        if not avaliacao_fora_municipio or avaliacao_fora_municipio.strip() == '':
+                            avaliacao_fora_municipio = 'São Paulo'
+            
+            # Verificar se já existe registro
+            cur.execute("""
+                SELECT id FROM analises_pc.conc_analise
+                WHERE conc_extrato_id = %s AND numero_termo = %s
+            """, (conc_extrato_id, numero_termo))
+            
+            existe = cur.fetchone()
+            
+            if existe:
+                # UPDATE
+                cur.execute("""
+                    UPDATE analises_pc.conc_analise SET
+                        avaliacao_guia = %s,
+                        avaliacao_comprovante = %s,
+                        avaliacao_contratos = %s,
+                        avaliacao_fora_municipio = %s
+                    WHERE conc_extrato_id = %s AND numero_termo = %s
+                    RETURNING id
+                """, (
+                    avaliacao_guia,
+                    avaliacao_comprovante,
+                    avaliacao_contratos,
+                    avaliacao_fora_municipio,
+                    conc_extrato_id,
+                    numero_termo
+                ))
+                result = cur.fetchone()
+                if result:
+                    ids_processados.append(result['id'])
+            else:
+                # INSERT
+                cur.execute("""
+                    INSERT INTO analises_pc.conc_analise (
+                        conc_extrato_id, avaliacao_guia, avaliacao_comprovante,
+                        avaliacao_contratos, avaliacao_fora_municipio, numero_termo
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    conc_extrato_id,
+                    avaliacao_guia,
+                    avaliacao_comprovante,
+                    avaliacao_contratos,
+                    avaliacao_fora_municipio,
+                    numero_termo
+                ))
+                novo_id = cur.fetchone()['id']
+                ids_processados.append(novo_id)
+        
+        db.commit()
+        
+        tempo_total = (time.time() - inicio) * 1000
+        print(f"\n[SAVE DOC] Tempo total: {tempo_total:.2f}ms | Documentos: {len(ids_processados)}")
+        
+        return jsonify({
+            'mensagem': f'{len(ids_processados)} documentos salvos',
+            'ids': ids_processados
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERRO] ao salvar documentos de análise: {e}")
+        if get_db():
+            get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+

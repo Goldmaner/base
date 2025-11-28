@@ -1,6 +1,8 @@
 """
 Servidor de PRODUÇÃO - Porta 5000
 Sem hot reload - precisa reiniciar manualmente para aplicar mudanças
+& C:/Users/d843702/AppData/Local/Programs/Python/Python312/python.exe "c:/Users/d843702/OneDrive - rede.sp/Área de Trabalho/FAF/FAF/run_prod.py"
+
 """
 import os
 os.environ['FLASK_ENV'] = 'production'
