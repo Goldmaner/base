@@ -3,9 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Dicionário de Despesas</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+<!-- VERSÃO ATUALIZADA 28/11/2025 - COM MELHORIAS UX -->
 <style>
 body { background-color: #f5f5f5; }
 .main-container { background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 2rem; margin: 2rem auto; max-width: 1400px; }
@@ -20,8 +24,34 @@ body { background-color: #f5f5f5; }
 .categoria-input.modified { border-color: #ffc107; background-color: #fff9e6; }
 .btn-salvar { opacity: 0; transition: all 0.2s; }
 tr:hover .btn-salvar { opacity: 1; }
-.table thead { background-color: #2c3e50; color: white; }
+.table thead { 
+    background-color: #2c3e50; 
+    color: white; 
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
 .table tbody tr:hover { background-color: #f8f9fa; }
+.table-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    overflow-x: auto;
+    position: relative;
+}
+.table-container::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+}
+.table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+.table-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 6px;
+}
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
 .checkbox-alteracao { width: 20px; height: 20px; cursor: pointer; }
 tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107; }
 .action-bar { position: sticky; bottom: 0; background: linear-gradient(to right, #667eea, #764ba2); padding: 1rem; border-radius: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: none; z-index: 1000; }
@@ -112,9 +142,10 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
         </li>
     </ul>
 </nav>
-<div class="table-responsive">
+<div class="table-container">
 <table class="table table-hover">
 <thead><tr>
+<th style="width:3%" class="text-center">Nº</th>
 <th style="width:3%" class="text-center">
     <input type="checkbox" id="selecionarTodos" class="checkbox-alteracao" title="Selecionar todas as alterações">
 </th>
@@ -127,6 +158,7 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 <tbody>
 {% for cat in categorias %}
 <tr data-original-categoria="{{ cat.categoria_despesa }}">
+<td class="text-center text-muted row-number"></td>
 <td class="text-center">
     <input type="checkbox" class="checkbox-alteracao checkbox-linha" disabled>
 </td>
@@ -647,7 +679,15 @@ btn.innerHTML = htmlOriginal;
 // Event listener para badges de termos
 document.addEventListener('DOMContentLoaded', function() {
     configurarEventosBadges();
+    numerarLinhas();
 });
+
+function numerarLinhas() {
+    const linhas = document.querySelectorAll('.row-number');
+    linhas.forEach((linha, index) => {
+        linha.textContent = index + 1;
+    });
+}
 
 function configurarEventosBadges() {
     document.querySelectorAll('.badge-termos').forEach(badge => {

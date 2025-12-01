@@ -255,9 +255,21 @@
 <body>
 
 <div class="container-fluid mt-4">
+    <!-- Indicador de Performance -->
+    <div id="perfIndicator" style="position: fixed; top: 10px; right: 10px; z-index: 2000; background: #2c3e50; color: white; padding: 10px 15px; border-radius: 5px; font-family: monospace; font-size: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: none;">
+        <div style="font-weight: bold; margin-bottom: 5px;">⚡ Performance Monitor</div>
+        <div id="perfStats"></div>
+        <div style="margin-top: 8px; font-size: 10px; opacity: 0.7;">
+            Console: perfSummary() | perfClear() | perfToggle()
+        </div>
+    </div>
+    
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="bi bi-bank me-2"></i>Conciliação Bancária</h2>
         <div>
+            <button class="btn btn-outline-secondary btn-sm me-2" onclick="togglePerfMonitor()" title="Toggle Performance Monitor">
+                <i class="bi bi-speedometer2"></i>
+            </button>
             <button class="btn btn-outline-primary me-2" id="btnMenuSecoes" onclick="toggleMenuSecoes()">
                 <i class="bi bi-list-check me-2"></i>Seções
             </button>
@@ -320,9 +332,12 @@
             <button class="btn btn-outline-danger me-2" onclick="limparTabela()">
                 <i class="bi bi-trash me-2"></i>Limpar
             </button>
-            <a href="/analises_pc" class="btn btn-outline-secondary">
+            <a href="/analises_pc" class="btn btn-outline-secondary me-2">
                 <i class="bi bi-arrow-left me-2"></i>Voltar
             </a>
+            <button class="btn btn-warning" id="btnAtualizarGuias" onclick="atualizarGuiasAutomaticamente()" style="display: none;" title="Atualizar Guias e preencher Competências automaticamente">
+                <i class="bi bi-magic me-2"></i>Auto-preencher Guias e Competências
+            </button>
         </div>
     </div>
 
@@ -347,12 +362,17 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label"><strong>Mostrar Linhas</strong></label>
-                <div class="btn-group w-100" role="group">
-                    <button type="button" class="btn btn-outline-primary" onclick="setLimite(100)">100</button>
-                    <button type="button" class="btn btn-outline-primary" onclick="setLimite(200)">200</button>
-                    <button type="button" class="btn btn-outline-primary" onclick="setLimite('todas')">Todas</button>
-                </div>
+                <label class="form-label"><strong>Visualização</strong></label>
+                <select class="form-select" id="selectModoVisualizacao" onchange="mudarModoVisualizacao()">
+                    <option value="paginas">Por Mês (Páginas)</option>
+                    <option value="todas">Todas as Linhas</option>
+                </select>
+            </div>
+            <div class="col-md-3" id="divNavegacaoMes" style="display: block;">
+                <label class="form-label"><strong>Selecionar Mês(es)</strong></label>
+                <select class="form-select" id="selectMesVisualizacao" onchange="mudarMesSelecionado()">
+                    <option value="">Selecione um mês...</option>
+                </select>
             </div>
             <div class="col-md-1">
                 <button class="btn btn-outline-info w-100" onclick="toggleFiltros()" id="btnToggleFiltros">
@@ -455,6 +475,15 @@
                 </select>
                 <small class="text-muted">Ctrl+Click para múltipla seleção</small>
             </div>
+            <div class="col-md-2">
+                <label for="filtroObservacoes" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Observações</strong></label>
+                <select class="form-select" id="filtroObservacoes" multiple size="4" onchange="aplicarFiltros()">
+                    <option value="">Todas</option>
+                    <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                    <option value="__PREENCHIDO__" style="color: #28a745; font-style: italic;">✅ Preenchido</option>
+                </select>
+                <small class="text-muted">Ctrl+Click para múltipla seleção</small>
+            </div>
             <div class="col-md-1 d-flex flex-column justify-content-end">
                 <button class="btn btn-secondary mb-2" onclick="limparFiltros()">
                     <i class="bi bi-x-circle me-1"></i>Limpar
@@ -546,6 +575,15 @@
 
 <!-- Datalist para Origem/Destino (auto-alimentado) -->
 <datalist id="datalistOrigemDestino">
+</datalist>
+
+<!-- Datalist para Observações -->
+<datalist id="datalistObservacoes">
+</datalist>
+
+<!-- Datalist para Competência -->
+<datalist id="datalistCompetencia">
+    <option value="Sem competência">Sem competência</option>
 </datalist>
 
 <!-- Datalist para Avaliações -->
@@ -666,20 +704,7 @@
             </div>
             <div class="modal-body">
                 <div class="row g-4">
-                    <div class="col-md-4">
-                        <label for="filtroDataExpandido" class="form-label fw-bold"><i class="bi bi-calendar3 me-1"></i>Data (Mês/Ano)</label>
-                        <select class="form-select" id="filtroDataExpandido" multiple size="12" onchange="sincronizarFiltro('filtroData', 'filtroDataExpandido')">
-                            <option value="">Todas as datas</option>
-                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="filtroCompetenciaExpandido" class="form-label fw-bold"><i class="bi bi-calendar-range me-1"></i>Competência</label>
-                        <select class="form-select" id="filtroCompetenciaExpandido" multiple size="12" onchange="sincronizarFiltro('filtroCompetencia', 'filtroCompetenciaExpandido')">
-                            <option value="">Todas as competências</option>
-                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
-                        </select>
-                    </div>
+                    <!-- Seção 1: Filtros principais (Categoria, Origem/Destino, Avaliação) -->
                     <div class="col-md-4">
                         <label for="filtroCategoriaExpandido" class="form-label fw-bold"><i class="bi bi-tags me-1"></i>Categoria</label>
                         <select class="form-select" id="filtroCategoriaExpandido" multiple size="12" onchange="sincronizarFiltro('filtroCategoria', 'filtroCategoriaExpandido')">
@@ -687,14 +712,14 @@
                             <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
                         </select>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label for="filtroOrigemDestinoExpandido" class="form-label fw-bold"><i class="bi bi-arrow-left-right me-1"></i>Origem/Destino</label>
                         <select class="form-select" id="filtroOrigemDestinoExpandido" multiple size="12" onchange="sincronizarFiltro('filtroOrigemDestino', 'filtroOrigemDestinoExpandido')">
                             <option value="">Todas as origens/destinos</option>
                             <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
                         </select>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label for="filtroAvaliacaoExpandido" class="form-label fw-bold"><i class="bi bi-clipboard-check me-1"></i>Avaliação</label>
                         <select class="form-select" id="filtroAvaliacaoExpandido" multiple size="12" onchange="sincronizarFiltro('filtroAvaliacao', 'filtroAvaliacaoExpandido')">
                             <option value="">Todas as avaliações</option>
@@ -704,6 +729,77 @@
                             <option value="Pessoa Gestora">Pessoa Gestora</option>
                             <option value="Glosar">Glosar</option>
                         </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filtroObservacoesExpandido" class="form-label fw-bold"><i class="bi bi-chat-left-text me-1"></i>Observações</label>
+                        <select class="form-select" id="filtroObservacoesExpandido" multiple size="12" onchange="sincronizarFiltro('filtroObservacoes', 'filtroObservacoesExpandido')">
+                            <option value="">Todas</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                            <option value="__PREENCHIDO__" style="color: #28a745; font-style: italic;">✅ Preenchido</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filtroGuiaExpandido" class="form-label fw-bold"><i class="bi bi-file-earmark-text me-1"></i>Guia</label>
+                        <select class="form-select" id="filtroGuiaExpandido" multiple size="12" onchange="sincronizarFiltro('filtroGuia', 'filtroGuiaExpandido')">
+                            <option value="">Todas</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                            <option value="Guia apresentada">Guia apresentada</option>
+                            <option value="Guia apresentada (cliente divergente)">Guia apresentada (cliente divergente)</option>
+                            <option value="Guia apresentada (destinatário não identificado)">Guia apresentada (destinatário não identificado)</option>
+                            <option value="Não apresentada">Não apresentada</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filtroComprovanteExpandido" class="form-label fw-bold"><i class="bi bi-receipt me-1"></i>Comprovante</label>
+                        <select class="form-select" id="filtroComprovanteExpandido" multiple size="12" onchange="sincronizarFiltro('filtroComprovante', 'filtroComprovanteExpandido')">
+                            <option value="">Todas</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                            <option value="Apresentado corretamente">Apresentado corretamente</option>
+                            <option value="Cartão de Crédito">Cartão de Crédito</option>
+                            <option value="Pago em Espécie">Pago em Espécie</option>
+                            <option value="Pago em Cheque">Pago em Cheque</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-4 mt-1">
+                    <div class="col-md-6">
+                        <label for="filtroContratosExpandido" class="form-label fw-bold"><i class="bi bi-file-earmark-ruled me-1"></i>Contratos</label>
+                        <select class="form-select" id="filtroContratosExpandido" multiple size="8" onchange="sincronizarFiltro('filtroContratos', 'filtroContratosExpandido')">
+                            <option value="">Todas</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                            <option value="Contratos apresentados">Contratos apresentados</option>
+                            <option value="Não apresentado">Não apresentado</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="filtroForaMunicipioExpandido" class="form-label fw-bold"><i class="bi bi-geo-alt me-1"></i>Fora Município</label>
+                        <select class="form-select" id="filtroForaMunicipioExpandido" multiple size="8" onchange="sincronizarFiltro('filtroForaMunicipio', 'filtroForaMunicipioExpandido')">
+                            <option value="">Todas</option>
+                            <option value="__NAO_PREENCHIDO__" style="color: #dc3545; font-style: italic;">❌ Não preenchido</option>
+                            <option value="São Paulo">São Paulo</option>
+                            <option value="Fora do município">Fora do município</option>
+                        </select>
+                    </div>
+                </div>
+                <hr>
+                <!-- Seção de Seleção de Meses (Checkboxes) -->
+                <div class="row g-4 mt-1">
+                    <div class="col-12">
+                        <label class="form-label fw-bold"><i class="bi bi-calendar3 me-1"></i>Filtrar por Mês(es) da Data</label>
+                        <div class="alert alert-info py-2" style="font-size: 0.875rem;">
+                            <i class="bi bi-info-circle me-1"></i>Selecione os meses que deseja visualizar. Você pode marcar múltiplos meses para ver dados de períodos diferentes simultaneamente.
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selecionarTodosMeses()">
+                                <i class="bi bi-check-all me-1"></i>Selecionar Todos
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">
+                                <i class="bi bi-x-circle me-1"></i>Desmarcar Todos
+                            </button>
+                        </div>
+                        <div id="checkboxesMeses" style="max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; background-color: #f8f9fa;">
+                            <!-- Checkboxes serão adicionados dinamicamente aqui -->
+                        </div>
                     </div>
                 </div>
                 <hr>
@@ -730,9 +826,130 @@
     let secaoNotasFiscaisAtiva = false;
     let secaoDocumentosAtiva = false;
     let limiteAtual = 100;
+    let modoVisualizacao = 'paginas'; // 'paginas' ou 'todas'
+    let mesesDisponiveis = []; // Lista de meses disponíveis (MM/AAAA)
+    let mesesSelecionados = []; // Meses selecionados via checkboxes
+    let mesAtualIndex = 0; // Índice do mês atual na lista (não usado mais com checkboxes)
     let proximoIndice = 1;
     let historicoAlteracoes = []; // Histórico para Undo (máximo 20 estados)
     const MAX_HISTORICO = 20;
+    
+    // ============================================================
+    // SISTEMA DE PROFILING DE PERFORMANCE
+    // ============================================================
+    const performanceMetrics = {
+        enabled: true, // Ativar/desativar profiling
+        logs: [],
+        
+        start(label) {
+            if (!this.enabled) return;
+            return {
+                label: label,
+                startTime: performance.now()
+            };
+        },
+        
+        end(timer) {
+            if (!this.enabled || !timer) return;
+            const duration = performance.now() - timer.startTime;
+            const log = {
+                label: timer.label,
+                duration: duration.toFixed(2),
+                timestamp: new Date().toISOString()
+            };
+            this.logs.push(log);
+            
+            // Log colorido no console
+            const color = duration > 1000 ? 'color: red; font-weight: bold' : 
+                         duration > 500 ? 'color: orange' : 
+                         duration > 100 ? 'color: blue' : 'color: green';
+            console.log(`%c[PERF] ${timer.label}: ${duration.toFixed(2)}ms`, color);
+            
+            return duration;
+        },
+        
+        summary() {
+            console.log('\n========== PERFORMANCE SUMMARY ==========');
+            const grouped = {};
+            this.logs.forEach(log => {
+                if (!grouped[log.label]) {
+                    grouped[log.label] = { count: 0, total: 0, min: Infinity, max: -Infinity };
+                }
+                const dur = parseFloat(log.duration);
+                grouped[log.label].count++;
+                grouped[log.label].total += dur;
+                grouped[log.label].min = Math.min(grouped[log.label].min, dur);
+                grouped[log.label].max = Math.max(grouped[log.label].max, dur);
+            });
+            
+            Object.entries(grouped).forEach(([label, stats]) => {
+                const avg = stats.total / stats.count;
+                console.log(`${label}:`);
+                console.log(`  Calls: ${stats.count} | Total: ${stats.total.toFixed(2)}ms | Avg: ${avg.toFixed(2)}ms | Min: ${stats.min.toFixed(2)}ms | Max: ${stats.max.toFixed(2)}ms`);
+            });
+            console.log('=========================================\n');
+        },
+        
+        clear() {
+            this.logs = [];
+            console.log('[PERF] Metrics cleared');
+        }
+    };
+    
+    // Comando global para análise
+    window.perfSummary = () => performanceMetrics.summary();
+    window.perfClear = () => performanceMetrics.clear();
+    window.perfToggle = () => {
+        performanceMetrics.enabled = !performanceMetrics.enabled;
+        console.log(`[PERF] Profiling ${performanceMetrics.enabled ? 'ENABLED' : 'DISABLED'}`);
+    };
+    
+    // Função para toggle do monitor visual
+    function togglePerfMonitor() {
+        const monitor = document.getElementById('perfIndicator');
+        if (monitor.style.display === 'none') {
+            monitor.style.display = 'block';
+            updatePerfMonitor();
+        } else {
+            monitor.style.display = 'none';
+        }
+    }
+    
+    // Atualizar estatísticas no monitor visual
+    function updatePerfMonitor() {
+        const stats = document.getElementById('perfStats');
+        if (!stats || !performanceMetrics.enabled) return;
+        
+        const grouped = {};
+        performanceMetrics.logs.slice(-10).forEach(log => {
+            if (!grouped[log.label]) {
+                grouped[log.label] = { count: 0, total: 0, last: 0 };
+            }
+            const dur = parseFloat(log.duration);
+            grouped[log.label].count++;
+            grouped[log.label].total += dur;
+            grouped[log.label].last = dur;
+        });
+        
+        let html = '';
+        Object.entries(grouped).forEach(([label, data]) => {
+            const color = data.last > 1000 ? '#e74c3c' : data.last > 500 ? '#f39c12' : data.last > 100 ? '#3498db' : '#2ecc71';
+            html += `<div style="margin: 3px 0; font-size: 11px;">
+                <span style="color: ${color};">●</span> ${label.replace('renderizarTabela - ', '').replace('carregarExtrato - ', '')}: 
+                <strong style="color: ${color};">${data.last.toFixed(0)}ms</strong>
+            </div>`;
+        });
+        
+        stats.innerHTML = html || '<div style="opacity: 0.5;">Aguardando métricas...</div>';
+    }
+    
+    // Atualizar monitor a cada segundo quando visível
+    setInterval(() => {
+        const monitor = document.getElementById('perfIndicator');
+        if (monitor && monitor.style.display !== 'none') {
+            updatePerfMonitor();
+        }
+    }, 1000);
     
     // Textos informativos
     const infos = {
@@ -761,6 +978,7 @@
     let periodoTermo = { inicio: null, final: null }; // Período do projeto
     let bancoAtual = ''; // Banco do extrato
     let origensDestinosUnicos = new Set(); // Lista dinâmica de origens/destinos já utilizados
+    let observacoesUnicas = new Set(); // Lista dinâmica de observações já utilizadas
     
     // Regras de avaliação automática (editável)
     const regrasAvaliacao = {
@@ -889,6 +1107,12 @@
             col.style.display = secaoDocumentosAtiva ? '' : 'none';
         });
         
+        // Mostrar/ocultar botão de atualizar guias
+        const btnAtualizarGuias = document.getElementById('btnAtualizarGuias');
+        if (btnAtualizarGuias) {
+            btnAtualizarGuias.style.display = secaoDocumentosAtiva ? 'block' : 'none';
+        }
+        
         // Carregar dados apenas ao ativar a seção
         if (secaoDocumentosAtiva) {
             await carregarDocumentosAnalise();
@@ -909,6 +1133,16 @@
 
     // Carregar termos ao iniciar
     document.addEventListener('DOMContentLoaded', function() {
+        // Mostrar instruções de performance no console
+        console.log('%c🚀 SISTEMA DE PROFILING DE PERFORMANCE ATIVADO', 'color: #2ecc71; font-size: 14px; font-weight: bold;');
+        console.log('%cComandos disponíveis no console:', 'color: #3498db; font-weight: bold;');
+        console.log('%c  perfSummary()  %c- Mostrar resumo de todas as métricas coletadas', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
+        console.log('%c  perfClear()    %c- Limpar histórico de métricas', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
+        console.log('%c  perfToggle()   %c- Ativar/desativar coleta de métricas', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
+        console.log('%cMonitor visual:', 'color: #3498db; font-weight: bold;');
+        console.log('%c  Clique no botão ⚡ no canto superior direito', 'color: #95a5a6;');
+        console.log('');
+        
         carregarTermos();
     });
 
@@ -947,6 +1181,8 @@
     }
 
     async function carregarExtrato() {
+        const timerTotal = performanceMetrics.start('carregarExtrato - TOTAL');
+        
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
             linhas = [];
@@ -958,7 +1194,11 @@
         try {
             document.getElementById('loadingIndicator').style.display = 'block';
             
+            // Se estiver no modo páginas, carregar todas as linhas para ter todos os meses
+            const limiteParaCarregar = modoVisualizacao === 'paginas' ? 'todas' : limiteAtual;
+            
             // Carregar categorias e período do termo em paralelo
+            const timerParallel = performanceMetrics.start('carregarExtrato - Carregar metadados paralelos');
             await Promise.all([
                 carregarCategoriasDespesas(numeroTermo),
                 carregarCategoriasAnalise(),
@@ -966,21 +1206,29 @@
                 carregarCategoriasAplicabilidade(),
                 carregarCategoriasRubricas(numeroTermo)
             ]);
+            performanceMetrics.end(timerParallel);
             
             // Carregar banco do termo
+            const timerBanco = performanceMetrics.start('carregarExtrato - Carregar banco');
             await carregarBancoTermo(numeroTermo);
+            performanceMetrics.end(timerBanco);
             
             const params = new URLSearchParams({
                 numero_termo: numeroTermo,
-                limite: limiteAtual
+                limite: limiteParaCarregar
             });
             
+            const timerFetch = performanceMetrics.start('carregarExtrato - Fetch API extrato');
             const response = await fetch('/conc_bancaria/api/extrato?' + params.toString());
             if (!response.ok) throw new Error('Erro ao carregar extrato');
+            performanceMetrics.end(timerFetch);
             
+            const timerJSON = performanceMetrics.start('carregarExtrato - Parse JSON');
             const dados = await response.json();
+            performanceMetrics.end(timerJSON);
             
             // Verificar se há autosave no cache para este termo
+            const timerCache = performanceMetrics.start('carregarExtrato - Verificar cache');
             const cacheKey = `autosave_conc_${numeroTermo}`;
             const autosaveData = localStorage.getItem(cacheKey);
             let usarAutosave = false;
@@ -1026,14 +1274,36 @@
                     adicionarLinhas(20);
                 }
             }
+            performanceMetrics.end(timerCache);
             
+            // Extrair meses disponíveis e inicializar navegação
+            const timerMeses = performanceMetrics.start('carregarExtrato - Extrair meses');
+            extrairMesesDisponiveis();
+            popularSelectMeses();
+            popularCheckboxesMeses();
+            performanceMetrics.end(timerMeses);
+            
+            // Selecionar primeiro mês por padrão no modo páginas
+            if (modoVisualizacao === 'paginas' && mesesDisponiveis.length > 0) {
+                mesesSelecionados = [mesesDisponiveis[0]];
+                document.getElementById('selectMesVisualizacao').value = mesesDisponiveis[0];
+                atualizarCheckboxesMeses();
+            }
+            
+            const timerRender = performanceMetrics.start('carregarExtrato - Renderizar tabela');
             renderizarTabela();
+            performanceMetrics.end(timerRender);
+            
             document.getElementById('btnSalvar').style.display = 'block';
             
             // Se seção de Notas Fiscais está ativa, carregar os dados
             if (secaoNotasFiscaisAtiva) {
+                const timerNF = performanceMetrics.start('carregarExtrato - Carregar notas fiscais');
                 await carregarNotasFiscais();
+                performanceMetrics.end(timerNF);
             }
+            
+            performanceMetrics.end(timerTotal);
             
         } catch (error) {
             console.error('Erro ao carregar extrato:', error);
@@ -1046,6 +1316,171 @@
     function setLimite(limite) {
         limiteAtual = limite;
         carregarExtrato();
+    }
+    
+    async function mudarModoVisualizacao() {
+        const select = document.getElementById('selectModoVisualizacao');
+        modoVisualizacao = select.value;
+        
+        const divNavegacao = document.getElementById('divNavegacaoMes');
+        
+        if (modoVisualizacao === 'paginas') {
+            // No modo páginas, carregar TODAS as linhas para ter todos os meses disponíveis
+            if (limiteAtual !== 'todas') {
+                const confirmar = confirm('Para usar a paginação por mês, é necessário carregar todas as linhas.\n\nDeseja continuar?');
+                if (!confirmar) {
+                    select.value = 'todas';
+                    modoVisualizacao = 'todas';
+                    divNavegacao.style.display = 'none';
+                    return;
+                }
+                limiteAtual = 'todas';
+                await carregarExtrato();
+            }
+            
+            divNavegacao.style.display = 'block';
+            // Extrair meses únicos das linhas
+            extrairMesesDisponiveis();
+            popularSelectMeses();
+            popularCheckboxesMeses();
+            // Selecionar primeiro mês por padrão
+            if (mesesDisponiveis.length > 0) {
+                mesesSelecionados = [mesesDisponiveis[0]];
+                document.getElementById('selectMesVisualizacao').value = mesesDisponiveis[0];
+                atualizarCheckboxesMeses();
+            }
+            renderizarTabela();
+        } else {
+            divNavegacao.style.display = 'none';
+            mesesSelecionados = [];
+            renderizarTabela();
+        }
+    }
+    
+    function extrairMesesDisponiveis() {
+        const mesesSet = new Set();
+        
+        // Extrair de TODAS as linhas carregadas, não só as exibidas
+        linhas.forEach(linha => {
+            if (linha.data) {
+                const partes = linha.data.split('-');
+                if (partes.length === 3) {
+                    const mesAno = `${partes[1]}/${partes[0]}`;
+                    mesesSet.add(mesAno);
+                }
+            }
+        });
+        
+        // Ordenar meses cronologicamente
+        mesesDisponiveis = Array.from(mesesSet).sort((a, b) => {
+            const [mesA, anoA] = a.split('/');
+            const [mesB, anoB] = b.split('/');
+            const dataA = new Date(anoA, mesA - 1);
+            const dataB = new Date(anoB, mesB - 1);
+            return dataA - dataB;
+        });
+        
+        console.log(`Meses disponíveis extraídos: ${mesesDisponiveis.length}`, mesesDisponiveis);
+    }
+    
+    function popularSelectMeses() {
+        const select = document.getElementById('selectMesVisualizacao');
+        select.innerHTML = '<option value="">Selecione um mês...</option>';
+        
+        mesesDisponiveis.forEach(mes => {
+            const option = document.createElement('option');
+            option.value = mes;
+            option.textContent = mes;
+            select.appendChild(option);
+        });
+    }
+    
+    function mudarMesSelecionado() {
+        const select = document.getElementById('selectMesVisualizacao');
+        const mesSelecionado = select.value;
+        
+        if (mesSelecionado) {
+            mesesSelecionados = [mesSelecionado];
+            // Atualizar checkboxes
+            atualizarCheckboxesMeses();
+            renderizarTabela();
+        }
+    }
+    
+    function popularCheckboxesMeses() {
+        const container = document.getElementById('checkboxesMeses');
+        container.innerHTML = '';
+        
+        if (mesesDisponiveis.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center mb-0">Nenhum mês disponível</p>';
+            return;
+        }
+        
+        mesesDisponiveis.forEach(mes => {
+            const div = document.createElement('div');
+            div.className = 'form-check';
+            
+            const checkbox = document.createElement('input');
+            checkbox.className = 'form-check-input';
+            checkbox.type = 'checkbox';
+            checkbox.value = mes;
+            checkbox.id = `checkMes_${mes.replace('/', '_')}`;
+            checkbox.onchange = () => toggleMesSelecionado(mes);
+            
+            const label = document.createElement('label');
+            label.className = 'form-check-label';
+            label.htmlFor = checkbox.id;
+            label.textContent = mes;
+            
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            container.appendChild(div);
+        });
+    }
+    
+    function toggleMesSelecionado(mes) {
+        const index = mesesSelecionados.indexOf(mes);
+        if (index > -1) {
+            mesesSelecionados.splice(index, 1);
+        } else {
+            mesesSelecionados.push(mes);
+        }
+        
+        // Atualizar select para mostrar primeiro mês selecionado ou vazio
+        const select = document.getElementById('selectMesVisualizacao');
+        if (mesesSelecionados.length > 0) {
+            select.value = mesesSelecionados[0];
+        } else {
+            select.value = '';
+        }
+        
+        renderizarTabela();
+    }
+    
+    function atualizarCheckboxesMeses() {
+        mesesDisponiveis.forEach(mes => {
+            const checkbox = document.getElementById(`checkMes_${mes.replace('/', '_')}`);
+            if (checkbox) {
+                checkbox.checked = mesesSelecionados.includes(mes);
+            }
+        });
+    }
+    
+    function selecionarTodosMeses() {
+        mesesSelecionados = [...mesesDisponiveis];
+        atualizarCheckboxesMeses();
+        const select = document.getElementById('selectMesVisualizacao');
+        if (mesesSelecionados.length > 0) {
+            select.value = mesesSelecionados[0];
+        }
+        renderizarTabela();
+    }
+    
+    function desmarcarTodosMeses() {
+        mesesSelecionados = [];
+        atualizarCheckboxesMeses();
+        document.getElementById('selectMesVisualizacao').value = '';
+        renderizarTabela();
     }
     
     async function carregarCategoriasDespesas(numeroTermo) {
@@ -1293,6 +1728,8 @@
     
     function formatarCompetenciaParaExibicao(dataStr) {
         if (!dataStr) return '';
+        // Verificar se é a data especial "Sem competência"
+        if (dataStr === '2000-01-01') return 'Sem competência';
         // Parse manual para evitar problemas com timezone: "2025-05-01" -> [2025, 05, 01]
         const partes = dataStr.split('-');
         const ano = partes[0];
@@ -1349,14 +1786,38 @@
     }
 
     function atualizarCompetencia(index, valorInput) {
+        // Verificar se é "Sem competência"
+        if (valorInput && valorInput.trim().toLowerCase() === 'sem competência') {
+            linhas[index].competencia = '2000-01-01';
+            linhas[index].competencia_valida = true;
+            linhas[index].competencia_erro = null;
+            delete linhas[index]._competencia_deletada; // Não é deleção, é valor especial
+            
+            // Atualização otimizada: só atualizar a célula, não toda a tabela
+            const row = document.querySelector(`tr[data-index="${index}"]`);
+            if (row) {
+                const competenciaCell = row.cells[6]; // Coluna 7 Competência (index 6)
+                const input = competenciaCell.querySelector('input');
+                if (input) {
+                    input.value = 'Sem competência';
+                    input.classList.remove('is-invalid');
+                    const feedback = competenciaCell.querySelector('.invalid-feedback');
+                    if (feedback) feedback.remove();
+                }
+            }
+            
+            agendarAutosave();
+            return;
+        }
+        
         // Parse do input do usuário
         const competenciaParsed = parseCompetencia(valorInput);
         
         if (!competenciaParsed) {
             linhas[index].competencia = null;
             linhas[index].competencia_valida = false;
-            linhas[index].competencia_erro = 'Formato inválido. Use MM/AAAA';
-            renderizarTabela();
+            linhas[index].competencia_erro = 'Formato inválido. Use MM/AAAA ou "Sem competência"';
+            renderizarTabela(); // Só renderiza quando há erro para mostrar mensagem
             return;
         }
         
@@ -1367,7 +1828,22 @@
         linhas[index].competencia_valida = validacao.valido;
         linhas[index].competencia_erro = validacao.valido ? null : validacao.mensagem;
         
-        renderizarTabela();
+        if (!validacao.valido) {
+            renderizarTabela(); // Só renderiza quando há erro para mostrar mensagem
+        } else {
+            // Atualização otimizada para competências válidas
+            const row = document.querySelector(`tr[data-index="${index}"]`);
+            if (row) {
+                const competenciaCell = row.cells[6]; // Coluna 7 Competência (index 6)
+                const input = competenciaCell.querySelector('input');
+                if (input) {
+                    input.classList.remove('is-invalid');
+                    const feedback = competenciaCell.querySelector('.invalid-feedback');
+                    if (feedback) feedback.remove();
+                }
+            }
+            agendarAutosave();
+        }
     }
 
     function formatarExibicaoCompetencia(index, input) {
@@ -1584,7 +2060,11 @@
     }
 
     function renderizarTabela() {
+        const timerTotal = performanceMetrics.start('renderizarTabela - TOTAL');
+        
         const tbody = document.getElementById('tbodyConciliacao');
+        
+        const timerFiltro = performanceMetrics.start('renderizarTabela - Filtrar linhas');
         
         // OTIMIZAÇÃO 1: Usar DocumentFragment para construir DOM antes de inserir
         // Reduz reflows de N para 1 (melhoria de 50-70% em tabelas grandes)
@@ -1597,7 +2077,24 @@
             gruposComposicaoCache.set(idx, identificarGrupoComposicao(idx));
         });
 
-        linhas.forEach((linha, index) => {
+        // Filtrar linhas por mês se estiver no modo páginas
+        let linhasFiltradas = linhas;
+        if (modoVisualizacao === 'paginas' && mesesSelecionados.length > 0) {
+            linhasFiltradas = linhas.filter(linha => {
+                if (!linha.data) return false;
+                const partes = linha.data.split('-');
+                if (partes.length === 3) {
+                    const mesAno = `${partes[1]}/${partes[0]}`;
+                    return mesesSelecionados.includes(mesAno);
+                }
+                return false;
+            });
+        }
+
+        linhasFiltradas.forEach((linha, filteredIndex) => {
+            // Encontrar índice real da linha no array original
+            const index = linhas.indexOf(linha);
+            
             const tr = document.createElement('tr');
             tr.dataset.index = index;
             
@@ -1764,7 +2261,8 @@
                            onchange="atualizarCompetencia(${index}, this.value)"
                            onblur="formatarExibicaoCompetencia(${index}, this)"
                            onkeydown="navegarCelula(event, ${index}, 5)"
-                           placeholder="MM/AAAA"
+                           list="datalistCompetencia"
+                           placeholder="MM/AAAA ou Sem competência"
                            autocomplete="off">
                     ${linha.competencia_erro ? `<div class="invalid-feedback d-block">${linha.competencia_erro}</div>` : ''}
                 </td>
@@ -1795,6 +2293,7 @@
                            value="${linha.avaliacao_analista || ''}" 
                            onchange="atualizarCampo(${index}, 'avaliacao_analista', this.value)"
                            onkeydown="navegarCelula(event, ${index}, 8)"
+                           list="datalistObservacoes"
                            placeholder="Observações..."
                            autocomplete="off">
                 </td>
@@ -1918,6 +2417,7 @@
                             <option value="" ${!valorGuia || valorGuia === '' ? 'selected' : ''}>Selecione...</option>
                             <option value="Guia apresentada" ${valorGuia === 'Guia apresentada' ? 'selected' : ''}>Guia apresentada</option>
                             <option value="Guia apresentada (cliente divergente)" ${valorGuia === 'Guia apresentada (cliente divergente)' ? 'selected' : ''}>Guia apresentada (cliente divergente)</option>
+                            <option value="Guia apresentada (destinatário não identificado)" ${valorGuia === 'Guia apresentada (destinatário não identificado)' ? 'selected' : ''}>Guia apresentada (destinatário não identificado)</option>
                             <option value="Não apresentada" ${valorGuia === 'Não apresentada' ? 'selected' : ''}>Não apresentada</option>
                         </select>
                     </td>
@@ -1964,13 +2464,29 @@
             fragment.appendChild(tr);
         });
         
+        performanceMetrics.end(timerFiltro);
+        
         // OTIMIZAÇÃO: Limpar tbody e adicionar fragment de uma vez (1 único reflow)
+        const timerDOM = performanceMetrics.start('renderizarTabela - Atualizar DOM');
         tbody.innerHTML = '';
         tbody.appendChild(fragment);
+        performanceMetrics.end(timerDOM);
         
         // Atualizar filtros e datalist após renderizar
+        const timerFiltros = performanceMetrics.start('renderizarTabela - Popular filtros');
         popularFiltros();
         atualizarDatalistOrigemDestino();
+        atualizarDatalistObservacoes();
+        performanceMetrics.end(timerFiltros);
+        
+        // Reaplicar filtros para manter seleções ativas
+        const timerReaplicar = performanceMetrics.start('renderizarTabela - Reaplicar filtros');
+        aplicarFiltros();
+        performanceMetrics.end(timerReaplicar);
+        
+        performanceMetrics.end(timerTotal);
+        
+        console.log(`%c[RENDER] ${linhasFiltradas.length} linhas renderizadas`, 'color: purple; font-weight: bold');
     }
     
     // Adicionar listener para colar do Excel
@@ -2195,12 +2711,14 @@
     function atualizarCampo(index, campo, valor) {
         linhas[index][campo] = valor;
         
-        // Auto-preencher competência quando mudar a data
-        if (campo === 'data' && valor) {
-            const competenciaAuto = calcularCompetenciaAutomatica(valor);
-            if (competenciaAuto && !linhas[index].competencia) {
-                linhas[index].competencia = competenciaAuto;
-                renderizarTabela();
+        // Rastrear deleção manual de competência
+        if (campo === 'competencia') {
+            if (!valor || valor.trim() === '') {
+                // Usuário deletou a competência - marcar para não auto-preencher
+                linhas[index]._competencia_deletada = true;
+            } else {
+                // Usuário preencheu - remover flag
+                delete linhas[index]._competencia_deletada;
             }
         }
         
@@ -2943,6 +3461,8 @@
     }
 
     function popularFiltros() {
+        const timerPopular = performanceMetrics.start('popularFiltros - TOTAL');
+        
         // Popular filtro de datas (por mês/ano)
         const selectData = document.getElementById('filtroData');
         const datasUnicas = new Set();
@@ -3020,14 +3540,19 @@
             option.textContent = origem;
             selectOrigemDestino.appendChild(option);
         });
+        
+        performanceMetrics.end(timerPopular);
     }
     
     function aplicarFiltros() {
+        const timerAplicar = performanceMetrics.start('aplicarFiltros - TOTAL');
+        
         const selectData = document.getElementById('filtroData');
         const selectCompetencia = document.getElementById('filtroCompetencia');
         const selectCategoria = document.getElementById('filtroCategoria');
         const selectOrigemDestino = document.getElementById('filtroOrigemDestino');
         const selectAvaliacao = document.getElementById('filtroAvaliacao');
+        const selectObservacoes = document.getElementById('filtroObservacoes');
         
         const datasSelecionadas = Array.from(selectData.selectedOptions)
             .map(opt => opt.value)
@@ -3048,6 +3573,10 @@
         const avaliacoesSelecionadas = Array.from(selectAvaliacao.selectedOptions)
             .map(opt => opt.value)
             .filter(val => val !== '');
+        
+        const observacoesSelecionadas = selectObservacoes ? Array.from(selectObservacoes.selectedOptions)
+            .map(opt => opt.value)
+            .filter(val => val !== '') : [];
         
         const tbody = document.getElementById('tbodyConciliacao');
         const rows = tbody.getElementsByTagName('tr');
@@ -3127,11 +3656,31 @@
                 }
             }
             
+            // Filtrar por observações
+            if (observacoesSelecionadas.length > 0) {
+                const temObservacao = linha.avaliacao_analista && linha.avaliacao_analista.trim() !== '';
+                const naoPreenchido = observacoesSelecionadas.includes('__NAO_PREENCHIDO__');
+                const preenchido = observacoesSelecionadas.includes('__PREENCHIDO__');
+                
+                if (naoPreenchido && !preenchido) {
+                    mostrar = mostrar && !temObservacao;
+                } else if (preenchido && !naoPreenchido) {
+                    mostrar = mostrar && temObservacao;
+                } else if (naoPreenchido && preenchido) {
+                    // Se ambos selecionados, mostra tudo
+                    mostrar = mostrar && true;
+                }
+            }
+            
             row.style.display = mostrar ? '' : 'none';
         });
+        
+        performanceMetrics.end(timerAplicar);
     }
     
     function atualizarDatalistOrigemDestino() {
+        const timerDatalist = performanceMetrics.start('atualizarDatalistOrigemDestino');
+        
         // Atualizar lista de origens/destinos únicos
         linhas.forEach(linha => {
             if (linha.origem_destino) {
@@ -3148,6 +3697,31 @@
             option.value = origem;
             datalist.appendChild(option);
         });
+        
+        performanceMetrics.end(timerDatalist);
+    }
+
+    function atualizarDatalistObservacoes() {
+        const timerDatalist = performanceMetrics.start('atualizarDatalistObservacoes');
+        
+        // Atualizar lista de observações únicas
+        linhas.forEach(linha => {
+            if (linha.avaliacao_analista && linha.avaliacao_analista.trim() !== '') {
+                observacoesUnicas.add(linha.avaliacao_analista.trim());
+            }
+        });
+        
+        // Atualizar datalist
+        const datalist = document.getElementById('datalistObservacoes');
+        datalist.innerHTML = '';
+        
+        [...observacoesUnicas].sort().forEach(obs => {
+            const option = document.createElement('option');
+            option.value = obs;
+            datalist.appendChild(option);
+        });
+        
+        performanceMetrics.end(timerDatalist);
     }
     
     function excluirLinhasPorIntervalo() {
@@ -3555,8 +4129,9 @@
             return linha.data || linha.credito || linha.debito || linha.discriminacao;
         }).map(linha => {
             // Auto-preencher competência se estiver vazia mas tiver data
+            // EXCETO se o usuário deletou manualmente
             let competencia = linha.competencia;
-            if (!competencia && linha.data) {
+            if (!competencia && linha.data && !linha._competencia_deletada) {
                 competencia = calcularCompetenciaAutomatica(linha.data);
             }
             
@@ -3737,8 +4312,15 @@
             // Limpar cache após salvar com sucesso
             limparCache();
             
+            // Salvar estado atual do limite antes de recarregar
+            const limiteAntesDeSalvar = limiteAtual;
+            
             // Recarregar dados
             await carregarExtrato();
+            
+            // Restaurar limite após recarregar
+            limiteAtual = limiteAntesDeSalvar;
+            
             if (secaoNotasFiscaisAtiva) {
                 await carregarNotasFiscais();
             }
@@ -3761,6 +4343,205 @@
         if (tbody && tbody.lastElementChild) {
             tbody.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
+    }
+    
+    // FUNÇÃO TEMPORÁRIA: Atualizar guias automaticamente
+    async function atualizarGuiasAutomaticamente() {
+        // PASSO 1: Simular as alterações sem aplicá-las
+        let contadorGuias = 0;
+        let contadorCompetencias = 0;
+        let contadorGlosar = 0;
+        let linhasParaAlterar = []; // Lista para preview
+        
+        // Percorrer todas as linhas para gerar preview
+        linhas.forEach((linha, index) => {
+            let linhaAlterada = false;
+            let alteracoes = [];
+            
+            // === VERIFICAÇÃO DE GUIAS ===
+            const temOrigemDestino = linha.origem_destino && linha.origem_destino.trim() !== '';
+            
+            if (temOrigemDestino && linha.id) {
+                const temCategoria = linha.cat_transacao && linha.cat_transacao.trim() !== '';
+                
+                if (temCategoria) {
+                    const categoriaNaoAplicavel = categoriasAplicabilidade[linha.cat_transacao] === true;
+                    
+                    if (!categoriaNaoAplicavel) {
+                        const doc = documentosAnalise[linha.id];
+                        
+                        if (doc && doc.avaliacao_guia === 'Não apresentada') {
+                            contadorGuias++;
+                            linhaAlterada = true;
+                            alteracoes.push('Guia → "Guia apresentada"');
+                        }
+                    }
+                }
+            }
+            
+            // === VERIFICAÇÃO DE COMPETÊNCIAS ===
+            if (!linha.competencia && linha.data && !linha._competencia_deletada) {
+                const competenciaAuto = calcularCompetenciaAutomatica(linha.data);
+                if (competenciaAuto) {
+                    contadorCompetencias++;
+                    linhaAlterada = true;
+                    alteracoes.push(`Competência → ${competenciaAuto}`);
+                }
+            }
+            
+            // === VERIFICAÇÃO DE GLOSAR ===
+            const categoriaDebito = linha.cat_transacao === 'Débitos Indevidos' || linha.cat_transacao === 'Débitos não identificados';
+            if (categoriaDebito) {
+                const doc = documentosAnalise[linha.id];
+                
+                if (doc && (!doc.avaliacao_analista || doc.avaliacao_analista.trim() === '' || doc.avaliacao_analista === 'Avaliado')) {
+                    contadorGlosar++;
+                    linhaAlterada = true;
+                    alteracoes.push('Avaliação → "Glosar"');
+                }
+            }
+            
+            // Adicionar à lista se houve alguma alteração
+            if (linhaAlterada) {
+                linhasParaAlterar.push({
+                    indice: linha.indice,
+                    data: linha.data ? formatarDataParaExibicao(linha.data) : '',
+                    origem_destino: linha.origem_destino || '',
+                    categoria: linha.cat_transacao || '',
+                    alteracoes: alteracoes.join(' | ')
+                });
+            }
+        });
+        
+        // PASSO 2: Mostrar preview e solicitar confirmação
+        if (contadorGuias === 0 && contadorCompetencias === 0 && contadorGlosar === 0) {
+            alert('❌ Nenhuma alteração será realizada.\n\nMotivos possíveis:\n• Guias já estão corretas\n• Competências já preenchidas ou foram deletadas manualmente\n• Avaliações já preenchidas\n• Linhas não atendem aos critérios');
+            return;
+        }
+        
+        // Construir mensagem de preview
+        let mensagemPreview = '📋 PREVIEW DAS ALTERAÇÕES A SEREM REALIZADAS\n';
+        mensagemPreview += '═'.repeat(60) + '\n\n';
+        mensagemPreview += '📊 RESUMO:\n';
+        
+        if (contadorGuias > 0) {
+            mensagemPreview += `   🎫 ${contadorGuias} guia(s) serão atualizadas para "Guia apresentada"\n`;
+        }
+        if (contadorCompetencias > 0) {
+            mensagemPreview += `   📅 ${contadorCompetencias} competência(s) serão preenchidas\n`;
+        }
+        if (contadorGlosar > 0) {
+            mensagemPreview += `   ❌ ${contadorGlosar} avaliação(ões) serão marcadas como "Glosar"\n`;
+        }
+        
+        mensagemPreview += '\n📝 DETALHES DAS ALTERAÇÕES:\n';
+        mensagemPreview += '═'.repeat(60) + '\n\n';
+        
+        linhasParaAlterar.forEach((linha, idx) => {
+            if (idx < 15) { // Limitar a 15 linhas no preview
+                mensagemPreview += `${idx + 1}. Índice ${linha.indice}`;
+                if (linha.data) mensagemPreview += ` | ${linha.data}`;
+                mensagemPreview += '\n';
+                
+                if (linha.origem_destino) {
+                    mensagemPreview += `   Origem/Destino: ${linha.origem_destino}\n`;
+                }
+                if (linha.categoria) {
+                    mensagemPreview += `   Categoria: ${linha.categoria}\n`;
+                }
+                mensagemPreview += `   ✏️ ${linha.alteracoes}\n\n`;
+            }
+        });
+        
+        if (linhasParaAlterar.length > 15) {
+            mensagemPreview += `... e mais ${linhasParaAlterar.length - 15} linha(s).\n\n`;
+        }
+        
+        mensagemPreview += '═'.repeat(60) + '\n';
+        mensagemPreview += '⚠️ As alterações NÃO foram aplicadas ainda.\n';
+        mensagemPreview += 'Deseja APLICAR estas alterações?\n\n';
+        mensagemPreview += 'Clique OK para CONFIRMAR ou CANCELAR para abortar.';
+        
+        // Solicitar confirmação
+        if (!confirm(mensagemPreview)) {
+            alert('❌ Operação cancelada. Nenhuma alteração foi realizada.');
+            return;
+        }
+        
+        // PASSO 3: Aplicar as alterações
+        let contadorGuiasAplicadas = 0;
+        let contadorCompetenciasAplicadas = 0;
+        let contadorGlosarAplicadas = 0;
+        
+        linhas.forEach((linha, index) => {
+            // === ATUALIZAÇÃO DE GUIAS ===
+            const temOrigemDestino = linha.origem_destino && linha.origem_destino.trim() !== '';
+            
+            if (temOrigemDestino && linha.id) {
+                const temCategoria = linha.cat_transacao && linha.cat_transacao.trim() !== '';
+                
+                if (temCategoria) {
+                    const categoriaNaoAplicavel = categoriasAplicabilidade[linha.cat_transacao] === true;
+                    
+                    if (!categoriaNaoAplicavel) {
+                        const doc = documentosAnalise[linha.id];
+                        
+                        if (doc && doc.avaliacao_guia === 'Não apresentada') {
+                            doc.avaliacao_guia = 'Guia apresentada';
+                            contadorGuiasAplicadas++;
+                        }
+                    }
+                }
+            }
+            
+            // === ATUALIZAÇÃO DE COMPETÊNCIAS ===
+            if (!linha.competencia && linha.data && !linha._competencia_deletada) {
+                const competenciaAuto = calcularCompetenciaAutomatica(linha.data);
+                if (competenciaAuto) {
+                    linha.competencia = competenciaAuto;
+                    contadorCompetenciasAplicadas++;
+                }
+            }
+            
+            // === ATUALIZAÇÃO DE GLOSAR ===
+            const categoriaDebito = linha.cat_transacao === 'Débitos Indevidos' || linha.cat_transacao === 'Débitos não identificados';
+            if (categoriaDebito) {
+                const doc = documentosAnalise[linha.id];
+                
+                if (doc && (!doc.avaliacao_analista || doc.avaliacao_analista.trim() === '' || doc.avaliacao_analista === 'Avaliado')) {
+                    doc.avaliacao_analista = 'Glosar';
+                    contadorGlosarAplicadas++;
+                }
+            }
+        });
+        
+        if (contadorGuiasAplicadas === 0 && contadorCompetenciasAplicadas === 0 && contadorGlosarAplicadas === 0) {
+            alert('❌ Nenhuma alteração foi aplicada (possível erro interno).');
+            return;
+        }
+        
+        // Re-renderizar tabela
+        renderizarTabela();
+        
+        // Construir mensagem de conclusão
+        let mensagemFinal = '✅ ALTERAÇÕES APLICADAS COM SUCESSO!\n';
+        mensagemFinal += '═'.repeat(60) + '\n\n';
+        
+        if (contadorGuiasAplicadas > 0) {
+            mensagemFinal += `🎫 ${contadorGuiasAplicadas} guia(s) atualizada(s)\n`;
+        }
+        if (contadorCompetenciasAplicadas > 0) {
+            mensagemFinal += `📅 ${contadorCompetenciasAplicadas} competência(s) preenchida(s)\n`;
+        }
+        if (contadorGlosarAplicadas > 0) {
+            mensagemFinal += `❌ ${contadorGlosarAplicadas} avaliação(ões) marcadas como "Glosar"\n`;
+        }
+        
+        mensagemFinal += '\n═'.repeat(60) + '\n';
+        mensagemFinal += '⚠️ ATENÇÃO: As alterações NÃO foram salvas ainda!\n';
+        mensagemFinal += 'Revise a tabela e clique em SALVAR para confirmar.';
+        
+        alert(mensagemFinal);
     }
 </script>
 

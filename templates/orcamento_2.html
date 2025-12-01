@@ -3,13 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Orçamento - Preenchimento</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- VERSÃO ATUALIZADA 28/11/2025 - MELHORIAS UX -->
   <style>
   /* permitir rolagem horizontal sem limitar a largura da tabela; ocupa 100% da viewport */
   body { margin: 0; padding: 0; }
   .container { max-width: 100%; padding: 1rem; }
-  .table-wrapper{ overflow-x: auto; width: 100%; max-width: 100%; margin: 0; }
+  .table-wrapper{ 
+    overflow-x: auto; 
+    overflow-y: auto;
+    width: 100%; 
+    max-width: 100%; 
+    margin: 0;
+    max-height: 70vh;
+    position: relative;
+  }
+  .table-wrapper::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+  }
+  .table-wrapper::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  .table-wrapper::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 6px;
+  }
+  .table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+  #tabelaOrc2 thead {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: #f8f9fa;
+  }
   /* largura mínima aumentada para cada coluna de mês */
   #tabelaOrc2 th.month-th, #tabelaOrc2 td.month-td { min-width: 140px; }
   /* largura mínima maior para colunas de rubrica e categoria */
@@ -28,6 +60,12 @@
   .col-resizer:hover { background: rgba(0,0,0,0.03); }
   /* ocultar colunas de meses */
   .hide-months .month-th, .hide-months .month-td { display: none !important; }
+  /* destaque de linha selecionada */
+  .row-number { cursor: pointer; user-select: none; }
+  .row-number:hover { background-color: #e9ecef !important; }
+  tr.linha-destacada { background-color: #fff3cd !important; border-left: 4px solid #ffc107; }
+  tr.linha-destacada td { background-color: #fff3cd !important; }
+  tr.linha-destacada .row-number { background-color: #ffc107 !important; color: white; font-weight: bold; }
   </style>
 </head>
 <body class="p-4">
@@ -83,6 +121,7 @@
       <table class="table table-sm table-bordered" id="tabelaOrc2">
         <thead class="table-light">
           <tr>
+            <th style="width: 40px;" class="text-center">Nº</th>
             <th style="width: 60px;">Mover</th>
             <th class="col-rubrica">Rubrica<span class="col-resizer"></span></th>
             <th>Quantidade</th>
@@ -99,6 +138,7 @@
         <tbody id="bodyOrc2">
           {% for i in range(20) %}
           <tr>
+            <td class="text-center text-muted row-number" style="padding: 0.25rem; font-size: 0.85rem;"></td>
             <td class="text-center" style="padding: 0.25rem;">
               <div class="btn-group-vertical" style="width: 100%;">
                 <button type="button" class="btn btn-sm btn-outline-secondary move-up" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para cima">▲</button>
@@ -138,7 +178,7 @@
         </tbody>
         <tfoot>
           <tr class="table-secondary">
-            <td colspan="4" class="text-end"><strong>Total</strong></td>
+            <td colspan="5" class="text-end"><strong>Total</strong></td>
             <!-- totals for month columns will be injected -->
             <td class="col-total month-td">0,00</td>
             <td class="col-total month-td">0,00</td>
@@ -186,6 +226,31 @@
   <!-- SheetJS para leitura de Excel no cliente -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script>
+    // Função para numerar linhas visíveis
+    function numerarLinhas() {
+      const linhas = document.querySelectorAll('#tabelaOrc2 tbody .row-number');
+      linhas.forEach((linha, index) => {
+        linha.textContent = index + 1;
+      });
+    }
+
+    // Função para destacar linha ao clicar no número
+    function configurarDestaqueLinhas() {
+      document.getElementById('bodyOrc2').addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('row-number')) {
+          const linha = e.target.closest('tr');
+          
+          // Remove destaque de todas as outras linhas
+          document.querySelectorAll('#bodyOrc2 tr').forEach(tr => {
+            tr.classList.remove('linha-destacada');
+          });
+          
+          // Adiciona ou remove destaque da linha clicada
+          linha.classList.toggle('linha-destacada');
+        }
+      });
+    }
+
     // util: criar header de mês com botão remover
     function makeMonthHeader(name){
       const th = document.createElement('th');
@@ -430,6 +495,7 @@
       // número de meses atual
       const monthCount = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
       let cols = `
+        <td class="text-center text-muted row-number" style="padding: 0.25rem; font-size: 0.85rem;"></td>
         <td class="text-center" style="padding: 0.25rem;">
           <div class="btn-group-vertical" style="width: 100%;">
             <button type="button" class="btn btn-sm btn-outline-secondary move-up" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para cima">▲</button>
@@ -454,11 +520,11 @@
   for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
       cols += `<td class="col-total-linha text-end total-linha">0,00</td>`;
       cols += `<td><button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar valor do Mês 1 para todos os meses">Listar</button><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
-      tr.innerHTML = cols; tbody.appendChild(tr); recalcTotals();
+      tr.innerHTML = cols; tbody.appendChild(tr); recalcTotals(); numerarLinhas();
     });
 
     // remover linha
-    document.getElementById('bodyOrc2').addEventListener('click', function(e){ if (e.target && e.target.classList.contains('remover')){ e.target.closest('tr').remove(); recalcTotals(); }});
+    document.getElementById('bodyOrc2').addEventListener('click', function(e){ if (e.target && e.target.classList.contains('remover')){ e.target.closest('tr').remove(); recalcTotals(); numerarLinhas(); }});
 
     // listar valor do Mês 1 para todos os meses
     document.getElementById('bodyOrc2').addEventListener('click', function(e) {
@@ -510,6 +576,7 @@
         const linhaAnterior = linha.previousElementSibling;
         if (linhaAnterior) {
           linha.parentNode.insertBefore(linha, linhaAnterior);
+          numerarLinhas();
         }
       }
     });
@@ -521,6 +588,7 @@
         const proximaLinha = linha.nextElementSibling;
         if (proximaLinha) {
           linha.parentNode.insertBefore(proximaLinha, linha);
+          numerarLinhas();
         }
       }
     });
@@ -534,6 +602,7 @@
         const monthCount = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
         
         let cols = `
+          <td class="text-center text-muted row-number" style="padding: 0.25rem; font-size: 0.85rem;"></td>
           <td class="text-center" style="padding: 0.25rem;">
             <div class="btn-group-vertical" style="width: 100%;">
               <button type="button" class="btn btn-sm btn-outline-secondary move-up" style="padding: 0.1rem; font-size: 0.7rem;" title="Mover para cima">▲</button>
@@ -562,6 +631,7 @@
         novaLinha.innerHTML = cols;
         linhaAtual.parentNode.insertBefore(novaLinha, linhaAtual.nextSibling);
         recalcTotals();
+        numerarLinhas();
       }
     });
 
@@ -1100,6 +1170,8 @@
     carregarCategorias();
     configurarAutoPreenchemento();
     carregarDadosExistentes();
+    numerarLinhas();
+    configurarDestaqueLinhas();
     
     // Adicionar listener para mudança de aditivo
     document.getElementById('aditivoSelect').addEventListener('change', function() {
