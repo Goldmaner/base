@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise da Contrapartida</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container-custom { max-width: 95%; background: white; border-radius: 15px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .header-gradient { background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 30px; }
+        .cell-input { width: 100%; border: 1px solid #dee2e6; padding: 0.375rem 0.75rem; border-radius: 0.25rem; font-size: 0.85rem; }
+        .cell-money { text-align: right; font-family: 'Courier New', monospace; }
+        .cell-calculated { background-color: #f8f9fa; font-weight: bold; }
+        .cell-negative { color: #dc3545; }
+        .cell-positive { color: #28a745; }
+        table { font-size: 0.85rem; }
+        th { background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; vertical-align: middle; position: relative; cursor: help; }
+        th[title]:hover::after { content: attr(title); position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 5px 10px; border-radius: 4px; white-space: nowrap; z-index: 1000; font-size: 0.75rem; }
+        .btn-action { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+        tfoot td { font-weight: bold; background-color: #e9ecef; }
+    </style>
+</head>
+<body>
+<div class="container-custom">
+    <div class="header-gradient">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h3><i class="bi bi-cash-coin me-2"></i>Análise da Contrapartida</h3>
+                <p class="mb-0">Termo: <span id="numeroTermoDisplay">{{ numero_termo }}</span></p>
+            </div>
+            <div>
+                <a href="#" id="btnVoltar" class="btn btn-light me-2">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+                <button type="button" class="btn btn-warning me-2" id="btnSalvar">
+                    <i class="bi bi-save"></i> Salvar
+                </button>
+                <button type="button" class="btn btn-success me-2" onclick="exportarCSV()">
+                    <i class="bi bi-filetype-csv"></i> CSV
+                </button>
+                <button type="button" class="btn btn-danger" onclick="exportarPDF()">
+                    <i class="bi bi-filetype-pdf"></i> PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width: 8%;" title="Mês/ano da despesa (formato: dd/mm/aaaa)">Competência</th>
+                    <th style="width: 12%;" title="Categoria da despesa de contrapartida">Categoria</th>
+                    <th style="width: 9%;" title="Valor previsto no plano de trabalho">Previsto (R$)</th>
+                    <th style="width: 9%;" title="Valor efetivamente executado">Executado (R$)</th>
+                    <th style="width: 9%;" title="Valor considerado após análise">Considerado (R$)</th>
+                    <th style="width: 9%;" title="Previsto - Executado">Saldo Não Utilizado</th>
+                    <th style="width: 8%;" title="Executado - Considerado">Glosa</th>
+                    <th style="width: 8%;" title="Executado - Previsto (se > 0)">Uso à Maior</th>
+                    <th style="width: 10%;" title="Guia de recolhimento apresentada">Guia</th>
+                    <th style="width: 10%;" title="Tipo de comprovante apresentado">Comprovante</th>
+                    <th style="width: 12%;" title="Observações sobre a despesa">Observações</th>
+                    <th style="width: 4%;" title="Ações">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tbodyContrapartida"></tbody>
+            <tbody>
+                <tr>
+                    <td colspan="12" class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarLinha()">
+                            <i class="bi bi-plus-circle"></i> Adicionar Linha
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2" class="text-center">TOTAL</td>
+                    <td class="cell-money" id="totalPrevisto">R$ 0,00</td>
+                    <td class="cell-money" id="totalExecutado">R$ 0,00</td>
+                    <td class="cell-money" id="totalConsiderado">R$ 0,00</td>
+                    <td class="cell-money" id="totalSaldo">R$ 0,00</td>
+                    <td class="cell-money" id="totalGlosa">R$ 0,00</td>
+                    <td class="cell-money" id="totalUsoMaior">R$ 0,00</td>
+                    <td colspan="4"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script>
+    let contrapartidas = [];
+    const numeroTermo = '{{ numero_termo }}';
+    
+    const opcoesGuia = ['', 'Guia apresentada', 'Não apresentada'];
+    const opcoesComprovante = ['', 'Apresentado corretamente', 'Cartão de Crédito', 'Pago em Espécie', 'Pago em Cheque'];
+    
+    function handlePaste(e) {
+        const target = e.target;
+        if (!target.classList.contains('cell-input')) return;
+        
+        e.preventDefault();
+        
+        const clipboardData = e.clipboardData || window.clipboardData;
+        const pastedData = clipboardData.getData('Text');
+        
+        if (!pastedData) return;
+        
+        // Dividir por linhas e colunas
+        const rows = pastedData.split(/\r?\n/).filter(row => row.trim() !== '');
+        const td = target.closest('td');
+        const tr = target.closest('tr');
+        const startRowIndex = Array.from(tr.parentElement.children).indexOf(tr);
+        const startColIndex = Array.from(tr.children).indexOf(td);
+        
+        // Mapeamento de colunas (índice -> campo)
+        const columnMap = {
+            0: 'competencia',      // Competência
+            1: 'categoria_despesa', // Categoria
+            2: 'valor_previsto',    // Previsto
+            3: 'valor_executado',   // Executado
+            4: 'valor_considerado', // Considerado
+            8: 'guia',              // Guia (pular colunas calculadas)
+            9: 'comprovante',       // Comprovante
+            10: 'observacoes'       // Observações
+        };
+        
+        rows.forEach((row, rowOffset) => {
+            const cells = row.split('\t');
+            const targetRowIndex = startRowIndex + rowOffset;
+            
+            // Garantir que existe linha suficiente no array
+            while (contrapartidas.length <= targetRowIndex) {
+                contrapartidas.push({
+                    id: null,
+                    competencia: null,
+                    categoria_despesa: '',
+                    valor_previsto: 0,
+                    valor_executado: 0,
+                    valor_considerado: 0,
+                    guia: '',
+                    comprovante: '',
+                    observacoes: ''
+                });
+            }
+            
+            cells.forEach((cell, colOffset) => {
+                const targetColIndex = startColIndex + colOffset;
+                const campo = columnMap[targetColIndex];
+                
+                if (!campo) return; // Ignorar colunas calculadas
+                
+                const valor = cell.trim();
+                
+                if (campo === 'competencia') {
+                    // Processar data
+                    if (valor === '' || valor === '-') {
+                        contrapartidas[targetRowIndex][campo] = null;
+                    } else {
+                        contrapartidas[targetRowIndex][campo] = converterDataParaISO(valor);
+                    }
+                } else if (['valor_previsto', 'valor_executado', 'valor_considerado'].includes(campo)) {
+                    // Processar valores monetários
+                    contrapartidas[targetRowIndex][campo] = valor === '' || valor === '-' ? 0 : parseMoeda(valor);
+                } else {
+                    // Texto normal
+                    contrapartidas[targetRowIndex][campo] = valor;
+                }
+            });
+        });
+        
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('numeroTermoDisplay').textContent = numeroTermo;
+        document.getElementById('btnVoltar').href = `/conc_bancaria/?termo=${encodeURIComponent(numeroTermo)}`;
+        
+        // Adicionar suporte para colar do Excel
+        const tbody = document.getElementById('tbodyContrapartida');
+        tbody.addEventListener('paste', handlePaste);
+        
+        // Adicionar navegação por teclado
+        document.addEventListener('keydown', (e) => {
+            const target = e.target;
+            if (!target.classList.contains('cell-input')) return;
+            
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                moverFoco(target, 'down');
+            } else if (e.key === 'Tab' && !e.ctrlKey) {
+                e.preventDefault();
+                moverFoco(target, e.shiftKey ? 'left' : 'right');
+            } else if (e.key === 'Tab' && e.ctrlKey) {
+                e.preventDefault();
+                moverFoco(target, 'left');
+            }
+        });
+        
+        carregarDados();
+    });
+    
+    async function carregarDados() {
+        try {
+            const response = await fetch(`/conc_contrapartida/api/contrapartidas?termo=${encodeURIComponent(numeroTermo)}`);
+            const result = await response.json();
+            
+            if (response.ok) {
+                contrapartidas = result.contrapartidas;
+                
+                // Garantir pelo menos 3 linhas vazias
+                while (contrapartidas.length < 3) {
+                    contrapartidas.push({
+                        id: null,
+                        competencia: null,
+                        categoria_despesa: '',
+                        valor_previsto: 0,
+                        valor_executado: 0,
+                        valor_considerado: 0,
+                        guia: '',
+                        comprovante: '',
+                        observacoes: ''
+                    });
+                }
+                
+                renderizarTabela();
+            }
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            // Iniciar com 3 linhas vazias
+            for (let i = 0; i < 3; i++) {
+                contrapartidas.push({
+                    id: null,
+                    competencia: null,
+                    categoria_despesa: '',
+                    valor_previsto: 0,
+                    valor_executado: 0,
+                    valor_considerado: 0,
+                    guia: '',
+                    comprovante: '',
+                    observacoes: ''
+                });
+            }
+            renderizarTabela();
+        }
+    }
+    
+    function renderizarTabela() {
+        const tbody = document.getElementById('tbodyContrapartida');
+        tbody.innerHTML = '';
+        
+        contrapartidas.forEach((c, index) => {
+            const tr = document.createElement('tr');
+            
+            const saldoNaoUtilizado = (c.valor_previsto || 0) - (c.valor_executado || 0);
+            const glosa = (c.valor_executado || 0) - (c.valor_considerado || 0);
+            const usoMaior = (c.valor_executado || 0) - (c.valor_previsto || 0);
+            
+            const competenciaDisplay = c.competencia ? formatarDataParaExibicao(c.competencia) : '';
+            
+            tr.innerHTML = `
+                <td>
+                    <input type="text" 
+                           class="cell-input" 
+                           value="${competenciaDisplay}"
+                           placeholder="dd/mm/aaaa"
+                           onchange="atualizarCompetencia(${index}, this.value)"
+                           onblur="formatarCampoData(this)"
+                           maxlength="10">
+                </td>
+                <td><input type="text" class="cell-input" value="${c.categoria_despesa || ''}" onchange="atualizarCampo(${index}, 'categoria_despesa', this.value)"></td>
+                <td class="cell-money"><input type="text" class="cell-input cell-money" value="${formatarMoeda(c.valor_previsto)}" onchange="atualizarValor(${index}, 'valor_previsto', this.value)" onblur="formatarCampoMoeda(this)"></td>
+                <td class="cell-money"><input type="text" class="cell-input cell-money" value="${formatarMoeda(c.valor_executado)}" onchange="atualizarValor(${index}, 'valor_executado', this.value)" onblur="formatarCampoMoeda(this)"></td>
+                <td class="cell-money"><input type="text" class="cell-input cell-money" value="${formatarMoeda(c.valor_considerado)}" onchange="atualizarValor(${index}, 'valor_considerado', this.value)" onblur="formatarCampoMoeda(this)"></td>
+                <td class="cell-money cell-calculated ${saldoNaoUtilizado < 0 ? 'cell-negative' : 'cell-positive'}">${formatarMoeda(saldoNaoUtilizado)}</td>
+                <td class="cell-money cell-calculated ${glosa > 0 ? 'cell-negative' : ''}">${formatarMoeda(glosa)}</td>
+                <td class="cell-money cell-calculated ${usoMaior > 0 ? 'cell-negative' : ''}">${formatarMoeda(usoMaior)}</td>
+                <td><select class="cell-input" onchange="atualizarCampo(${index}, 'guia', this.value)">
+                    ${opcoesGuia.map(op => `<option value="${op}" ${c.guia === op ? 'selected' : ''}>${op}</option>`).join('')}
+                </select></td>
+                <td><select class="cell-input" onchange="atualizarCampo(${index}, 'comprovante', this.value)">
+                    ${opcoesComprovante.map(op => `<option value="${op}" ${c.comprovante === op ? 'selected' : ''}>${op}</option>`).join('')}
+                </select></td>
+                <td><input type="text" class="cell-input" value="${c.observacoes || ''}" onchange="atualizarCampo(${index}, 'observacoes', this.value)"></td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-danger btn-action" onclick="excluirLinha(${index})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+            
+            tbody.appendChild(tr);
+        });
+        
+        calcularTotais();
+    }
+    
+    function atualizarCampo(index, campo, valor) {
+        contrapartidas[index][campo] = valor;
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function atualizarCompetencia(index, valor) {
+        // Converter dd/mm/aaaa para aaaa-mm-dd (formato ISO)
+        if (!valor || valor.trim() === '') {
+            contrapartidas[index]['competencia'] = null;
+        } else {
+            const dataISO = converterDataParaISO(valor);
+            contrapartidas[index]['competencia'] = dataISO;
+        }
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function formatarCampoData(input) {
+        const valor = input.value.trim();
+        if (!valor) return;
+        
+        // Aceitar formatos: ddmmaaaa, dd/mm/aaaa, dd-mm-aaaa
+        let limpo = valor.replace(/[^0-9]/g, '');
+        if (limpo.length === 8) {
+            input.value = `${limpo.substr(0,2)}/${limpo.substr(2,2)}/${limpo.substr(4,4)}`;
+        }
+    }
+    
+    function converterDataParaISO(data) {
+        if (!data) return null;
+        
+        // Remover caracteres não numéricos
+        const limpo = data.replace(/[^0-9]/g, '');
+        
+        if (limpo.length === 8) {
+            const dia = limpo.substr(0, 2);
+            const mes = limpo.substr(2, 2);
+            const ano = limpo.substr(4, 4);
+            return `${ano}-${mes}-${dia}`;
+        }
+        
+        // Tentar parsear formato dd/mm/aaaa
+        const partes = data.split(/[\/\-]/);
+        if (partes.length === 3) {
+            const dia = partes[0].padStart(2, '0');
+            const mes = partes[1].padStart(2, '0');
+            const ano = partes[2];
+            return `${ano}-${mes}-${dia}`;
+        }
+        
+        return null;
+    }
+    
+    function formatarDataParaExibicao(dataISO) {
+        if (!dataISO) return '';
+        
+        // Se já estiver em formato dd/mm/aaaa, retornar como está
+        if (dataISO.includes('/')) return dataISO;
+        
+        // Converter de aaaa-mm-dd para dd/mm/aaaa
+        const partes = dataISO.split('-');
+        if (partes.length === 3) {
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+        
+        return dataISO;
+    }
+    
+    function atualizarValor(index, campo, valor) {
+        const valorNumerico = parseMoeda(valor);
+        contrapartidas[index][campo] = valorNumerico;
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function adicionarLinha() {
+        contrapartidas.push({
+            id: null,
+            competencia: null,
+            categoria_despesa: '',
+            valor_previsto: 0,
+            valor_executado: 0,
+            valor_considerado: 0,
+            guia: '',
+            comprovante: '',
+            observacoes: ''
+        });
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    async function excluirLinha(index) {
+        const c = contrapartidas[index];
+        
+        if (!confirm('Confirma a exclusão desta linha?')) return;
+        
+        if (c.id) {
+            // Linha salva no banco - excluir via API
+            try {
+                const response = await fetch(`/conc_contrapartida/api/contrapartidas/${c.id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Erro ao excluir');
+            } catch (error) {
+                alert('Erro ao excluir linha: ' + error.message);
+                return;
+            }
+        }
+        
+        contrapartidas.splice(index, 1);
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function calcularTotais() {
+        let totalPrevisto = 0, totalExecutado = 0, totalConsiderado = 0;
+        let totalSaldo = 0, totalGlosa = 0, totalUsoMaior = 0;
+        
+        contrapartidas.forEach(c => {
+            totalPrevisto += c.valor_previsto || 0;
+            totalExecutado += c.valor_executado || 0;
+            totalConsiderado += c.valor_considerado || 0;
+            totalSaldo += (c.valor_previsto || 0) - (c.valor_executado || 0);
+            totalGlosa += (c.valor_executado || 0) - (c.valor_considerado || 0);
+            totalUsoMaior += (c.valor_executado || 0) - (c.valor_previsto || 0);
+        });
+        
+        document.getElementById('totalPrevisto').textContent = formatarMoeda(totalPrevisto);
+        document.getElementById('totalExecutado').textContent = formatarMoeda(totalExecutado);
+        document.getElementById('totalConsiderado').textContent = formatarMoeda(totalConsiderado);
+        document.getElementById('totalSaldo').textContent = formatarMoeda(totalSaldo);
+        document.getElementById('totalGlosa').textContent = formatarMoeda(totalGlosa);
+        document.getElementById('totalUsoMaior').textContent = formatarMoeda(totalUsoMaior);
+    }
+    
+    document.getElementById('btnSalvar').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/conc_contrapartida/api/contrapartidas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ numero_termo: numeroTermo, contrapartidas })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert('Dados salvos com sucesso!');
+                document.getElementById('btnSalvar').style.display = 'none';
+                carregarDados();
+            } else {
+                alert('Erro: ' + result.erro);
+            }
+        } catch (error) {
+            alert('Erro ao salvar: ' + error.message);
+        }
+    });
+    
+    function exportarCSV() {
+        const linhas = [['Competência', 'Categoria', 'Previsto', 'Executado', 'Considerado', 'Saldo Não Utilizado', 'Glosa', 'Uso à Maior', 'Guia', 'Comprovante', 'Observações']];
+        
+        contrapartidas.forEach(c => {
+            const saldo = (c.valor_previsto || 0) - (c.valor_executado || 0);
+            const glosa = (c.valor_executado || 0) - (c.valor_considerado || 0);
+            const usoMaior = (c.valor_executado || 0) - (c.valor_previsto || 0);
+            const comp = formatarDataParaExibicao(c.competencia) || '';
+            
+            linhas.push([comp, c.categoria_despesa, c.valor_previsto, c.valor_executado, c.valor_considerado, saldo, glosa, usoMaior, c.guia, c.comprovante, c.observacoes]);
+        });
+        
+        const csv = linhas.map(l => l.join(';')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `contrapartida_${numeroTermo.replace(/\//g, '_')}.csv`;
+        link.click();
+    }
+    
+    function exportarPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        
+        doc.setFontSize(16);
+        doc.text('Análise da Contrapartida', 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Termo: ${numeroTermo}`, 14, 22);
+        
+        const dados = contrapartidas.map(c => {
+            const comp = formatarDataParaExibicao(c.competencia) || '';
+            return [
+                comp, c.categoria_despesa,
+                formatarMoeda(c.valor_previsto), formatarMoeda(c.valor_executado), formatarMoeda(c.valor_considerado),
+                formatarMoeda((c.valor_previsto || 0) - (c.valor_executado || 0)),
+                formatarMoeda((c.valor_executado || 0) - (c.valor_considerado || 0)),
+                formatarMoeda((c.valor_executado || 0) - (c.valor_previsto || 0)),
+                c.guia, c.comprovante, c.observacoes
+            ];
+        });
+        
+        doc.autoTable({
+            head: [['Comp.', 'Categoria', 'Previsto', 'Executado', 'Considerado', 'Saldo', 'Glosa', 'Uso Maior', 'Guia', 'Comp.', 'Obs']],
+            body: dados,
+            startY: 28,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [102, 126, 234] }
+        });
+        
+        doc.save(`contrapartida_${numeroTermo.replace(/\//g, '_')}.pdf`);
+    }
+    
+    function formatarMoeda(valor) {
+        const valorNumerico = parseFloat(valor);
+        if (!valor || isNaN(valorNumerico) || valorNumerico === 0) return 'R$ 0,00';
+        return 'R$ ' + new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valorNumerico);
+    }
+    
+    function formatarCampoMoeda(input) {
+        const valor = parseMoeda(input.value);
+        input.value = formatarMoeda(valor);
+    }
+    
+    function parseMoeda(valor) {
+        if (!valor) return 0;
+        let valorStr = String(valor).replace(/R\$/g, '').trim();
+        const temVirgula = valorStr.includes(',');
+        const temPonto = valorStr.includes('.');
+        if (temVirgula && temPonto) valorStr = valorStr.replace(/\./g, '').replace(',', '.');
+        else if (temVirgula) valorStr = valorStr.replace(',', '.');
+        const resultado = parseFloat(valorStr);
+        return isNaN(resultado) ? 0 : resultado;
+    }
+    
+    function moverFoco(elementoAtual, direcao) {
+        const target = e.target;
+        if (!target.classList.contains('cell-input')) return;
+        
+        e.preventDefault();
+        
+        const clipboardData = e.clipboardData || window.clipboardData;
+        const pastedData = clipboardData.getData('Text');
+        
+        if (!pastedData) return;
+        
+        // Dividir por linhas e colunas
+        const rows = pastedData.split(/\r?\n/).filter(row => row.trim() !== '');
+        const td = target.closest('td');
+        const tr = target.closest('tr');
+        const startRowIndex = Array.from(tr.parentElement.children).indexOf(tr);
+        const startColIndex = Array.from(tr.children).indexOf(td);
+        
+        // Mapeamento de colunas (índice -> campo)
+        const columnMap = {
+            0: 'competencia',      // Competência
+            1: 'categoria_despesa', // Categoria
+            2: 'valor_previsto',    // Previsto
+            3: 'valor_executado',   // Executado
+            4: 'valor_considerado', // Considerado
+            8: 'guia',              // Guia (pular colunas calculadas)
+            9: 'comprovante',       // Comprovante
+            10: 'observacoes'       // Observações
+        };
+        
+        rows.forEach((row, rowOffset) => {
+            const cells = row.split('\t');
+            const targetRowIndex = startRowIndex + rowOffset;
+            
+            // Garantir que existe linha suficiente no array
+            while (contrapartidas.length <= targetRowIndex) {
+                adicionarLinha();
+            }
+            
+            cells.forEach((cell, colOffset) => {
+                const targetColIndex = startColIndex + colOffset;
+                const campo = columnMap[targetColIndex];
+                
+                if (!campo) return; // Ignorar colunas calculadas
+                
+                const valor = cell.trim();
+                
+                if (campo === 'competencia') {
+                    // Processar data
+                    if (valor === '' || valor === '-') {
+                        contrapartidas[targetRowIndex][campo] = null;
+                    } else {
+                        contrapartidas[targetRowIndex][campo] = converterDataParaISO(valor);
+                    }
+                } else if (['valor_previsto', 'valor_executado', 'valor_considerado'].includes(campo)) {
+                    // Processar valores monetários
+                    contrapartidas[targetRowIndex][campo] = valor === '' || valor === '-' ? 0 : parseMoeda(valor);
+                } else {
+                    // Texto normal
+                    contrapartidas[targetRowIndex][campo] = valor;
+                }
+            });
+        });
+        
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function moverFoco(elementoAtual, direcao) {
+        const td = elementoAtual.closest('td');
+        const tr = elementoAtual.closest('tr');
+        let proximoInput = null;
+        
+        if (direcao === 'down') {
+            const colunaIndex = Array.from(tr.children).indexOf(td);
+            const proximaTr = tr.nextElementSibling;
+            if (proximaTr && proximaTr.children[colunaIndex]) {
+                proximoInput = proximaTr.children[colunaIndex].querySelector('.cell-input');
+            }
+        } else if (direcao === 'right') {
+            let proximaTd = td.nextElementSibling;
+            while (proximaTd && !proximaTd.querySelector('.cell-input')) proximaTd = proximaTd.nextElementSibling;
+            if (proximaTd) proximoInput = proximaTd.querySelector('.cell-input');
+            else {
+                const proximaTr = tr.nextElementSibling;
+                if (proximaTr) proximoInput = proximaTr.querySelector('.cell-input');
+            }
+        } else if (direcao === 'left') {
+            let anteriorTd = td.previousElementSibling;
+            while (anteriorTd && !anteriorTd.querySelector('.cell-input')) anteriorTd = anteriorTd.previousElementSibling;
+            if (anteriorTd) proximoInput = anteriorTd.querySelector('.cell-input');
+            else {
+                const anteriorTr = tr.previousElementSibling;
+                if (anteriorTr) {
+                    const inputs = anteriorTr.querySelectorAll('.cell-input');
+                    proximoInput = inputs[inputs.length - 1];
+                }
+            }
+        }
+        
+        if (proximoInput) {
+            proximoInput.focus();
+            proximoInput.select();
+        }
+    }
+</script>
+</body>
+</html>

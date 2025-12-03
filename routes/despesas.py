@@ -66,7 +66,6 @@ def get_termo_info(numero_termo):
             "meses": max(1, meses)  # pelo menos 1 mês
         }
         
-        print(f"DEBUG: Retornando: {resultado}")
         return jsonify(resultado)
         
     except Exception as e:

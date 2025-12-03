@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR (testes) - Conversão de Extrato - FAF</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<style>
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+    
+    .ocr-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    #textoExtrato {
+        border: 2px solid #dee2e6;
+        transition: border-color 0.2s;
+        font-family: 'Courier New', monospace;
+    }
+
+    #textoExtrato:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.25);
+    }
+
+    pre {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.375rem;
+        border: 1px solid #dee2e6;
+        overflow-x: auto;
+    }
+
+    .table-responsive {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .table th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 1;
+    }
+    
+    .alert-floating {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+</style>
+</head>
+<body>
+
+<div class="container-fluid mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="bi bi-file-earmark-text"></i> OCR (testes) - Conversão de Extrato</h4>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="voltarParaConc()">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </button>
+    </div>
+
+    <div class="ocr-card">
+        <div class="card-header bg-primary text-white mb-3" style="margin: -25px -25px 20px -25px; padding: 15px 25px; border-radius: 10px 10px 0 0;">
+            <i class="bi bi-clipboard"></i> Cole o extrato bancário abaixo
+        </div>
+        
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> 
+            <strong>Instruções:</strong> Cole o texto do extrato bancário no campo abaixo OU envie o PDF diretamente para converter.
+            <br><small class="text-muted">Atalho texto: <kbd>Ctrl</kbd> + <kbd>Enter</kbd></small>
+        </div>
+
+        <!-- NOVO: Upload de PDF -->
+        <div class="mb-4 p-3 border rounded bg-light">
+            <h6 class="mb-3"><i class="bi bi-file-pdf"></i> Opção 1: Enviar PDF do Extrato</h6>
+            <div class="row align-items-end">
+                <div class="col-md-8">
+                    <label for="pdfUpload" class="form-label">Selecione o arquivo PDF:</label>
+                    <input type="file" class="form-control" id="pdfUpload" accept=".pdf">
+                </div>
+                <div class="col-md-4">
+                    <button type="button" class="btn btn-primary w-100" onclick="processarPDF()">
+                        <i class="bi bi-file-pdf"></i> Processar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mb-3">
+            <strong class="text-muted">— OU —</strong>
+        </div>
+
+        <!-- Opção original de texto -->
+        <div class="mb-3">
+            <h6 class="mb-3"><i class="bi bi-textarea-t"></i> Opção 2: Colar Texto</h6>
+            <label for="textoExtrato" class="form-label">
+                <strong>Texto do Extrato:</strong>
+            </label>
+            <textarea 
+                class="form-control" 
+                id="textoExtrato" 
+                rows="20" 
+                placeholder="Cole aqui o texto do extrato bancário...
+
+Exemplo:
+31/10/2024 0000 00000 000 Saldo Anterior 0,00 C
+01/11/2024 0000 14175 983 TED Devolvida 200.017 1.732,40 C
+AG OU CNT DEST DO CRED INVAL
+01/11/2024 0000 13105 393 TED Transf.Eletr.Disponiv 110.102 1.732,40 D
+260 0001 053246086000101 COMPANHIA PLA
+..."
+                style="font-size: 0.9rem;"
+            ></textarea>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-success" onclick="processarExtrato()">
+                <i class="bi bi-file-earmark-arrow-down"></i> Processar e Baixar CSV
+            </button>
+            <button type="button" class="btn btn-outline-secondary" onclick="limparTexto()">
+                <i class="bi bi-x-circle"></i> Limpar
+            </button>
+        </div>
+    </div>
+
+    <!-- Exemplo de formato esperado -->
+    <div class="ocr-card">
+        <div class="card-header bg-secondary text-white mb-3" style="margin: -25px -25px 20px -25px; padding: 15px 25px; border-radius: 10px 10px 0 0;">
+            <i class="bi bi-lightbulb"></i> Exemplo de Formato Esperado
+        </div>
+        
+        <pre class="mb-0" style="font-size: 0.85rem;">31/10/2024 0000 00000 000 Saldo Anterior 0,00 C
+01/11/2024 0000 14175 983 TED Devolvida 200.017 1.732,40 C
+AG OU CNT DEST DO CRED INVAL
+01/11/2024 0000 13105 393 TED Transf.Eletr.Disponiv 110.102 1.732,40 D
+260 0001 053246086000101 COMPANHIA PLA
+04/11/2024 0000 13105 393 TED Transf.Eletr.Disponiv 110.401 2.082,40 D
+104 0689 018113566000195 18.113.566 LI
+04/11/2024 0000 13113 310 Tar DOC/TED Eletrônico 863.091.100.025.272 12,30 D
+Cobrança referente 04/11/2024
+04/11/2024 0000 00000 791 Resgate Fundo 32 6.827,10 C 0,00 C
+BB RF Ref DI Plus Agil</pre>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const termoAtual = '{{ session.get("numero_termo", "") }}';
+
+    function voltarParaConc() {
+        if (termoAtual) {
+            window.location.href = `/conc_bancaria/?termo=${encodeURIComponent(termoAtual)}`;
+        } else {
+            window.location.href = '/conc_bancaria/';
+        }
+    }
+
+    function limparTexto() {
+        document.getElementById('textoExtrato').value = '';
+        document.getElementById('pdfUpload').value = '';
+    }
+
+    async function processarPDF() {
+        const inputPDF = document.getElementById('pdfUpload');
+        
+        if (!inputPDF.files || inputPDF.files.length === 0) {
+            alert('Por favor, selecione um arquivo PDF.');
+            return;
+        }
+
+        const arquivo = inputPDF.files[0];
+        
+        if (!arquivo.name.toLowerCase().endsWith('.pdf')) {
+            alert('Por favor, selecione um arquivo PDF válido.');
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('pdf', arquivo);
+
+            // Mostrar loading
+            const btnProcessar = event.target;
+            const textoOriginal = btnProcessar.innerHTML;
+            btnProcessar.disabled = true;
+            btnProcessar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando PDF (pode demorar)...';
+
+            const response = await fetch('/ocr_testes/api/processar-pdf', {
+                method: 'POST',
+                body: formData,
+                // Timeout maior para PDFs grandes
+                signal: AbortSignal.timeout(120000) // 2 minutos
+            });
+
+            btnProcessar.disabled = false;
+            btnProcessar.innerHTML = textoOriginal;
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.erro || 'Erro ao processar PDF');
+            }
+
+            // Fazer download do arquivo
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Extrair nome do arquivo
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'extrato_pdf_convertido.csv';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            // Limpar input e mostrar mensagem de sucesso
+            inputPDF.value = '';
+            mostrarMensagemSucesso('PDF processado e CSV baixado com sucesso!');
+
+        } catch (error) {
+            console.error('Erro:', error);
+            alert(`Erro ao processar PDF: ${error.message}`);
+        }
+    }
+
+    async function processarExtrato() {
+        const texto = document.getElementById('textoExtrato').value.trim();
+        
+        if (!texto) {
+            alert('Por favor, cole o texto do extrato antes de processar.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/ocr_testes/api/processar-ocr', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ texto })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.erro || 'Erro ao processar extrato');
+            }
+
+            // Fazer download do arquivo
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Extrair nome do arquivo do header Content-Disposition se disponível
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'extrato_convertido.csv';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            // Mostrar mensagem de sucesso
+            mostrarMensagemSucesso('CSV gerado e baixado com sucesso!');
+
+        } catch (error) {
+            console.error('Erro:', error);
+            alert(`Erro ao processar extrato: ${error.message}`);
+        }
+    }
+
+    function mostrarMensagemSucesso(mensagem) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show alert-floating';
+        alertDiv.innerHTML = `
+            <i class="bi bi-check-circle-fill"></i> ${mensagem}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+
+    // Atalhos de teclado
+    document.getElementById('textoExtrato').addEventListener('keydown', function(e) {
+        // Ctrl+Enter para processar
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            processarExtrato();
+        }
+    });
+</script>
+
+</body>
+</html>

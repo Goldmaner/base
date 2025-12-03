@@ -5,6 +5,7 @@ Rotas para Conciliação Bancária - Análise de Prestação de Contas
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db
 from functools import wraps
+from datetime import datetime, date
 
 bp = Blueprint('conc_bancaria', __name__, url_prefix='/conc_bancaria')
 
@@ -21,7 +22,7 @@ def login_required(f):
 @login_required
 def index():
     """Página principal de conciliação bancária"""
-    return render_template('conc_bancaria.html')
+    return render_template('analises_pc/conc_bancaria.html')
 
 
 @bp.route('/api/extrato', methods=['GET'])
@@ -236,6 +237,112 @@ def api_salvar_extrato():
                 novo_id = cur.fetchone()['id']
                 ids_processados.append(novo_id)
         
+        # ============================================================
+        # AUTOMAÇÃO: Destinatário Identificado/Não Identificado
+        # ============================================================
+        # Buscar portaria e transição do termo
+        cur.execute("""
+            SELECT portaria, transicao 
+            FROM public.parcerias 
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        termo_info = cur.fetchone()
+        
+        if termo_info:
+            portaria = termo_info['portaria'] or ''
+            transicao = termo_info['transicao'] or 0
+            
+            print(f"[AUTOMAÇÃO] Termo: {numero_termo}, Portaria: {portaria}, Transição: {transicao}")
+            
+            # Determinar data de corte baseada na portaria
+            data_corte = None
+            
+            # Portarias 021 (2019 ou 2023)
+            if 'Portaria nº 021/SMDHC/2019' in portaria or 'Portaria n° 021/SMDHC/2019' in portaria or \
+               'Portaria nº 021/SMDHC/2023' in portaria or 'Portaria n° 021/SMDHC/2023' in portaria:
+                data_corte = date(2023, 3, 1)  # mar/23
+                print(f"[AUTOMAÇÃO] Portaria 021 detectada, corte: mar/23")
+            # Portarias 090 (2019 ou 2023)
+            elif 'Portaria nº 090/SMDHC/2019' in portaria or 'Portaria n° 090/SMDHC/2019' in portaria or \
+                 'Portaria nº 090/SMDHC/2023' in portaria or 'Portaria n° 090/SMDHC/2023' in portaria:
+                data_corte = date(2024, 1, 1)  # jan/24
+                print(f"[AUTOMAÇÃO] Portaria 090 detectada, corte: jan/24")
+            # Portarias 121 com transição = 1
+            elif (('Portaria nº 121/SMDHC/2019' in portaria or 'Portaria n° 121/SMDHC/2019' in portaria or \
+                   'Portaria nº 121/SMDHC/2023' in portaria or 'Portaria n° 121/SMDHC/2023' in portaria) and transicao == 1):
+                data_corte = date(2023, 3, 1)  # mar/23
+                print(f"[AUTOMAÇÃO] Portaria 121 com transição, corte: mar/23")
+            # Portarias 140 com transição = 1
+            elif (('Portaria nº 140/SMDHC/2019' in portaria or 'Portaria n° 140/SMDHC/2019' in portaria or \
+                   'Portaria nº 140/SMDHC/2023' in portaria or 'Portaria n° 140/SMDHC/2023' in portaria) and transicao == 1):
+                data_corte = date(2024, 1, 1)  # jan/24
+                print(f"[AUTOMAÇÃO] Portaria 140 com transição, corte: jan/24")
+            
+            # Aplicar automação apenas se houver data de corte definida
+            if data_corte:
+                print(f"[AUTOMAÇÃO] Aplicando regra para competências >= {data_corte}")
+                
+                # Buscar categorias da Lista de Despesas (não devem ser alteradas)
+                cur.execute("""
+                    SELECT DISTINCT categoria_extra 
+                    FROM categoricas.c_despesas_analise
+                    WHERE categoria_extra IS NOT NULL
+                """)
+                categorias_despesas = {row['categoria_extra'] for row in cur.fetchall()}
+                print(f"[AUTOMAÇÃO] Categorias de despesas (não alterar): {len(categorias_despesas)}")
+                
+                linhas_atualizadas = 0
+                
+                # Processar cada linha salva
+                for linha_id in ids_processados:
+                    cur.execute("""
+                        SELECT id, competencia, origem_destino, cat_transacao, credito, debito
+                        FROM analises_pc.conc_extrato
+                        WHERE id = %s
+                    """, (linha_id,))
+                    linha_data = cur.fetchone()
+                    
+                    if not linha_data:
+                        continue
+                    
+                    competencia = linha_data['competencia']
+                    cat_transacao_atual = linha_data['cat_transacao'] or ''
+                    origem_destino = (linha_data['origem_destino'] or '').strip()
+                    credito = linha_data['credito'] or 0
+                    debito = linha_data['debito'] or 0
+                    
+                    # Verificar se competência é >= data de corte
+                    # IMPORTANTE: Se competência não está preenchida, pular
+                    if not competencia:
+                        continue
+                    
+                    # IMPORTANTE: Regra só se aplica a DÉBITOS
+                    if debito <= 0:
+                        continue
+                        
+                    if competencia >= data_corte:
+                        # Apenas aplicar se categoria atual NÃO está na Lista de Despesas
+                        # E também se não está vazia (não sobrescrever categorias já definidas da lista)
+                        if cat_transacao_atual not in categorias_despesas:
+                            nova_categoria = None
+                            
+                            if origem_destino:
+                                # Origem/Destino preenchido → Destinatário Identificado
+                                nova_categoria = 'Destinatário Identificado'
+                            else:
+                                # Origem/Destino vazio → Destinatário não Identificado
+                                nova_categoria = 'Destinatário não Identificado'
+                            
+                            # Atualizar categoria e marcar como "Avaliado"
+                            if nova_categoria:
+                                cur.execute("""
+                                    UPDATE analises_pc.conc_extrato
+                                    SET cat_transacao = %s,
+                                        cat_avaliacao = 'Avaliado'
+                                    WHERE id = %s
+                                """, (nova_categoria, linha_id))
+                                linhas_atualizadas += 1
+        
         db.commit()
         
         tempo_total = (time.time() - inicio) * 1000
@@ -276,12 +383,16 @@ def api_excluir_extrato(extrato_id):
 @bp.route('/api/termos', methods=['GET'])
 @login_required
 def api_listar_termos():
-    """API para listar números de termos que possuem extrato cadastrado"""
+    """API para listar números de termos (de parcerias + extratos existentes)"""
     try:
         cur = get_cursor()
         
-        # Buscar apenas termos que têm registros na tabela conc_extrato
+        # Buscar termos de parcerias (todos os termos válidos) + termos com extrato existente
         cur.execute("""
+            SELECT DISTINCT numero_termo 
+            FROM public.parcerias 
+            WHERE numero_termo IS NOT NULL
+            UNION
             SELECT DISTINCT numero_termo 
             FROM analises_pc.conc_extrato 
             WHERE numero_termo IS NOT NULL 
@@ -430,6 +541,25 @@ def api_get_banco():
         
     except Exception as e:
         print(f"[ERRO] ao buscar banco: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/salvar-termo-session', methods=['POST'])
+@login_required
+def api_salvar_termo_session():
+    """API para salvar o termo atual na session"""
+    try:
+        dados = request.get_json()
+        numero_termo = dados.get('numero_termo')
+        
+        if numero_termo:
+            session['numero_termo'] = numero_termo
+            return jsonify({'sucesso': True}), 200
+        else:
+            return jsonify({'erro': 'numero_termo não fornecido'}), 400
+            
+    except Exception as e:
+        print(f"[ERRO] Erro ao salvar termo na session: {str(e)}")
         return jsonify({'erro': str(e)}), 500
 
 

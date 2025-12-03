@@ -209,6 +209,74 @@ def obter_anos_disponiveis():
         return jsonify({'erro': str(e)}), 500
 
 
+@analises_bp.route("/api/modelo-ausencia-extratos", methods=["POST"])
+@login_required
+def obter_modelo_ausencia_extratos():
+    """
+    API para buscar modelo de texto de solicitação de extratos bancários
+    baseado na portaria do termo.
+    
+    Regra:
+    - Portarias 021/090 SMDHC/2019 → "Análise de Contas: Ausência de extratos bancários pós-2023"
+    - Outras portarias → "Análise de Contas: Ausência de extratos bancários pré-2023"
+    """
+    try:
+        data = request.get_json()
+        numero_termo = data.get('numero_termo')
+        
+        if not numero_termo:
+            return jsonify({'erro': 'Número do termo não fornecido'}), 400
+        
+        cur = get_cursor()
+        
+        # Buscar portaria do termo
+        query_portaria = """
+            SELECT portaria 
+            FROM public.parcerias 
+            WHERE numero_termo = %s
+        """
+        cur.execute(query_portaria, (numero_termo,))
+        resultado = cur.fetchone()
+        
+        if not resultado:
+            cur.close()
+            return jsonify({'erro': 'Termo não encontrado'}), 404
+        
+        portaria = resultado['portaria']
+        
+        # Determinar qual modelo usar baseado na portaria
+        if portaria and ('021/SMDHC/2019' in portaria or '090/SMDHC/2019' in portaria):
+            titulo_modelo = 'Análise de Contas: Ausência de extratos bancários pós-2023'
+        else:
+            titulo_modelo = 'Análise de Contas: Ausência de extratos bancários pré-2023'
+        
+        # Buscar modelo de texto
+        query_modelo = """
+            SELECT titulo_texto, modelo_texto 
+            FROM categoricas.c_modelo_textos 
+            WHERE titulo_texto = %s
+        """
+        cur.execute(query_modelo, (titulo_modelo,))
+        modelo = cur.fetchone()
+        cur.close()
+        
+        if not modelo:
+            return jsonify({
+                'erro': f'Modelo "{titulo_modelo}" não encontrado no sistema'
+            }), 404
+        
+        return jsonify({
+            'titulo_texto': modelo['titulo_texto'],
+            'modelo_texto': modelo['modelo_texto']
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar modelo de texto: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
+
 @analises_bp.route("/", methods=["GET"])
 @login_required
 def listar():
@@ -763,6 +831,99 @@ def adicionar_analises():
                          analistas=analistas)
 
 
+@analises_bp.route('/api/adicionar-multiplos', methods=['POST'])
+@login_required
+def adicionar_analises_multiplos():
+    """
+    API para adicionar análises de múltiplos termos de uma vez
+    Recebe lista de termos com suas prestações
+    """
+    from db import get_db
+    
+    try:
+        data = request.get_json()
+        termos = data.get('termos', [])
+        
+        if not termos:
+            return jsonify({'erro': 'Nenhum termo informado'}), 400
+        
+        cur = get_cursor()
+        
+        termos_salvos = 0
+        prestacoes_salvas = 0
+        
+        for termo_data in termos:
+            numero_termo = termo_data.get('numero_termo')
+            analises = termo_data.get('analises', [])
+            
+            if not numero_termo or not analises:
+                continue
+            
+            # Buscar portaria do termo para determinar responsabilidade automática
+            cur.execute("SELECT portaria FROM parcerias WHERE numero_termo = %s LIMIT 1", (numero_termo,))
+            termo_info = cur.fetchone()
+            portaria = termo_info['portaria'] if termo_info else None
+            
+            # Inserir cada análise
+            for analise in analises:
+                vigencia_final = analise.get('vigencia_final')
+                
+                # Determinar responsabilidade automática baseada na portaria E vigência final
+                responsabilidade_auto = determinar_responsabilidade_por_vigencia(portaria, vigencia_final)
+                
+                query = """
+                    INSERT INTO parcerias_analises (
+                        numero_termo, tipo_prestacao, numero_prestacao,
+                        vigencia_inicial, vigencia_final,
+                        responsabilidade_analise,
+                        entregue, cobrado, e_notificacao, e_parecer,
+                        e_fase_recursal, e_encerramento,
+                        data_parecer_dp, valor_devolucao, valor_devolvido,
+                        responsavel_dp, data_parecer_pg, responsavel_pg, observacoes
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                params = (
+                    numero_termo,
+                    analise.get('tipo_prestacao'),
+                    analise.get('numero_prestacao'),
+                    analise.get('vigencia_inicial'),
+                    analise.get('vigencia_final'),
+                    responsabilidade_auto,
+                    analise.get('entregue', False),
+                    analise.get('cobrado', False),
+                    analise.get('e_notificacao', False),
+                    analise.get('e_parecer', False),
+                    analise.get('e_fase_recursal', False),
+                    analise.get('e_encerramento', False),
+                    analise.get('data_parecer_dp') or None,
+                    analise.get('valor_devolucao') or None,
+                    analise.get('valor_devolvido') or None,
+                    analise.get('responsavel_dp') or None,
+                    analise.get('data_parecer_pg') or None,
+                    analise.get('responsavel_pg'),
+                    analise.get('observacoes')
+                )
+                cur.execute(query, params)
+                prestacoes_salvas += 1
+            
+            termos_salvos += 1
+        
+        get_db().commit()
+        cur.close()
+        
+        return jsonify({
+            'mensagem': f'{termos_salvos} termo(s) com {prestacoes_salvas} prestação(ões) adicionadas com sucesso!',
+            'termos_salvos': termos_salvos,
+            'prestacoes_salvas': prestacoes_salvas
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao adicionar análises múltiplas: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
+
 @analises_bp.route('/api/calcular-prestacoes', methods=['POST'])
 @login_required
 def calcular_prestacoes():
@@ -892,7 +1053,8 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
     
     if portaria in portarias_semestral:
         # Portarias 021 e 090: Semestral + Final
-        # REGRA: Não gerar semestral parcial no final (menor que 6 meses)
+        # REGRA: Só gerar semestral se houver MAIS de 6 meses de vigência
+        # Se vigência <= 6 meses, gerar APENAS Final
         numero_prestacao = 1
         data_atual = data_inicio
         
@@ -900,9 +1062,10 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
             # Calcular fim do semestre (6 meses)
             data_fim_semestre = data_atual + relativedelta(months=6) - relativedelta(days=1)
             
-            # Se passou do término, verificar se é semestre completo
-            if data_fim_semestre > data_termino:
-                # Esta seria uma semestral parcial - NÃO gerar
+            # Se passou do término OU atingiu exatamente o término, NÃO gerar semestral
+            # Nestes casos, a prestação Final já cobre todo o período
+            if data_fim_semestre >= data_termino:
+                # Esta seria a única semestral OU uma semestral parcial - NÃO gerar
                 # A prestação Final já cobre todo o período
                 break
             

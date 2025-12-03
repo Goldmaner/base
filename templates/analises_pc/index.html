@@ -298,7 +298,10 @@
                 <div class="checklist-item" data-order="5">
                     <input type="checkbox" id="check_preenchimento_conciliacao_bancaria" onchange="handleCheckboxChange(this)">
                     <label for="check_preenchimento_conciliacao_bancaria">Preenchimento da conciliação bancária</label>
-                    <button class="btn btn-sm btn-info action-btn ms-3" onclick="abrirConciliacaoBancaria()" title="Construir e/ou consultar conciliações bancárias">
+                    <button type="button" class="info-badge" onclick="abrirModalAusenciaExtratos(); return false;">
+                        📄 Na ausência de extratos
+                    </button>
+                    <button class="btn btn-sm btn-info action-btn ms-2" onclick="abrirConciliacaoBancaria()" title="Construir e/ou consultar conciliações bancárias">
                         <i class="bi bi-bank me-1"></i>Construir e/ou consultar conciliações bancárias existentes
                     </button>
                 </div>
@@ -400,6 +403,57 @@
                     </a>
                     <button type="button" class="btn btn-success" onclick="criarPastaModelo()" id="btnCriarPasta">
                         <i class="bi bi-folder-plus"></i> Criar Pasta Modelo
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        ✖ Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Ausência de Extratos Bancários -->
+    <div class="modal fade modal-instrucao" id="modalAusenciaExtratos" tabindex="-1" aria-labelledby="modalAusenciaExtratosLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="modalAusenciaExtratosLabel">
+                        📄 Solicitação de Extratos Bancários - Ausência de Documentos
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Explicação -->
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Quando usar esta função:</strong>
+                        <p class="mb-0 mt-2">
+                            Esta função serve para quando <strong>não há extratos bancários (nenhum)</strong> ou 
+                            <strong>documentos de prestação de contas enviados</strong>.
+                        </p>
+                    </div>
+                    
+                    <!-- Área do Texto Gerado -->
+                    <div id="areaTextoGerado" style="display: none;">
+                        <h6 class="text-success mb-3">📝 Texto de Solicitação Gerado:</h6>
+                        <div class="border rounded p-3 bg-light">
+                            <div id="textoSolicitacaoHTML" class="instrucao-content"></div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-primary" onclick="copiarTextoSolicitacao()">
+                                <i class="bi bi-clipboard me-1"></i>Copiar Texto
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading -->
+                    <div id="loadingTexto" class="text-center text-muted" style="display: none;">
+                        <span class="spinner-border spinner-border-sm me-2"></span>Gerando texto de solicitação...
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="btnGerarTextoExtratos" onclick="gerarTextoSolicitacaoExtratos()">
+                        📄 Gerar texto de Solicitação de Extratos Bancários
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         ✖ Fechar
@@ -988,6 +1042,97 @@
             // Abrir modal
             const modal = new bootstrap.Modal(document.getElementById('modalInstrucaoPC'));
             modal.show();
+        }
+        
+        // Função para abrir modal de ausência de extratos
+        function abrirModalAusenciaExtratos() {
+            // Limpar área de texto gerado
+            document.getElementById('areaTextoGerado').style.display = 'none';
+            document.getElementById('loadingTexto').style.display = 'none';
+            document.getElementById('textoSolicitacaoHTML').innerHTML = '';
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('modalAusenciaExtratos'));
+            modal.show();
+        }
+        
+        // Função para gerar texto de solicitação de extratos
+        async function gerarTextoSolicitacaoExtratos() {
+            const numeroTermo = document.getElementById('numeroTermo').value;
+            
+            if (!numeroTermo) {
+                alert('Selecione um termo primeiro!');
+                return;
+            }
+            
+            try {
+                // Mostrar loading
+                document.getElementById('loadingTexto').style.display = 'block';
+                document.getElementById('areaTextoGerado').style.display = 'none';
+                document.getElementById('btnGerarTextoExtratos').disabled = true;
+                
+                // Buscar modelo de texto baseado na portaria do termo
+                const response = await fetch('/analises/api/modelo-ausencia-extratos', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Erro ao buscar modelo de texto');
+                }
+                
+                const data = await response.json();
+                
+                // Esconder loading
+                document.getElementById('loadingTexto').style.display = 'none';
+                
+                // Mostrar texto gerado
+                if (data.modelo_texto) {
+                    document.getElementById('textoSolicitacaoHTML').innerHTML = data.modelo_texto;
+                    document.getElementById('areaTextoGerado').style.display = 'block';
+                } else {
+                    alert('Modelo de texto não encontrado no sistema.');
+                }
+                
+            } catch (error) {
+                console.error('Erro ao gerar texto:', error);
+                alert('Erro ao gerar texto de solicitação: ' + error.message);
+                document.getElementById('loadingTexto').style.display = 'none';
+            } finally {
+                document.getElementById('btnGerarTextoExtratos').disabled = false;
+            }
+        }
+        
+        // Função para copiar texto de solicitação
+        function copiarTextoSolicitacao() {
+            const textoHTML = document.getElementById('textoSolicitacaoHTML').innerHTML;
+            
+            // Criar elemento temporário para copiar com formatação
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = textoHTML;
+            document.body.appendChild(tempDiv);
+            
+            // Selecionar e copiar
+            const range = document.createRange();
+            range.selectNode(tempDiv);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            
+            try {
+                document.execCommand('copy');
+                alert('✓ Texto copiado para a área de transferência!');
+            } catch (err) {
+                alert('Erro ao copiar texto. Por favor, copie manualmente.');
+            }
+            
+            // Limpar
+            window.getSelection().removeAllRanges();
+            document.body.removeChild(tempDiv);
         }
         
         // Função para abrir modal de dados base

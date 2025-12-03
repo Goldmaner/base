@@ -31,6 +31,23 @@
       text-align: center;
       padding: 20px;
     }
+    /* Estilos para modal de revisão */
+    #modalRevisaoTodos .card {
+      transition: border-left 0.3s ease;
+    }
+    #modalRevisaoTodos .table-sm th,
+    #modalRevisaoTodos .table-sm td {
+      padding: 0.5rem;
+      font-size: 0.9rem;
+    }
+    #revisaoTermosContainer {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .termo-checkbox {
+      transform: scale(1.2);
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -101,7 +118,10 @@
 
         <div class="mt-3">
           <button type="button" class="btn btn-primary btn-lg" id="btnGerarPrestacoes">
-            <i class="bi bi-calculator me-2"></i>Gerar Prestações
+            <i class="bi bi-calculator me-2"></i>Gerar Prestações (Termo Selecionado)
+          </button>
+          <button type="button" class="btn btn-success btn-lg ms-2" id="btnGerarTodos">
+            <i class="bi bi-lightning-charge me-2"></i>Gerar Todos os Termos Pendentes
           </button>
         </div>
       </div>
@@ -171,9 +191,63 @@
 
   </div>
 
+  <!-- Modal de Revisão - Múltiplos Termos -->
+  <div class="modal fade" id="modalRevisaoTodos" tabindex="-1" aria-labelledby="modalRevisaoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="modalRevisaoLabel">
+            <i class="bi bi-check2-square me-2"></i>Revisão - Adicionar Todos os Termos Pendentes
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Revisão Final:</strong> Revise as prestações geradas para cada termo. 
+            Desmarque os termos que NÃO deseja adicionar. Marque/desmarque campos conforme necessário.
+          </div>
+          
+          <!-- Ações em massa -->
+          <div class="mb-3 p-3 bg-light border rounded">
+            <h6>Ações em Massa:</h6>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnSelecionarTodos">
+              <i class="bi bi-check-all"></i> Selecionar Todos
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnDeselecionarTodos">
+              <i class="bi bi-x"></i> Desselecionar Todos
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-warning" id="btnMarcarEncerradoTodos">
+              <i class="bi bi-check-circle"></i> Marcar Todos como Encerrado
+            </button>
+          </div>
+          
+          <!-- Container de termos -->
+          <div id="revisaoTermosContainer"></div>
+          
+          <!-- Resumo -->
+          <div class="alert alert-secondary mt-3">
+            <strong>Resumo:</strong>
+            <span id="resumoTermosSelecionados">0 termos selecionados</span>, 
+            <span id="resumoPrestacoes">0 prestações no total</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <button type="button" class="btn btn-success" id="btnSalvarTodos">
+            <i class="bi bi-check-circle"></i> Salvar Termos Selecionados
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let prestacoesGeradas = [];
+    let todosTermosData = []; // Armazena dados de todos os termos
     const analistasData = {{ analistas | tojson }};
 
     // Filtrar termos ACP/TCC
@@ -194,7 +268,90 @@
       });
     });
 
-    // Gerar prestações ao clicar no botão
+    // Gerar TODOS os termos pendentes
+    document.getElementById('btnGerarTodos')?.addEventListener('click', async function() {
+      const todosTermos = Array.from(document.querySelectorAll('input[name="termo_selecionado"]'))
+        .filter(radio => {
+          // Filtrar apenas termos visíveis (não-ACP/TCC se checkbox desmarcado)
+          const termoOption = radio.closest('.termo-option');
+          return termoOption && termoOption.style.display !== 'none';
+        })
+        .map(radio => ({
+          numero_termo: radio.value,
+          inicio: radio.dataset.inicio,
+          termino: radio.dataset.termino,
+          portaria: radio.dataset.portaria
+        }));
+      
+      if (todosTermos.length === 0) {
+        alert('Nenhum termo visível para processar.');
+        return;
+      }
+      
+      if (!confirm(`Você está prestes a gerar prestações para ${todosTermos.length} termo(s). Continuar?`)) {
+        return;
+      }
+      
+      // Mostrar loading
+      document.getElementById('loadingContainer').style.display = 'block';
+      document.getElementById('loadingContainer').querySelector('p').textContent = 
+        `Processando ${todosTermos.length} termo(s)...`;
+      document.querySelector('.card').style.display = 'none';
+      
+      try {
+        // Processar todos os termos em sequência
+        todosTermosData = [];
+        
+        for (const [index, termo] of todosTermos.entries()) {
+          document.getElementById('loadingContainer').querySelector('p').textContent = 
+            `Processando termo ${index + 1} de ${todosTermos.length}: ${termo.numero_termo}...`;
+          
+          const response = await fetch('/analises/api/calcular-prestacoes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ numero_termo: termo.numero_termo })
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok) {
+            todosTermosData.push({
+              numero_termo: termo.numero_termo,
+              prestacoes: result.prestacoes,
+              rescindido: result.rescindido,
+              aviso: result.aviso,
+              selecionado: true // Por padrão, todos vêm selecionados
+            });
+          } else {
+            console.error(`Erro ao processar ${termo.numero_termo}:`, result.erro);
+            todosTermosData.push({
+              numero_termo: termo.numero_termo,
+              prestacoes: [],
+              erro: result.erro,
+              selecionado: false
+            });
+          }
+        }
+        
+        // Esconder loading
+        document.getElementById('loadingContainer').style.display = 'none';
+        
+        // Renderizar modal de revisão
+        renderizarModalRevisao();
+        
+        // Abrir modal
+        const modal = new bootstrap.Modal(document.getElementById('modalRevisaoTodos'));
+        modal.show();
+        
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao processar termos: ' + error.message);
+        document.getElementById('loadingContainer').style.display = 'none';
+        document.querySelector('.card').style.display = 'block';
+      }
+    });
+    
+    // Gerar prestações ao clicar no botão (termo individual)
     document.getElementById('btnGerarPrestacoes')?.addEventListener('click', async function() {
       const termoSelecionado = document.querySelector('input[name="termo_selecionado"]:checked');
       
@@ -452,6 +609,298 @@
       } catch (error) {
         console.error('Erro:', error);
         alert('Erro ao salvar: ' + error.message);
+      }
+    });
+    
+    // ============================================
+    // FUNÇÕES PARA MÚLTIPLOS TERMOS
+    // ============================================
+    
+    function renderizarModalRevisao() {
+      const container = document.getElementById('revisaoTermosContainer');
+      container.innerHTML = '';
+      
+      todosTermosData.forEach((termoData, termoIndex) => {
+        const termoCard = document.createElement('div');
+        termoCard.className = 'card mb-3';
+        termoCard.style.borderLeft = termoData.selecionado ? '4px solid #28a745' : '4px solid #ccc';
+        
+        let headerClass = 'bg-primary text-white';
+        if (termoData.rescindido) headerClass = 'bg-warning text-dark';
+        if (termoData.erro) headerClass = 'bg-danger text-white';
+        
+        let headerHTML = `
+          <div class="card-header ${headerClass}">
+            <div class="form-check d-inline-block me-3">
+              <input class="form-check-input termo-checkbox" 
+                     type="checkbox" 
+                     id="termo_check_${termoIndex}" 
+                     ${termoData.selecionado ? 'checked' : ''}
+                     data-termo-index="${termoIndex}">
+              <label class="form-check-label fw-bold" for="termo_check_${termoIndex}">
+                ${termoData.numero_termo}
+              </label>
+            </div>
+            ${termoData.rescindido ? '<span class="badge bg-danger ms-2">🔴 RESCINDIDO</span>' : ''}
+            <span class="badge bg-light text-dark ms-2">${termoData.prestacoes.length} prestação(ões)</span>
+          </div>
+        `;
+        
+        let bodyHTML = '';
+        
+        if (termoData.erro) {
+          bodyHTML = `
+            <div class="card-body">
+              <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Erro:</strong> ${termoData.erro}
+              </div>
+            </div>
+          `;
+        } else {
+          // Aviso de rescisão
+          if (termoData.rescindido && termoData.aviso) {
+            bodyHTML += `
+              <div class="alert alert-warning m-3">
+                <i class="bi bi-exclamation-triangle me-2"></i>${termoData.aviso}
+              </div>
+            `;
+          }
+          
+          // Renderizar prestações
+          bodyHTML += '<div class="card-body"><div class="table-responsive"><table class="table table-sm table-bordered">';
+          bodyHTML += `
+            <thead class="table-light">
+              <tr>
+                <th>Prestação</th>
+                <th>Vigência</th>
+                <th class="text-center">
+                  <input type="checkbox" class="form-check-input" 
+                         id="check_encerrado_termo_${termoIndex}" 
+                         title="Marcar todas como encerrado">
+                  Encerrado
+                </th>
+                <th>Responsável PG</th>
+              </tr>
+            </thead>
+            <tbody>
+          `;
+          
+          termoData.prestacoes.forEach((prestacao, prestIndex) => {
+            bodyHTML += `
+              <tr>
+                <td><strong>${prestacao.tipo_prestacao} - ${prestacao.numero_prestacao}</strong></td>
+                <td><small>${formatarData(prestacao.vigencia_inicial)} até ${formatarData(prestacao.vigencia_final)}</small></td>
+                <td class="text-center">
+                  <input type="checkbox" class="form-check-input checkbox-encerrado" 
+                         id="encerrado_${termoIndex}_${prestIndex}"
+                         data-termo-index="${termoIndex}"
+                         data-prest-index="${prestIndex}">
+                </td>
+                <td>
+                  <select class="form-select form-select-sm" 
+                          id="responsavel_pg_${termoIndex}_${prestIndex}"
+                          data-termo-index="${termoIndex}"
+                          data-prest-index="${prestIndex}">
+                    <option value="">Selecione...</option>
+                    ${analistasData.map(a => `<option value="${a.id}">${a.nome_analista}</option>`).join('')}
+                  </select>
+                </td>
+              </tr>
+            `;
+          });
+          
+          bodyHTML += '</tbody></table></div></div>';
+        }
+        
+        termoCard.innerHTML = headerHTML + bodyHTML;
+        container.appendChild(termoCard);
+      });
+      
+      atualizarResumo();
+      configurarEventosModal();
+    }
+    
+    function configurarEventosModal() {
+      // Checkbox de seleção de termo
+      document.querySelectorAll('.termo-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          const termoIndex = parseInt(this.dataset.termoIndex);
+          todosTermosData[termoIndex].selecionado = this.checked;
+          
+          // Atualizar borda do card
+          const card = this.closest('.card');
+          card.style.borderLeft = this.checked ? '4px solid #28a745' : '4px solid #ccc';
+          
+          atualizarResumo();
+        });
+      });
+      
+      // Checkbox "Marcar todas como encerrado" por termo
+      todosTermosData.forEach((termoData, termoIndex) => {
+        const checkTermo = document.getElementById(`check_encerrado_termo_${termoIndex}`);
+        if (checkTermo) {
+          checkTermo.addEventListener('change', function() {
+            const marcado = this.checked;
+            termoData.prestacoes.forEach((prest, prestIndex) => {
+              const checkPrest = document.getElementById(`encerrado_${termoIndex}_${prestIndex}`);
+              if (checkPrest) {
+                checkPrest.checked = marcado;
+                aplicarEncerramento(termoIndex, prestIndex, marcado);
+              }
+            });
+          });
+        }
+      });
+      
+      // Checkbox individual de encerramento
+      document.querySelectorAll('.checkbox-encerrado').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          const termoIndex = parseInt(this.dataset.termoIndex);
+          const prestIndex = parseInt(this.dataset.prestIndex);
+          aplicarEncerramento(termoIndex, prestIndex, this.checked);
+        });
+      });
+    }
+    
+    function aplicarEncerramento(termoIndex, prestIndex, encerrado) {
+      const prestacao = todosTermosData[termoIndex].prestacoes[prestIndex];
+      if (encerrado) {
+        prestacao.e_notificacao = true;
+        prestacao.e_parecer = true;
+        prestacao.e_fase_recursal = true;
+        prestacao.e_encerramento = true;
+        prestacao.valor_devolucao = 0;
+        prestacao.valor_devolvido = 0;
+      } else {
+        prestacao.e_notificacao = false;
+        prestacao.e_parecer = false;
+        prestacao.e_fase_recursal = false;
+        prestacao.e_encerramento = false;
+      }
+    }
+    
+    function atualizarResumo() {
+      const termosSelecionados = todosTermosData.filter(t => t.selecionado && !t.erro);
+      const totalPrestacoes = termosSelecionados.reduce((sum, t) => sum + t.prestacoes.length, 0);
+      
+      document.getElementById('resumoTermosSelecionados').textContent = 
+        `${termosSelecionados.length} termo(s) selecionado(s)`;
+      document.getElementById('resumoPrestacoes').textContent = 
+        `${totalPrestacoes} prestação(ões) no total`;
+    }
+    
+    // Botões de ação em massa
+    document.getElementById('btnSelecionarTodos')?.addEventListener('click', function() {
+      document.querySelectorAll('.termo-checkbox').forEach(cb => {
+        if (!cb.disabled) {
+          cb.checked = true;
+          cb.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+    
+    document.getElementById('btnDeselecionarTodos')?.addEventListener('click', function() {
+      document.querySelectorAll('.termo-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change'));
+      });
+    });
+    
+    document.getElementById('btnMarcarEncerradoTodos')?.addEventListener('click', function() {
+      if (!confirm('Marcar TODAS as prestações de TODOS os termos como encerrado?')) return;
+      
+      todosTermosData.forEach((termoData, termoIndex) => {
+        if (termoData.selecionado && !termoData.erro) {
+          termoData.prestacoes.forEach((prest, prestIndex) => {
+            const check = document.getElementById(`encerrado_${termoIndex}_${prestIndex}`);
+            if (check) {
+              check.checked = true;
+              aplicarEncerramento(termoIndex, prestIndex, true);
+            }
+          });
+        }
+      });
+      
+      alert('Todas as prestações marcadas como encerrado!');
+    });
+    
+    // Salvar todos os termos selecionados
+    document.getElementById('btnSalvarTodos')?.addEventListener('click', async function() {
+      const termosSelecionados = todosTermosData.filter(t => t.selecionado && !t.erro);
+      
+      if (termosSelecionados.length === 0) {
+        alert('Nenhum termo selecionado para salvar!');
+        return;
+      }
+      
+      const totalPrestacoes = termosSelecionados.reduce((sum, t) => sum + t.prestacoes.length, 0);
+      
+      if (!confirm(`Confirma o salvamento de ${termosSelecionados.length} termo(s) com ${totalPrestacoes} prestação(ões)?`)) {
+        return;
+      }
+      
+      // Preparar dados
+      const termosParaSalvar = termosSelecionados.map((termoData, termoIndex) => {
+        // Encontrar termoIndex original em todosTermosData
+        const indexOriginal = todosTermosData.indexOf(termoData);
+        
+        const analises = termoData.prestacoes.map((prestacao, prestIndex) => {
+          const responsavelPgSelect = document.getElementById(`responsavel_pg_${indexOriginal}_${prestIndex}`);
+          const responsavel_pg = responsavelPgSelect ? responsavelPgSelect.value : null;
+          
+          return {
+            tipo_prestacao: prestacao.tipo_prestacao,
+            numero_prestacao: prestacao.numero_prestacao,
+            vigencia_inicial: prestacao.vigencia_inicial,
+            vigencia_final: prestacao.vigencia_final,
+            entregue: prestacao.entregue || false,
+            cobrado: prestacao.cobrado || false,
+            e_notificacao: prestacao.e_notificacao || false,
+            e_parecer: prestacao.e_parecer || false,
+            e_fase_recursal: prestacao.e_fase_recursal || false,
+            e_encerramento: prestacao.e_encerramento || false,
+            data_parecer_dp: null,
+            data_parecer_pg: null,
+            responsavel_dp: null,
+            responsavel_pg: responsavel_pg,
+            valor_devolucao: prestacao.valor_devolucao || 0,
+            valor_devolvido: prestacao.valor_devolvido || 0,
+            observacoes: null
+          };
+        });
+        
+        return {
+          numero_termo: termoData.numero_termo,
+          analises: analises
+        };
+      });
+      
+      try {
+        this.disabled = true;
+        this.innerHTML = '<span class=\"spinner-border spinner-border-sm me-2\"></span>Salvando...';
+        
+        const response = await fetch('/analises/api/adicionar-multiplos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ termos: termosParaSalvar })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          alert(`Sucesso! ${result.termos_salvos} termo(s) com ${result.prestacoes_salvas} prestação(ões) adicionadas!`);
+          window.location.href = '/analises';
+        } else {
+          alert('Erro: ' + result.erro);
+          this.disabled = false;
+          this.innerHTML = '<i class=\"bi bi-check-circle\"></i> Salvar Termos Selecionados';
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao salvar: ' + error.message);
+        this.disabled = false;
+        this.innerHTML = '<i class=\"bi bi-check-circle\"></i> Salvar Termos Selecionados';
       }
     });
   </script>

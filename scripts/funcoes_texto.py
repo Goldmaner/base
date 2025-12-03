@@ -529,6 +529,12 @@ def identificar_coordenacoes(osc_nome):
       }
     """
     try:
+        # DEBUG para OSC ADRA
+        if 'ADRA' in osc_nome.upper():
+            print(f"\n{'='*80}")
+            print(f"[DEBUG identificar_coordenacoes] OSC ADRA detectada: {osc_nome}")
+            print(f"{'='*80}")
+        
         query = """
             SELECT DISTINCT p.numero_termo
             FROM public.parcerias p
@@ -545,6 +551,13 @@ def identificar_coordenacoes(osc_nome):
         cur.execute(query, (osc_nome,))
         resultados = cur.fetchall()
         cur.close()
+        
+        # DEBUG para OSC ADRA
+        if 'ADRA' in osc_nome.upper():
+            print(f"[DEBUG] Query executada com sucesso")
+            print(f"[DEBUG] Termos encontrados com responsabilidade 2 ou 3: {len(resultados)}")
+            for row in resultados:
+                print(f"  - {row.get('numero_termo', 'N/A')}")
         
         # Agrupar por SETOR SEI (não apenas por sigla)
         from collections import defaultdict
@@ -573,6 +586,23 @@ def identificar_coordenacoes(osc_nome):
                 # Agrupar por setor SEI
                 setores_dict[setor_sei]['sigla'] = sigla_dropdown
                 setores_dict[setor_sei]['termos'].append(numero_termo)
+                
+                # DEBUG para OSC ADRA
+                if 'ADRA' in osc_nome.upper():
+                    print(f"[DEBUG] Processando termo: {numero_termo}")
+                    print(f"  → Sigla extraída: {sigla}")
+                    print(f"  → Setor SEI: {setor_sei}")
+                    print(f"  → Sigla dropdown: {sigla_dropdown}")
+        
+        # DEBUG para OSC ADRA
+        if 'ADRA' in osc_nome.upper():
+            print(f"\n[DEBUG] Resultado final - setores_dict:")
+            for setor, info in setores_dict.items():
+                print(f"  {setor}:")
+                print(f"    - Sigla: {info['sigla']}")
+                print(f"    - Total termos: {len(info['termos'])}")
+                print(f"    - Termos: {info['termos']}")
+            print(f"{'='*80}\n")
         
         return dict(setores_dict)
         
@@ -717,6 +747,86 @@ def verificar_responsabilidades_mistas(osc_nome):
     - Dict com {'tem_dp': bool, 'tem_pos2023': bool, 'misto': bool}
     """
     try:
+        # DEBUG para OSC ADRA
+        if 'ADRA' in osc_nome.upper():
+            print(f"\n{'='*80}")
+            print(f"[DEBUG verificar_responsabilidades_mistas] OSC ADRA: {osc_nome}")
+            print(f"[DEBUG] Valor exato do osc_nome: '{osc_nome}'")
+            print(f"[DEBUG] Tamanho da string: {len(osc_nome)} caracteres")
+            print(f"{'='*80}")
+        
+        # Primeiro, verificar TODOS os termos da OSC (sem filtro de responsabilidade)
+        query_todos = """
+            SELECT 
+                p.numero_termo,
+                p.osc,
+                pa.responsabilidade_analise
+            FROM public.parcerias p
+            LEFT JOIN public.parcerias_analises pa ON p.numero_termo = pa.numero_termo
+            WHERE p.osc = %s
+            ORDER BY p.numero_termo
+        """
+        
+        cur = get_cursor()
+        if cur is None:
+            return {'tem_dp': False, 'tem_pos2023': False, 'misto': False}
+        
+        if 'ADRA' in osc_nome.upper():
+            print(f"\n[DEBUG] Executando query para buscar TODOS os termos...")
+            print(f"[DEBUG] Query: {query_todos}")
+            print(f"[DEBUG] Parâmetro osc_nome: '{osc_nome}'")
+            
+            cur.execute(query_todos, (osc_nome,))
+            todos_termos = cur.fetchall()
+            print(f"\n[DEBUG] TODOS os termos da OSC (total: {len(todos_termos)}):")
+            
+            if len(todos_termos) == 0:
+                print(f"[DEBUG] ⚠️ ATENÇÃO: Nenhum termo encontrado!")
+                print(f"[DEBUG] Vamos buscar OSCs parecidas no banco...")
+                
+                # Buscar OSCs que contenham "ADRA"
+                query_osc_like = """
+                    SELECT DISTINCT osc
+                    FROM public.parcerias
+                    WHERE UPPER(osc) LIKE %s
+                    LIMIT 10
+                """
+                cur.execute(query_osc_like, ('%ADRA%',))
+                oscs_parecidas = cur.fetchall()
+                print(f"\n[DEBUG] OSCs que contêm 'ADRA' no banco ({len(oscs_parecidas)}):")
+                for osc_row in oscs_parecidas:
+                    osc_db = osc_row.get('osc', 'N/A')
+                    print(f"  - '{osc_db}' (tamanho: {len(osc_db)})")
+                
+                # Buscar o termo específico TFM/111/2025/SMDHC/CPPI
+                query_termo_especifico = """
+                    SELECT p.numero_termo, p.osc, pa.responsabilidade_analise
+                    FROM public.parcerias p
+                    LEFT JOIN public.parcerias_analises pa ON p.numero_termo = pa.numero_termo
+                    WHERE p.numero_termo = 'TFM/111/2025/SMDHC/CPPI'
+                """
+                cur.execute(query_termo_especifico)
+                termo_especifico = cur.fetchall()
+                if len(termo_especifico) > 0:
+                    print(f"\n[DEBUG] ✅ Termo TFM/111/2025/SMDHC/CPPI ENCONTRADO:")
+                    for t in termo_especifico:
+                        print(f"  - OSC no banco: '{t.get('osc', 'N/A')}'")
+                        print(f"  - Responsabilidade: {t.get('responsabilidade_analise', 'NULL')}")
+                else:
+                    print(f"\n[DEBUG] ❌ Termo TFM/111/2025/SMDHC/CPPI NÃO encontrado no banco")
+            else:
+                for termo in todos_termos:
+                    resp = termo.get('responsabilidade_analise', 'NULL')
+                    print(f"  - {termo.get('numero_termo', 'N/A')}: responsabilidade = {resp}")
+                    
+                # Verificar especificamente o termo TFM/111/2025/SMDHC/CPPI
+                termo_encontrado = any(t.get('numero_termo') == 'TFM/111/2025/SMDHC/CPPI' for t in todos_termos)
+                if termo_encontrado:
+                    print(f"\n[DEBUG] ✅ Termo TFM/111/2025/SMDHC/CPPI está na lista!")
+                else:
+                    print(f"\n[DEBUG] ❌ Termo TFM/111/2025/SMDHC/CPPI NÃO está na lista!")
+        
+        # Query original para contar responsabilidades
         query = """
             SELECT 
                 COUNT(CASE WHEN pa.responsabilidade_analise = 1 THEN 1 END) as total_dp,
@@ -726,10 +836,6 @@ def verificar_responsabilidades_mistas(osc_nome):
             WHERE p.osc = %s
         """
         
-        cur = get_cursor()
-        if cur is None:
-            return {'tem_dp': False, 'tem_pos2023': False, 'misto': False}
-        
         cur.execute(query, (osc_nome,))
         resultado = cur.fetchone()
         cur.close()
@@ -737,6 +843,16 @@ def verificar_responsabilidades_mistas(osc_nome):
         tem_dp = resultado['total_dp'] > 0
         tem_pos2023 = resultado['total_pos2023'] > 0
         misto = tem_dp and tem_pos2023
+        
+        # DEBUG para OSC ADRA
+        if 'ADRA' in osc_nome.upper():
+            print(f"\n[DEBUG] Resultado da contagem:")
+            print(f"  - total_dp (resp=1): {resultado['total_dp']}")
+            print(f"  - total_pos2023 (resp=2 ou 3): {resultado['total_pos2023']}")
+            print(f"  - tem_dp: {tem_dp}")
+            print(f"  - tem_pos2023: {tem_pos2023}")
+            print(f"  - misto: {misto}")
+            print(f"{'='*80}\n")
         
         return {
             'tem_dp': tem_dp,
@@ -746,6 +862,8 @@ def verificar_responsabilidades_mistas(osc_nome):
         
     except Exception as e:
         print(f"[ERRO verificar_responsabilidades_mistas] {e}")
+        import traceback
+        traceback.print_exc()
         return {'tem_dp': False, 'tem_pos2023': False, 'misto': False}
 
 

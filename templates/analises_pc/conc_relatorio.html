@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Conciliação - Análise PC - FAF</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<style>
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+    
+    .relatorio-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .table-relatorio {
+        font-size: 1rem;
+        margin-bottom: 0;
+    }
+    
+    .table-relatorio th {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        font-weight: 600;
+        padding: 12px;
+        text-align: left;
+        border: none;
+    }
+    
+    .table-relatorio td {
+        padding: 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .table-relatorio tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .valor-destaque {
+        font-weight: 600;
+        color: #28a745;
+        font-size: 1.1rem;
+    }
+    
+    .info-termo {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 4px solid #667eea;
+    }
+    
+    .badge-tipo {
+        font-size: 0.9rem;
+        padding: 8px 12px;
+    }
+</style>
+</head>
+<body>
+
+<div class="container-fluid mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="bi bi-file-text"></i> Relatório de Conciliação</h4>
+        <div>
+            <button type="button" class="btn btn-warning btn-sm me-2" onclick="baixarDebugDP()" id="btnDebugDP" style="display: none;">
+                <i class="bi bi-bug"></i> Debug DP (CSV)
+            </button>
+            <button type="button" class="btn btn-success btn-sm me-2" onclick="exportarCSV()">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+            </button>
+            <button type="button" class="btn btn-danger btn-sm me-2" onclick="exportarPDF()">
+                <i class="bi bi-file-earmark-pdf"></i> Exportar PDF
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="voltarParaConc()">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </button>
+        </div>
+    </div>
+
+    <!-- Informações do Termo -->
+    <div class="relatorio-card">
+        <div class="info-termo">
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Número do Termo:</strong>
+                    <span id="numeroTermoDisplay">-</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Tipo de Relatório:</strong>
+                    <span class="badge bg-primary badge-tipo" id="tipoRelatorio">Pessoa Gestora</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controle de Rendimento -->
+    <div class="relatorio-card">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="checkRendimentoLiquido" onchange="carregarDados()">
+                    <label class="form-check-label" for="checkRendimentoLiquido">
+                        <strong>Considerar Rendimento Líquido</strong>
+                        <small class="text-muted">(Bruto - IR - IOF)</small>
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAlternarModo" onclick="alternarModoCalculo()" style="display: none;">
+                    <i class="bi bi-arrow-left-right"></i> <span id="textoAlternar">Visualizar como DP</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Cálculos -->
+    <div class="relatorio-card">
+        <div class="card-header bg-success text-white mb-3" style="margin: -25px -25px 20px -25px; padding: 15px 25px; border-radius: 10px 10px 0 0;">
+            <i class="bi bi-calculator"></i> <span id="tituloTabela">Tabela de Cálculos para Pessoa Gestora</span>
+        </div>
+
+        <table class="table table-relatorio table-bordered">
+            <thead>
+                <tr>
+                    <th style="width: 60%;">Descrição</th>
+                    <th style="width: 40%; text-align: right;">Valor (R$)</th>
+                </tr>
+            </thead>
+            <tbody id="tbodyRelatorio">
+                <tr>
+                    <td colspan="2" class="text-center text-muted">
+                        <em>Carregando dados...</em>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Detalhamento de Rendimentos (se considerar líquido) -->
+    <div class="relatorio-card" id="cardDetalhamentoRendimentos" style="display: none;">
+        <div class="card-header bg-info text-white mb-3" style="margin: -25px -25px 20px -25px; padding: 15px 25px; border-radius: 10px 10px 0 0;">
+            <i class="bi bi-info-circle"></i> Detalhamento de Rendimentos
+        </div>
+
+        <table class="table table-sm table-bordered">
+            <tbody>
+                <tr>
+                    <td><strong>Rendimento Bruto:</strong></td>
+                    <td class="text-end" id="rendimentoBruto">R$ 0,00</td>
+                </tr>
+                <tr>
+                    <td><strong>(-) Imposto de Renda:</strong></td>
+                    <td class="text-end text-danger" id="rendimentoIR">R$ 0,00</td>
+                </tr>
+                <tr>
+                    <td><strong>(-) IOF:</strong></td>
+                    <td class="text-end text-danger" id="rendimentoIOF">R$ 0,00</td>
+                </tr>
+                <tr class="table-success">
+                    <td><strong>Rendimento Líquido:</strong></td>
+                    <td class="text-end fw-bold" id="rendimentoLiquido">R$ 0,00</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let dadosAtuais = null;
+    let modoVisualizacao = null; // 'original', 'pg', 'dp'
+    let responsabilidadeOriginal = null;
+
+    window.onload = function() {
+        // Prioriza o parâmetro da URL, depois a sessão
+        const params = new URLSearchParams(window.location.search);
+        const termoUrl = params.get('termo');
+        const termoSessao = '{{ session.get("numero_termo", "") }}';
+        const termo = termoUrl || termoSessao;
+        
+        if (termo) {
+            document.getElementById('numeroTermoDisplay').textContent = termo;
+            carregarDados(termo);
+        } else {
+            alert('Número do termo não encontrado');
+        }
+    };
+
+    function voltarParaConc() {
+        const params = new URLSearchParams(window.location.search);
+        const termoUrl = params.get('termo');
+        const termoSessao = '{{ session.get("numero_termo", "") }}';
+        const termo = termoUrl || termoSessao;
+        
+        if (termo) {
+            window.location.href = `/conc_bancaria/?termo=${encodeURIComponent(termo)}`;
+        } else {
+            window.location.href = '/conc_bancaria/';
+        }
+    }
+
+    async function carregarDados(termoParam = null) {
+        const params = new URLSearchParams(window.location.search);
+        const termoUrl = params.get('termo');
+        const termoSessao = '{{ session.get("numero_termo", "") }}';
+        const termo = termoParam || termoUrl || termoSessao;
+        
+        if (!termo) {
+            alert('Número do termo não encontrado');
+            return;
+        }
+
+        const considerarLiquido = document.getElementById('checkRendimentoLiquido').checked;
+
+        try {
+            const response = await fetch(`/conc_relatorio/api/dados-relatorio?numero_termo=${encodeURIComponent(termo)}&considerar_liquido=${considerarLiquido}`);
+            
+            if (!response.ok) {
+                let errorMsg = 'Erro ao carregar dados';
+                try {
+                    const error = await response.json();
+                    errorMsg = error.erro || errorMsg;
+                } catch (e) {
+                    errorMsg = `Erro ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMsg);
+            }
+
+            dadosAtuais = await response.json();
+            renderizarTabela(dadosAtuais);
+            
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            alert(`Erro: ${error.message}`);
+        }
+    }
+
+    function renderizarTabela(dados) {
+        const tbody = document.getElementById('tbodyRelatorio');
+        tbody.innerHTML = '';
+        
+        // Salvar responsabilidade original na primeira renderização
+        if (responsabilidadeOriginal === null) {
+            responsabilidadeOriginal = dados.responsabilidade;
+        }
+        
+        // Atualizar badge e botões
+        const badgeTipo = document.getElementById('tipoRelatorio');
+        const btnDebug = document.getElementById('btnDebugDP');
+        const btnAlternar = document.getElementById('btnAlternarModo');
+        const textoAlternar = document.getElementById('textoAlternar');
+        const tituloTabela = document.getElementById('tituloTabela');
+        
+        // Determinar modo atual (prioriza visualização manual)
+        let modoAtual = dados.tipo_relatorio;
+        if (modoVisualizacao === 'pg') {
+            modoAtual = 'pessoa_gestora';
+        } else if (modoVisualizacao === 'dp') {
+            modoAtual = 'departamento_parcerias';
+        }
+        
+        if (modoAtual === 'departamento_parcerias') {
+            badgeTipo.textContent = 'Departamento de Parcerias';
+            badgeTipo.className = 'badge bg-info badge-tipo';
+            btnDebug.style.display = 'inline-block';
+            tituloTabela.textContent = 'Tabela de Cálculos';
+            renderizarTabelaDP(dados, tbody);
+            
+            // Mostrar botão alternar se for PG original
+            if (responsabilidadeOriginal === 3) {
+                btnAlternar.style.display = 'inline-block';
+                textoAlternar.textContent = 'Voltar para PG';
+            } else {
+                btnAlternar.style.display = 'none';
+            }
+        } else {
+            badgeTipo.textContent = 'Pessoa Gestora';
+            badgeTipo.className = 'badge bg-primary badge-tipo';
+            btnDebug.style.display = 'none';
+            tituloTabela.textContent = 'Tabela de Cálculos para Pessoa Gestora';
+            renderizarTabelaPG(dados, tbody);
+            
+            // Mostrar botão alternar se for PG original
+            if (responsabilidadeOriginal === 3) {
+                btnAlternar.style.display = 'inline-block';
+                textoAlternar.textContent = 'Visualizar como DP';
+            } else {
+                btnAlternar.style.display = 'none';
+            }
+        }
+        
+        // Exibir detalhamento se rendimento líquido
+        const cardDetalhamento = document.getElementById('cardDetalhamentoRendimentos');
+        if (dados.considerar_liquido) {
+            cardDetalhamento.style.display = 'block';
+            document.getElementById('rendimentoBruto').textContent = formatarMoeda(dados.rendimentos.bruto);
+            document.getElementById('rendimentoIR').textContent = formatarMoeda(dados.rendimentos.ir);
+            document.getElementById('rendimentoIOF').textContent = formatarMoeda(dados.rendimentos.iof);
+            document.getElementById('rendimentoLiquido').textContent = formatarMoeda(dados.rendimentos.liquido);
+        } else {
+            cardDetalhamento.style.display = 'none';
+        }
+    }
+    
+    function renderizarTabelaDP(dados, tbody) {
+        let row;
+        
+        // Valor Total Previsto
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Total Previsto</strong></td>
+            <td class="text-end valor-destaque">${formatarMoeda(dados.valor_total_previsto)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Valor Repassado
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Repassado</strong></td>
+            <td class="text-end">${formatarMoeda(dados.valor_repassado)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Rendimentos
+        const labelRendimento = dados.considerar_liquido ? 'Rendimentos (Líquido)' : 'Rendimentos (Bruto)';
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${labelRendimento}</strong></td>
+            <td class="text-end">${formatarMoeda(dados.rendimentos.valor_usado)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Contrapartida (se houver)
+        if (dados.tem_contrapartida) {
+            row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>Contrapartida</strong></td>
+                <td class="text-end">${formatarMoeda(dados.contrapartida)}</td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        // Valor Total do Projeto
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Total do Projeto</strong></td>
+            <td class="text-end valor-destaque">${formatarMoeda(dados.valor_total_projeto)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Valor Executado e Aprovado
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Executado e Aprovado</strong></td>
+            <td class="text-end text-success">${formatarMoeda(dados.valor_executado_aprovado)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // === TOTAL DE DESCONTOS ===
+        row = document.createElement('tr');
+        row.className = 'table-warning';
+        row.innerHTML = `
+            <td><strong>Total de Descontos</strong></td>
+            <td class="text-end fw-bold">${formatarMoeda(dados.total_descontos)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Saldos não Utilizados Remanescentes
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Saldos não Utilizados Remanescentes</td>
+            <td class="text-end">${formatarMoeda(dados.saldos_remanescentes)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Descontos já Realizados
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Descontos já Realizados</td>
+            <td class="text-end">${formatarMoeda(dados.descontos_realizados)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Descontos de Contrapartida
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Descontos de Contrapartida</td>
+            <td class="text-end">${formatarMoeda(dados.desconto_contrapartida)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Despesas Passíveis de Glosa
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Despesas Passíveis de Glosa</td>
+            <td class="text-end text-danger">${formatarMoeda(dados.despesas_glosa)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Taxas Bancárias não Devolvidas
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Taxas Bancárias não Devolvidas</td>
+            <td class="text-end">${formatarMoeda(dados.taxas_nao_devolvidas)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Valores já Devolvidos
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valores já Devolvidos</strong></td>
+            <td class="text-end text-success">${formatarMoeda(dados.valores_devolvidos)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Valor a ser Ressarcido
+        row = document.createElement('tr');
+        row.className = 'table-danger';
+        row.innerHTML = `
+            <td><strong>Valor a ser Ressarcido</strong></td>
+            <td class="text-end fw-bold text-danger">${formatarMoeda(dados.valor_ressarcido)}</td>
+        `;
+        tbody.appendChild(row);
+    }
+    
+    function renderizarTabelaPG(dados, tbody) {
+        let row;
+        
+        // Valor Total Previsto
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Total Previsto</strong></td>
+            <td class="text-end valor-destaque">${formatarMoeda(dados.valor_total_disponivel)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Valor Repassado
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Repassado</strong></td>
+            <td class="text-end">${formatarMoeda(dados.valor_repassado)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Rendimentos (Bruto ou Líquido)
+        const labelRendimento = dados.considerar_liquido ? 'Rendimentos (Líquido)' : 'Rendimentos (Bruto)';
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${labelRendimento}</strong></td>
+            <td class="text-end">${formatarMoeda(dados.rendimentos.valor_usado)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Valor Total Disponível = Valor Repassado + Rendimentos
+        const valorTotalCalculado = dados.valor_repassado + dados.rendimentos.valor_usado;
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Total Disponível para o Projeto</strong></td>
+            <td class="text-end valor-destaque">${formatarMoeda(valorTotalCalculado)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Contrapartida (só se houver)
+        if (dados.tem_contrapartida) {
+            row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>Contrapartida</strong></td>
+                <td class="text-end">${formatarMoeda(dados.contrapartida)}</td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        // Valor Executado com Destinatários Identificados
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Executado com Destinatários Identificados</strong></td>
+            <td class="text-end">${formatarMoeda(dados.valor_dest_identificado)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Destinatários não Identificados
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Destinatários não Identificados</strong></td>
+            <td class="text-end">${formatarMoeda(dados.valor_dest_nao_identificado)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Taxas Bancárias não Devolvidas
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Taxas Bancárias não Devolvidas</strong></td>
+            <td class="text-end">${formatarMoeda(dados.taxas_nao_devolvidas)}</td>
+        `;
+        tbody.appendChild(row);
+
+        // Crédito Externo da OSC (só se houver)
+        if (dados.tem_credito_externo) {
+            row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>Crédito Externo da OSC</strong></td>
+                <td class="text-end">${formatarMoeda(dados.credito_externo)}</td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        // Glosas (só se houver)
+        if (dados.tem_glosas) {
+            row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>Glosas</strong></td>
+                <td class="text-end text-danger">${formatarMoeda(dados.glosas)}</td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        // Saldos não Utilizados no Período
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Saldos não Utilizados no Período</strong></td>
+            <td class="text-end ${dados.saldos_nao_utilizados < 0 ? 'text-danger' : 'text-success'}">${formatarMoeda(dados.saldos_nao_utilizados)}</td>
+        `;
+        tbody.appendChild(row);
+    }
+
+    function formatarMoeda(valor) {
+        if (!valor || isNaN(valor)) return 'R$ 0,00';
+        return 'R$ ' + new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(valor);
+    }
+
+    function baixarDebugDP() {
+        const params = new URLSearchParams(window.location.search);
+        const termoUrl = params.get('termo');
+        const termoSessao = '{{ session.get("numero_termo", "") }}';
+        const termo = termoUrl || termoSessao;
+        
+        if (!termo) {
+            alert('Número do termo não encontrado');
+            return;
+        }
+        
+        // Abrir em nova aba para download
+        const url = `/conc_relatorio/api/debug-executado-aprovado?numero_termo=${encodeURIComponent(termo)}`;
+        window.open(url, '_blank');
+    }
+    
+    async function alternarModoCalculo() {
+        if (!dadosAtuais) {
+            alert('Carregue os dados primeiro');
+            return;
+        }
+        
+        // Alternar entre PG e DP
+        if (modoVisualizacao === 'dp' || dadosAtuais.tipo_relatorio === 'departamento_parcerias') {
+            // Voltar para PG
+            modoVisualizacao = 'pg';
+        } else {
+            // Mudar para DP
+            modoVisualizacao = 'dp';
+        }
+        
+        // Recarregar dados com o novo modo
+        const params = new URLSearchParams(window.location.search);
+        const termoUrl = params.get('termo');
+        const termoSessao = '{{ session.get("numero_termo", "") }}';
+        const termo = termoUrl || termoSessao;
+        
+        if (!termo) return;
+        
+        const considerarLiquido = document.getElementById('checkRendimentoLiquido').checked;
+        
+        try {
+            // Forçar recalcular como DP ou PG
+            const response = await fetch(`/conc_relatorio/api/dados-relatorio?numero_termo=${encodeURIComponent(termo)}&considerar_liquido=${considerarLiquido}&forcar_modo=${modoVisualizacao}`);
+            
+            if (!response.ok) {
+                throw new Error('Erro ao carregar dados');
+            }
+
+            dadosAtuais = await response.json();
+            
+            // Forçar tipo de relatório baseado no modo
+            if (modoVisualizacao === 'dp') {
+                dadosAtuais.tipo_relatorio = 'departamento_parcerias';
+            } else if (modoVisualizacao === 'pg') {
+                dadosAtuais.tipo_relatorio = 'pessoa_gestora';
+            }
+            
+            renderizarTabela(dadosAtuais);
+            
+        } catch (error) {
+            console.error('Erro ao alternar modo:', error);
+            alert(`Erro: ${error.message}`);
+        }
+    }
+
+    function exportarCSV() {
+        if (!dadosAtuais) {
+            alert('Carregue os dados primeiro');
+            return;
+        }
+
+        const termo = dadosAtuais.numero_termo;
+        const tipoRendimento = dadosAtuais.considerar_liquido ? 'Líquido' : 'Bruto';
+        
+        // Cabeçalho CSV
+        let csv = 'Descrição;Valor (R$)\n';
+        
+        // Dados diferentes por tipo
+        if (dadosAtuais.tipo_relatorio === 'departamento_parcerias') {
+            csv += `Valor Total Previsto;${dadosAtuais.valor_total_previsto.toFixed(2).replace('.', ',')}\n`;
+            csv += `Valor Repassado;${dadosAtuais.valor_repassado.toFixed(2).replace('.', ',')}\n`;
+            csv += `Rendimentos (${tipoRendimento});${dadosAtuais.rendimentos.valor_usado.toFixed(2).replace('.', ',')}\n`;
+            
+            if (dadosAtuais.tem_contrapartida) {
+                csv += `Contrapartida;${dadosAtuais.contrapartida.toFixed(2).replace('.', ',')}\n`;
+            }
+            
+            csv += `Valor Total do Projeto;${dadosAtuais.valor_total_projeto.toFixed(2).replace('.', ',')}\n`;
+            csv += `Valor Executado e Aprovado;${dadosAtuais.valor_executado_aprovado.toFixed(2).replace('.', ',')}\n`;
+            csv += `Total de Descontos;${dadosAtuais.total_descontos.toFixed(2).replace('.', ',')}\n`;
+            csv += `• Saldos não Utilizados Remanescentes;${dadosAtuais.saldos_remanescentes.toFixed(2).replace('.', ',')}\n`;
+            csv += `• Descontos já Realizados;${dadosAtuais.descontos_realizados.toFixed(2).replace('.', ',')}\n`;
+            csv += `• Descontos de Contrapartida;${dadosAtuais.desconto_contrapartida.toFixed(2).replace('.', ',')}\n`;
+            csv += `• Despesas Passíveis de Glosa;${dadosAtuais.despesas_glosa.toFixed(2).replace('.', ',')}\n`;
+            csv += `• Taxas Bancárias não Devolvidas;${dadosAtuais.taxas_nao_devolvidas.toFixed(2).replace('.', ',')}\n`;
+            csv += `Valores já Devolvidos;${dadosAtuais.valores_devolvidos.toFixed(2).replace('.', ',')}\n`;
+            csv += `Valor a ser Ressarcido;${dadosAtuais.valor_ressarcido.toFixed(2).replace('.', ',')}\n`;
+        } else {
+            // Pessoa Gestora
+            csv += `Valor Total Previsto;${dadosAtuais.valor_total_disponivel.toFixed(2).replace('.', ',')}\n`;
+            csv += `Valor Repassado;${dadosAtuais.valor_repassado.toFixed(2).replace('.', ',')}\n`;
+            csv += `Rendimentos (${tipoRendimento});${dadosAtuais.rendimentos.valor_usado.toFixed(2).replace('.', ',')}\n`;
+            
+            const valorTotal = dadosAtuais.valor_repassado + dadosAtuais.rendimentos.valor_usado;
+            csv += `Valor Total Disponível para o Projeto;${valorTotal.toFixed(2).replace('.', ',')}\n`;
+            
+            if (dadosAtuais.tem_contrapartida) {
+                csv += `Contrapartida;${dadosAtuais.contrapartida.toFixed(2).replace('.', ',')}\n`;
+            }
+            
+            csv += `Valor Executado com Destinatários Identificados;${dadosAtuais.valor_dest_identificado.toFixed(2).replace('.', ',')}\n`;
+            csv += `Destinatários não Identificados;${dadosAtuais.valor_dest_nao_identificado.toFixed(2).replace('.', ',')}\n`;
+            csv += `Taxas Bancárias não Devolvidas;${dadosAtuais.taxas_nao_devolvidas.toFixed(2).replace('.', ',')}\n`;
+            
+            if (dadosAtuais.tem_credito_externo) {
+                csv += `Crédito Externo da OSC;${dadosAtuais.credito_externo.toFixed(2).replace('.', ',')}\n`;
+            }
+            
+            if (dadosAtuais.tem_glosas) {
+                csv += `Glosas;${dadosAtuais.glosas.toFixed(2).replace('.', ',')}\n`;
+            }
+            
+            csv += `Saldos não Utilizados no Período;${dadosAtuais.saldos_nao_utilizados.toFixed(2).replace('.', ',')}\n`;
+        }
+        
+        // Download
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `relatorio_${termo.replace(/\//g, '_')}.csv`;
+        link.click();
+    }
+
+    function exportarPDF() {
+        if (!dadosAtuais) {
+            alert('Carregue os dados primeiro');
+            return;
+        }
+
+        const termo = dadosAtuais.numero_termo;
+        const tipoRendimento = dadosAtuais.considerar_liquido ? 'Líquido' : 'Bruto';
+        
+        // Criar janela de impressão com formatação
+        const printWindow = window.open('', '_blank');
+        
+        let html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Conciliação - ${termo}</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #28a745; font-size: 20px; }
+        .info { background: #f8f9fa; padding: 10px; margin-bottom: 20px; border-left: 4px solid #667eea; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background: #28a745; color: white; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #dee2e6; }
+        .valor { text-align: right; }
+        .destaque { font-weight: bold; color: #28a745; }
+        .negativo { color: #dc3545; }
+        @media print {
+            body { margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Relatório de Conciliação</h1>
+    <div class="info">
+        <strong>Número do Termo:</strong> ${termo}<br>
+        <strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Descrição</th>
+                <th class="valor">Valor (R$)</th>
+            </tr>
+        </thead>
+        <tbody>`;
+        
+        if (dadosAtuais.tipo_relatorio === 'departamento_parcerias') {
+            // Tabela DP
+            html += `
+            <tr>
+                <td><strong>Valor Total Previsto</strong></td>
+                <td class="valor destaque">${formatarMoeda(dadosAtuais.valor_total_previsto)}</td>
+            </tr>
+            <tr>
+                <td><strong>Valor Repassado</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.valor_repassado)}</td>
+            </tr>
+            <tr>
+                <td><strong>Rendimentos (${tipoRendimento})</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.rendimentos.valor_usado)}</td>
+            </tr>`;
+            
+            if (dadosAtuais.tem_contrapartida) {
+                html += `
+            <tr>
+                <td><strong>Contrapartida</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.contrapartida)}</td>
+            </tr>`;
+            }
+            
+            html += `
+            <tr>
+                <td><strong>Valor Total do Projeto</strong></td>
+                <td class="valor destaque">${formatarMoeda(dadosAtuais.valor_total_projeto)}</td>
+            </tr>
+            <tr>
+                <td><strong>Valor Executado e Aprovado</strong></td>
+                <td class="valor" style="color: #28a745;">${formatarMoeda(dadosAtuais.valor_executado_aprovado)}</td>
+            </tr>
+            <tr style="background: #fff3cd;">
+                <td><strong>Total de Descontos</strong></td>
+                <td class="valor" style="font-weight: bold;">${formatarMoeda(dadosAtuais.total_descontos)}</td>
+            </tr>
+            <tr>
+                <td style="padding-left: 30px;">• Saldos não Utilizados Remanescentes</td>
+                <td class="valor">${formatarMoeda(dadosAtuais.saldos_remanescentes)}</td>
+            </tr>
+            <tr>
+                <td style="padding-left: 30px;">• Descontos já Realizados</td>
+                <td class="valor">${formatarMoeda(dadosAtuais.descontos_realizados)}</td>
+            </tr>
+            <tr>
+                <td style="padding-left: 30px;">• Descontos de Contrapartida</td>
+                <td class="valor">${formatarMoeda(dadosAtuais.desconto_contrapartida)}</td>
+            </tr>
+            <tr>
+                <td style="padding-left: 30px;">• Despesas Passíveis de Glosa</td>
+                <td class="valor negativo">${formatarMoeda(dadosAtuais.despesas_glosa)}</td>
+            </tr>
+            <tr>
+                <td style="padding-left: 30px;">• Taxas Bancárias não Devolvidas</td>
+                <td class="valor">${formatarMoeda(dadosAtuais.taxas_nao_devolvidas)}</td>
+            </tr>
+            <tr>
+                <td><strong>Valores já Devolvidos</strong></td>
+                <td class="valor" style="color: #28a745;">${formatarMoeda(dadosAtuais.valores_devolvidos)}</td>
+            </tr>
+            <tr style="background: #f8d7da;">
+                <td><strong>Valor a ser Ressarcido</strong></td>
+                <td class="valor negativo" style="font-weight: bold;">${formatarMoeda(dadosAtuais.valor_ressarcido)}</td>
+            </tr>`;
+        } else {
+            // Tabela PG
+            html += `
+            <tr>
+                <td><strong>Valor Total Previsto</strong></td>
+                <td class="valor destaque">${formatarMoeda(dadosAtuais.valor_total_disponivel)}</td>
+            </tr>
+            <tr>
+                <td><strong>Valor Repassado</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.valor_repassado)}</td>
+            </tr>
+            <tr>
+                <td><strong>Rendimentos (${tipoRendimento})</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.rendimentos.valor_usado)}</td>
+            </tr>
+            <tr>
+                <td><strong>Valor Total Disponível para o Projeto</strong></td>
+                <td class="valor destaque">${formatarMoeda(dadosAtuais.valor_repassado + dadosAtuais.rendimentos.valor_usado)}</td>
+            </tr>`;
+        
+            if (dadosAtuais.tem_contrapartida) {
+                html += `
+            <tr>
+                <td><strong>Contrapartida</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.contrapartida)}</td>
+            </tr>`;
+            }
+        
+            html += `
+            <tr>
+                <td><strong>Valor Executado com Destinatários Identificados</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.valor_dest_identificado)}</td>
+            </tr>
+            <tr>
+                <td><strong>Destinatários não Identificados</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.valor_dest_nao_identificado)}</td>
+            </tr>
+            <tr>
+                <td><strong>Taxas Bancárias não Devolvidas</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.taxas_nao_devolvidas)}</td>
+            </tr>`;
+        
+            if (dadosAtuais.tem_credito_externo) {
+                html += `
+            <tr>
+                <td><strong>Crédito Externo da OSC</strong></td>
+                <td class="valor">${formatarMoeda(dadosAtuais.credito_externo)}</td>
+            </tr>`;
+            }
+        
+            if (dadosAtuais.tem_glosas) {
+                html += `
+            <tr>
+                <td><strong>Glosas</strong></td>
+                <td class="valor negativo">${formatarMoeda(dadosAtuais.glosas)}</td>
+            </tr>`;
+            }
+        
+            const saldoClass = dadosAtuais.saldos_nao_utilizados < 0 ? 'negativo' : '';
+            html += `
+            <tr>
+                <td><strong>Saldos não Utilizados no Período</strong></td>
+                <td class="valor ${saldoClass}">${formatarMoeda(dadosAtuais.saldos_nao_utilizados)}</td>
+            </tr>`;
+        }
+        
+        html += `
+        </tbody>
+    </table>
+</body>
+</html>`;
+        
+        printWindow.document.write(html);
+        printWindow.document.close();
+        
+        // Aguardar carregamento e imprimir
+        printWindow.onload = function() {
+            printWindow.print();
+        };
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rendimentos de Ativos Financeiros - Análise PC - FAF</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<style>
+    .rend-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .table-rend {
+        font-size: 0.9rem;
+        border-collapse: collapse;
+        margin-bottom: 0;
+        width: 100%;
+    }
+    
+    .table-rend thead th {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        font-weight: 600;
+        padding: 12px 8px;
+        border: none;
+        text-align: center;
+        vertical-align: middle;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-rend tbody td {
+        padding: 8px;
+        vertical-align: middle;
+        border: 1px solid #dee2e6;
+    }
+    
+    .table-rend tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .table-rend tfoot td {
+        background-color: #e9ecef;
+        font-weight: bold;
+        padding: 10px 8px;
+        border-top: 3px solid #28a745;
+    }
+    
+    .cell-input {
+        width: 100%;
+        border: none;
+        padding: 6px;
+        text-align: center;
+        background: transparent;
+    }
+    
+    .cell-input:focus {
+        outline: 2px solid #28a745;
+        background: #f0fff4;
+    }
+    
+    .cell-money {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+    }
+    
+    .cell-calculated {
+        background-color: #e7f5ff;
+        font-weight: 600;
+    }
+    
+    .table-container {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+    
+    .tooltip-header {
+        cursor: pointer;
+        position: relative;
+    }
+    
+    .tooltip-header .info-icon {
+        color: white;
+        font-size: 0.9rem;
+        margin-left: 5px;
+        opacity: 0.8;
+    }
+    
+    .tooltip-header:hover .info-icon {
+        opacity: 1;
+    }
+</style>
+</head>
+<body>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-piggy-bank me-2"></i>Rendimentos de Ativos Financeiros</h2>
+        <div>
+            <a href="#" id="btnVoltar" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left me-1"></i>Voltar
+            </a>
+            <button class="btn btn-success me-2" onclick="salvarRendimentos()" id="btnSalvar" style="display: none;">
+                <i class="bi bi-save me-1"></i>Salvar
+            </button>
+            <button class="btn btn-outline-primary me-2" onclick="exportarCSV()">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>CSV
+            </button>
+            <button class="btn btn-outline-danger" onclick="exportarPDF()">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Seleção de Termo -->
+    <div class="rend-card">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label for="numeroTermo" class="form-label"><strong>Número do Termo</strong></label>
+                <input type="text" 
+                       class="form-control" 
+                       id="numeroTermo" 
+                       readonly>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label"><strong>Período do Projeto</strong></label>
+                <input type="text" class="form-control" id="periodoTermo" readonly>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label"><strong>Total de Meses</strong></label>
+                <input type="text" class="form-control" id="totalMeses" readonly>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Rendimentos -->
+    <div class="rend-card">
+        <div class="table-container">
+            <table class="table table-rend table-hover" id="tabelaRendimentos">
+                <thead>
+                    <tr>
+                        <th class="tooltip-header" onclick="mostrarInfo('mes')" style="width: 15%;">
+                            Mês/Ano
+                            <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th class="tooltip-header" onclick="mostrarInfo('rendimento_bruto')" style="width: 18%;">
+                            Rendimento Bruto (R$)
+                            <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th class="tooltip-header" onclick="mostrarInfo('ir')" style="width: 15%;">
+                            IR (R$)
+                            <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th class="tooltip-header" onclick="mostrarInfo('iof')" style="width: 15%;">
+                            IOF (R$)
+                            <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th class="tooltip-header" onclick="mostrarInfo('valor_liquido')" style="width: 18%;">
+                            Valor Líquido (R$)
+                            <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                        <th class="tooltip-header" onclick="mostrarInfo('observacoes')" style="width: 19%;">
+                            Observações
+                            <i class="bi bi-info-circle info-icon"></i>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyRendimentos">
+                    <!-- Linhas geradas dinamicamente -->
+                </tbody>
+                <tbody>
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="adicionarNovaLinha()">
+                                <i class="bi bi-plus-circle"></i> Adicionar Mês
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="text-center">TOTAL</td>
+                        <td class="cell-money" id="totalBruto">R$ 0,00</td>
+                        <td class="cell-money" id="totalIR">R$ 0,00</td>
+                        <td class="cell-money" id="totalIOF">R$ 0,00</td>
+                        <td class="cell-money" id="totalLiquido">R$ 0,00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Informação -->
+<div class="modal fade" id="modalInfo" tabindex="-1" aria-labelledby="modalInfoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInfoLabel">Informação da Coluna</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modalInfoBody">
+                <!-- Conteúdo dinâmico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let rendimentos = [];
+    let periodoTermo = { inicio: null, final: null };
+    let mesesProjeto = [];
+    
+    // Textos informativos
+    const infos = {
+        'mes': 'Mês e ano de referência do rendimento de ativos financeiros. Gerado automaticamente com base no período do projeto (início e término).',
+        'rendimento_bruto': 'Valor bruto dos rendimentos de aplicações financeiras no mês, antes dos descontos de IR e IOF. Digite apenas números e vírgulas para decimais.',
+        'ir': 'Imposto de Renda retido na fonte sobre os rendimentos de aplicações financeiras. Digite apenas números e vírgulas para decimais.',
+        'iof': 'Imposto sobre Operações Financeiras retido sobre os rendimentos de aplicações financeiras. Digite apenas números e vírgulas para decimais.',
+        'valor_liquido': 'Valor líquido dos rendimentos após descontos de IR e IOF. Calculado automaticamente pela fórmula: Rendimento Bruto - IR - IOF.',
+        'observacoes': 'Campo livre para anotações e observações do analista sobre os rendimentos do mês. Útil para registrar informações adicionais, justificativas ou pendências.'
+    };
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        carregarDados();
+        
+        // Adicionar navegação por teclado
+        document.addEventListener('keydown', function(e) {
+            const target = e.target;
+            
+            // Verificar se é um input da tabela
+            if (!target.classList.contains('cell-input')) return;
+            
+            // Enter - move para célula de baixo (mesma coluna)
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                moverFoco(target, 'down');
+            }
+            // Tab - move para célula da direita
+            else if (e.key === 'Tab' && !e.ctrlKey) {
+                e.preventDefault();
+                moverFoco(target, e.shiftKey ? 'left' : 'right');
+            }
+            // Ctrl + Tab - move para célula da esquerda
+            else if (e.key === 'Tab' && e.ctrlKey) {
+                e.preventDefault();
+                moverFoco(target, 'left');
+            }
+        });
+    });
+    
+    function moverFoco(elementoAtual, direcao) {
+        const td = elementoAtual.closest('td');
+        const tr = elementoAtual.closest('tr');
+        const tbody = tr.parentElement;
+        
+        let proximoInput = null;
+        
+        if (direcao === 'down') {
+            // Próxima linha, mesma coluna
+            const colunaIndex = Array.from(tr.children).indexOf(td);
+            const proximaTr = tr.nextElementSibling;
+            
+            if (proximaTr && proximaTr.children[colunaIndex]) {
+                proximoInput = proximaTr.children[colunaIndex].querySelector('.cell-input');
+            }
+        }
+        else if (direcao === 'right') {
+            // Próxima célula na mesma linha
+            let proximaTd = td.nextElementSibling;
+            
+            // Pular a célula calculada (Valor Líquido)
+            while (proximaTd && !proximaTd.querySelector('.cell-input')) {
+                proximaTd = proximaTd.nextElementSibling;
+            }
+            
+            if (proximaTd) {
+                proximoInput = proximaTd.querySelector('.cell-input');
+            } else {
+                // Se chegou no final da linha, vai para a primeira célula da próxima linha
+                const proximaTr = tr.nextElementSibling;
+                if (proximaTr) {
+                    proximoInput = proximaTr.querySelector('.cell-input');
+                }
+            }
+        }
+        else if (direcao === 'left') {
+            // Célula anterior na mesma linha
+            let anteriorTd = td.previousElementSibling;
+            
+            // Pular células sem input
+            while (anteriorTd && !anteriorTd.querySelector('.cell-input')) {
+                anteriorTd = anteriorTd.previousElementSibling;
+            }
+            
+            if (anteriorTd) {
+                proximoInput = anteriorTd.querySelector('.cell-input');
+            } else {
+                // Se chegou no início da linha, vai para a última célula da linha anterior
+                const anteriorTr = tr.previousElementSibling;
+                if (anteriorTr) {
+                    const inputs = anteriorTr.querySelectorAll('.cell-input');
+                    proximoInput = inputs[inputs.length - 1];
+                }
+            }
+        }
+        
+        if (proximoInput) {
+            proximoInput.focus();
+            proximoInput.select();
+        }
+    }
+    
+    async function carregarDados() {
+        // Obter termo da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const termoUrl = urlParams.get('termo');
+        
+        if (!termoUrl) {
+            alert('Termo não especificado na URL');
+            window.location.href = '/analises_pc';
+            return;
+        }
+        
+        document.getElementById('numeroTermo').value = termoUrl;
+        
+        // Configurar botão voltar
+        document.getElementById('btnVoltar').href = `/conc_bancaria/?termo=${encodeURIComponent(termoUrl)}`;
+        
+        try {
+            // Buscar período do termo
+            const responsePeriodo = await fetch(`/conc_rendimentos/api/periodo-termo?numero_termo=${encodeURIComponent(termoUrl)}`);
+            if (!responsePeriodo.ok) throw new Error('Erro ao buscar período do termo');
+            
+            periodoTermo = await responsePeriodo.json();
+            
+            // Exibir período
+            const dataInicio = new Date(periodoTermo.inicio + 'T00:00:00');
+            const dataFim = new Date(periodoTermo.final + 'T00:00:00');
+            document.getElementById('periodoTermo').value = 
+                `${dataInicio.toLocaleDateString('pt-BR')} a ${dataFim.toLocaleDateString('pt-BR')}`;
+            
+            // Gerar lista de meses
+            gerarMesesProjeto(dataInicio, dataFim);
+            
+            // Buscar rendimentos existentes
+            const responseRendimentos = await fetch(`/conc_rendimentos/api/rendimentos?numero_termo=${encodeURIComponent(termoUrl)}`);
+            if (responseRendimentos.ok) {
+                const rendimentosExistentes = await responseRendimentos.json();
+                
+                // Mapear rendimentos existentes por data
+                const rendimentosMap = {};
+                rendimentosExistentes.forEach(r => {
+                    rendimentosMap[r.data_referencia] = r;
+                });
+                
+                // Criar estrutura de rendimentos com base nos meses do projeto
+                rendimentos = mesesProjeto.map(mes => {
+                    const dataRef = mes.data;
+                    if (rendimentosMap[dataRef]) {
+                        return rendimentosMap[dataRef];
+                    } else {
+                        return {
+                            id: null,
+                            numero_termo: termoUrl,
+                            rendimento_bruto: 0,
+                            rendimento_ir: 0,
+                            rendimento_iof: 0,
+                            data_referencia: dataRef,
+                            observacoes: ''
+                        };
+                    }
+                });
+                
+                // IMPORTANTE: Adicionar meses extras que foram salvos mas estão fora do período
+                rendimentosExistentes.forEach(r => {
+                    const dataRef = r.data_referencia;
+                    // Verificar se este mês já está na lista
+                    const jaExiste = mesesProjeto.some(mes => mes.data === dataRef);
+                    
+                    if (!jaExiste) {
+                        // Adicionar mês extra ao mesesProjeto
+                        const data = new Date(dataRef + 'T00:00:00');
+                        const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
+                                       'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+                        const mes = meses[data.getMonth()];
+                        const ano = data.getFullYear().toString().slice(-2);
+                        const mesAnoLabel = `${mes}-${ano}`;
+                        
+                        mesesProjeto.push({
+                            label: mesAnoLabel,
+                            data: dataRef
+                        });
+                        
+                        // Adicionar aos rendimentos
+                        rendimentos.push(r);
+                    }
+                });
+                
+                // Ordenar por data
+                const ordenarPorData = (a, b) => {
+                    const dataA = a.data_referencia || a.data;
+                    const dataB = b.data_referencia || b.data;
+                    return dataA.localeCompare(dataB);
+                };
+                
+                mesesProjeto.sort((a, b) => a.data.localeCompare(b.data));
+                rendimentos.sort(ordenarPorData);
+                
+                // Atualizar contador
+                document.getElementById('totalMeses').value = mesesProjeto.length;
+                
+            } else {
+                // Criar estrutura vazia
+                rendimentos = mesesProjeto.map(mes => ({
+                    id: null,
+                    numero_termo: termoUrl,
+                    rendimento_bruto: 0,
+                    rendimento_ir: 0,
+                    rendimento_iof: 0,
+                    data_referencia: mes.data,
+                    observacoes: ''
+                }));
+            }
+            
+            renderizarTabela();
+            
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            alert('Erro ao carregar dados do termo');
+        }
+    }
+    
+    function gerarMesesProjeto(dataInicio, dataFim) {
+        const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
+                       'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+        
+        mesesProjeto = [];
+        
+        let dataAtual = new Date(dataInicio);
+        dataAtual.setDate(1); // Sempre dia 01
+        
+        while (dataAtual <= dataFim) {
+            const mes = meses[dataAtual.getMonth()];
+            const ano = dataAtual.getFullYear().toString().slice(-2);
+            const mesAnoLabel = `${mes}-${ano}`;
+            
+            const ano4digitos = dataAtual.getFullYear();
+            const mesNum = String(dataAtual.getMonth() + 1).padStart(2, '0');
+            const dataReferencia = `${ano4digitos}-${mesNum}-01`;
+            
+            mesesProjeto.push({
+                label: mesAnoLabel,
+                data: dataReferencia
+            });
+            
+            // Próximo mês
+            dataAtual.setMonth(dataAtual.getMonth() + 1);
+        }
+        
+        document.getElementById('totalMeses').value = mesesProjeto.length;
+    }
+    
+    function renderizarTabela() {
+        const tbody = document.getElementById('tbodyRendimentos');
+        tbody.innerHTML = '';
+        
+        rendimentos.forEach((rend, index) => {
+            const tr = document.createElement('tr');
+            
+            const mesInfo = mesesProjeto[index];
+            const valorLiquido = (rend.rendimento_bruto || 0) - (rend.rendimento_ir || 0) - (rend.rendimento_iof || 0);
+            
+            tr.innerHTML = `
+                <td class="text-center">${mesInfo.label}</td>
+                <td class="cell-money">
+                    <input type="text" 
+                           class="cell-input cell-money" 
+                           value="${formatarMoeda(rend.rendimento_bruto)}"
+                           onchange="atualizarValor(${index}, 'rendimento_bruto', this.value)"
+                           onblur="formatarCampoMoeda(this)">
+                </td>
+                <td class="cell-money">
+                    <input type="text" 
+                           class="cell-input cell-money" 
+                           value="${formatarMoeda(rend.rendimento_ir)}"
+                           onchange="atualizarValor(${index}, 'rendimento_ir', this.value)"
+                           onblur="formatarCampoMoeda(this)">
+                </td>
+                <td class="cell-money">
+                    <input type="text" 
+                           class="cell-input cell-money" 
+                           value="${formatarMoeda(rend.rendimento_iof)}"
+                           onchange="atualizarValor(${index}, 'rendimento_iof', this.value)"
+                           onblur="formatarCampoMoeda(this)">
+                </td>
+                <td class="cell-money cell-calculated">${formatarMoeda(valorLiquido)}</td>
+                <td>
+                    <input type="text" 
+                           class="cell-input" 
+                           value="${rend.observacoes || ''}"
+                           onchange="atualizarCampo(${index}, 'observacoes', this.value)">
+                </td>
+            `;
+            
+            tbody.appendChild(tr);
+        });
+        
+        calcularTotais();
+    }
+    
+    function atualizarValor(index, campo, valor) {
+        const valorNumerico = parseMoeda(valor);
+        rendimentos[index][campo] = valorNumerico;
+        
+        // Re-renderizar para atualizar valor líquido calculado
+        renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function atualizarCampo(index, campo, valor) {
+        rendimentos[index][campo] = valor;
+        document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function adicionarNovaLinha() {
+        // Obter o último mês da lista
+        const ultimoMes = mesesProjeto.length > 0 ? mesesProjeto[mesesProjeto.length - 1] : null;
+        
+        let proximaData;
+        if (ultimoMes) {
+            // Parsear a data do último mês e adicionar 1 mês
+            // Formato: "YYYY-MM-01" -> parse manual para evitar timezone
+            const partes = ultimoMes.data.split('-');
+            const ano = parseInt(partes[0]);
+            const mes = parseInt(partes[1]) - 1; // 0-indexed
+            const dataAtual = new Date(ano, mes, 1);
+            dataAtual.setMonth(dataAtual.getMonth() + 1);
+            proximaData = dataAtual;
+        } else {
+            // Se não houver meses, começar do mês atual
+            proximaData = new Date();
+        }
+        
+        // Gerar label do mês
+        const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
+                      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+        const mes = meses[proximaData.getMonth()];
+        const ano = proximaData.getFullYear().toString().slice(-2);
+        const label = `${mes}-${ano}`;
+        
+        // Formatar data para YYYY-MM-01
+        const ano4Digitos = proximaData.getFullYear();
+        const mesNum = (proximaData.getMonth() + 1).toString().padStart(2, '0');
+        const dataFormatada = `${ano4Digitos}-${mesNum}-01`;
+        
+        // Adicionar novo mês ao array
+        mesesProjeto.push({
+            label: label,
+            data: dataFormatada
+        });
+        
+        // Adicionar novo rendimento vazio
+        rendimentos.push({
+            id: null,
+            data_referencia: dataFormatada,
+            rendimento_bruto: 0,
+            rendimento_ir: 0,
+            rendimento_iof: 0,
+            observacoes: ''
+        });
+        
+        // Re-renderizar tabela
+        renderizarTabela();
+        
+        // Marcar para salvar
+        document.getElementById('btnSalvar').style.display = 'block';
+        
+        // Scroll para a nova linha
+        setTimeout(() => {
+            const tbody = document.getElementById('tbodyRendimentos');
+            const ultimaLinha = tbody.lastElementChild;
+            if (ultimaLinha) {
+                ultimaLinha.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+    }
+    
+    function calcularTotais() {
+        let totalBruto = 0;
+        let totalIR = 0;
+        let totalIOF = 0;
+        let totalLiquido = 0;
+        
+        rendimentos.forEach(rend => {
+            totalBruto += rend.rendimento_bruto || 0;
+            totalIR += rend.rendimento_ir || 0;
+            totalIOF += rend.rendimento_iof || 0;
+            totalLiquido += ((rend.rendimento_bruto || 0) - (rend.rendimento_ir || 0) - (rend.rendimento_iof || 0));
+        });
+        
+        document.getElementById('totalBruto').textContent = formatarMoeda(totalBruto);
+        document.getElementById('totalIR').textContent = formatarMoeda(totalIR);
+        document.getElementById('totalIOF').textContent = formatarMoeda(totalIOF);
+        document.getElementById('totalLiquido').textContent = formatarMoeda(totalLiquido);
+    }
+    
+    async function salvarRendimentos() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        
+        if (!numeroTermo) {
+            alert('Número do termo não encontrado');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/conc_rendimentos/api/rendimentos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    numero_termo: numeroTermo,
+                    rendimentos: rendimentos
+                })
+            });
+            
+            if (!response.ok) {
+                const erro = await response.json();
+                throw new Error(erro.erro || 'Erro ao salvar');
+            }
+            
+            const resultado = await response.json();
+            alert('✓ Rendimentos salvos com sucesso!');
+            document.getElementById('btnSalvar').style.display = 'none';
+            
+            // Recarregar dados
+            await carregarDados();
+            
+        } catch (error) {
+            console.error('Erro ao salvar:', error);
+            alert('Erro ao salvar rendimentos: ' + error.message);
+        }
+    }
+    
+    function formatarMoeda(valor) {
+        // Garantir que valor é número válido
+        const valorNumerico = parseFloat(valor);
+        if (!valor || isNaN(valorNumerico) || valorNumerico === 0) return 'R$ 0,00';
+        return 'R$ ' + new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(valorNumerico);
+    }
+    
+    function formatarCampoMoeda(input) {
+        const valor = parseMoeda(input.value);
+        if (valor !== null && valor !== 0) {
+            input.value = formatarMoeda(valor);
+        }
+    }
+    
+    function parseMoeda(valor) {
+        if (!valor) return 0;
+        
+        let valorStr = String(valor).trim();
+        
+        // Remover R$ e espaços
+        valorStr = valorStr.replace(/R\$/g, '').trim();
+        
+        // Detectar formato brasileiro (1.234,56) vs americano (1,234.56)
+        const temVirgula = valorStr.includes(',');
+        const temPonto = valorStr.includes('.');
+        
+        if (temVirgula && temPonto) {
+            // Remover separador de milhar e converter vírgula decimal para ponto
+            valorStr = valorStr.replace(/\./g, '').replace(',', '.');
+        } else if (temVirgula) {
+            // Apenas vírgula = decimal brasileiro
+            valorStr = valorStr.replace(',', '.');
+        }
+        
+        // Remover tudo exceto números, ponto e sinal negativo
+        valorStr = valorStr.replace(/[^\d.-]/g, '');
+        
+        return parseFloat(valorStr) || 0;
+    }
+    
+    function mostrarInfo(campo) {
+        const modalBody = document.getElementById('modalInfoBody');
+        const texto = infos[campo] || 'Informação não disponível.';
+        modalBody.innerHTML = `<p class="mb-0">${texto}</p>`;
+        
+        const modal = new bootstrap.Modal(document.getElementById('modalInfo'));
+        modal.show();
+    }
+    
+    function exportarCSV() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        
+        let csv = 'Mês/Ano,Rendimento Bruto,IR,IOF,Valor Líquido,Observações\n';
+        
+        rendimentos.forEach((rend, index) => {
+            const mesInfo = mesesProjeto[index];
+            const valorLiquido = (rend.rendimento_bruto || 0) - (rend.rendimento_ir || 0) - (rend.rendimento_iof || 0);
+            
+            csv += `${mesInfo.label},`;
+            csv += `${(rend.rendimento_bruto || 0).toFixed(2)},`;
+            csv += `${(rend.rendimento_ir || 0).toFixed(2)},`;
+            csv += `${(rend.rendimento_iof || 0).toFixed(2)},`;
+            csv += `${valorLiquido.toFixed(2)},`;
+            csv += `"${(rend.observacoes || '').replace(/"/g, '""')}"\n`;
+        });
+        
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `rendimentos_${numeroTermo}_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+    }
+    
+    function exportarPDF() {
+        alert('Funcionalidade de exportação para PDF será implementada em breve.');
+    }
+    
+    // ===== COPIAR/COLAR DO EXCEL =====
+    document.addEventListener('DOMContentLoaded', function() {
+        const tbody = document.querySelector('#tabelaRendimentos tbody');
+        
+        tbody.addEventListener('paste', function(e) {
+            const target = e.target;
+            
+            // Verificar se é um input dentro da tabela
+            if (!target.classList.contains('cell-input')) return;
+            
+            e.preventDefault();
+            
+            // Obter dados colados
+            const pastedData = e.clipboardData.getData('text');
+            
+            // Dividir em linhas e células (Excel usa \r\n para linhas e \t para células)
+            const rows = pastedData.split(/\r?\n/);
+            const cells = rows[0].split('\t');
+            
+            // Encontrar a célula atual
+            const currentTr = target.closest('tr');
+            const currentTd = target.closest('td');
+            const allTrs = Array.from(tbody.querySelectorAll('tr'));
+            const allTdsInRow = Array.from(currentTr.querySelectorAll('td'));
+            
+            const startRowIndex = allTrs.indexOf(currentTr);
+            const startColIndex = allTdsInRow.indexOf(currentTd);
+            
+            // Mapear índices de colunas para campos
+            const colMapping = {
+                1: 'rendimento_bruto',
+                2: 'rendimento_ir',
+                3: 'rendimento_iof',
+                5: 'observacoes'
+            };
+            
+            // Processar cada linha colada
+            rows.forEach((row, rowOffset) => {
+                if (row.trim() === '') return; // Pular linhas vazias
+                
+                const targetRowIndex = startRowIndex + rowOffset;
+                if (targetRowIndex >= allTrs.length) return; // Não ultrapassar tabela
+                
+                const targetRow = allTrs[targetRowIndex];
+                const targetCells = Array.from(targetRow.querySelectorAll('td'));
+                const cellValues = row.split('\t');
+                
+                // Processar cada célula colada
+                cellValues.forEach((value, colOffset) => {
+                    const targetColIndex = startColIndex + colOffset;
+                    if (targetColIndex >= targetCells.length) return;
+                    
+                    const campo = colMapping[targetColIndex];
+                    if (!campo) return; // Coluna não editável
+                    
+                    const input = targetCells[targetColIndex].querySelector('input');
+                    if (!input) return;
+                    
+                    // Limpar valor (remover espaços, permitir vazio)
+                    const cleanValue = value.trim();
+                    
+                    if (campo === 'observacoes') {
+                        // Observações: aceitar qualquer texto
+                        input.value = cleanValue;
+                        atualizarCampo(targetRowIndex, campo, cleanValue);
+                    } else {
+                        // Campos monetários
+                        if (cleanValue === '' || cleanValue === '-') {
+                            // Célula vazia = 0
+                            input.value = formatarMoeda(0);
+                            atualizarValor(targetRowIndex, campo, 0);
+                        } else {
+                            // Tentar converter número
+                            const numericValue = parseMoeda(cleanValue);
+                            if (!isNaN(numericValue)) {
+                                input.value = formatarMoeda(numericValue);
+                                atualizarValor(targetRowIndex, campo, numericValue);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            // Re-renderizar para atualizar totais
+            renderizarTabela();
+        });
+    });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -267,6 +267,18 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="bi bi-bank me-2"></i>Conciliação Bancária</h2>
         <div>
+            <a href="#" class="btn btn-success me-2" id="btnRendimentos" onmousedown="atualizarHrefRendimentos()" onclick="abrirRendimentos(event)" title="Rendimentos de Ativos Financeiros">
+                <i class="bi bi-piggy-bank me-2"></i>Rendimentos
+            </a>
+            <a href="#" class="btn btn-warning me-2" id="btnContrapartida" onmousedown="atualizarHrefContrapartida()" onclick="abrirContrapartida(event)" title="Análise da Contrapartida" style="display: none;">
+                <i class="bi bi-cash-coin me-2"></i>Contrapartida
+            </a>
+            <a href="#" class="btn btn-primary me-2" id="btnRelatorio" onmousedown="atualizarHrefRelatorio()" onclick="abrirRelatorio(event)" title="Relatório de Conciliação">
+                <i class="bi bi-file-text me-2"></i>Relatório
+            </a>
+            <a href="/ocr_testes/" class="btn btn-info me-2" id="btnOCR" onmousedown="atualizarHrefOCR()" onclick="abrirOCR(event)" title="OCR - Conversão de Extrato">
+                <i class="bi bi-file-earmark-text me-2"></i>OCR (testes)
+            </a>
             <button class="btn btn-outline-secondary btn-sm me-2" onclick="togglePerfMonitor()" title="Toggle Performance Monitor">
                 <i class="bi bi-speedometer2"></i>
             </button>
@@ -346,9 +358,15 @@
         <div class="row g-3 align-items-end">
             <div class="col-md-3">
                 <label for="numeroTermo" class="form-label"><strong>Número do Termo</strong></label>
-                <select class="form-select" id="numeroTermo" onchange="carregarExtrato()">
-                    <option value="">Selecione um termo...</option>
-                </select>
+                <input type="text" 
+                       class="form-control" 
+                       id="numeroTermo" 
+                       list="datalistTermos"
+                       placeholder="Digite para buscar..."
+                       onchange="carregarExtrato()"
+                       oninput="filtrarTermos(this.value)">
+                <datalist id="datalistTermos">
+                </datalist>
             </div>
             <div class="col-md-3">
                 <label for="bancoExtrato" class="form-label"><strong>Banco do Extrato</strong></label>
@@ -980,6 +998,9 @@
     let origensDestinosUnicos = new Set(); // Lista dinâmica de origens/destinos já utilizados
     let observacoesUnicas = new Set(); // Lista dinâmica de observações já utilizadas
     
+    // OTIMIZAÇÃO: WeakMap cache para grupos de composição (memoização global)
+    const gruposComposicaoCache = new WeakMap();
+    
     // Regras de avaliação automática (editável)
     const regrasAvaliacao = {
         // Categorias que devem ser automaticamente marcadas como "Glosar" (prioridade máxima)
@@ -1093,8 +1114,8 @@
             await carregarNotasFiscais();
         }
         
-        // Re-renderizar tabela
-        renderizarTabela();
+        // Re-renderizar tabela com skip de filtros (debounce)
+        renderizarTabela(true);
     }
     
     async function toggleSecaoDocumentos() {
@@ -1118,8 +1139,8 @@
             await carregarDocumentosAnalise();
         }
         
-        // Re-renderizar tabela
-        renderizarTabela();
+        // Re-renderizar tabela com skip de filtros (debounce)
+        renderizarTabela(true);
     }
     
     function mostrarInfo(campo) {
@@ -1146,31 +1167,36 @@
         carregarTermos();
     });
 
+    let todosOsTermos = []; // Lista completa de termos
+
     async function carregarTermos() {
         try {
             console.log('Carregando termos...');
             const response = await fetch('/conc_bancaria/api/termos');
             if (!response.ok) throw new Error('Erro ao carregar termos');
             
-            const termos = await response.json();
-            console.log('Termos recebidos:', termos);
-            const select = document.getElementById('numeroTermo');
+            todosOsTermos = await response.json();
+            console.log('Termos recebidos:', todosOsTermos);
             
-            termos.forEach(termo => {
-                const option = document.createElement('option');
-                option.value = termo;
-                option.textContent = termo;
-                select.appendChild(option);
-            });
+            // Popular datalist inicialmente com todos os termos
+            atualizarDatalistTermos(todosOsTermos);
             
             // Verificar se há termo na URL (vindo da página de análises)
             const urlParams = new URLSearchParams(window.location.search);
             const termoUrl = urlParams.get('termo');
             console.log('Termo da URL:', termoUrl);
             
-            if (termoUrl && termos.includes(termoUrl)) {
+            if (termoUrl) {
+                // Se termo não está na lista, adicionar (novo termo)
+                if (!todosOsTermos.includes(termoUrl)) {
+                    console.log('Termo novo, adicionando à lista:', termoUrl);
+                    todosOsTermos.push(termoUrl);
+                    atualizarDatalistTermos(todosOsTermos);
+                }
+                
+                // Selecionar e carregar (funciona para novos e existentes)
                 console.log('Selecionando termo:', termoUrl);
-                select.value = termoUrl;
+                document.getElementById('numeroTermo').value = termoUrl;
                 await carregarExtrato();
             }
             
@@ -1178,6 +1204,33 @@
             console.error('Erro ao carregar termos:', error);
             alert('Erro ao carregar lista de termos');
         }
+    }
+    
+    function atualizarDatalistTermos(termos) {
+        const datalist = document.getElementById('datalistTermos');
+        datalist.innerHTML = '';
+        
+        termos.forEach(termo => {
+            const option = document.createElement('option');
+            option.value = termo;
+            datalist.appendChild(option);
+        });
+    }
+    
+    function filtrarTermos(busca) {
+        if (!busca || busca.length < 2) {
+            // Se busca muito curta, mostrar todos
+            atualizarDatalistTermos(todosOsTermos);
+            return;
+        }
+        
+        // Filtrar termos que contenham o texto da busca (case-insensitive)
+        const buscaLower = busca.toLowerCase();
+        const termosFiltrados = todosOsTermos.filter(termo => 
+            termo.toLowerCase().includes(buscaLower)
+        );
+        
+        atualizarDatalistTermos(termosFiltrados);
     }
 
     async function carregarExtrato() {
@@ -1188,11 +1241,15 @@
             linhas = [];
             renderizarTabela();
             document.getElementById('btnSalvar').style.display = 'none';
+            document.getElementById('btnContrapartida').style.display = 'none';
             return;
         }
 
         try {
             document.getElementById('loadingIndicator').style.display = 'block';
+            
+            // Verificar se termo tem contrapartida
+            verificarContrapartida(numeroTermo);
             
             // Se estiver no modo páginas, carregar todas as linhas para ter todos os meses
             const limiteParaCarregar = modoVisualizacao === 'paginas' ? 'todas' : limiteAtual;
@@ -1269,9 +1326,9 @@
                     }));
                     proximoIndice = Math.max(...linhas.map(l => l.indice || 0)) + 1;
                 } else {
-                    // Se não houver dados, iniciar com 20 linhas vazias
+                    // Se não houver dados, iniciar vazio (usuário adiciona manualmente)
                     linhas = [];
-                    adicionarLinhas(20);
+                    proximoIndice = 1;
                 }
             }
             performanceMetrics.end(timerCache);
@@ -1985,25 +2042,10 @@
         
         // Resetar input
         input.value = '1';
-        
-        // Feedback
-        alert(`${quantidade} linha(s) adicionada(s) no final da tabela`);
     }
 
     async function adicionarLinhaAbaixo(index) {
-        // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
-        if (limiteAtual !== 'todas') {
-            const confirmar = confirm(
-                'Para adicionar novas linhas com segurança, o sistema precisa carregar TODAS as linhas disponíveis.\n\n' +
-                'Deseja continuar?'
-            );
-            
-            if (!confirmar) return;
-            
-            // Carregar todas as linhas
-            limiteAtual = 'todas';
-            await carregarExtrato();
-        }
+        // Não precisa mais recarregar - adiciona localmente mesmo em modo limitado
         
         const novaLinha = {
             id: null,
@@ -2025,6 +2067,15 @@
         recalcularIndices();
         renderizarTabela();
         document.getElementById('btnSalvar').style.display = 'block';
+        
+        // Scroll para a nova linha
+        setTimeout(() => {
+            const tbody = document.getElementById('tbodyConciliacao');
+            const novaRow = tbody.children[index + 1];
+            if (novaRow) {
+                novaRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
     }
 
     function duplicarLinha(index, direcao) {
@@ -2059,22 +2110,75 @@
         document.getElementById('btnSalvar').style.display = 'block';
     }
 
-    function renderizarTabela() {
+    function aplicarAutoPreenchimento() {
+        /**
+         * Aplica auto-preenchimentos nas linhas (competência, origem/destino, avaliação)
+         * sem salvar no banco - apenas atualiza o estado local
+         */
+        const bancoExtrato = document.getElementById('bancoExtrato').value;
+        
+        linhas.forEach(linha => {
+            // Auto-preencher competência se estiver vazia mas tiver data
+            if (!linha.competencia && linha.data && !linha._competencia_deletada) {
+                linha.competencia = calcularCompetenciaAutomatica(linha.data);
+            }
+            
+            // Auto-preencher origem_destino se estiver vazia mas tiver categoria
+            if (!linha.origem_destino && linha.cat_transacao) {
+                const categoria = categoriasAnalise.find(cat => cat.categoria_extra === linha.cat_transacao);
+                if (categoria && categoria.correspondente) {
+                    let origemDestino = categoria.correspondente;
+                    
+                    // Se o correspondente for "Banco", substituir pelo banco atual do termo
+                    if (origemDestino === 'Banco' && bancoAtual) {
+                        origemDestino = bancoAtual;
+                    }
+                    
+                    linha.origem_destino = origemDestino;
+                }
+            }
+            
+            // Auto-classificar avaliação baseado em regras
+            if (!linha.cat_avaliacao) {
+                // Regra prioritária: Categoria de Transação
+                if (linha.cat_transacao && regrasAvaliacao.glosar.includes(linha.cat_transacao)) {
+                    linha.cat_avaliacao = 'Glosar';
+                }
+                // Regra secundária: Origem/Destino
+                else if (linha.origem_destino) {
+                    const origemNormalizada = linha.origem_destino.toLowerCase().trim();
+                    if (regrasAvaliacao.avaliado.includes(origemNormalizada)) {
+                        linha.cat_avaliacao = 'Avaliado';
+                    }
+                }
+            }
+            
+            // Auto-preencher composição se estiver vazia
+            if (!linha.discriminacao && (linha.credito || linha.debito)) {
+                linha.discriminacao = linha.credito || linha.debito;
+            }
+        });
+    }
+
+    function renderizarTabela(skipFilters = false) {
         const timerTotal = performanceMetrics.start('renderizarTabela - TOTAL');
+        
+        // Aplicar auto-preenchimentos antes de renderizar
+        aplicarAutoPreenchimento();
         
         const tbody = document.getElementById('tbodyConciliacao');
         
-        const timerFiltro = performanceMetrics.start('renderizarTabela - Filtrar linhas');
+        const timerFiltro = performanceMetrics.start('renderizarTabela - Construir HTML');
         
         // OTIMIZAÇÃO 1: Usar DocumentFragment para construir DOM antes de inserir
-        // Reduz reflows de N para 1 (melhoria de 50-70% em tabelas grandes)
         const fragment = document.createDocumentFragment();
         
-        // OTIMIZAÇÃO 2: Cachear identificação de grupos de composição
-        // Evita recalcular O(n²) → O(n) - cada linha só é processada uma vez
-        const gruposComposicaoCache = new Map();
-        linhas.forEach((_, idx) => {
-            gruposComposicaoCache.set(idx, identificarGrupoComposicao(idx));
+        // OTIMIZAÇÃO 2: Cachear grupos de composição usando WeakMap global
+        // Calcular apenas para linhas que não estão no cache
+        linhas.forEach((linha, idx) => {
+            if (!gruposComposicaoCache.has(linha)) {
+                gruposComposicaoCache.set(linha, identificarGrupoComposicao(idx));
+            }
         });
 
         // Filtrar linhas por mês se estiver no modo páginas
@@ -2130,29 +2234,41 @@
                 }
             }
             
-            // OTIMIZAÇÃO: Usar grupo de composição do cache (pré-calculado)
-            const grupoInfo = gruposComposicaoCache.get(index);
+            // OTIMIZAÇÃO: Usar grupo de composição do cache WeakMap
+            const grupoInfo = gruposComposicaoCache.get(linha);
             
-            // Célula de índice simples
-            tr.innerHTML = `
-                <td class="text-center">${linha.indice || ''}</td>
-            `;
+            // OTIMIZAÇÃO CRÍTICA: Construir HTML com array.join() ao invés de innerHTML +=
+            // Elimina reparse O(n²) -> O(n)
+            const htmlParts = [];
             
-            // Renderizar célula de crédito
-            let htmlCredito = '';
+            // Célula de índice
+            htmlParts.push(`<td class="text-center">${linha.indice || ''}</td>`);
+            
+            // Célula de Data
+            htmlParts.push(`
+                <td>
+                    <input type="text" 
+                           class="cell-input" 
+                           value="${linha.data ? formatarDataParaExibicao(linha.data) : ''}" 
+                           onchange="atualizarCampoData(${index}, this.value)"
+                           onkeydown="navegarCelulaData(event, ${index})"
+                           placeholder="dd/mm/aaaa"
+                           maxlength="10">
+                </td>
+            `);
+            
+            // Célula de Crédito
             if (linha.credito) {
-                if (grupoInfo.ehGrupo && grupoInfo.tipo === 'credito' && !grupoInfo.ehPrimeira) {
-                    // Linha secundária de grupo de composição de crédito
-                    htmlCredito = `
+                if (grupoInfo && grupoInfo.ehGrupo && grupoInfo.tipo === 'credito' && !grupoInfo.ehPrimeira) {
+                    htmlParts.push(`
                         <td class="${linha.debito ? 'cell-disabled' : ''}" style="background-color: #e8f5e9;">
                             <div style="text-align: center; padding: 6px; color: #2e7d32; font-style: italic;">
                                 Crédito composto
                             </div>
                         </td>
-                    `;
+                    `);
                 } else {
-                    // Linha normal ou primeira do grupo
-                    htmlCredito = `
+                    htmlParts.push(`
                         <td class="${linha.debito ? 'cell-disabled' : ''}">
                             <input type="text" class="cell-input cell-money" 
                                    value="${formatarMoeda(linha.credito)}" 
@@ -2161,10 +2277,10 @@
                                    onblur="blurCondicional(${index}, this)"
                                    onkeydown="navegarCelula(event, ${index}, 1)">
                         </td>
-                    `;
+                    `);
                 }
             } else {
-                htmlCredito = `
+                htmlParts.push(`
                     <td class="${linha.debito ? 'cell-disabled' : ''}">
                         <input type="text" class="cell-input cell-money" 
                                value="${formatarMoeda(linha.credito)}" 
@@ -2173,24 +2289,21 @@
                                onblur="blurCondicional(${index}, this)"
                                onkeydown="navegarCelula(event, ${index}, 1)">
                     </td>
-                `;
+                `);
             }
             
-            // Renderizar célula de débito
-            let htmlDebito = '';
+            // Célula de Débito
             if (linha.debito) {
-                if (grupoInfo.ehGrupo && grupoInfo.tipo === 'debito' && !grupoInfo.ehPrimeira) {
-                    // Linha secundária de grupo de composição de débito
-                    htmlDebito = `
+                if (grupoInfo && grupoInfo.ehGrupo && grupoInfo.tipo === 'debito' && !grupoInfo.ehPrimeira) {
+                    htmlParts.push(`
                         <td class="${linha.credito ? 'cell-disabled' : ''}" style="background-color: #ffebee;">
                             <div style="text-align: center; padding: 6px; color: #c62828; font-style: italic;">
                                 Débito composto
                             </div>
                         </td>
-                    `;
+                    `);
                 } else {
-                    // Linha normal ou primeira do grupo
-                    htmlDebito = `
+                    htmlParts.push(`
                         <td class="${linha.credito ? 'cell-disabled' : ''}">
                             <input type="text" class="cell-input cell-money" 
                                    value="${formatarMoeda(linha.debito)}" 
@@ -2199,10 +2312,10 @@
                                    onblur="blurCondicional(${index}, this)"
                                    onkeydown="navegarCelula(event, ${index}, 2)">
                         </td>
-                    `;
+                    `);
                 }
             } else {
-                htmlDebito = `
+                htmlParts.push(`
                     <td class="${linha.credito ? 'cell-disabled' : ''}">
                         <input type="text" class="cell-input cell-money" 
                                value="${formatarMoeda(linha.debito)}" 
@@ -2211,7 +2324,7 @@
                                onblur="blurCondicional(${index}, this)"
                                onkeydown="navegarCelula(event, ${index}, 2)">
                     </td>
-                `;
+                `);
             }
             
             // Renderizar input com datalist de categoria (busca sugestiva)
@@ -2234,18 +2347,8 @@
             });
             htmlCategoria += '</datalist>';
             
-            tr.innerHTML += `
-                <td>
-                    <input type="text" 
-                           class="cell-input" 
-                           value="${linha.data ? formatarDataParaExibicao(linha.data) : ''}" 
-                           onchange="atualizarCampoData(${index}, this.value)"
-                           onkeydown="navegarCelulaData(event, ${index})"
-                           placeholder="dd/mm/aaaa"
-                           maxlength="10">
-                </td>
-                ${htmlCredito}
-                ${htmlDebito}
+            //  Continuar construindo htmlParts com as células restantes
+            htmlParts.push(`
                 <td class="${!validarComposicao(index) ? 'composicao-invalida' : ''}">
                     <input type="text" class="cell-input cell-money" 
                            value="${formatarMoeda(linha.discriminacao)}" 
@@ -2338,7 +2441,7 @@
                         </ul>
                     </div>
                 </td>
-            `;
+            `);
             
             // OTIMIZAÇÃO 2: Lazy loading para Notas Fiscais
             // Só processar se linha tem ID (linha salva no banco), evita lookup desnecessário
@@ -2346,7 +2449,7 @@
                 const nf = linha.id && notasFiscais[linha.id] ? notasFiscais[linha.id] : { numero_nota: '', chave_acesso: '', cnpj_nota: '' };
                 const cnpjInvalido = nf.cnpj_nota && nf.cnpj_nota.replace(/\D/g, '').length !== 14;
                 
-                tr.innerHTML += `
+                htmlParts.push(`
                     <!-- Coluna 11: Número da Nota -->
                     <td class="col-nf">
                         <input type="number" 
@@ -2377,7 +2480,7 @@
                                placeholder="00.000.000/0001-00"
                                autocomplete="off">
                     </td>
-                `;
+                `);
             }
             
             // OTIMIZAÇÃO 2: Lazy loading para Documentos
@@ -2407,7 +2510,7 @@
                 const valorContratos = naoAplicavelContratos ? '' : (doc.avaliacao_contratos || '');
                 const valorForaMunicipio = naoAplicavelForaMunicipio ? '' : (doc.avaliacao_fora_municipio || '');
                 
-                tr.innerHTML += `
+                htmlParts.push(`
                     <!-- Coluna 14: Guia -->
                     <td class="col-doc ${naoAplicavelGeral ? 'cell-disabled' : ''}">
                         <select class="form-select form-select-sm" 
@@ -2457,8 +2560,11 @@
                             <option value="Fora do município" ${valorForaMunicipio === 'Fora do município' ? 'selected' : ''}>Fora do município</option>
                         </select>
                     </td>
-                `;
+                `);
             }
+            
+            // OTIMIZAÇÃO CRÍTICA: Parse único com join()
+            tr.innerHTML = htmlParts.join('');
             
             // OTIMIZAÇÃO: Adicionar ao fragment (não dispara reflow)
             fragment.appendChild(tr);
@@ -2472,17 +2578,18 @@
         tbody.appendChild(fragment);
         performanceMetrics.end(timerDOM);
         
-        // Atualizar filtros e datalist após renderizar
-        const timerFiltros = performanceMetrics.start('renderizarTabela - Popular filtros');
-        popularFiltros();
-        atualizarDatalistOrigemDestino();
-        atualizarDatalistObservacoes();
-        performanceMetrics.end(timerFiltros);
-        
-        // Reaplicar filtros para manter seleções ativas
-        const timerReaplicar = performanceMetrics.start('renderizarTabela - Reaplicar filtros');
-        aplicarFiltros();
-        performanceMetrics.end(timerReaplicar);
+        // DEBOUNCE: Pular atualização de filtros se flag ativada (reduz renders desnecessários)
+        if (!skipFilters) {
+            const timerFiltros = performanceMetrics.start('renderizarTabela - Popular filtros');
+            popularFiltros();
+            atualizarDatalistOrigemDestino();
+            atualizarDatalistObservacoes();
+            performanceMetrics.end(timerFiltros);
+            
+            const timerReaplicar = performanceMetrics.start('renderizarTabela - Reaplicar filtros');
+            aplicarFiltros();
+            performanceMetrics.end(timerReaplicar);
+        }
         
         performanceMetrics.end(timerTotal);
         
@@ -2746,6 +2853,18 @@
         }
         
         atualizarCampo(index, 'data', dataFormatada);
+        
+        // Auto-preencher competência apenas se:
+        // 1. Data foi preenchida
+        // 2. Competência ainda não foi deletada/editada manualmente
+        if (dataFormatada && !linhas[index]._competencia_deletada) {
+            const competenciaAuto = calcularCompetenciaAutomatica(dataFormatada);
+            if (competenciaAuto) {
+                linhas[index].competencia = competenciaAuto;
+                linhas[index].competencia_valida = true;
+                console.log(`Auto-preenchimento: competência = ${formatarCompetenciaParaExibicao(competenciaAuto)}`);
+            }
+        }
     }
     
     function navegarCelulaData(event, linhaIndex) {
@@ -3142,14 +3261,28 @@
 
     function atualizarValor(index, campo, valor) {
         const valorNumerico = parseMoeda(valor);
+        const linhaAnterior = linhas[index][campo];
         linhas[index][campo] = valorNumerico;
+        
+        // Auto-preencher composição apenas na PRIMEIRA vez que crédito/débito for preenchido
+        // (se composição ainda está vazia ou não foi editada manualmente)
+        if ((campo === 'credito' || campo === 'debito') && valorNumerico) {
+            const composicaoAtual = linhas[index].discriminacao;
+            
+            // Se composição está vazia OU nunca foi editada manualmente
+            if (!composicaoAtual && !linhas[index]._composicao_editada) {
+                linhas[index].discriminacao = valorNumerico;
+                console.log(`Auto-preenchimento: composição = ${valorNumerico}`);
+            }
+        }
+        
         // Não renderizar toda tabela no onchange, apenas no onblur
         agendarAutosave();
     }
     
     function verificarAutoPreenchimento(index) {
-        // DESABILITADO: Auto-preenchimento de composição
-        // O usuário tem controle manual total dos valores
+        // Marcar que composição foi editada manualmente
+        linhas[index]._composicao_editada = true;
         
         // Renderizar apenas uma vez após todas as atualizações
         renderizarTabela();
@@ -4115,6 +4248,148 @@
         window.location.href = '/conc_bancaria/api/modelo-importacao';
     }
 
+    function atualizarHrefRendimentos() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (numeroTermo) {
+            document.getElementById('btnRendimentos').href = `/conc_rendimentos/?termo=${encodeURIComponent(numeroTermo)}`;
+        }
+    }
+
+    function atualizarHrefContrapartida() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (numeroTermo) {
+            document.getElementById('btnContrapartida').href = `/conc_contrapartida/?termo=${encodeURIComponent(numeroTermo)}`;
+        }
+    }
+
+    async function atualizarHrefOCR() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        
+        // Salvar termo na session antes de atualizar href
+        if (numeroTermo) {
+            try {
+                await fetch('/conc_bancaria/api/salvar-termo-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numero_termo: numeroTermo })
+                });
+            } catch (error) {
+                console.error('Erro ao salvar termo na sessão:', error);
+            }
+        }
+        // Href já está definido como /ocr_testes/ no HTML
+    }
+
+    async function atualizarHrefRelatorio() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (numeroTermo) {
+            document.getElementById('btnRelatorio').href = `/conc_relatorio/?termo=${encodeURIComponent(numeroTermo)}`;
+        }
+    }
+
+    function abrirRendimentos(event) {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) {
+            event.preventDefault();
+            alert('Selecione um termo primeiro!');
+            return false;
+        }
+        // Atualizar href antes de navegar
+        const url = `/conc_rendimentos/?termo=${encodeURIComponent(numeroTermo)}`;
+        document.getElementById('btnRendimentos').href = url;
+        
+        // Se for click esquerdo sem modificadores, redirecionar
+        if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+            event.preventDefault();
+            window.location.href = url;
+        }
+        // Click do meio ou Ctrl+Click: deixar o navegador abrir em nova aba
+        return true;
+    }
+
+    function abrirContrapartida(event) {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) {
+            event.preventDefault();
+            alert('Selecione um termo primeiro!');
+            return false;
+        }
+        // Atualizar href antes de navegar
+        const url = `/conc_contrapartida/?termo=${encodeURIComponent(numeroTermo)}`;
+        document.getElementById('btnContrapartida').href = url;
+        
+        // Se for click esquerdo sem modificadores, redirecionar
+        if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+            event.preventDefault();
+            window.location.href = url;
+        }
+        // Click do meio ou Ctrl+Click: deixar o navegador abrir em nova aba
+        return true;
+    }
+
+    function abrirRelatorio(event) {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) {
+            event.preventDefault();
+            alert('Selecione um termo primeiro!');
+            return false;
+        }
+        // Atualizar href antes de navegar
+        const url = `/conc_relatorio/?termo=${encodeURIComponent(numeroTermo)}`;
+        document.getElementById('btnRelatorio').href = url;
+        
+        // Se for click esquerdo sem modificadores, redirecionar
+        if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+            event.preventDefault();
+            window.location.href = url;
+        }
+        // Click do meio ou Ctrl+Click: deixar o navegador abrir em nova aba
+        return true;
+    }
+
+    async function abrirOCR(event) {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        
+        // Salvar termo na session antes de ir para OCR
+        if (numeroTermo) {
+            try {
+                await fetch('/conc_bancaria/api/salvar-termo-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numero_termo: numeroTermo })
+                });
+            } catch (error) {
+                console.error('Erro ao salvar termo na sessão:', error);
+            }
+        }
+        
+        const url = '/ocr_testes/';
+        
+        // Se for click esquerdo sem modificadores, redirecionar
+        if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+            event.preventDefault();
+            window.location.href = url;
+        }
+        // Click do meio ou Ctrl+Click: deixar o navegador abrir em nova aba
+        return true;
+    }
+
+    async function verificarContrapartida(numeroTermo) {
+        try {
+            const response = await fetch(`/conc_contrapartida/api/verificar-contrapartida/${encodeURIComponent(numeroTermo)}`);
+            const result = await response.json();
+            
+            if (response.ok && result.tem_contrapartida) {
+                document.getElementById('btnContrapartida').style.display = 'inline-block';
+            } else {
+                document.getElementById('btnContrapartida').style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Erro ao verificar contrapartida:', error);
+            document.getElementById('btnContrapartida').style.display = 'none';
+        }
+    }
+
     async function salvarConciliacao() {
         const numeroTermo = document.getElementById('numeroTermo').value;
         const bancoExtrato = document.getElementById('bancoExtrato').value;
@@ -4312,21 +4587,29 @@
             // Limpar cache após salvar com sucesso
             limparCache();
             
-            // Salvar estado atual do limite antes de recarregar
-            const limiteAntesDeSalvar = limiteAtual;
+            // Atualizar IDs das linhas que foram inseridas (novas linhas sem ID)
+            // O backend retorna os IDs das linhas inseridas
+            if (resultado.ids_inseridos && resultado.ids_inseridos.length > 0) {
+                let indexId = 0;
+                linhas.forEach(linha => {
+                    if (!linha.id && indexId < resultado.ids_inseridos.length) {
+                        linha.id = resultado.ids_inseridos[indexId];
+                        indexId++;
+                    }
+                });
+            }
             
-            // Recarregar dados
-            await carregarExtrato();
-            
-            // Restaurar limite após recarregar
-            limiteAtual = limiteAntesDeSalvar;
-            
+            // Recarregar apenas dados auxiliares (Notas Fiscais e Documentos) se necessário
+            // NÃO recarregar extrato completo - os dados em memória já estão corretos
             if (secaoNotasFiscaisAtiva) {
                 await carregarNotasFiscais();
             }
             if (secaoDocumentosAtiva) {
                 await carregarDocumentosAnalise();
             }
+            
+            // Re-renderizar tabela para atualizar IDs e estado visual
+            renderizarTabela();
 
         } catch (error) {
             console.error('Erro ao salvar:', error);
@@ -4345,12 +4628,10 @@
         }
     }
     
-    // FUNÇÃO TEMPORÁRIA: Atualizar guias automaticamente
+    // FUNÇÃO: Atualizar guias automaticamente
     async function atualizarGuiasAutomaticamente() {
         // PASSO 1: Simular as alterações sem aplicá-las
         let contadorGuias = 0;
-        let contadorCompetencias = 0;
-        let contadorGlosar = 0;
         let linhasParaAlterar = []; // Lista para preview
         
         // Percorrer todas as linhas para gerar preview
@@ -4359,26 +4640,55 @@
             let alteracoes = [];
             
             // === VERIFICAÇÃO DE GUIAS ===
-            const temOrigemDestino = linha.origem_destino && linha.origem_destino.trim() !== '';
+            // Requisitos para atualizar:
+            // 1. Origem/Destino preenchido
+            // 2. Categoria (cat_transacao) preenchida
+            // 3. Composição (discriminacao) preenchida
+            // 4. Linha tem ID (está salva no banco)
+            // 5. Guia está como "Não apresentada" ou vazia/Selecione
             
-            if (temOrigemDestino && linha.id) {
-                const temCategoria = linha.cat_transacao && linha.cat_transacao.trim() !== '';
+            const temOrigemDestino = linha.origem_destino && linha.origem_destino.trim() !== '';
+            const temCategoria = linha.cat_transacao && linha.cat_transacao.trim() !== '';
+            const ehDebito = linha.debito && linha.debito > 0;
+            const temComposicao = ehDebito && linha.discriminacao && linha.discriminacao > 0;
+            
+            // DEBUG: Log detalhado para entender o problema
+            if (temOrigemDestino && temCategoria && linha.id) {
+                console.log(`[DEBUG PREVIEW] Linha ${linha.indice}:`, {
+                    origem: linha.origem_destino,
+                    categoria: linha.cat_transacao,
+                    credito: linha.credito,
+                    debito: linha.debito,
+                    discriminacao: linha.discriminacao,
+                    ehDebito: ehDebito,
+                    temComposicao: temComposicao,
+                    vai_atualizar_guia: temComposicao
+                });
+            }
+            
+            if (temOrigemDestino && temCategoria && temComposicao && linha.id) {
+                const categoriaNaoAplicavel = categoriasAplicabilidade[linha.cat_transacao] === true;
                 
-                if (temCategoria) {
-                    const categoriaNaoAplicavel = categoriasAplicabilidade[linha.cat_transacao] === true;
+                // Só atualizar se categoria NÃO é "Não aplicável"
+                if (!categoriaNaoAplicavel) {
+                    const doc = documentosAnalise[linha.id];
                     
-                    if (!categoriaNaoAplicavel) {
-                        const doc = documentosAnalise[linha.id];
-                        
-                        if (doc && doc.avaliacao_guia === 'Não apresentada') {
-                            contadorGuias++;
-                            linhaAlterada = true;
-                            alteracoes.push('Guia → "Guia apresentada"');
-                        }
+                    // Verificar se guia está vazia, "Não apresentada" ou não definida
+                    if (doc && (
+                        !doc.avaliacao_guia || 
+                        doc.avaliacao_guia === '' || 
+                        doc.avaliacao_guia === 'Não apresentada'
+                    )) {
+                        contadorGuias++;
+                        linhaAlterada = true;
+                        alteracoes.push('Guia → "Guia apresentada"');
                     }
                 }
             }
             
+            // === COMPETÊNCIAS E GLOSAR DESATIVADOS ===
+            // (código mantido comentado para referência futura)
+            /*
             // === VERIFICAÇÃO DE COMPETÊNCIAS ===
             if (!linha.competencia && linha.data && !linha._competencia_deletada) {
                 const competenciaAuto = calcularCompetenciaAutomatica(linha.data);
@@ -4400,6 +4710,7 @@
                     alteracoes.push('Avaliação → "Glosar"');
                 }
             }
+            */
             
             // Adicionar à lista se houve alguma alteração
             if (linhaAlterada) {
@@ -4408,14 +4719,15 @@
                     data: linha.data ? formatarDataParaExibicao(linha.data) : '',
                     origem_destino: linha.origem_destino || '',
                     categoria: linha.cat_transacao || '',
+                    composicao: formatarMoeda(linha.discriminacao),
                     alteracoes: alteracoes.join(' | ')
                 });
             }
         });
         
         // PASSO 2: Mostrar preview e solicitar confirmação
-        if (contadorGuias === 0 && contadorCompetencias === 0 && contadorGlosar === 0) {
-            alert('❌ Nenhuma alteração será realizada.\n\nMotivos possíveis:\n• Guias já estão corretas\n• Competências já preenchidas ou foram deletadas manualmente\n• Avaliações já preenchidas\n• Linhas não atendem aos critérios');
+        if (contadorGuias === 0) {
+            alert('❌ Nenhuma alteração será realizada.\n\nMotivos possíveis:\n• Guias já estão preenchidas\n• Linhas não possuem Origem/Destino, Categoria e Composição preenchidos simultaneamente\n• Categoria está marcada como "Não aplicável"\n• Linhas não foram salvas ainda (sem ID)');
             return;
         }
         
@@ -4423,16 +4735,7 @@
         let mensagemPreview = '📋 PREVIEW DAS ALTERAÇÕES A SEREM REALIZADAS\n';
         mensagemPreview += '═'.repeat(60) + '\n\n';
         mensagemPreview += '📊 RESUMO:\n';
-        
-        if (contadorGuias > 0) {
-            mensagemPreview += `   🎫 ${contadorGuias} guia(s) serão atualizadas para "Guia apresentada"\n`;
-        }
-        if (contadorCompetencias > 0) {
-            mensagemPreview += `   📅 ${contadorCompetencias} competência(s) serão preenchidas\n`;
-        }
-        if (contadorGlosar > 0) {
-            mensagemPreview += `   ❌ ${contadorGlosar} avaliação(ões) serão marcadas como "Glosar"\n`;
-        }
+        mensagemPreview += `   🎫 ${contadorGuias} guia(s) serão atualizadas para "Guia apresentada"\n`;
         
         mensagemPreview += '\n📝 DETALHES DAS ALTERAÇÕES:\n';
         mensagemPreview += '═'.repeat(60) + '\n\n';
@@ -4448,6 +4751,9 @@
                 }
                 if (linha.categoria) {
                     mensagemPreview += `   Categoria: ${linha.categoria}\n`;
+                }
+                if (linha.composicao) {
+                    mensagemPreview += `   Composição: ${linha.composicao}\n`;
                 }
                 mensagemPreview += `   ✏️ ${linha.alteracoes}\n\n`;
             }
@@ -4470,30 +4776,47 @@
         
         // PASSO 3: Aplicar as alterações
         let contadorGuiasAplicadas = 0;
-        let contadorCompetenciasAplicadas = 0;
-        let contadorGlosarAplicadas = 0;
         
         linhas.forEach((linha, index) => {
             // === ATUALIZAÇÃO DE GUIAS ===
             const temOrigemDestino = linha.origem_destino && linha.origem_destino.trim() !== '';
+            const temCategoria = linha.cat_transacao && linha.cat_transacao.trim() !== '';
+            const ehDebito = linha.debito && linha.debito > 0;
+            const temComposicao = ehDebito && linha.discriminacao && linha.discriminacao > 0;
             
-            if (temOrigemDestino && linha.id) {
-                const temCategoria = linha.cat_transacao && linha.cat_transacao.trim() !== '';
+            // DEBUG: Log detalhado para entender o problema na aplicação
+            if (temOrigemDestino && temCategoria && linha.id) {
+                console.log(`[DEBUG APLICACAO] Linha ${linha.indice}:`, {
+                    origem: linha.origem_destino,
+                    categoria: linha.cat_transacao,
+                    credito: linha.credito,
+                    debito: linha.debito,
+                    discriminacao: linha.discriminacao,
+                    ehDebito: ehDebito,
+                    temComposicao: temComposicao,
+                    vai_atualizar_guia: temComposicao
+                });
+            }
+            
+            if (temOrigemDestino && temCategoria && temComposicao && linha.id) {
+                const categoriaNaoAplicavel = categoriasAplicabilidade[linha.cat_transacao] === true;
                 
-                if (temCategoria) {
-                    const categoriaNaoAplicavel = categoriasAplicabilidade[linha.cat_transacao] === true;
+                if (!categoriaNaoAplicavel) {
+                    const doc = documentosAnalise[linha.id];
                     
-                    if (!categoriaNaoAplicavel) {
-                        const doc = documentosAnalise[linha.id];
-                        
-                        if (doc && doc.avaliacao_guia === 'Não apresentada') {
-                            doc.avaliacao_guia = 'Guia apresentada';
-                            contadorGuiasAplicadas++;
-                        }
+                    if (doc && (
+                        !doc.avaliacao_guia || 
+                        doc.avaliacao_guia === '' || 
+                        doc.avaliacao_guia === 'Não apresentada'
+                    )) {
+                        doc.avaliacao_guia = 'Guia apresentada';
+                        contadorGuiasAplicadas++;
                     }
                 }
             }
             
+            // === COMPETÊNCIAS E GLOSAR DESATIVADOS ===
+            /*
             // === ATUALIZAÇÃO DE COMPETÊNCIAS ===
             if (!linha.competencia && linha.data && !linha._competencia_deletada) {
                 const competenciaAuto = calcularCompetenciaAutomatica(linha.data);
@@ -4513,9 +4836,10 @@
                     contadorGlosarAplicadas++;
                 }
             }
+            */
         });
         
-        if (contadorGuiasAplicadas === 0 && contadorCompetenciasAplicadas === 0 && contadorGlosarAplicadas === 0) {
+        if (contadorGuiasAplicadas === 0) {
             alert('❌ Nenhuma alteração foi aplicada (possível erro interno).');
             return;
         }
@@ -4526,17 +4850,7 @@
         // Construir mensagem de conclusão
         let mensagemFinal = '✅ ALTERAÇÕES APLICADAS COM SUCESSO!\n';
         mensagemFinal += '═'.repeat(60) + '\n\n';
-        
-        if (contadorGuiasAplicadas > 0) {
-            mensagemFinal += `🎫 ${contadorGuiasAplicadas} guia(s) atualizada(s)\n`;
-        }
-        if (contadorCompetenciasAplicadas > 0) {
-            mensagemFinal += `📅 ${contadorCompetenciasAplicadas} competência(s) preenchida(s)\n`;
-        }
-        if (contadorGlosarAplicadas > 0) {
-            mensagemFinal += `❌ ${contadorGlosarAplicadas} avaliação(ões) marcadas como "Glosar"\n`;
-        }
-        
+        mensagemFinal += `🎫 ${contadorGuiasAplicadas} guia(s) atualizada(s) para "Guia apresentada"\n`;
         mensagemFinal += '\n═'.repeat(60) + '\n';
         mensagemFinal += '⚠️ ATENÇÃO: As alterações NÃO foram salvas ainda!\n';
         mensagemFinal += 'Revise a tabela e clique em SALVAR para confirmar.';
