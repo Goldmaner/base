@@ -5,6 +5,7 @@ Blueprint de parcerias (listagem e formulário)
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, jsonify
 from db import get_cursor, get_db, execute_query
 from utils import login_required
+from decorators import requires_access
 import csv
 from io import StringIO, BytesIO
 from datetime import datetime
@@ -21,6 +22,7 @@ parcerias_bp = Blueprint('parcerias', __name__, url_prefix='/parcerias')
 
 @parcerias_bp.route("/", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def listar():
     """
     Listagem de todas as parcerias/termos com filtros e busca
@@ -241,6 +243,7 @@ def listar():
 
 @parcerias_bp.route("/nova", methods=["GET", "POST"])
 @login_required
+@requires_access('parcerias')
 def nova():
     """
     Criar nova parceria
@@ -400,6 +403,7 @@ def nova():
 
 @parcerias_bp.route("/editar/<path:numero_termo>", methods=["GET", "POST"])
 @login_required
+@requires_access('parcerias')
 def editar(numero_termo):
     """
     Formulário completo de edição de parceria
@@ -624,6 +628,7 @@ def editar(numero_termo):
 
 @parcerias_bp.route("/api/oscs", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def api_oscs():
     """
     API para buscar lista de OSCs únicas para autocomplete
@@ -651,6 +656,7 @@ def api_oscs():
 
 @parcerias_bp.route("/api/sigla-tipo-termo", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def api_sigla_tipo_termo():
     """
     API para buscar mapeamento de siglas para tipos de termo
@@ -673,6 +679,7 @@ def api_sigla_tipo_termo():
 
 @parcerias_bp.route("/exportar-csv", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def exportar_csv():
     """
     Exporta parcerias para CSV respeitando os filtros aplicados
@@ -879,6 +886,7 @@ def exportar_csv():
 
 @parcerias_bp.route("/exportar-pdf", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def exportar_pdf():
     """
     Exporta uma parceria específica para PDF
@@ -1035,6 +1043,7 @@ def exportar_pdf():
 
 @parcerias_bp.route("/conferencia", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def conferencia():
     """
     Compara as parcerias do CSV com as do banco
@@ -1102,6 +1111,7 @@ def conferencia():
 
 @parcerias_bp.route("/conferencia/atualizar", methods=["POST"])
 @login_required
+@requires_access('parcerias')
 def atualizar_conferencia():
     """
     Executa o script import_conferencia.py para atualizar os dados
@@ -1143,6 +1153,7 @@ def atualizar_conferencia():
 
 @parcerias_bp.route("/conferencia/pos-insercao", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def conferencia_pos_insercao():
     """
     Rota intermediária após inserção de parceria vinda da conferência.
@@ -1181,6 +1192,7 @@ def conferencia_pos_insercao():
 
 @parcerias_bp.route("/dicionario-oscs", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def dicionario_oscs():
     """
     Dicionário de OSCs - permite padronizar e corrigir nomes de OSCs
@@ -1236,6 +1248,7 @@ def dicionario_oscs():
 
 @parcerias_bp.route("/buscar-oscs", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def buscar_oscs():
     """
     API para buscar OSCs no banco de dados (busca global)
@@ -1278,6 +1291,7 @@ def buscar_oscs():
 
 @parcerias_bp.route("/termos-por-osc/<path:osc>", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def termos_por_osc(osc):
     """
     API para buscar todos os termos de uma OSC específica
@@ -1320,6 +1334,7 @@ def termos_por_osc(osc):
 
 @parcerias_bp.route("/atualizar-osc", methods=["POST"])
 @login_required
+@requires_access('parcerias')
 def atualizar_osc():
     """
     API para atualizar nome de uma OSC em todos os registros
@@ -1383,6 +1398,7 @@ def atualizar_osc():
 
 @parcerias_bp.route("/rescisoes", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def termos_rescindidos():
     """
     Página de cadastro e listagem de termos rescindidos
@@ -1418,6 +1434,7 @@ def termos_rescindidos():
 
 @parcerias_bp.route("/api/termos-disponiveis", methods=["GET"])
 @login_required
+@requires_access('parcerias')
 def api_termos_disponiveis():
     """
     API para autocomplete de termos disponíveis (não rescindidos)
@@ -1461,6 +1478,7 @@ def api_termos_disponiveis():
 
 @parcerias_bp.route("/rescisao/salvar", methods=["POST"])
 @login_required
+@requires_access('parcerias')
 def salvar_rescisao():
     """
     Salvar novo termo rescindido
@@ -1529,6 +1547,7 @@ def salvar_rescisao():
 
 @parcerias_bp.route("/rescisao/editar/<int:id>", methods=["GET", "POST"])
 @login_required
+@requires_access('parcerias')
 def editar_rescisao(id):
     """
     Editar termo rescindido existente
@@ -1610,6 +1629,7 @@ def editar_rescisao(id):
 
 @parcerias_bp.route("/rescisao/deletar/<int:id>", methods=["POST"])
 @login_required
+@requires_access('parcerias')
 def deletar_rescisao(id):
     """
     Deletar termo rescindido

@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db
 from functools import wraps
 from datetime import datetime, date
+from decorators import requires_access
 
 bp = Blueprint('conc_bancaria', __name__, url_prefix='/conc_bancaria')
 
@@ -20,6 +21,7 @@ def login_required(f):
 
 @bp.route('/')
 @login_required
+@requires_access('conc_bancaria')
 def index():
     """Página principal de conciliação bancária"""
     return render_template('analises_pc/conc_bancaria.html')
@@ -27,6 +29,7 @@ def index():
 
 @bp.route('/api/extrato', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_listar_extrato():
     """
     API para listar movimentações do extrato
@@ -126,6 +129,7 @@ def api_listar_extrato():
 
 @bp.route('/api/extrato', methods=['POST'])
 @login_required
+@requires_access('conc_bancaria')
 def api_salvar_extrato():
     """API para salvar múltiplas linhas do extrato de uma vez"""
     try:
@@ -362,6 +366,7 @@ def api_salvar_extrato():
 
 @bp.route('/api/extrato/<int:extrato_id>', methods=['DELETE'])
 @login_required
+@requires_access('conc_bancaria')
 def api_excluir_extrato(extrato_id):
     """API para excluir uma linha do extrato"""
     try:
@@ -382,6 +387,7 @@ def api_excluir_extrato(extrato_id):
 
 @bp.route('/api/termos', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_listar_termos():
     """API para listar números de termos (de parcerias + extratos existentes)"""
     try:
@@ -410,6 +416,7 @@ def api_listar_termos():
 
 @bp.route('/api/categorias-despesas', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_categorias_despesas():
     """API para listar categorias de despesas de um termo específico"""
     try:
@@ -447,6 +454,7 @@ def api_categorias_despesas():
 
 @bp.route('/api/categorias-analise', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_categorias_analise():
     """API para listar categorias de análise"""
     try:
@@ -478,6 +486,7 @@ def api_categorias_analise():
 
 @bp.route('/api/periodo-termo', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_periodo_termo():
     """API para obter período (datas início e final) de um termo de parceria"""
     try:
@@ -516,6 +525,7 @@ def api_periodo_termo():
 
 @bp.route('/api/banco', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_get_banco():
     """API para obter o banco do extrato de um termo"""
     try:
@@ -546,6 +556,7 @@ def api_get_banco():
 
 @bp.route('/api/salvar-termo-session', methods=['POST'])
 @login_required
+@requires_access('conc_bancaria')
 def api_salvar_termo_session():
     """API para salvar o termo atual na session"""
     try:
@@ -565,6 +576,7 @@ def api_salvar_termo_session():
 
 @bp.route('/api/banco', methods=['POST'])
 @login_required
+@requires_access('conc_bancaria')
 def api_save_banco():
     """API para salvar o banco do extrato de um termo"""
     try:
@@ -613,6 +625,7 @@ def api_save_banco():
 
 @bp.route('/api/notas-fiscais', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_listar_notas_fiscais():
     """API para listar notas fiscais de um termo"""
     try:
@@ -649,6 +662,7 @@ def api_listar_notas_fiscais():
 
 @bp.route('/api/notas-fiscais', methods=['POST'])
 @login_required
+@requires_access('conc_bancaria')
 def api_salvar_notas_fiscais():
     """API para salvar notas fiscais com UPSERT (UPDATE prioritário)"""
     try:
@@ -754,6 +768,7 @@ def api_salvar_notas_fiscais():
 
 @bp.route('/api/categorias-aplicabilidade', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_categorias_aplicabilidade():
     """API para buscar aplicabilidade de documentos por categoria"""
     try:
@@ -780,6 +795,7 @@ def api_categorias_aplicabilidade():
 
 @bp.route('/api/categorias-rubricas', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_categorias_rubricas():
     """API para buscar rubricas das categorias por termo"""
     try:
@@ -812,6 +828,7 @@ def api_categorias_rubricas():
 
 @bp.route('/api/documentos-analise', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def api_listar_documentos_analise():
     """API para listar documentos de análise de um termo"""
     try:
@@ -849,6 +866,7 @@ def api_listar_documentos_analise():
 
 @bp.route('/api/documentos-analise', methods=['POST'])
 @login_required
+@requires_access('conc_bancaria')
 def api_salvar_documentos_analise():
     """API para salvar documentos de análise com UPSERT e auto-marcação"""
     try:

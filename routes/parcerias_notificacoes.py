@@ -5,6 +5,8 @@ Rotas para Ofícios, Documentos e Notificações de Parcerias
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db, execute_query
 from functools import wraps
+from decorators import requires_access
+from datetime import timedelta, date, datetime
 
 bp = Blueprint('parcerias_notificacoes', __name__, url_prefix='/parcerias_notificacoes')
 
@@ -21,6 +23,7 @@ def login_required(f):
 
 @bp.route('/')
 @login_required
+@requires_access('parcerias_notificacoes')
 def listar():
     """Página principal de listagem de notificações"""
     user = {
@@ -33,6 +36,7 @@ def listar():
 
 @bp.route('/api/notificacoes', methods=['GET'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_listar_notificacoes():
     """
     API para listar notificações com filtros
@@ -135,8 +139,6 @@ def api_listar_notificacoes():
                 data_base = item.get('data_pub') or item.get('data_email_ar')
                 
                 if data_base:
-                    from datetime import timedelta, date, datetime
-                    
                     # Converter datetime para date se necessário
                     if isinstance(data_base, datetime):
                         data_base = data_base.date()
@@ -191,6 +193,7 @@ def api_listar_notificacoes():
 
 @bp.route('/api/notificacoes/<int:notif_id>', methods=['GET'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_obter_notificacao(notif_id):
     """API para obter uma notificação específica"""
     try:
@@ -230,6 +233,7 @@ def api_obter_notificacao(notif_id):
 
 @bp.route('/api/notificacoes', methods=['POST'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_criar_notificacao():
     """API para criar uma nova notificação"""
     try:
@@ -287,6 +291,7 @@ def api_criar_notificacao():
 
 @bp.route('/api/notificacoes/<int:notif_id>', methods=['PUT'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_editar_notificacao(notif_id):
     """API para editar uma notificação existente"""
     try:
@@ -346,6 +351,7 @@ def api_editar_notificacao(notif_id):
 
 @bp.route('/api/notificacoes/<int:notif_id>', methods=['DELETE'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_excluir_notificacao(notif_id):
     """API para excluir uma notificação"""
     try:
@@ -372,6 +378,7 @@ def api_excluir_notificacao(notif_id):
 
 @bp.route('/api/tipos-documento', methods=['GET'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_listar_tipos_documento():
     """
     API para listar tipos de documento filtrados por órgão emissor
@@ -429,6 +436,7 @@ def api_listar_tipos_documento():
 
 @bp.route('/api/analistas', methods=['GET'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_listar_analistas():
     """
     API para listar analistas filtrados por tipo de usuário
@@ -490,6 +498,7 @@ def api_listar_analistas():
 
 @bp.route('/api/numeros-termo', methods=['GET'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_listar_numeros_termo():
     """
     API para listar números de termo da tabela parcerias
@@ -515,6 +524,7 @@ def api_listar_numeros_termo():
 
 @bp.route('/api/proximo-numero', methods=['GET'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_proximo_numero():
     """
     API para obter o próximo número de documento para um tipo e ano específico
@@ -546,6 +556,7 @@ def api_proximo_numero():
 
 @bp.route('/api/calcular-prazo', methods=['GET'])
 @login_required
+@requires_access('parcerias_notificacoes')
 def api_calcular_prazo():
     """
     API para calcular prazo baseado em tipo_doc, numero_termo e data
@@ -585,8 +596,6 @@ def api_calcular_prazo():
         prazo_dias = resultado['prazo_dias']
         
         # Calcular data final
-        from datetime import datetime, timedelta
-        
         # Converter string de data para datetime
         if 'T' in data_base_str:
             data_base = datetime.fromisoformat(data_base_str.replace('Z', '+00:00'))

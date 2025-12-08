@@ -5,6 +5,7 @@ Blueprint de orçamento (listagem e edição)
 from flask import Blueprint, render_template, request, Response, jsonify
 from db import get_cursor
 from utils import login_required
+from decorators import requires_access
 import csv
 from io import StringIO
 from datetime import datetime
@@ -14,6 +15,7 @@ orcamento_bp = Blueprint('orcamento', __name__, url_prefix='/orcamento')
 
 @orcamento_bp.route("/", methods=["GET"])
 @login_required
+@requires_access('orcamento')
 def listar():
     """
     Listagem de parcerias/termos com estatísticas de preenchimento
@@ -148,6 +150,7 @@ def listar():
 
 @orcamento_bp.route('/editar/<path:numero_termo>')
 @login_required
+@requires_access('orcamento')
 def editar(numero_termo):
     """
     Editor de orçamento para um termo específico
@@ -195,6 +198,7 @@ def editar(numero_termo):
 
 @orcamento_bp.route('/dicionario-despesas')
 @login_required
+@requires_access('orcamento')
 def dicionario_despesas():
     """
     Exibe dicionário de categorias de despesas com suas rubricas mais comuns
@@ -261,6 +265,7 @@ def dicionario_despesas():
 
 @orcamento_bp.route('/atualizar-categoria', methods=['POST'])
 @login_required
+@requires_access('orcamento')
 def atualizar_categoria():
     """
     Atualiza em massa uma categoria de despesa no banco de dados
@@ -300,6 +305,8 @@ def atualizar_categoria():
 
 
 @orcamento_bp.route('/buscar-categorias', methods=['GET'])
+@login_required
+@requires_access('orcamento')
 def buscar_categorias():
     """
     API para busca global de categorias.
@@ -383,6 +390,7 @@ def buscar_categorias():
 
 @orcamento_bp.route('/termos-por-categoria/<path:categoria>', methods=['GET'])
 @login_required
+@requires_access('orcamento')
 def termos_por_categoria(categoria):
     """
     API para buscar todos os termos (numero_termo) que usam uma categoria específica.
@@ -429,6 +437,7 @@ def termos_por_categoria(categoria):
 
 @orcamento_bp.route("/exportar-termo-csv", methods=["GET"])
 @login_required
+@requires_access('orcamento')
 def exportar_termo_csv():
     """
     Exporta os dados de orçamento preenchidos de UM termo específico para CSV
@@ -564,6 +573,7 @@ def exportar_termo_csv():
 
 @orcamento_bp.route("/exportar-csv", methods=["GET"])
 @login_required
+@requires_access('orcamento')
 def exportar_csv():
     """
     Exporta TODAS as parcerias para CSV com suas informações de orçamento

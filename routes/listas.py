@@ -5,6 +5,7 @@ Blueprint de gerenciamento de listas/tabelas categóricas
 from flask import Blueprint, render_template, request, jsonify
 from db import get_cursor, execute_query
 from utils import login_required
+from decorators import requires_access
 
 listas_bp = Blueprint('listas', __name__, url_prefix='/listas')
 
@@ -199,6 +200,7 @@ TABELAS_CONFIG = {
 
 @listas_bp.route("/", methods=["GET"])
 @login_required
+@requires_access('listas')
 def index():
     """
     Página principal de gerenciamento de listas
@@ -216,6 +218,7 @@ def index():
 
 @listas_bp.route("/api/dados/<tabela>", methods=["GET"])
 @login_required
+@requires_access('listas')
 def obter_dados(tabela):
     """
     Retorna os dados de uma tabela específica
@@ -315,6 +318,7 @@ def obter_dados(tabela):
 
 @listas_bp.route("/api/dados/<tabela>", methods=["POST"])
 @login_required
+@requires_access('listas')
 def criar_registro(tabela):
     """
     Cria um novo registro na tabela
@@ -359,6 +363,7 @@ def criar_registro(tabela):
 
 @listas_bp.route("/api/dados/<tabela>/<int:id>", methods=["PUT"])
 @login_required
+@requires_access('listas')
 def atualizar_registro(tabela, id):
     """
     Atualiza um registro existente
@@ -440,6 +445,7 @@ def atualizar_registro(tabela, id):
 
 @listas_bp.route("/api/dados/<tabela>/<int:id>", methods=["DELETE"])
 @login_required
+@requires_access('listas')
 def excluir_registro(tabela, id):
     """
     Exclui um registro
@@ -470,6 +476,7 @@ def excluir_registro(tabela, id):
 
 @listas_bp.route("/api/dados/<tabela>/salvar-lote", methods=["POST"])
 @login_required
+@requires_access('listas')
 def salvar_lote(tabela):
     """
     Salva múltiplos registros de uma vez (edição inline em lote)

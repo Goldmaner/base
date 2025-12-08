@@ -1,6 +1,7 @@
 # routes/conc_contrapartida.py
 from flask import Blueprint, render_template, request, jsonify, session
 from functools import wraps
+from decorators import requires_access
 from db import get_cursor, get_db
 
 bp = Blueprint('conc_contrapartida', __name__, url_prefix='/conc_contrapartida')
@@ -16,6 +17,7 @@ def login_required(f):
 
 @bp.route('/')
 @login_required
+@requires_access('conc_contrapartida')
 def index():
     """Renderiza a página de conciliação de contrapartida"""
     numero_termo = request.args.get('termo', '')
@@ -24,6 +26,7 @@ def index():
 
 @bp.route('/api/contrapartidas', methods=['GET'])
 @login_required
+@requires_access('conc_contrapartida')
 def listar_contrapartidas():
     """Lista todas as contrapartidas de um termo"""
     try:
@@ -87,6 +90,7 @@ def listar_contrapartidas():
 
 @bp.route('/api/contrapartidas', methods=['POST'])
 @login_required
+@requires_access('conc_contrapartida')
 def salvar_contrapartidas():
     """Salva ou atualiza contrapartidas (UPSERT)"""
     try:
@@ -197,6 +201,7 @@ def salvar_contrapartidas():
 
 @bp.route('/api/contrapartidas/<int:id>', methods=['DELETE'])
 @login_required
+@requires_access('conc_contrapartida')
 def excluir_contrapartida(id):
     """Exclui uma contrapartida"""
     try:
@@ -226,6 +231,7 @@ def excluir_contrapartida(id):
 
 @bp.route('/api/verificar-contrapartida/<path:numero_termo>', methods=['GET'])
 @login_required
+@requires_access('conc_contrapartida')
 def verificar_contrapartida(numero_termo):
     """Verifica se o termo possui contrapartida"""
     try:

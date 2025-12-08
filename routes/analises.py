@@ -5,6 +5,7 @@ Blueprint de gerenciamento de análises de prestação de contas
 from flask import Blueprint, render_template, request, jsonify, make_response
 from db import get_cursor, execute_query
 from utils import login_required
+from decorators import requires_access
 from datetime import datetime, timedelta
 import io
 import re
@@ -167,6 +168,7 @@ analises_bp = Blueprint('analises', __name__, url_prefix='/analises')
 
 @analises_bp.route("/api/anos-disponiveis", methods=["GET"])
 @login_required
+@requires_access('analises')
 def obter_anos_disponiveis():
     """
     API para buscar os anos disponíveis nas datas de parecer
@@ -211,6 +213,7 @@ def obter_anos_disponiveis():
 
 @analises_bp.route("/api/modelo-ausencia-extratos", methods=["POST"])
 @login_required
+@requires_access('analises')
 def obter_modelo_ausencia_extratos():
     """
     API para buscar modelo de texto de solicitação de extratos bancários
@@ -279,6 +282,7 @@ def obter_modelo_ausencia_extratos():
 
 @analises_bp.route("/", methods=["GET"])
 @login_required
+@requires_access('analises')
 def listar():
     """
     Página principal de análises
@@ -288,6 +292,7 @@ def listar():
 
 @analises_bp.route("/api/dados", methods=["GET"])
 @login_required
+@requires_access('analises')
 def obter_dados():
     """
     API para buscar dados de análises com filtros
@@ -543,6 +548,7 @@ def calcular_regularidade(vigencia_final, entregue, tipo_prestacao):
 
 @analises_bp.route("/api/exportar", methods=["GET"])
 @login_required
+@requires_access('analises')
 def exportar_csv():
     """
     Exporta dados filtrados para CSV
@@ -617,6 +623,7 @@ def exportar_csv():
 
 @analises_bp.route("/editar-termo", methods=["GET", "POST"])
 @login_required
+@requires_access('analises')
 def editar_por_termo():
     """
     Edita TODAS as análises de um termo específico de uma vez
@@ -712,6 +719,7 @@ def editar_por_termo():
 
 @analises_bp.route('/adicionar', methods=['GET', 'POST'])
 @login_required
+@requires_access('analises')
 def adicionar_analises():
     """
     Interface para adicionar novas análises de prestação de contas
@@ -833,6 +841,7 @@ def adicionar_analises():
 
 @analises_bp.route('/api/adicionar-multiplos', methods=['POST'])
 @login_required
+@requires_access('analises')
 def adicionar_analises_multiplos():
     """
     API para adicionar análises de múltiplos termos de uma vez
@@ -926,6 +935,7 @@ def adicionar_analises_multiplos():
 
 @analises_bp.route('/api/calcular-prestacoes', methods=['POST'])
 @login_required
+@requires_access('analises')
 def calcular_prestacoes():
     """
     API para calcular as prestações de contas baseado no termo selecionado
@@ -1200,6 +1210,7 @@ def gerar_prestacoes(numero_termo, data_inicio, data_termino, portaria):
 
 @analises_bp.route('/atualizar-prestacoes', methods=['GET', 'POST'])
 @login_required
+@requires_access('analises')
 def atualizar_prestacoes():
     """
     Interface para atualizar prestações de contas que estão com divergência de datas
@@ -1547,6 +1558,7 @@ def atualizar_prestacoes():
 
 @analises_bp.route('/api/limpar-prestacoes-sem-recursos', methods=['POST'])
 @login_required
+@requires_access('analises')
 def limpar_prestacoes_sem_recursos():
     """
     API para limpar prestações de termos rescindidos que não receberam recursos (total_pago = 0).

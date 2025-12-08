@@ -17,7 +17,13 @@
 <body>
   <div class="container main-container">
     <div class="d-flex justify-content-between align-items-center">
-      <h2>Módulo de Análise de Contas</h2>
+      <h2>
+        {% if user['tipo_usuario'] == 'Agente DGP' %}
+          Módulo de Divisão de Gestão de Parcerias
+        {% else %}
+          Módulo de Análise de Contas
+        {% endif %}
+      </h2>
       <div>
         <small>Logado como: <strong>{{ user['email'] }}</strong></small><br>
         <small>Tipo: <span class="badge bg-info">{{ user['tipo_usuario'] }}</span></small><br>
@@ -28,43 +34,62 @@
     <div class="mt-4">
       <!-- Grid de 2-2-2 para os botões principais -->
       <div class="row g-3">
+        {% set user_acessos = user.get('acessos', '') %}
+        {% set is_admin = user['tipo_usuario'] == 'Agente Público' %}
+        
+        {% if is_admin or 'instrucoes' in user_acessos %}
         <div class="col-md-6">
           <a href="{{ url_for('instrucoes.listar_view') }}" class="btn btn-main">
             <i class="bi bi-plus-circle-fill me-2"></i>Iniciar ou prosseguir análise
           </a>
         </div>
+        {% endif %}
+        
+        {% if is_admin or 'analises' in user_acessos %}
         <div class="col-md-6">
           <a href="{{ url_for('analises.listar') }}" class="btn btn-main">
             <i class="bi bi-arrow-clockwise me-2"></i>Menu de Prestações de Contas
           </a>
         </div>
+        {% endif %}
+        
+        {% if is_admin or 'orcamento' in user_acessos %}
         <div class="col-md-6">
           <a href="{{ url_for('orcamento.listar') }}" class="btn btn-main">
             <i class="bi bi-currency-dollar me-2"></i>Orçamento anual
           </a>
         </div>
+        {% endif %}
+        
+        {% if is_admin or 'parcerias' in user_acessos %}
         <div class="col-md-6">
           <a href="{{ url_for('parcerias.listar') }}" class="btn btn-main">
             <i class="bi bi-people-fill me-2"></i>Parcerias
           </a>
         </div>
-        {% if user['tipo_usuario'] in ['Agente DAC', 'Agente Público'] %}
+        {% endif %}
+        
+        {% if (is_admin or 'pesquisa_parcerias' in user_acessos) and user['tipo_usuario'] in ['Agente DAC', 'Agente Público'] %}
         <div class="col-md-6">
           <a href="{{ url_for('pesquisa_parcerias.index') }}" class="btn btn-main" style="background-color: #198754;">
             <i class="bi bi-search me-2"></i>Pesquisa de Parcerias
           </a>
         </div>
         {% endif %}
+        
+        {% if is_admin or 'parcerias_notificacoes' in user_acessos %}
         <div class="col-md-6">
           <a href="{{ url_for('parcerias_notificacoes.listar') }}" class="btn btn-main" style="background-color: #fd7e14;">
             <i class="bi bi-envelope-fill me-2"></i>Ofícios, Documentos e Notificações
           </a>
         </div>
+        {% endif %}
       </div>
     </div>
 
     <!-- Listas Suspensas (para Agente Público e outros Agentes) -->
     {% if user['tipo_usuario'] in ['Agente Público', 'Agente DAC', 'Agente DGP', 'Agente DP'] %}
+      {% if is_admin or 'listas' in user_acessos %}
       <div class="mt-4 p-3 border-top">
         <h5>Gestão de Dados</h5>
         <div class="row g-3">
@@ -75,27 +100,37 @@
           </div>
         </div>
       </div>
+      {% endif %}
     {% endif %}
 
-    {% if user['tipo_usuario'] == 'Agente Público' %}
+    <!-- Opções de Administração -->
+    {% if is_admin or 'portarias' in user_acessos or 'usuarios' in user_acessos or 'modelos_textos' in user_acessos %}
       <div class="mt-4 p-3 border-top">
         <h5>Opções do Administrador</h5>
         <div class="row g-3">
+          {% if is_admin or 'portarias' in user_acessos %}
           <div class="col-12">
             <a href="{{ url_for('main.gerenciar_portarias') }}" class="btn btn-main btn-admin">
               <i class="bi bi-file-earmark-text me-2"></i>Gerenciar Portarias/Legislações
             </a>
           </div>
+          {% endif %}
+          
+          {% if is_admin or 'usuarios' in user_acessos %}
           <div class="col-12">
             <a href="#" class="btn btn-main btn-admin" data-bs-toggle="modal" data-bs-target="#modalUsuarios">
               <i class="bi bi-people me-2"></i>Gerenciar Usuários
             </a>
           </div>
+          {% endif %}
+          
+          {% if is_admin or 'modelos_textos' in user_acessos %}
           <div class="col-12">
             <a href="{{ url_for('main.modelos_textos_index') }}" class="btn btn-main btn-admin">
               <i class="bi bi-file-text me-2"></i>Modelos de texto
             </a>
           </div>
+          {% endif %}
         </div>
       </div>
     {% endif %}
@@ -472,10 +507,67 @@
     }
 
     async function editarUsuario(id, email, tipo, d_usuario) {
+      // Buscar dados completos do usuário incluindo acessos
+      let acessosAtuais = [];
+      try {
+        const response = await fetch(`/api/usuarios/${id}`);
+        if (response.ok) {
+          const userData = await response.json();
+          acessosAtuais = userData.acessos ? userData.acessos.split(';').filter(a => a.trim()) : [];
+        }
+      } catch (error) {
+        console.error('Erro ao buscar dados do usuário:', error);
+      }
+      
+      // Lista de todos os módulos/blueprints disponíveis
+      const modulosDisponiveis = [
+        { id: 'instrucoes', nome: 'Iniciar ou prosseguir análise', grupo: 'Principal' },
+        { id: 'analises', nome: 'Menu de Prestações de Contas', grupo: 'Principal' },
+        { id: 'orcamento', nome: 'Orçamento anual', grupo: 'Principal' },
+        { id: 'parcerias', nome: 'Parcerias', grupo: 'Principal' },
+        { id: 'pesquisa_parcerias', nome: 'Pesquisa de Parcerias', grupo: 'Principal' },
+        { id: 'parcerias_notificacoes', nome: 'Ofícios, Documentos e Notificações', grupo: 'Principal' },
+        { id: 'listas', nome: 'Listas suspensas', grupo: 'Gestão' },
+        { id: 'conc_bancaria', nome: 'Conciliação Bancária', grupo: 'Análise PC' },
+        { id: 'conc_rendimentos', nome: 'Rendimentos', grupo: 'Análise PC' },
+        { id: 'conc_contrapartida', nome: 'Contrapartida', grupo: 'Análise PC' },
+        { id: 'conc_relatorio', nome: 'Relatório de Conciliação', grupo: 'Análise PC' },
+        { id: 'portarias', nome: 'Gerenciar Portarias/Legislações', grupo: 'Admin' },
+        { id: 'usuarios', nome: 'Gerenciar Usuários', grupo: 'Admin' },
+        { id: 'modelos_textos', nome: 'Modelos de texto', grupo: 'Admin' }
+      ];
+      
+      // Agrupar módulos
+      const grupos = {};
+      modulosDisponiveis.forEach(mod => {
+        if (!grupos[mod.grupo]) grupos[mod.grupo] = [];
+        grupos[mod.grupo].push(mod);
+      });
+      
+      // Gerar HTML dos checkboxes agrupados
+      let checkboxesHtml = '';
+      Object.keys(grupos).forEach(grupo => {
+        checkboxesHtml += `<div class="mb-3">`;
+        checkboxesHtml += `<h6 class="text-muted mb-2"><i class="bi bi-folder me-1"></i>${grupo}</h6>`;
+        grupos[grupo].forEach(mod => {
+          const checked = tipo === 'Agente Público' || acessosAtuais.includes(mod.id) ? 'checked' : '';
+          const disabled = tipo === 'Agente Público' ? 'disabled' : '';
+          checkboxesHtml += `
+            <div class="form-check">
+              <input class="form-check-input acesso-checkbox" type="checkbox" 
+                     value="${mod.id}" id="acesso_${mod.id}" ${checked} ${disabled}>
+              <label class="form-check-label" for="acesso_${mod.id}">
+                ${mod.nome}
+              </label>
+            </div>`;
+        });
+        checkboxesHtml += `</div>`;
+      });
+      
       // Criar formulário modal usando Bootstrap
       const modalHtml = `
         <div class="modal fade" id="modalEditarUsuario" tabindex="-1">
-          <div class="modal-dialog">
+          <div class="modal-dialog modal-lg">
             <div class="modal-content">
               <div class="modal-header bg-warning">
                 <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar Usuário: ${email}</h5>
@@ -484,7 +576,7 @@
               <div class="modal-body">
                 <div class="mb-3">
                   <label class="form-label">Tipo de Usuário</label>
-                  <select class="form-select" id="editTipo">
+                  <select class="form-select" id="editTipo" onchange="atualizarAcessosDisponiveis(this.value)">
                     <option value="Agente Público" ${tipo === 'Agente Público' ? 'selected' : ''}>Agente Público (Admin)</option>
                     <option value="Agente DAC" ${tipo === 'Agente DAC' ? 'selected' : ''}>Agente DAC</option>
                     <option value="Agente DGP" ${tipo === 'Agente DGP' ? 'selected' : ''}>Agente DGP</option>
@@ -496,6 +588,29 @@
                   <label class="form-label">Registro do Usuário</label>
                   <input type="text" class="form-control" id="editDUsuario" value="${d_usuario}" maxlength="20" placeholder="Ex: DAC, DGP, DP...">
                   <small class="text-muted">Máximo 20 caracteres</small>
+                </div>
+                
+                <hr>
+                
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="form-label mb-0"><i class="bi bi-key-fill me-2"></i>Controle de Acessos</label>
+                    <div id="acessosControls">
+                      <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="marcarTodos()">
+                        <i class="bi bi-check-all"></i> Marcar Todos
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodos()">
+                        <i class="bi bi-x"></i> Desmarcar Todos
+                      </button>
+                    </div>
+                  </div>
+                  <small class="text-muted d-block mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Agente Público tem acesso total (não editável). Para outros tipos, selecione os módulos permitidos.
+                  </small>
+                  <div id="checkboxesAcessos" style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; background-color: #f8f9fa;">
+                    ${checkboxesHtml}
+                  </div>
                 </div>
               </div>
               <div class="modal-footer">
@@ -521,9 +636,46 @@
       modal.show();
     }
     
+    function atualizarAcessosDisponiveis(tipoUsuario) {
+      const checkboxes = document.querySelectorAll('.acesso-checkbox');
+      const controls = document.getElementById('acessosControls');
+      
+      if (tipoUsuario === 'Agente Público') {
+        // Agente Público: marcar todos e desabilitar
+        checkboxes.forEach(cb => {
+          cb.checked = true;
+          cb.disabled = true;
+        });
+        controls.style.display = 'none';
+      } else {
+        // Outros: habilitar edição
+        checkboxes.forEach(cb => {
+          cb.disabled = false;
+        });
+        controls.style.display = 'block';
+      }
+    }
+    
+    function marcarTodos() {
+      const checkboxes = document.querySelectorAll('.acesso-checkbox:not([disabled])');
+      checkboxes.forEach(cb => cb.checked = true);
+    }
+    
+    function desmarcarTodos() {
+      const checkboxes = document.querySelectorAll('.acesso-checkbox:not([disabled])');
+      checkboxes.forEach(cb => cb.checked = false);
+    }
+    
     async function salvarEdicao(id) {
       const novoTipo = document.getElementById('editTipo').value;
       const novoDUsuario = document.getElementById('editDUsuario').value.trim();
+      
+      // Coletar acessos selecionados
+      const checkboxes = document.querySelectorAll('.acesso-checkbox:checked');
+      const acessosSelecionados = Array.from(checkboxes).map(cb => cb.value);
+      const acessosString = acessosSelecionados.join(';');
+      
+      console.log('[DEBUG] Salvando usuário:', { id, novoTipo, novoDUsuario, acessos: acessosString });
       
       try {
         const response = await fetch(`/api/usuarios/${id}`, {
@@ -531,7 +683,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             tipo_usuario: novoTipo,
-            d_usuario: novoDUsuario
+            d_usuario: novoDUsuario,
+            acessos: acessosString
           })
         });
         

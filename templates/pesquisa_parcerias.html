@@ -311,8 +311,13 @@
     document.getElementById('nomeOsc').addEventListener('input', async function() {
       const nomeOsc = this.value.trim();
       
+      console.log('🔍 [DEBUG] OSC digitada:', nomeOsc);
+      console.log('🔍 [DEBUG] Comprimento:', nomeOsc.length);
+      console.log('🔍 [DEBUG] Caracteres:', nomeOsc.split('').map(c => c.charCodeAt(0)));
+      
       // Se checkbox "não identificada" estiver marcado, não buscar CNPJ
       if (document.getElementById('oscNaoIdentificada').checked) {
+        console.log('⚠️ [DEBUG] Checkbox "não identificada" marcado, pulando busca');
         return;
       }
       
@@ -322,19 +327,27 @@
       }
 
       try {
-        const response = await fetch(`/pesquisa-parcerias/api/cnpj/${encodeURIComponent(nomeOsc)}`);
+        const url = `/pesquisa-parcerias/api/cnpj/${encodeURIComponent(nomeOsc)}`;
+        console.log('🌐 [DEBUG] URL da requisição:', url);
+        
+        const response = await fetch(url);
+        console.log('📥 [DEBUG] Status da resposta:', response.status);
+        
         const data = await response.json();
+        console.log('📦 [DEBUG] Dados recebidos:', data);
         
         if (data.erro) {
           // OSC não encontrada, limpar CNPJ
+          console.warn('❌ [DEBUG] Erro na API:', data.erro);
           document.getElementById('cnpj').value = '';
           return;
         }
 
+        console.log('✅ [DEBUG] CNPJ encontrado:', data.cnpj);
         document.getElementById('cnpj').value = data.cnpj || '';
 
       } catch (error) {
-        console.error('Erro ao buscar CNPJ:', error);
+        console.error('💥 [DEBUG] Erro ao buscar CNPJ:', error);
       }
     });
 

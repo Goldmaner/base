@@ -6,6 +6,7 @@ Geração de tabelas de cálculos para diferentes tipos de responsabilidade
 from flask import Blueprint, render_template, request, jsonify, session, Response
 from db import get_cursor, get_db
 from functools import wraps
+from decorators import requires_access
 import csv
 from io import StringIO
 
@@ -23,6 +24,7 @@ def login_required(f):
 
 @bp.route('/')
 @login_required
+@requires_access('conc_relatorio')
 def index():
     """Página principal do relatório de conciliação"""
     return render_template('analises_pc/conc_relatorio.html')
@@ -30,6 +32,7 @@ def index():
 
 @bp.route('/api/test', methods=['GET'])
 @login_required
+@requires_access('conc_relatorio')
 def test():
     """Endpoint de teste"""
     return jsonify({'status': 'ok', 'message': 'Blueprint funcionando'})
@@ -37,6 +40,7 @@ def test():
 
 @bp.route('/api/dados-relatorio', methods=['GET'])
 @login_required
+@requires_access('conc_relatorio')
 def dados_relatorio():
     """Retorna dados do relatório conforme o tipo de responsabilidade"""
     conn = None
@@ -406,6 +410,7 @@ def dados_relatorio():
 
 @bp.route('/api/debug-executado-aprovado', methods=['GET'])
 @login_required
+@requires_access('conc_relatorio')
 def debug_executado_aprovado():
     """Gera CSV detalhado do cálculo de Valor Executado e Aprovado"""
     conn = None

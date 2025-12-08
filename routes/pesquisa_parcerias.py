@@ -1,6 +1,8 @@
 # routes/pesquisa_parcerias.py
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from functools import wraps
+from decorators import requires_access
+from datetime import datetime
 from db import get_cursor, execute_query
 import sys
 import os
@@ -81,7 +83,6 @@ def relatorio():
 def obter_proximo_numero():
     """Retorna o próximo número de pesquisa (reseta anualmente)"""
     try:
-        from datetime import datetime
         ano_atual = datetime.now().year
         
         query = """
@@ -149,8 +150,13 @@ def listar_oscs():
 def buscar_cnpj(nome_osc):
     """Retorna o CNPJ de uma OSC específica"""
     try:
-        query = """
-            SELECT cnpj
+        print(f"\n🔍 [BACKEND DEBUG] Buscando CNPJ para OSC: '{nome_osc}'")
+        print(f"🔍 [BACKEND DEBUG] Comprimento: {len(nome_osc)}")
+        print(f"🔍 [BACKEND DEBUG] Bytes: {nome_osc.encode('utf-8')}")
+        
+        # Primeiro: buscar exatamente
+        query_exata = """
+            SELECT cnpj, osc
             FROM public.parcerias
             WHERE osc = %s
             LIMIT 1
@@ -160,19 +166,53 @@ def buscar_cnpj(nome_osc):
         if cur is None:
             return jsonify({'erro': 'Erro ao conectar com banco de dados'}), 500
         
-        cur.execute(query, (nome_osc,))
+        cur.execute(query_exata, (nome_osc,))
         resultados = cur.fetchall()
+        
+        if len(resultados) > 0:
+            print(f"✅ [BACKEND DEBUG] Match exato encontrado!")
+            cur.close()
+            return jsonify({
+                'sucesso': True,
+                'cnpj': resultados[0]['cnpj']
+            })
+        
+        print(f"⚠️ [BACKEND DEBUG] Match exato não encontrado. Buscando variações...")
+        
+        # Se não encontrou, buscar variações similares
+        query_similar = """
+            SELECT cnpj, osc, 
+                   LENGTH(osc) as tamanho,
+                   ENCODE(osc::bytea, 'hex') as hex
+            FROM public.parcerias
+            WHERE LOWER(TRIM(osc)) LIKE LOWER(%s)
+            LIMIT 5
+        """
+        
+        cur.execute(query_similar, (f'%{nome_osc}%',))
+        similares = cur.fetchall()
+        
+        if len(similares) > 0:
+            print(f"📋 [BACKEND DEBUG] Encontradas {len(similares)} OSCs similares:")
+            for s in similares:
+                print(f"   - '{s['osc']}' (len={s['tamanho']}, hex={s['hex'][:50]}...)")
+            
+            # Retornar a primeira similar (pode ajustar lógica depois)
+            cur.close()
+            return jsonify({
+                'sucesso': True,
+                'cnpj': similares[0]['cnpj'],
+                'aviso': f"Match aproximado: '{similares[0]['osc']}'"
+            })
+        
+        print(f"❌ [BACKEND DEBUG] Nenhuma OSC similar encontrada")
         cur.close()
-        
-        if len(resultados) == 0:
-            return jsonify({'erro': 'OSC não encontrada'}), 404
-        
-        return jsonify({
-            'sucesso': True,
-            'cnpj': resultados[0]['cnpj']
-        })
+        return jsonify({'erro': 'OSC não encontrada'}), 404
         
     except Exception as e:
+        print(f"💥 [BACKEND DEBUG] Erro: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'erro': str(e)}), 500
 
 

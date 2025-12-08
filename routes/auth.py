@@ -20,7 +20,7 @@ def login():
         senha_input = request.form["password"]
 
         cur = get_cursor()
-        cur.execute("SELECT id, email, senha, tipo_usuario FROM usuarios WHERE email = %s", (email_input,))
+        cur.execute("SELECT id, email, senha, tipo_usuario, acessos FROM usuarios WHERE email = %s", (email_input,))
         user = cur.fetchone()
         cur.close()
         
@@ -36,6 +36,7 @@ def login():
             session["user_id"] = user["id"]
             session["email"] = user["email"]
             session["tipo_usuario"] = user["tipo_usuario"]
+            session["acessos"] = user["acessos"] or ""  # Armazenar acessos na sessão
             flash("Logado com sucesso.", "success")
             return redirect(url_for("main.index"))
         else:
@@ -74,7 +75,7 @@ def listar_usuarios():
         print("[DEBUG] Executando query para listar usuários...")
         cur = get_cursor()
         cur.execute("""
-            SELECT id, email, tipo_usuario, d_usuario, data_criacao 
+            SELECT id, email, tipo_usuario, d_usuario, data_criacao, acessos
             FROM usuarios 
             ORDER BY data_criacao DESC
         """)
@@ -91,7 +92,8 @@ def listar_usuarios():
                 "email": user["email"],
                 "tipo_usuario": user["tipo_usuario"],
                 "d_usuario": user["d_usuario"],
-                "data_criacao": user["data_criacao"].isoformat() if user["data_criacao"] else None
+                "data_criacao": user["data_criacao"].isoformat() if user["data_criacao"] else None,
+                "acessos": user["acessos"]
             })
         
         print(f"[DEBUG] Retornando {len(resultado)} usuários")
@@ -162,6 +164,44 @@ def criar_usuario():
         return jsonify({"erro": str(e)}), 500
 
 
+@auth_bp.route("/api/usuarios/<int:user_id>", methods=["GET"])
+@login_required
+def obter_usuario(user_id):
+    """
+    API para obter dados completos de um usuário específico (apenas para Agente Público)
+    """
+    # Verificar se é Agente Público
+    if session.get("tipo_usuario") != "Agente Público":
+        return jsonify({"erro": "Acesso negado"}), 403
+    
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT id, email, tipo_usuario, d_usuario, data_criacao, acessos
+            FROM usuarios 
+            WHERE id = %s
+        """, (user_id,))
+        
+        usuario = cur.fetchone()
+        cur.close()
+        
+        if not usuario:
+            return jsonify({"erro": "Usuário não encontrado"}), 404
+        
+        resultado = {
+            "id": usuario["id"],
+            "email": usuario["email"],
+            "tipo_usuario": usuario["tipo_usuario"],
+            "d_usuario": usuario["d_usuario"],
+            "data_criacao": usuario["data_criacao"].isoformat() if usuario["data_criacao"] else None,
+            "acessos": usuario["acessos"]
+        }
+        
+        return jsonify(resultado), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
 @auth_bp.route("/api/usuarios/<int:user_id>", methods=["PUT"])
 @login_required
 def atualizar_usuario(user_id):
@@ -176,6 +216,7 @@ def atualizar_usuario(user_id):
         data = request.get_json()
         tipo_usuario = data.get("tipo_usuario", "").strip()
         d_usuario = data.get("d_usuario", "").strip()
+        acessos = data.get("acessos", "").strip()
         
         # Validações
         tipos_validos = ["Agente Público", "Agente DAC", "Agente DGP", "Agente DP", "Externo"]
@@ -199,6 +240,10 @@ def atualizar_usuario(user_id):
         if "d_usuario" in data:  # Permite enviar vazio para limpar
             updates.append("d_usuario = %s")
             params.append(d_usuario if d_usuario else None)
+        
+        if "acessos" in data:  # Permite enviar vazio para limpar
+            updates.append("acessos = %s")
+            params.append(acessos if acessos else None)
         
         if not updates:
             return jsonify({"erro": "Nenhum campo para atualizar"}), 400

@@ -5,6 +5,7 @@ Rotas para Conciliação de Rendimentos de Ativos Financeiros - Análise PC
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db
 from functools import wraps
+from decorators import requires_access
 from datetime import datetime, date
 import calendar
 
@@ -21,6 +22,7 @@ def login_required(f):
 
 @bp.route('/')
 @login_required
+@requires_access('conc_rendimentos')
 def index():
     """Página principal de conciliação de rendimentos"""
     return render_template('analises_pc/conc_rendimentos.html')
@@ -28,6 +30,7 @@ def index():
 
 @bp.route('/api/rendimentos', methods=['GET'])
 @login_required
+@requires_access('conc_rendimentos')
 def api_listar_rendimentos():
     """
     API para listar rendimentos de um termo
@@ -87,6 +90,7 @@ def api_listar_rendimentos():
 
 @bp.route('/api/rendimentos', methods=['POST'])
 @login_required
+@requires_access('conc_rendimentos')
 def api_salvar_rendimentos():
     """API para salvar rendimentos"""
     try:
@@ -172,6 +176,7 @@ def api_salvar_rendimentos():
 
 @bp.route('/api/periodo-termo', methods=['GET'])
 @login_required
+@requires_access('conc_rendimentos')
 def api_periodo_termo():
     """API para obter período (datas início e final) de um termo"""
     try:

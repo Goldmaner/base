@@ -6,12 +6,14 @@ from flask import Blueprint, render_template, request, jsonify
 import psycopg2
 from db import get_db, get_cursor
 from utils import login_required
+from decorators import requires_access
 
 instrucoes_bp = Blueprint('instrucoes', __name__, url_prefix='/instrucoes')
 
 
 @instrucoes_bp.route("/", methods=["GET"])
 @login_required
+@requires_access('instrucoes')
 def listar_view():
     """
     Página de listagem de instruções
@@ -25,6 +27,7 @@ def listar_view():
 
 @instrucoes_bp.route("/api", methods=["GET"])
 @login_required
+@requires_access('instrucoes')
 def listar_api():
     """
     API para listar todas as instruções (JSON)
@@ -39,6 +42,7 @@ def listar_api():
 
 @instrucoes_bp.route("/api/<int:id>", methods=["DELETE"])
 @login_required
+@requires_access('instrucoes')
 def deletar(id):
     """
     API para deletar uma instrução por ID
@@ -56,6 +60,7 @@ def deletar(id):
 
 @instrucoes_bp.route("/api", methods=["POST"])
 @login_required
+@requires_access('instrucoes')
 def criar():
     """
     API para criar uma nova instrução
