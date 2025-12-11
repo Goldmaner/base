@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demonstrativo de Execução Financeira - FAF</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<style>
+    .table-mes {
+        font-size: 0.9rem;
+    }
+    
+    .table-mes th {
+        background-color: #0d6efd;
+        color: white;
+        text-align: center;
+        vertical-align: middle;
+    }
+    
+    .table-mes td {
+        vertical-align: middle;
+    }
+    
+    .text-end {
+        text-align: right !important;
+    }
+    
+    .mes-titulo {
+        background-color: #f8f9fa;
+        padding: 10px;
+        margin-top: 30px;
+        margin-bottom: 15px;
+        border-left: 4px solid #0d6efd;
+    }
+    
+    .valor-negativo {
+        color: #dc3545;
+    }
+    
+    .valor-positivo {
+        color: #198754;
+    }
+</style>
+</head>
+<body>
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2>Demonstrativo de Execução Financeira</h2>
+            <p class="text-muted">Relatório mensal de execução orçamentária e financeira</p>
+        </div>
+    </div>
+
+    <!-- Seletor de Termo -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <label for="selectTermo" class="form-label">Selecionar Termo de Parceria:</label>
+            <select class="form-select" id="selectTermo">
+                <option value="">Carregando termos...</option>
+            </select>
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+            <button class="btn btn-secondary me-2" onclick="voltarConcBancaria()">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </button>
+            <button class="btn btn-primary" id="btnCarregar" onclick="carregarDemonstrativo()">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Carregar Demonstrativo
+            </button>
+            <button class="btn btn-success ms-2" id="btnExportar" onclick="exportarExcel()" style="display: none;">
+                <i class="bi bi-file-excel"></i> Exportar Excel
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="checkOcultarTaxas" checked onchange="aplicarFiltros()">
+                <label class="form-check-label" for="checkOcultarTaxas">
+                    Não visualizar Taxas Bancárias
+                </label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="checkExcluirPG" checked onchange="aplicarFiltros()">
+                <label class="form-check-label" for="checkExcluirPG">
+                    Excluir avaliações "Pessoa Gestora"
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Área de Conteúdo -->
+    <div id="conteudoDemonstrativo" style="display: none;">
+        <div class="alert alert-info">
+            <strong>Termo:</strong> <span id="infoTermo"></span>
+        </div>
+
+        <!-- Tabelas Mensais -->
+        <div id="tabelasMensais"></div>
+
+        <!-- Quadro de Cálculo Geral -->
+        <div class="mt-5">
+            <h3 class="mb-3">Quadro de Cálculo Geral</h3>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm" id="tabelaQuadroGeral">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Quadro de Cálculo Geral</th>
+                            <th class="text-end">Previsto</th>
+                            <th class="text-end">Executado</th>
+                            <th class="text-end">Considerado</th>
+                            <th class="text-end">Não Utilizado</th>
+                            <th class="text-end">Glosado</th>
+                            <th class="text-end">Descontado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoQuadroGeral">
+                    </tbody>
+                    <tfoot class="table-secondary fw-bold">
+                        <tr id="totalQuadroGeral">
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mensagem de Erro -->
+    <div id="mensagemErro" class="alert alert-danger" style="display: none;"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let dadosDemonstrativo = null;
+
+    // Carregar lista de termos ao inicializar
+    document.addEventListener('DOMContentLoaded', function() {
+        carregarTermos();
+        
+        // Verificar se há parâmetro 'termo' na URL e carregar automaticamente
+        const urlParams = new URLSearchParams(window.location.search);
+        const termoUrl = urlParams.get('termo');
+        if (termoUrl) {
+            // Aguardar o carregamento da lista de termos antes de selecionar
+            setTimeout(() => {
+                const select = document.getElementById('selectTermo');
+                select.value = termoUrl;
+                carregarDemonstrativo();
+            }, 500);
+        }
+    });
+
+    function carregarTermos() {
+        fetch('/api/termos-com-analise-dp')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('selectTermo');
+                select.innerHTML = '<option value="">Selecione um termo...</option>';
+                
+                data.termos.forEach(termo => {
+                    const option = document.createElement('option');
+                    option.value = termo.numero_termo;
+                    option.textContent = termo.numero_termo;
+                    select.appendChild(option);
+                });
+                
+                // Se há termo na URL, selecionar após carregar a lista
+                const urlParams = new URLSearchParams(window.location.search);
+                const termoUrl = urlParams.get('termo');
+                if (termoUrl) {
+                    select.value = termoUrl;
+                    carregarDemonstrativo();
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao carregar termos:', error);
+                document.getElementById('selectTermo').innerHTML = '<option value="">Erro ao carregar termos</option>';
+            });
+    }
+
+    function carregarDemonstrativo() {
+        const termo = document.getElementById('selectTermo').value;
+        
+        console.log('[DEBUG] carregarDemonstrativo chamado, termo:', termo);
+        
+        if (!termo) {
+            alert('Por favor, selecione um termo');
+            return;
+        }
+
+        const ocultarTaxas = document.getElementById('checkOcultarTaxas').checked;
+        const excluirPG = document.getElementById('checkExcluirPG').checked;
+
+        console.log('[DEBUG] Iniciando fetch para:', `/conc_demonstrativo/api/dados?termo=${encodeURIComponent(termo)}&ocultar_taxas=${ocultarTaxas}&excluir_pg=${excluirPG}`);
+
+        // Limpar conteúdo anterior
+        document.getElementById('conteudoDemonstrativo').style.display = 'none';
+        document.getElementById('mensagemErro').style.display = 'none';
+        document.getElementById('btnExportar').style.display = 'none';
+
+        fetch(`/conc_demonstrativo/api/dados?termo=${encodeURIComponent(termo)}&ocultar_taxas=${ocultarTaxas}&excluir_pg=${excluirPG}`)
+            .then(response => {
+                console.log('[DEBUG] Response status:', response.status);
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.erro || 'Erro ao carregar dados');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('[DEBUG] Dados recebidos:', data);
+                dadosDemonstrativo = data;
+                renderizarDemonstrativo(data);
+                document.getElementById('conteudoDemonstrativo').style.display = 'block';
+                document.getElementById('btnExportar').style.display = 'inline-block';
+            })
+            .catch(error => {
+                console.error('[DEBUG] Erro ao carregar:', error);
+                const divErro = document.getElementById('mensagemErro');
+                divErro.textContent = error.message;
+                divErro.style.display = 'block';
+            });
+    }
+
+    function renderizarDemonstrativo(data) {
+        // Atualizar informações do termo
+        document.getElementById('infoTermo').textContent = data.numero_termo;
+
+        // Renderizar tabelas mensais
+        const containerMensais = document.getElementById('tabelasMensais');
+        containerMensais.innerHTML = '';
+
+        data.meses.forEach(mes => {
+            const divMes = document.createElement('div');
+            divMes.className = 'mb-5';
+            
+            const tituloMes = document.createElement('h4');
+            tituloMes.className = 'mes-titulo';
+            tituloMes.textContent = `Mês ${mes.mes_numero} - ${mes.mes_nome}`;
+            divMes.appendChild(tituloMes);
+
+            const table = criarTabelaMensal(mes);
+            divMes.appendChild(table);
+            
+            containerMensais.appendChild(divMes);
+        });
+
+        // Renderizar Quadro de Cálculo Geral
+        renderizarQuadroGeral(data.quadro_geral, data.totais_gerais);
+    }
+
+    function criarTabelaMensal(mes) {
+        const divTable = document.createElement('div');
+        divTable.className = 'table-responsive';
+
+        const table = document.createElement('table');
+        table.className = 'table table-bordered table-hover table-sm table-mes';
+
+        // Cabeçalho
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th style="width: 25%;">Categoria de Despesa</th>
+                <th class="text-end" style="width: 12.5%;">Previsto</th>
+                <th class="text-end" style="width: 12.5%;">Executado</th>
+                <th class="text-end" style="width: 12.5%;">Considerado</th>
+                <th class="text-end" style="width: 12.5%;">Não Utilizado</th>
+                <th class="text-end" style="width: 12.5%;">Glosa</th>
+                <th class="text-end" style="width: 12.5%;">Uso à Maior</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+
+        // Corpo
+        const tbody = document.createElement('tbody');
+        mes.linhas.forEach(linha => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${linha.categoria}</td>
+                <td class="text-end">${formatarMoeda(linha.previsto)}</td>
+                <td class="text-end">${formatarMoeda(linha.executado)}</td>
+                <td class="text-end">${formatarMoeda(linha.considerado)}</td>
+                <td class="text-end">${formatarMoeda(linha.nao_utilizado)}</td>
+                <td class="text-end ${linha.glosa > 0 ? 'valor-negativo' : ''}">${formatarMoeda(linha.glosa)}</td>
+                <td class="text-end ${linha.uso_a_maior > 0 ? 'valor-negativo' : ''}">${formatarMoeda(linha.uso_a_maior)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+        // Rodapé com totais
+        const tfoot = document.createElement('tfoot');
+        tfoot.className = 'table-secondary fw-bold';
+        tfoot.innerHTML = `
+            <tr>
+                <td>Total</td>
+                <td class="text-end">${formatarMoeda(mes.totais.previsto)}</td>
+                <td class="text-end">${formatarMoeda(mes.totais.executado)}</td>
+                <td class="text-end">${formatarMoeda(mes.totais.considerado)}</td>
+                <td class="text-end">${formatarMoeda(mes.totais.nao_utilizado)}</td>
+                <td class="text-end ${mes.totais.glosa > 0 ? 'valor-negativo' : ''}">${formatarMoeda(mes.totais.glosa)}</td>
+                <td class="text-end ${mes.totais.uso_a_maior > 0 ? 'valor-negativo' : ''}">${formatarMoeda(mes.totais.uso_a_maior)}</td>
+            </tr>
+        `;
+        table.appendChild(tfoot);
+
+        divTable.appendChild(table);
+        return divTable;
+    }
+
+    function renderizarQuadroGeral(quadro, totais) {
+        const tbody = document.getElementById('corpoQuadroGeral');
+        tbody.innerHTML = '';
+
+        quadro.forEach(linha => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${linha.categoria}</td>
+                <td class="text-end">${formatarMoeda(linha.previsto)}</td>
+                <td class="text-end">${formatarMoeda(linha.executado)}</td>
+                <td class="text-end">${formatarMoeda(linha.considerado)}</td>
+                <td class="text-end">${formatarMoeda(linha.nao_utilizado)}</td>
+                <td class="text-end ${linha.glosa > 0 ? 'valor-negativo' : ''}">${formatarMoeda(linha.glosa)}</td>
+                <td class="text-end ${linha.descontado > 0 ? 'valor-negativo' : ''}">${formatarMoeda(linha.descontado)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Totais
+        const trTotal = document.getElementById('totalQuadroGeral');
+        trTotal.innerHTML = `
+            <td>Total</td>
+            <td class="text-end">${formatarMoeda(totais.previsto)}</td>
+            <td class="text-end">${formatarMoeda(totais.executado)}</td>
+            <td class="text-end">${formatarMoeda(totais.considerado)}</td>
+            <td class="text-end">${formatarMoeda(totais.nao_utilizado)}</td>
+            <td class="text-end ${totais.glosa > 0 ? 'valor-negativo' : ''}">${formatarMoeda(totais.glosa)}</td>
+            <td class="text-end ${totais.descontado > 0 ? 'valor-negativo' : ''}">${formatarMoeda(totais.descontado)}</td>
+        `;
+    }
+
+    function formatarMoeda(valor) {
+        if (valor === null || valor === undefined || valor === 0) {
+            return 'R$ -';
+        }
+        return 'R$ ' + parseFloat(valor).toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function exportarExcel() {
+        // TODO: Implementar exportação para Excel
+        alert('Funcionalidade de exportação em desenvolvimento');
+    }
+    
+    function voltarConcBancaria() {
+        const termoAtual = document.getElementById('selectTermo').value;
+        if (termoAtual) {
+            window.location.href = `/conc_bancaria/?termo=${encodeURIComponent(termoAtual)}`;
+        } else {
+            window.location.href = '/conc_bancaria/';
+        }
+    }
+    
+    function aplicarFiltros() {
+        // Recarregar demonstrativo com os filtros atualizados
+        if (dadosDemonstrativo) {
+            carregarDemonstrativo();
+        }
+    }
+</script>
+
+</body>
+</html>

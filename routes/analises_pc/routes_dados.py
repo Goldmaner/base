@@ -583,3 +583,417 @@ def verificar_orcamento():
         }
         print(f"[ERRO] verificar_orcamento: {error_details}")
         return jsonify(error_details), 500
+
+
+@analises_pc_bp.route('/api/listar-informacoes-pg', methods=['GET'])
+def listar_informacoes_pg():
+    """Lista todas as Informações à Pessoa Gestora cadastradas"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        cur.execute("""
+            SELECT id, numero_doc, ano_doc, numero_termo
+            FROM public.parcerias_notificacoes
+            WHERE tipo_doc = 'Informação à Pessoa Gestora'
+            ORDER BY ano_doc DESC, numero_doc DESC
+        """)
+        
+        informacoes = cur.fetchall()
+        cur.close()
+        
+        return jsonify({'informacoes': informacoes})
+    
+    except Exception as e:
+        cur.close()
+        print(f"[ERRO] listar_informacoes_pg: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/dados-informacao-pg/<int:informacao_id>', methods=['GET'])
+def dados_informacao_pg(informacao_id):
+    """Busca dados completos de uma informação específica (com join em parcerias)"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        cur.execute("""
+            SELECT 
+                pn.numero_termo,
+                p.osc,
+                p.projeto,
+                p.portaria
+            FROM public.parcerias_notificacoes pn
+            LEFT JOIN public.parcerias p ON p.numero_termo = pn.numero_termo
+            WHERE pn.id = %s
+            LIMIT 1
+        """, (informacao_id,))
+        
+        resultado = cur.fetchone()
+        cur.close()
+        
+        if not resultado:
+            return jsonify({'error': 'Informação não encontrada'}), 404
+        
+        return jsonify(dict(resultado))
+    
+    except Exception as e:
+        cur.close()
+        print(f"[ERRO] dados_informacao_pg: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/gerar-texto-ausencia-extratos', methods=['POST'])
+def gerar_texto_ausencia_extratos():
+    """Gera texto substituindo placeholders no modelo"""
+    data = request.get_json()
+    
+    # Validar dados recebidos
+    numero_informacao = data.get('numero_informacao', '')
+    numero_termo = data.get('numero_termo', '')
+    osc = data.get('osc', '')
+    projeto = data.get('projeto', '')
+    portaria = data.get('portaria', '')
+    sei_termo = data.get('sei_termo', '')
+    possui_conciliacao = data.get('possui_conciliacao', False)
+    
+    if not all([numero_informacao, numero_termo, osc, projeto, portaria, sei_termo]):
+        return jsonify({'error': 'Dados incompletos'}), 400
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Buscar modelo de texto
+        cur.execute("""
+            SELECT modelo_texto
+            FROM categoricas.c_modelo_textos
+            WHERE titulo_texto = 'Análise de Contas: Ausência de extratos bancários pós-2023'
+            LIMIT 1
+        """)
+        
+        resultado = cur.fetchone()
+        cur.close()
+        
+        if not resultado or not resultado['modelo_texto']:
+            return jsonify({'error': 'Modelo de texto não encontrado'}), 404
+        
+        texto = resultado['modelo_texto']
+        
+        # Log para debug
+        print(f"[DEBUG] Texto original (primeiros 500 chars): {texto[:500]}")
+        print(f"[DEBUG] Dados recebidos:")
+        print(f"  - numero_informacao: '{numero_informacao}'")
+        print(f"  - numero_termo: '{numero_termo}'")
+        print(f"  - osc: '{osc}'")
+        print(f"  - projeto: '{projeto}'")
+        print(f"  - portaria: '{portaria}'")
+        print(f"  - sei_termo: '{sei_termo}'")
+        print(f"  - possui_conciliacao: {possui_conciliacao}")
+        
+        # Substituir placeholders básicos (sem colchetes e com colchetes)
+        texto = texto.replace('numero_informacao_usuario', numero_informacao)
+        texto = texto.replace('[numero_informacao_usuario]', numero_informacao)
+        
+        texto = texto.replace('termo_usuario', numero_termo)
+        texto = texto.replace('[termo_usuario]', numero_termo)
+        
+        texto = texto.replace('osc_usuario', osc)
+        texto = texto.replace('[osc_usuario]', osc)
+        
+        texto = texto.replace('projeto_usuario', projeto)
+        texto = texto.replace('[projeto_usuario]', projeto)
+        
+        texto = texto.replace('portaria_usuario', portaria)
+        texto = texto.replace('[portaria_usuario]', portaria)
+        
+        texto = texto.replace('sei_informado_termo_usuario', sei_termo)
+        texto = texto.replace('[sei_informado_termo_usuario]', sei_termo)
+        
+        # Substituir SEI de solicitação
+        sei_solicitacao = data.get('sei_solicitacao', '')
+        texto = texto.replace('sei_informado_1', sei_solicitacao)
+        texto = texto.replace('[sei_informado_1]', sei_solicitacao)
+        
+        # Substituir SEI do relatório sintético
+        sei_relatorio = data.get('sei_relatorio', '')
+        texto = texto.replace('sei_informado_relatorio_usuario', sei_relatorio)
+        texto = texto.replace('[sei_informado_relatorio_usuario]', sei_relatorio)
+        
+        # Substituição condicional: possui conciliação
+        if possui_conciliacao:
+            texto = texto.replace('opcao_1_usuario', 'contendo apenas a conciliação bancária, ')
+            texto = texto.replace('[opcao_1_usuario]', 'contendo apenas a conciliação bancária, ')
+        else:
+            texto = texto.replace('opcao_1_usuario', '')
+            texto = texto.replace('[opcao_1_usuario]', '')
+        
+        # Substituição condicional: artigos baseados na portaria
+        if '021/2023' in portaria or '21/2023' in portaria:
+            artigo_1 = '60, 64 §3º, 67, 80 §3º'
+            artigo_2 = ' 72 §2º e Artigo 59'
+        else:  # Portaria 090/2023 ou outras
+            artigo_1 = '64, 67 §3º, 71, 77 §2º e 81 §3º'
+            artigo_2 = ' 74 §2º e artigo 63'
+        
+        texto = texto.replace('numero_artigo_1_usuario', artigo_1)
+        texto = texto.replace('[numero_artigo_1_usuario]', artigo_1)
+        
+        texto = texto.replace('numero_artigo_2_usuario', artigo_2)
+        texto = texto.replace('[numero_artigo_2_usuario]', artigo_2)
+        
+        print(f"[DEBUG] Texto após substituições (primeiros 500 chars): {texto[:500]}")
+        
+        return jsonify({'texto_gerado': texto})
+    
+    except Exception as e:
+        cur.close()
+        print(f"[ERRO] gerar_texto_ausencia_extratos: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================
+# API: Listar Relatórios de Inconsistências Disponíveis
+# ============================================================
+@analises_pc_bp.route('/api/listar-relatorios-inconsistencias', methods=['GET'])
+def listar_relatorios_inconsistencias():
+    """
+    Lista todos os Relatórios de Inconsistências disponíveis.
+    Filtra por tipo_doc = 'Relatório de Inconsistências' em public.parcerias_notificacoes
+    """
+    cur = None
+    try:
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Query com variações do nome do tipo de documento
+        query = """
+            SELECT 
+                pn.id,
+                pn.numero_doc,
+                pn.ano_doc,
+                pn.numero_termo,
+                p.osc,
+                p.projeto
+            FROM public.parcerias_notificacoes pn
+            LEFT JOIN public.parcerias p ON p.numero_termo = pn.numero_termo
+            WHERE pn.tipo_doc ILIKE %s
+            ORDER BY pn.ano_doc DESC, pn.numero_doc DESC
+        """
+        
+        # Usar ILIKE para ignorar case e acentos potenciais
+        cur.execute(query, ('%Relatório%Inconsistências%',))
+        resultados = cur.fetchall()
+        
+        print(f"[DEBUG] Encontrados {len(resultados)} relatórios de inconsistências")
+        
+        relatorios = []
+        for row in resultados:
+            relatorios.append({
+                'id': row['id'],
+                'numero_doc': row['numero_doc'],
+                'ano_doc': row['ano_doc'],
+                'numero_termo': row['numero_termo'] or '',
+                'osc': row['osc'] or '',
+                'projeto': row['projeto'] or '',
+                'formatado': f"{row['numero_doc']}/{row['ano_doc']}"
+            })
+        
+        return jsonify({'dados': relatorios})
+    
+    except Exception as e:
+        print(f"[ERRO] listar_relatorios_inconsistencias: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cur:
+            cur.close()
+
+# ============================================================
+# API: Buscar Meses Disponíveis para Análise (por termo)
+# ============================================================
+@analises_pc_bp.route('/api/meses-disponiveis/<path:numero_termo>', methods=['GET'])
+def meses_disponiveis_termo(numero_termo):
+    """
+    Retorna os meses disponíveis na tabela analises_pc.conc_extrato
+    para um determinado termo.
+    """
+    cur = None
+    try:
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        print(f"[DEBUG] Buscando meses para termo: {numero_termo}")
+        
+        query = """
+            SELECT DISTINCT 
+                DATE_TRUNC('month', data) AS mes
+            FROM analises_pc.conc_extrato
+            WHERE numero_termo = %s
+            ORDER BY mes ASC
+        """
+        
+        cur.execute(query, (numero_termo,))
+        resultados = cur.fetchall()
+        
+        print(f"[DEBUG] Encontrados {len(resultados)} meses distintos")
+        
+        meses = []
+        for row in resultados:
+            if row['mes']:
+                # Formatar como "janeiro/2024"
+                mes_obj = row['mes']
+                meses_nomes = {
+                    1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril',
+                    5: 'maio', 6: 'junho', 7: 'julho', 8: 'agosto',
+                    9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'
+                }
+                mes_nome = meses_nomes.get(mes_obj.month, str(mes_obj.month))
+                ano = mes_obj.year
+                meses.append({
+                    'valor': f"{mes_nome}/{ano}",
+                    'data_iso': mes_obj.strftime('%Y-%m-%d')
+                })
+        
+        return jsonify({'meses': meses})
+    
+    except Exception as e:
+        print(f"[ERRO] meses_disponiveis_termo: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cur:
+            cur.close()
+
+# ============================================================
+# API: Gerar Texto do Relatório de Inconsistências
+# ============================================================
+@analises_pc_bp.route('/api/gerar-texto-relatorio-inconsistencias', methods=['POST'])
+def gerar_texto_relatorio_inconsistencias():
+    """
+    Gera o texto do Relatório de Inconsistências com substituição de variáveis.
+    
+    Espera JSON:
+    {
+        "numero_doc": "123",
+        "ano_doc": "2024",
+        "numero_termo": "001/2023",
+        "mes_inicio": "agosto/2024",
+        "mes_fim": "dezembro/2025"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        numero_doc = data.get('numero_doc', '')
+        ano_doc = data.get('ano_doc', '')
+        numero_termo = data.get('numero_termo', '')
+        mes_inicio = data.get('mes_inicio', '')
+        mes_fim = data.get('mes_fim', '')
+        
+        if not numero_doc or not ano_doc or not numero_termo:
+            return jsonify({'error': 'Parâmetros obrigatórios: numero_doc, ano_doc, numero_termo'}), 400
+        
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Buscar dados da parceria
+        query_parceria = """
+            SELECT 
+                p.osc,
+                p.projeto,
+                p.portaria,
+                p.sei_pc
+            FROM public.parcerias p
+            WHERE p.numero_termo = %s
+        """
+        
+        cur.execute(query_parceria, (numero_termo,))
+        parceria = cur.fetchone()
+        
+        if not parceria:
+            cur.close()
+            return jsonify({'error': 'Termo não encontrado'}), 404
+        
+        osc = parceria['osc'] or ''
+        projeto = parceria['projeto'] or ''
+        portaria = parceria['portaria'] or ''
+        sei_pagamento = parceria['sei_pc'] or ''
+        
+        # Determinar qual modelo usar baseado na portaria
+        if '121' in portaria or '140' in portaria:
+            titulo_modelo = 'Análise de Contas: Relatório de Inconsistências'
+            print(f"[DEBUG] Portaria 121/140 detectada - usando modelo padrão")
+        elif '021' in portaria or '090' in portaria:
+            titulo_modelo = 'Análise de Contas: Relatório de Inconsistências pós-2023'
+            print(f"[DEBUG] Portaria 021/090 detectada - usando modelo pós-2023")
+        else:
+            # Fallback para modelo padrão
+            titulo_modelo = 'Análise de Contas: Relatório de Inconsistências'
+            print(f"[DEBUG] Portaria não identificada - usando modelo padrão")
+        
+        # Buscar template do modelo de texto
+        query_modelo = """
+            SELECT titulo_texto, modelo_texto 
+            FROM categoricas.c_modelo_textos 
+            WHERE titulo_texto = %s
+        """
+        
+        cur.execute(query_modelo, (titulo_modelo,))
+        resultado = cur.fetchone()
+        cur.close()
+        
+        if not resultado or not resultado['modelo_texto']:
+            return jsonify({'error': f'Modelo de texto "{titulo_modelo}" não encontrado'}), 404
+        
+        texto = resultado['modelo_texto']
+        print(f"[DEBUG] Modelo carregado: {titulo_modelo}")
+        
+        # ======= SUBSTITUIÇÕES DE VARIÁVEIS =======
+        
+        # 1. numero_informacao_usuario = numero_doc/ano_doc
+        numero_informacao_formatado = f"{numero_doc}/{ano_doc}"
+        texto = texto.replace('numero_informacao_usuario', numero_informacao_formatado)
+        
+        # 2. sei_pagamento_usuario = sei_pc
+        texto = texto.replace('sei_pagamento_usuario', sei_pagamento)
+        
+        # 3. osc_usuario
+        texto = texto.replace('osc_usuario', osc)
+        
+        # 4. projeto_usuario
+        texto = texto.replace('projeto_usuario', projeto)
+        
+        # 5. termo_usuario
+        texto = texto.replace('termo_usuario', numero_termo)
+        
+        # 6. meses_usuario = "mes_inicio a mes_fim"
+        if mes_inicio and mes_fim:
+            periodo = f"{mes_inicio} a {mes_fim}"
+        elif mes_inicio:
+            periodo = mes_inicio
+        else:
+            periodo = '[período não informado]'
+        texto = texto.replace('meses_usuario', periodo)
+        
+        # 7. portaria_usuario
+        texto = texto.replace('portaria_usuario', portaria)
+        
+        # 8. numero_artigo_1_usuario - Lógica condicional baseada na portaria
+        if '121/SMDHC/2019' in portaria or '121/2019' in portaria:
+            numero_artigo_1 = '95'
+        elif '140/SMDHC/2019' in portaria or '140/2019' in portaria:
+            numero_artigo_1 = '98'
+        elif '021/SMDHC/2023' in portaria or '021/2023' in portaria or '21/2023' in portaria:
+            numero_artigo_1 = '75'
+        elif '090/SMDHC/2023' in portaria or '090/2023' in portaria or '90/2023' in portaria:
+            numero_artigo_1 = '77'
+        else:
+            numero_artigo_1 = '[artigo não identificado]'
+        
+        texto = texto.replace('numero_artigo_1_usuario', numero_artigo_1)
+        
+        # Substituições concluídas - não há mais processamento de condicionais
+        # Os modelos já vêm com o texto correto baseado na portaria
+        
+        print(f"[DEBUG] Relatório de Inconsistências gerado para termo {numero_termo}")
+        
+        return jsonify({'texto_gerado': texto})
+    
+    except Exception as e:
+        print(f"[ERRO] gerar_texto_relatorio_inconsistencias: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500

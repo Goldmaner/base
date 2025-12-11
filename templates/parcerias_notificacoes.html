@@ -210,10 +210,16 @@
                             </div>
                             <div class="col-md-4">
                                 <label for="numeroTermo" class="form-label">Número do Termo</label>
-                                <select class="form-select" id="numeroTermo" onchange="calcularPrazoFormulario()">
-                                    <option value="">-- Selecione --</option>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="numeroTermo" 
+                                       list="datalistNumerosTermo" 
+                                       placeholder="Digite para buscar..." 
+                                       autocomplete="off"
+                                       onchange="calcularPrazoFormulario()">
+                                <datalist id="datalistNumerosTermo">
                                     <!-- Preenchido via JavaScript -->
-                                </select>
+                                </datalist>
                             </div>
 
                             <!-- Linha 2 -->
@@ -327,6 +333,13 @@
             // Event listener para calcular próximo número quando tipo_doc mudar
             document.getElementById('tipoDoc').addEventListener('change', calcularProximoNumero);
             document.getElementById('anoDoc').addEventListener('change', calcularProximoNumero);
+            
+            // Event listener para autocomplete dinâmico
+            document.getElementById('tipoDoc').addEventListener('input', function() {
+                if (this.value.length >= 2) {
+                    buscarTiposDocumento(this.value);
+                }
+            });
         });
 
         // Carregar tipos de documento (filtrados por tipo de usuário)
@@ -370,6 +383,55 @@
             } catch (error) {
                 console.error('[ERRO] ao carregar tipos de documento:', error);
                 alert('Erro ao carregar tipos de documento: ' + error.message);
+            }
+        }
+        
+        // Autocomplete dinâmico para número do termo
+        let timeoutBuscaTermo = null;
+        async function buscarNumerosTermo(query) {
+            try {
+                console.log('[DEBUG] buscarNumerosTermo chamada com query:', query);
+                if (timeoutBuscaTermo) clearTimeout(timeoutBuscaTermo);
+                
+                timeoutBuscaTermo = setTimeout(async () => {
+                    console.log('[DEBUG] Executando busca após debounce...');
+                    const url = `/parcerias_notificacoes/api/numeros-termo?q=${encodeURIComponent(query)}`;
+                    console.log('[DEBUG] URL da busca:', url);
+                    
+                    const response = await fetch(url);
+                    console.log('[DEBUG] Response status:', response.status);
+                    
+                    if (!response.ok) {
+                        console.error('[DEBUG] Resposta não OK');
+                        return;
+                    }
+                    
+                    const data = await response.json();
+                    console.log('[DEBUG] Dados recebidos:', data);
+                    
+                    const datalist = document.getElementById('datalistNumerosTermo');
+                    if (!datalist) {
+                        console.error('[DEBUG] ❌ Datalist não encontrado!');
+                        return;
+                    }
+                    
+                    console.log('[DEBUG] Limpando datalist...');
+                    datalist.innerHTML = '';
+                    
+                    if (data.termos && data.termos.length > 0) {
+                        console.log('[DEBUG] Populando datalist com', data.termos.length, 'termos');
+                        data.termos.forEach(termo => {
+                            const option = document.createElement('option');
+                            option.value = termo;
+                            datalist.appendChild(option);
+                        });
+                        console.log('[DEBUG] ✅ Datalist populado com sucesso!');
+                    } else {
+                        console.log('[DEBUG] ⚠️ Nenhum termo encontrado');
+                    }
+                }, 300); // Debounce de 300ms
+            } catch (error) {
+                console.error('[ERRO] ao buscar números de termo:', error);
             }
         }
 
@@ -433,19 +495,44 @@
                 numerosTermo = await response.json();
                 console.log('[DEBUG] Números de termo recebidos:', numerosTermo.length);
                 
-                // Preencher select
-                const select = document.getElementById('numeroTermo');
-                select.innerHTML = '<option value="">-- Selecione --</option>';
+                // Preencher datalist do formulário
+                const datalist = document.getElementById('datalistNumerosTermo');
+                datalist.innerHTML = '';
+                
+                numerosTermo.forEach(termo => {
+                    const option = document.createElement('option');
+                    option.value = termo;
+                    datalist.appendChild(option);
+                });
+                
+                // Preencher select do filtro (mantém como select)
+                const selectFiltro = document.getElementById('filtroTermo');
+                selectFiltro.innerHTML = '<option value="">Todos</option>';
                 
                 numerosTermo.forEach(termo => {
                     const option = document.createElement('option');
                     option.value = termo;
                     option.textContent = termo;
-                    select.appendChild(option);
+                    selectFiltro.appendChild(option);
                 });
                 
-                console.log('[DEBUG] Select de número de termo populado com', numerosTermo.length, 'opções');
+                console.log('[DEBUG] Datalist de número de termo populado com', numerosTermo.length, 'opções');
                 termosCarregados = true;
+                
+                // Adicionar event listener para autocomplete dinâmico
+                const inputTermo = document.getElementById('numeroTermo');
+                if (inputTermo) {
+                    console.log('[DEBUG] ✅ Input numeroTermo encontrado! Adicionando event listener...');
+                    inputTermo.addEventListener('input', function() {
+                        console.log('[DEBUG] Input event disparado! Valor:', this.value, 'Length:', this.value.length);
+                        if (this.value.length >= 2) {
+                            buscarNumerosTermo(this.value);
+                        }
+                    });
+                    console.log('[DEBUG] ✅ Event listener adicionado com sucesso!');
+                } else {
+                    console.error('[DEBUG] ❌ Input numeroTermo NÃO encontrado!');
+                }
             } catch (error) {
                 console.error('[ERRO] ao carregar números de termo:', error);
                 alert('Erro ao carregar números de termo: ' + error.message);

@@ -194,6 +194,74 @@ TABELAS_CONFIG = {
             'descricao': 'textarea',
             'correspondente': 'text'
         }
+    },
+    'c_despesas_provisao': {
+        'nome': 'Despesas de Provisão',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['despesa_provisao', 'descricao'],
+        'colunas_obrigatorias': ['despesa_provisao'],
+        'labels': {
+            'despesa_provisao': 'Despesa de Provisão',
+            'descricao': 'Descrição'
+        },
+        'colunas_filtro': ['despesa_provisao'],
+        'ordem': 'despesa_provisao',
+        'tipos_campo': {
+            'despesa_provisao': 'text',
+            'descricao': 'textarea'
+        }
+    },
+    'c_modelo_textos_inconsistencias': {
+        'nome': 'Modelos de Textos de Inconsistências',
+        'schema': 'categoricas',
+        'colunas_editaveis': [
+            'nome_item', 
+            'tipo_inconsistencia', 
+            'modelo_texto', 
+            'genero_inconsistencia',
+            'situacao',
+            'nivel_gravidade',
+            'referencia_normativa',
+            'ordem'
+        ],
+        'colunas_obrigatorias': ['nome_item', 'tipo_inconsistencia', 'modelo_texto'],
+        'labels': {
+            'nome_item': 'Nome do Item',
+            'tipo_inconsistencia': 'Tipo de Inconsistência',
+            'modelo_texto': 'Modelo de Texto',
+            'genero_inconsistencia': 'Gênero',
+            'situacao': 'Situação',
+            'nivel_gravidade': 'Nível de Gravidade',
+            'referencia_normativa': 'Referência Normativa',
+            'ordem': 'Ordem'
+        },
+        'colunas_filtro': ['nome_item', 'tipo_inconsistencia', 'genero_inconsistencia', 'situacao', 'nivel_gravidade'],
+        'ordem': 'ordem NULLS LAST, nome_item',
+        'permite_reordenar': True,  # Habilita botões de reordenação ↑↓
+        'tipos_campo': {
+            'nome_item': 'text',
+            'tipo_inconsistencia': 'select',
+            'opcoes_tipo_inconsistencia': [
+                'Solicitações globais',
+                'Créditos não esclarecidos',
+                'Débitos não esclarecidos',
+                'Forma de Pagamento Incorreta',
+                'Inconsistência com plano de trabalho ou termo',
+                'Inconsistência de aplicação da verba',
+                'Inconsistência em demonstrativo',
+                'Outros'
+            ],
+            'modelo_texto': 'textarea',
+            'rows_modelo_texto': 15,  # Campo maior para textos longos
+            'genero_inconsistencia': 'select',
+            'opcoes_genero_inconsistencia': ['Material', 'Formal'],
+            'situacao': 'select',
+            'opcoes_situacao': ['Ativa', 'Inativa'],
+            'nivel_gravidade': 'select',
+            'opcoes_nivel_gravidade': ['Leve', 'Moderada', 'Grave'],
+            'referencia_normativa': 'text',
+            'ordem': 'number'
+        }
     }
 }
 
@@ -336,6 +404,21 @@ def criar_registro(tabela):
         for col in colunas_obrigatorias:
             if col not in dados or dados[col] is None or str(dados[col]).strip() == '':
                 return jsonify({'erro': f'Campo {col} é obrigatório'}), 400
+        
+        # Se permite reordenação e não tem ordem definida, colocar no final
+        if config.get('permite_reordenar') and 'ordem' in config['colunas_editaveis']:
+            if 'ordem' not in dados or dados['ordem'] is None or str(dados['ordem']).strip() == '':
+                # Buscar maior ordem atual
+                cur = get_cursor()
+                cur.execute(f"""
+                    SELECT COALESCE(MAX(ordem), 0) as max_ordem
+                    FROM {schema}.{tabela}
+                """)
+                resultado = cur.fetchone()
+                cur.close()
+                
+                # Definir nova ordem (10 a mais que a maior)
+                dados['ordem'] = (resultado['max_ordem'] or 0) + 10
         
         # Montar query de inserção apenas com campos enviados
         colunas_a_inserir = [col for col in config['colunas_editaveis'] if col in dados]
@@ -557,4 +640,86 @@ def salvar_lote(tabela):
         import traceback
         traceback.print_exc()
         return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/dados/<tabela>/<int:id>/mover", methods=["POST"])
+@login_required
+@requires_access('listas')
+def mover_item(tabela, id):
+    """
+    Move um item para cima ou para baixo na ordenação
+    """
+    if tabela not in TABELAS_CONFIG:
+        return jsonify({'erro': 'Tabela inválida'}), 400
+    
+    config = TABELAS_CONFIG[tabela]
+    
+    if not config.get('permite_reordenar'):
+        return jsonify({'erro': 'Tabela não permite reordenação'}), 400
+    
+    try:
+        dados = request.json
+        direcao = dados.get('direcao')  # 'cima' ou 'baixo'
+        
+        if direcao not in ['cima', 'baixo']:
+            return jsonify({'erro': 'Direção inválida'}), 400
+        
+        schema = config['schema']
+        cur = get_cursor()
+        
+        # Buscar todos os registros ordenados
+        cur.execute(f"""
+            SELECT id, ordem
+            FROM {schema}.{tabela}
+            ORDER BY ordem NULLS LAST, id
+        """)
+        registros = cur.fetchall()
+        
+        # Encontrar posição atual
+        posicao_atual = None
+        for idx, reg in enumerate(registros):
+            if reg['id'] == id:
+                posicao_atual = idx
+                break
+        
+        if posicao_atual is None:
+            cur.close()
+            return jsonify({'erro': 'Registro não encontrado'}), 404
+        
+        # Calcular nova posição
+        if direcao == 'cima':
+            nova_posicao = max(0, posicao_atual - 1)
+        else:  # baixo
+            nova_posicao = min(len(registros) - 1, posicao_atual + 1)
+        
+        # Se não mudou, retornar
+        if nova_posicao == posicao_atual:
+            cur.close()
+            return jsonify({'sucesso': True, 'mensagem': 'Item já está no limite'})
+        
+        # Trocar posições
+        registros[posicao_atual], registros[nova_posicao] = registros[nova_posicao], registros[posicao_atual]
+        
+        # Renumerar todos os registros (ordem de 10 em 10 para facilitar inserções futuras)
+        for idx, reg in enumerate(registros):
+            nova_ordem = (idx + 1) * 10
+            execute_query(f"""
+                UPDATE {schema}.{tabela}
+                SET ordem = %s
+                WHERE id = %s
+            """, (nova_ordem, reg['id']))
+        
+        cur.close()
+        
+        return jsonify({
+            'sucesso': True,
+            'mensagem': 'Item movido com sucesso'
+        })
+        
+    except Exception as e:
+        print(f"[ERRO mover_item] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
 

@@ -250,6 +250,25 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         display: none;
     }
+    
+    /* Hover nos cards de ações */
+    .hover-shadow {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .hover-shadow:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .hover-shadow .card-body {
+        transition: background-color 0.2s ease;
+    }
+    
+    .hover-shadow:hover .card-body {
+        background-color: #f8f9fa;
+    }
 </style>
 </head>
 <body>
@@ -267,18 +286,155 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="bi bi-bank me-2"></i>Conciliação Bancária</h2>
         <div>
-            <a href="#" class="btn btn-success me-2" id="btnRendimentos" onmousedown="atualizarHrefRendimentos()" onclick="abrirRendimentos(event)" title="Rendimentos de Ativos Financeiros">
-                <i class="bi bi-piggy-bank me-2"></i>Rendimentos
-            </a>
-            <a href="#" class="btn btn-warning me-2" id="btnContrapartida" onmousedown="atualizarHrefContrapartida()" onclick="abrirContrapartida(event)" title="Análise da Contrapartida" style="display: none;">
-                <i class="bi bi-cash-coin me-2"></i>Contrapartida
-            </a>
-            <a href="#" class="btn btn-primary me-2" id="btnRelatorio" onmousedown="atualizarHrefRelatorio()" onclick="abrirRelatorio(event)" title="Relatório de Conciliação">
-                <i class="bi bi-file-text me-2"></i>Relatório
-            </a>
-            <a href="/ocr_testes/" class="btn btn-info me-2" id="btnOCR" onmousedown="atualizarHrefOCR()" onclick="abrirOCR(event)" title="OCR - Conversão de Extrato">
-                <i class="bi bi-file-earmark-text me-2"></i>OCR (testes)
-            </a>
+            <!-- Botão Ações com Dropdown -->
+            <div class="btn-group me-2">
+                <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-lightning-charge me-1"></i>Ações
+                </button>
+                <div class="dropdown-menu dropdown-menu-end p-0" style="width: 650px; max-height: 70vh; overflow-y: auto;">
+                    <div class="p-3">
+                        <h6 class="text-muted mb-3"><i class="bi bi-grid-3x3-gap me-2"></i>Ações Disponíveis</h6>
+                        
+                        <div class="row g-2">
+                            <!-- Rendimentos -->
+                            <div class="col-6">
+                                <a href="#" id="btnRendimentos" onmousedown="atualizarHrefRendimentos()" onclick="abrirRendimentos(event)" class="text-decoration-none">
+                                    <div class="card border-success h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-piggy-bank fs-4 text-success me-2"></i>
+                                                <h6 class="mb-0 text-success">Rendimentos</h6>
+                                            </div>
+                                            <small class="text-muted">Análise de rendimentos de ativos financeiros da parceria</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Demonstrativo -->
+                            <div class="col-6">
+                                <a href="#" id="btnDemonstrativo" onmousedown="atualizarHrefDemonstrativo()" onclick="abrirDemonstrativo(event)" class="text-decoration-none">
+                                    <div class="card border-info h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-file-earmark-spreadsheet fs-4 text-info me-2"></i>
+                                                <h6 class="mb-0 text-info">Demonstrativo</h6>
+                                            </div>
+                                            <small class="text-muted">Demonstrativo de execução financeira do termo</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Contrapartida (condicional) -->
+                            <div class="col-6" id="cardContrapartida" style="display: none;">
+                                <a href="#" id="btnContrapartidaCard" onmousedown="atualizarHrefContrapartida()" onclick="abrirContrapartida(event)" class="text-decoration-none">
+                                    <div class="card border-warning h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-cash-coin fs-4 text-warning me-2"></i>
+                                                <h6 class="mb-0 text-warning">Contrapartida</h6>
+                                            </div>
+                                            <small class="text-muted">Análise da contrapartida da parceria</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Relatório -->
+                            <div class="col-6">
+                                <a href="#" id="btnRelatorio" onmousedown="atualizarHrefRelatorio()" onclick="abrirRelatorio(event)" class="text-decoration-none">
+                                    <div class="card border-primary h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-file-text fs-4 text-primary me-2"></i>
+                                                <h6 class="mb-0 text-primary">Relatório</h6>
+                                            </div>
+                                            <small class="text-muted">Relatório completo de conciliação bancária</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Relatório de Inconsistências -->
+                            <div class="col-6">
+                                <a href="/analises_pc/conc_inconsistencias" class="text-decoration-none">
+                                    <div class="card border-danger h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-exclamation-triangle fs-4 text-danger me-2"></i>
+                                                <h6 class="mb-0 text-danger">Inconsistências</h6>
+                                            </div>
+                                            <small class="text-muted">Emissão de relatório de inconsistências identificadas</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- OCR -->
+                            <div class="col-6">
+                                <a href="/ocr_testes/" id="btnOCR" onmousedown="atualizarHrefOCR()" onclick="abrirOCR(event)" class="text-decoration-none">
+                                    <div class="card border-secondary h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-file-earmark-text fs-4 text-secondary me-2"></i>
+                                                <h6 class="mb-0 text-secondary">OCR <span class="badge bg-warning text-dark">Beta</span></h6>
+                                            </div>
+                                            <small class="text-muted">Conversão automática de extratos em PDF/imagem</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Exportar CSV -->
+                            <div class="col-6">
+                                <a href="#" onclick="exportarCSV(); return false;" class="text-decoration-none">
+                                    <div class="card border-success h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-download fs-4 text-success me-2"></i>
+                                                <h6 class="mb-0 text-success">Exportar CSV</h6>
+                                            </div>
+                                            <small class="text-muted">Exporta dados da conciliação em formato CSV</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Exportar PDF -->
+                            <div class="col-6">
+                                <a href="#" onclick="abrirModalPDF(); return false;" data-bs-toggle="modal" data-bs-target="#modalExportarPDF" class="text-decoration-none">
+                                    <div class="card border-danger h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-file-pdf fs-4 text-danger me-2"></i>
+                                                <h6 class="mb-0 text-danger">Exportar PDF</h6>
+                                            </div>
+                                            <small class="text-muted">Gera arquivo PDF da conciliação bancária</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Modelo de Importação -->
+                            <div class="col-6">
+                                <a href="#" onclick="baixarModelo(); return false;" class="text-decoration-none">
+                                    <div class="card border-info h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-file-earmark-arrow-down fs-4 text-info me-2"></i>
+                                                <h6 class="mb-0 text-info">Modelo Importação</h6>
+                                            </div>
+                                            <small class="text-muted">Baixa planilha modelo para importação de dados</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <button class="btn btn-outline-secondary btn-sm me-2" onclick="togglePerfMonitor()" title="Toggle Performance Monitor">
                 <i class="bi bi-speedometer2"></i>
             </button>
@@ -332,15 +488,6 @@
                     </li>
                 </ul>
             </div>
-            <button class="btn btn-success me-2" onclick="exportarCSV()">
-                <i class="bi bi-download me-2"></i>Exportar CSV
-            </button>
-            <button class="btn btn-danger me-2" onclick="abrirModalPDF()" data-bs-toggle="modal" data-bs-target="#modalExportarPDF">
-                <i class="bi bi-file-pdf me-2"></i>Exportar PDF
-            </button>
-            <button class="btn btn-info me-2" onclick="baixarModelo()">
-                <i class="bi bi-file-earmark-arrow-down me-2"></i>Modelo Importação
-            </button>
             <button class="btn btn-outline-danger me-2" onclick="limparTabela()">
                 <i class="bi bi-trash me-2"></i>Limpar
             </button>
@@ -368,7 +515,7 @@
                 <datalist id="datalistTermos">
                 </datalist>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="bancoExtrato" class="form-label"><strong>Banco do Extrato</strong></label>
                 <select class="form-select" id="bancoExtrato">
                     <option value="">Selecione o banco...</option>
@@ -378,6 +525,22 @@
                     <option value="Caixa Econômica Federal">Caixa Econômica Federal</option>
                     <option value="Santander">Santander</option>
                 </select>
+            </div>
+            <div class="col-md-2">
+                <label for="contaEspecifica" class="form-label"><strong>Conta Específica Prevista</strong></label>
+                <input type="text" 
+                       class="form-control" 
+                       id="contaEspecifica" 
+                       placeholder="Ex: 6784-8 / 15151-9"
+                       title="Número da conta prevista no termo">
+            </div>
+            <div class="col-md-2">
+                <label for="contaExecucao" class="form-label"><strong>Conta Específica de Execução</strong></label>
+                <input type="text" 
+                       class="form-control" 
+                       id="contaExecucao" 
+                       placeholder="Ex: 6784-8 / 15151-9"
+                       title="Número da conta efetivamente utilizada na execução">
             </div>
             <div class="col-md-2">
                 <label class="form-label"><strong>Visualização</strong></label>
@@ -1241,7 +1404,8 @@
             linhas = [];
             renderizarTabela();
             document.getElementById('btnSalvar').style.display = 'none';
-            document.getElementById('btnContrapartida').style.display = 'none';
+            const cardContrapartida = document.getElementById('cardContrapartida');
+            if (cardContrapartida) cardContrapartida.style.display = 'none';
             return;
         }
 
@@ -1254,14 +1418,21 @@
             // Se estiver no modo páginas, carregar todas as linhas para ter todos os meses
             const limiteParaCarregar = modoVisualizacao === 'paginas' ? 'todas' : limiteAtual;
             
-            // Carregar categorias e período do termo em paralelo
+            // Carregar categorias e período do termo em paralelo (com métricas individuais)
             const timerParallel = performanceMetrics.start('carregarExtrato - Carregar metadados paralelos');
+            
+            const timer1 = performanceMetrics.start('  └ carregarCategoriasDespesas');
+            const timer2 = performanceMetrics.start('  └ carregarCategoriasAnalise');
+            const timer3 = performanceMetrics.start('  └ carregarPeriodoTermo');
+            const timer4 = performanceMetrics.start('  └ carregarCategoriasAplicabilidade');
+            const timer5 = performanceMetrics.start('  └ carregarCategoriasRubricas');
+            
             await Promise.all([
-                carregarCategoriasDespesas(numeroTermo),
-                carregarCategoriasAnalise(),
-                carregarPeriodoTermo(numeroTermo),
-                carregarCategoriasAplicabilidade(),
-                carregarCategoriasRubricas(numeroTermo)
+                carregarCategoriasDespesas(numeroTermo).then(() => performanceMetrics.end(timer1)),
+                carregarCategoriasAnalise().then(() => performanceMetrics.end(timer2)),
+                carregarPeriodoTermo(numeroTermo).then(() => performanceMetrics.end(timer3)),
+                carregarCategoriasAplicabilidade().then(() => performanceMetrics.end(timer4)),
+                carregarCategoriasRubricas(numeroTermo).then(() => performanceMetrics.end(timer5))
             ]);
             performanceMetrics.end(timerParallel);
             
@@ -1744,9 +1915,25 @@
                 document.getElementById('bancoExtrato').value = '';
                 bancoAtual = '';
             }
+            
+            // Carregar conta específica
+            if (dados.conta) {
+                document.getElementById('contaEspecifica').value = dados.conta;
+            } else {
+                document.getElementById('contaEspecifica').value = '';
+            }
+            
+            // Carregar conta de execução
+            if (dados.conta_execucao) {
+                document.getElementById('contaExecucao').value = dados.conta_execucao;
+            } else {
+                document.getElementById('contaExecucao').value = '';
+            }
         } catch (error) {
             console.error('Erro ao carregar banco do termo:', error);
             document.getElementById('bancoExtrato').value = '';
+            document.getElementById('contaEspecifica').value = '';
+            document.getElementById('contaExecucao').value = '';
             bancoAtual = '';
         }
     }
@@ -4103,13 +4290,68 @@
     }
 
     function limparTabela() {
-        if (!confirm('Tem certeza que deseja limpar toda a tabela? Esta ação não pode ser desfeita.')) {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        
+        if (!numeroTermo) {
+            alert('Selecione um termo antes de limpar.');
             return;
         }
         
-        linhas = [];
-        renderizarTabela();
-        document.getElementById('btnSalvar').style.display = 'none';
+        if (!confirm(`⚠️ ATENÇÃO!\n\nEsta ação irá DELETAR PERMANENTEMENTE todos os dados do termo:\n${numeroTermo}\n\nSerão removidos:\n• Extrato bancário\n• Rendimentos\n• Notas fiscais\n• Contrapartida\n\nEsta ação NÃO PODE ser desfeita!\n\nDeseja realmente continuar?`)) {
+            return;
+        }
+        
+        // Confirmação adicional
+        const confirmaNumero = prompt(`Para confirmar, digite o número do termo que será limpo:\n${numeroTermo}`);
+        
+        if (confirmaNumero !== numeroTermo) {
+            alert('Número do termo não confere. Operação cancelada.');
+            return;
+        }
+        
+        // Exibir loading
+        const btnLimpar = event?.target?.closest('button');
+        const textoOriginal = btnLimpar ? btnLimpar.innerHTML : '';
+        if (btnLimpar) {
+            btnLimpar.disabled = true;
+            btnLimpar.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Limpando...';
+        }
+        
+        // Chamar API de limpeza
+        fetch(`/conc_bancaria/api/limpar-termo?numero_termo=${encodeURIComponent(numeroTermo)}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.erro) {
+                throw new Error(data.erro);
+            }
+            
+            // Limpar frontend
+            linhas = [];
+            renderizarTabela();
+            document.getElementById('btnSalvar').style.display = 'none';
+            
+            // Exibir resultado
+            const total = data.registros_deletados?.total || 0;
+            alert(`✅ Dados limpos com sucesso!\n\nRegistros deletados:\n• Extrato: ${data.registros_deletados?.extrato || 0}\n• Rendimentos: ${data.registros_deletados?.rendimentos || 0}\n• Notas Fiscais: ${data.registros_deletados?.notas_fiscais || 0}\n• Contrapartida: ${data.registros_deletados?.contrapartida || 0}\n\nTotal: ${total} registros`);
+            
+            console.log('[LIMPAR TERMO] Sucesso:', data);
+        })
+        .catch(error => {
+            console.error('[ERRO] ao limpar termo:', error);
+            alert(`❌ Erro ao limpar dados:\n${error.message}`);
+        })
+        .finally(() => {
+            // Restaurar botão
+            if (btnLimpar) {
+                btnLimpar.disabled = false;
+                btnLimpar.innerHTML = textoOriginal;
+            }
+        });
     }
 
     function exportarCSV() {
@@ -4255,10 +4497,20 @@
         }
     }
 
+    function atualizarHrefDemonstrativo() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (numeroTermo) {
+            document.getElementById('btnDemonstrativo').href = `/conc_demonstrativo/?termo=${encodeURIComponent(numeroTermo)}`;
+        }
+    }
+
     function atualizarHrefContrapartida() {
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (numeroTermo) {
-            document.getElementById('btnContrapartida').href = `/conc_contrapartida/?termo=${encodeURIComponent(numeroTermo)}`;
+            const btnContrapartidaCard = document.getElementById('btnContrapartidaCard');
+            if (btnContrapartidaCard) {
+                btnContrapartidaCard.href = `/conc_contrapartida/?termo=${encodeURIComponent(numeroTermo)}`;
+            }
         }
     }
 
@@ -4307,6 +4559,26 @@
         return true;
     }
 
+    function abrirDemonstrativo(event) {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) {
+            event.preventDefault();
+            alert('Selecione um termo primeiro!');
+            return false;
+        }
+        // Atualizar href antes de navegar
+        const url = `/conc_demonstrativo/?termo=${encodeURIComponent(numeroTermo)}`;
+        document.getElementById('btnDemonstrativo').href = url;
+        
+        // Se for click esquerdo sem modificadores, redirecionar
+        if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+            event.preventDefault();
+            window.location.href = url;
+        }
+        // Click do meio ou Ctrl+Click: deixar o navegador abrir em nova aba
+        return true;
+    }
+
     function abrirContrapartida(event) {
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
@@ -4316,7 +4588,10 @@
         }
         // Atualizar href antes de navegar
         const url = `/conc_contrapartida/?termo=${encodeURIComponent(numeroTermo)}`;
-        document.getElementById('btnContrapartida').href = url;
+        const btnContrapartidaCard = document.getElementById('btnContrapartidaCard');
+        if (btnContrapartidaCard) {
+            btnContrapartidaCard.href = url;
+        }
         
         // Se for click esquerdo sem modificadores, redirecionar
         if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
@@ -4380,13 +4655,24 @@
             const result = await response.json();
             
             if (response.ok && result.tem_contrapartida) {
-                document.getElementById('btnContrapartida').style.display = 'inline-block';
+                // Mostrar card no dropdown (não há mais botão standalone)
+                const cardContrapartida = document.getElementById('cardContrapartida');
+                if (cardContrapartida) {
+                    cardContrapartida.style.display = 'block';
+                }
             } else {
-                document.getElementById('btnContrapartida').style.display = 'none';
+                // Ocultar card no dropdown
+                const cardContrapartida = document.getElementById('cardContrapartida');
+                if (cardContrapartida) {
+                    cardContrapartida.style.display = 'none';
+                }
             }
         } catch (error) {
             console.error('Erro ao verificar contrapartida:', error);
-            document.getElementById('btnContrapartida').style.display = 'none';
+            const cardContrapartida = document.getElementById('cardContrapartida');
+            if (cardContrapartida) {
+                cardContrapartida.style.display = 'none';
+            }
         }
     }
 
@@ -4488,19 +4774,25 @@
                 throw new Error(error.erro || 'Erro ao salvar extrato');
             }
 
-            // Salvar banco (se preenchido)
-            if (bancoExtrato) {
+            // Salvar banco e conta (se preenchidos)
+            const contaEspecifica = document.getElementById('contaEspecifica').value.trim();
+            
+            if (bancoExtrato || contaEspecifica) {
+                const contaExecucao = document.getElementById('contaExecucao').value.trim();
+                
                 const bancResponse = await fetch('/conc_bancaria/api/banco', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         numero_termo: numeroTermo,
-                        banco_extrato: bancoExtrato
+                        banco_extrato: bancoExtrato || null,
+                        conta: contaEspecifica || null,
+                        conta_execucao: contaExecucao || null
                     })
                 });
 
                 if (!bancResponse.ok) {
-                    console.warn('Aviso: Não foi possível salvar o banco');
+                    console.warn('Aviso: Não foi possível salvar banco/conta');
                 }
             }
 

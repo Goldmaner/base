@@ -119,33 +119,45 @@
             Todos os arquivos estão no formato original (.pdf ou .xlsx).
         </div>
 
-        <!-- Upload de Modelos (Apenas Agente Público) -->
-        {% if session.get('tipo_usuario') == 'Agente Público' %}
+        <!-- Gerenciamento de Modelos (Apenas Administrador) -->
+        {% if is_admin %}
         <div class="card border-success mb-4">
             <div class="card-header bg-success text-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-cloud-upload-fill me-2"></i>Upload de Modelos (Administrador)
-                </h5>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear-fill me-2"></i>Gerenciamento de Modelos (Administrador)
+                    </h5>
+                    <button class="btn btn-light btn-sm" onclick="abrirModalModelo()">
+                        <i class="bi bi-plus-circle me-1"></i>Novo Modelo
+                    </button>
+                </div>
             </div>
             <div class="card-body">
-                <form id="formUpload" enctype="multipart/form-data">
-                    <div class="row align-items-end">
-                        <div class="col-md-8">
-                            <label class="form-label"><strong>Selecione o arquivo modelo (.pdf ou .xlsx):</strong></label>
-                            <input type="file" class="form-control" id="arquivoModelo" name="arquivo" 
-                                   accept=".pdf,.xlsx" required>
-                            <small class="text-muted">
-                                Tipos aceitos: PDF, XLSX | Tamanho máximo: 10MB
-                            </small>
-                        </div>
-                        <div class="col-md-4">
-                            <button type="submit" class="btn btn-success w-100">
-                                <i class="bi bi-upload me-2"></i>Fazer Upload
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-cloud-upload me-2"></i>Upload de Arquivo</h6>
+                        <form id="formUpload" enctype="multipart/form-data">
+                            <div class="mb-2">
+                                <input type="file" class="form-control" id="arquivoModelo" name="arquivo" 
+                                       accept=".pdf,.xlsx" required>
+                                <small class="text-muted">Tipos: PDF, XLSX | Máx: 10MB | Nome deve começar com "modelo_"</small>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm">
+                                <i class="bi bi-upload me-1"></i>Fazer Upload
                             </button>
-                        </div>
+                        </form>
+                        <div id="uploadStatus" class="mt-2"></div>
                     </div>
-                </form>
-                <div id="uploadStatus" class="mt-3"></div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-info-circle me-2"></i>Instruções</h6>
+                        <ul class="mb-0 small">
+                            <li>Faça upload do arquivo primeiro</li>
+                            <li>Depois clique em "Novo Modelo" para criar o card</li>
+                            <li>Escolha arquivo, ícone e preencha os dados</li>
+                            <li>Use os botões nos cards para editar ou remover</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -175,6 +187,18 @@
                        class="btn btn-download">
                         <i class="bi bi-download me-2"></i>Baixar
                     </a>
+                    
+                    <!-- Botões de Administração -->
+                    {% if is_admin %}
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editarModelo({{ modelo.id }})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="removerModelo({{ modelo.id }})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -218,6 +242,75 @@
                 <i class="bi bi-github me-1"></i>
                 Os modelos são versionados via Git e mantidos atualizados conforme legislação vigente.
             </small>
+        </div>
+    </div>
+
+    <!-- Modal de Gerenciamento de Modelo -->
+    <div class="modal fade" id="modalModelo" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalTitulo">Novo Modelo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formModelo">
+                        <input type="hidden" id="modeloId">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nome do Modelo *</label>
+                            <input type="text" class="form-control" id="modeloNome" required 
+                                   placeholder="Ex: Termo de Fomento">
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold">Arquivo (na pasta modelos/) *</label>
+                                <select class="form-select" id="modeloArquivo" required>
+                                    <option value="">Carregando...</option>
+                                </select>
+                                <small class="text-muted">Faça upload do arquivo primeiro se não aparecer na lista</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Ícone *</label>
+                                <select class="form-select" id="modeloIcone" required style="font-size: 24px;">
+                                    <option value="📄">📄 Documento</option>
+                                    <option value="📝">📝 Rascunho</option>
+                                    <option value="📋">📋 Clipboard</option>
+                                    <option value="📊">📊 Gráfico</option>
+                                    <option value="💰">💰 Dinheiro</option>
+                                    <option value="🏦">🏦 Banco</option>
+                                    <option value="🧮">🧮 Calculadora</option>
+                                    <option value="📨">📨 Email</option>
+                                    <option value="📑">📑 Múltiplos Docs</option>
+                                    <option value="📈">📈 Crescimento</option>
+                                    <option value="📉">📉 Declínio</option>
+                                    <option value="✅">✅ Aprovado</option>
+                                    <option value="⚠️">⚠️ Atenção</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Descrição</label>
+                            <textarea class="form-control" id="modeloDescricao" rows="3" 
+                                      placeholder="Descreva brevemente o propósito deste modelo..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Ordem de Exibição</label>
+                            <input type="number" class="form-control" id="modeloOrdem" value="999" min="0">
+                            <small class="text-muted">Modelos com menor número aparecem primeiro</small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarModelo()">
+                        <i class="bi bi-save me-1"></i>Salvar
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -286,6 +379,142 @@
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             `;
+        }
+        
+        // Gerenciamento de modelos
+        let modalModelo;
+        
+        async function abrirModalModelo(modeloId = null) {
+            if (!modalModelo) {
+                modalModelo = new bootstrap.Modal(document.getElementById('modalModelo'));
+            }
+            
+            // Carregar arquivos disponíveis
+            await carregarArquivosDisponiveis();
+            
+            if (modeloId) {
+                // Editar modelo existente
+                document.getElementById('modalTitulo').textContent = 'Editar Modelo';
+                await carregarDadosModelo(modeloId);
+            } else {
+                // Novo modelo
+                document.getElementById('modalTitulo').textContent = 'Novo Modelo';
+                document.getElementById('formModelo').reset();
+                document.getElementById('modeloId').value = '';
+                document.getElementById('modeloOrdem').value = '999';
+            }
+            
+            modalModelo.show();
+        }
+        
+        async function carregarArquivosDisponiveis() {
+            try {
+                const response = await fetch('{{ url_for("analises_pc.listar_arquivos_disponiveis") }}');
+                const data = await response.json();
+                
+                const select = document.getElementById('modeloArquivo');
+                select.innerHTML = '<option value="">Selecione um arquivo...</option>';
+                
+                if (data.arquivos && data.arquivos.length > 0) {
+                    data.arquivos.forEach(arquivo => {
+                        select.innerHTML += `<option value="${arquivo}">${arquivo}</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar arquivos:', error);
+                alert('Erro ao carregar lista de arquivos');
+            }
+        }
+        
+        async function carregarDadosModelo(id) {
+            try {
+                const response = await fetch(`/analises_pc/api/modelos/${id}`);
+                const modelo = await response.json();
+                
+                document.getElementById('modeloId').value = modelo.id;
+                document.getElementById('modeloNome').value = modelo.nome;
+                document.getElementById('modeloArquivo').value = modelo.arquivo;
+                document.getElementById('modeloIcone').value = modelo.icone;
+                document.getElementById('modeloDescricao').value = modelo.descricao || '';
+                document.getElementById('modeloOrdem').value = modelo.ordem || 0;
+            } catch (error) {
+                console.error('Erro ao carregar modelo:', error);
+                alert('Erro ao carregar dados do modelo');
+            }
+        }
+        
+        async function salvarModelo() {
+            const id = document.getElementById('modeloId').value;
+            const dados = {
+                nome: document.getElementById('modeloNome').value,
+                arquivo: document.getElementById('modeloArquivo').value,
+                icone: document.getElementById('modeloIcone').value,
+                descricao: document.getElementById('modeloDescricao').value,
+                ordem: parseInt(document.getElementById('modeloOrdem').value) || 0
+            };
+            
+            if (!dados.nome || !dados.arquivo || !dados.icone) {
+                alert('Preencha todos os campos obrigatórios!');
+                return;
+            }
+            
+            try {
+                let response;
+                if (id) {
+                    // Atualizar
+                    response = await fetch(`/analises_pc/api/modelos/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dados)
+                    });
+                } else {
+                    // Criar novo
+                    response = await fetch('/analises_pc/api/modelos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dados)
+                    });
+                }
+                
+                if (response.ok) {
+                    alert('Modelo salvo com sucesso!');
+                    modalModelo.hide();
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Erro ao salvar: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Erro ao salvar modelo:', error);
+                alert('Erro ao salvar modelo');
+            }
+        }
+        
+        function editarModelo(id) {
+            abrirModalModelo(id);
+        }
+        
+        async function removerModelo(id) {
+            if (!confirm('Tem certeza que deseja remover este modelo?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/analises_pc/api/modelos/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Modelo removido com sucesso!');
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Erro ao remover: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Erro ao remover modelo:', error);
+                alert('Erro ao remover modelo');
+            }
         }
     </script>
 </body>

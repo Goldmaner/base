@@ -200,6 +200,9 @@
         <button id="addLinha" class="btn btn-secondary btn-sm">Adicionar Linha</button>
         <button id="limparBtn" class="btn btn-warning btn-sm">🗑️ Limpar Tudo</button>
         <button id="exportarCsvBtn" class="btn btn-success btn-sm">📥 Exportar CSV</button>
+        <button id="undoBtn" class="btn btn-outline-secondary btn-sm" disabled title="Desfazer última edição">
+          ↶ Desfazer
+        </button>
         <button id="salvarOrc2" class="btn btn-primary ms-auto">
           <span id="salvarText">💾 Salvar</span>
           <span id="salvarSpinner" class="spinner-border spinner-border-sm d-none" role="status">
@@ -226,6 +229,74 @@
   <!-- SheetJS para leitura de Excel no cliente -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script>
+    // === SISTEMA DE UNDO COM MÚLTIPLOS NÍVEIS ===
+    let historicoEdicoes = []; // Array para armazenar até 10 edições
+    const MAX_UNDO = 10;
+    const undoBtn = document.getElementById('undoBtn');
+    
+    function salvarEstadoAnterior(input) {
+      // Adicionar ao histórico
+      historicoEdicoes.push({
+        elemento: input,
+        valorAnterior: input.value,
+        timestamp: Date.now()
+      });
+      
+      // Manter apenas as últimas 10 edições
+      if (historicoEdicoes.length > MAX_UNDO) {
+        historicoEdicoes.shift();
+      }
+      
+      atualizarBotaoUndo();
+    }
+    
+    function executarUndo() {
+      if (historicoEdicoes.length === 0) return;
+      
+      const ultimaEdicao = historicoEdicoes.pop();
+      const { elemento, valorAnterior } = ultimaEdicao;
+      
+      if (elemento && document.body.contains(elemento)) {
+        elemento.value = valorAnterior;
+        elemento.focus();
+        recalcTotals();
+      }
+      
+      atualizarBotaoUndo();
+    }
+    
+    function atualizarBotaoUndo() {
+      if (!undoBtn) return;
+      
+      if (historicoEdicoes.length === 0) {
+        undoBtn.disabled = true;
+        undoBtn.title = 'Desfazer última edição';
+      } else {
+        undoBtn.disabled = false;
+        const qtd = historicoEdicoes.length;
+        undoBtn.title = `Desfazer (${qtd} ${qtd === 1 ? 'edição' : 'edições'} no histórico)`;
+      }
+    }
+    
+    function limparUndo() {
+      historicoEdicoes = [];
+      atualizarBotaoUndo();
+    }
+    
+    // Listener do botão Undo
+    if (undoBtn) {
+      undoBtn.addEventListener('click', executarUndo);
+    }
+    
+    // Atalho Ctrl+Z
+    document.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        executarUndo();
+      }
+    });
+    // === FIM SISTEMA DE UNDO ===
+    
     // Função para numerar linhas visíveis
     function numerarLinhas() {
       const linhas = document.querySelectorAll('#tabelaOrc2 tbody .row-number');
@@ -649,6 +720,11 @@
       
       e.preventDefault(); // Impede comportamento padrão
       
+      // SALVAR ESTADO DO PRIMEIRO INPUT PARA UNDO
+      if (target.tagName === 'INPUT') {
+        salvarEstadoAnterior(target);
+      }
+      
       const linhaAtual = target.closest('tr');
       const celulaAtual = target.closest('td');
       const tbody = document.getElementById('bodyOrc2');
@@ -750,7 +826,9 @@
       const monthNames = Array.from(document.querySelectorAll('.month-name')).map(n => n.value || 'Mês');
       const rows = document.querySelectorAll('#bodyOrc2 tr');
       const despesas = [];
-      rows.forEach((tr) => {
+      const errosFormato = []; // Array para coletar erros de formato
+      
+      rows.forEach((tr, rowIndex) => {
         const selectRub = tr.querySelector('select[name="rubrica"]');
         const rubrica = selectRub ? selectRub.value : '';
         const qInp = tr.querySelector('.quantidade');
@@ -758,17 +836,37 @@
         const categoria = tr.querySelector('.categoria') ? tr.querySelector('.categoria').value : '';
         if (!rubrica) return;
         const valores_por_mes = {};
+        
         tr.querySelectorAll('input.valor').forEach((inp, idx) => {
           const raw = inp.value && inp.value.trim();
-          if (!raw) return;
+          if (!raw || raw === '-') return;
+          
+          // VALIDAÇÃO DE FORMATO MONETÁRIO
+          // Aceitar: 10000, 10.000,00, 10000,05, 10.000
+          // Rejeitar: 10,000.00 (formato americano)
+          const temPonto = raw.includes('.');
+          const temVirgula = raw.includes(',');
+          
+          // Formato americano: ponto como decimal (ex: 10,000.00 ou 1234.56)
+          // Detectar se tem vírgula como separador de milhares E ponto como decimal
+          const isFormatoAmericano = temVirgula && temPonto && raw.lastIndexOf('.') > raw.lastIndexOf(',');
+          
+          if (isFormatoAmericano) {
+            errosFormato.push({
+              mes: monthNames[idx] || `Mês ${idx + 1}`,
+              despesa: categoria || rubrica,
+              valor: raw,
+              linha: rowIndex + 1
+            });
+            return; // Não adicionar este valor
+          }
+          
           // normalizar: aceitar formatos 1.234,56 ou 1234.56
           const normalized = String(raw).replace(/\./g,'').replace(',', '.').replace('R$', '').trim();
           const num = parseFloat(normalized);
           if (!isNaN(num) && num !== 0) {
             // enviar como string com ponto decimal — backend aceita com ',' e 'R$' também
             valores_por_mes[idx+1] = num.toString();
-          } else if (normalized === '-' ) {
-            // ignorar
           } else if (!isNaN(num) && num === 0) {
             // include zeros explicitly
             valores_por_mes[idx+1] = '0';
@@ -778,6 +876,26 @@
       });
       
       updateProgress(30, 'Validando dados...');
+      
+      // Verificar se há erros de formato
+      if (errosFormato.length > 0) {
+        // Restaurar botão e ocultar progresso
+        salvarText.classList.remove('d-none');
+        salvarSpinner.classList.add('d-none');
+        btnSalvar.disabled = false;
+        progressContainer.classList.add('d-none');
+        
+        let mensagemErro = '⚠️ FORMATO INVÁLIDO DETECTADO!\n\n';
+        mensagemErro += 'Os seguintes valores estão em formato americano (use vírgula para decimal):\n\n';
+        errosFormato.forEach(erro => {
+          mensagemErro += `• Linha ${erro.linha} - ${erro.mes}: ${erro.despesa} = "${erro.valor}"\n`;
+        });
+        mensagemErro += '\n✅ Formatos aceitos: 10000 | 10.000,00 | 10000,05\n';
+        mensagemErro += '❌ Formato rejeitado: 10,000.00 (americano)';
+        
+        alert(mensagemErro);
+        return;
+      }
       
       if (despesas.length === 0) { 
         // Restaurar botão e ocultar progresso
@@ -830,6 +948,7 @@
                 salvarSpinner.classList.add('d-none');
                 btnSalvar.disabled = false;
                 progressContainer.classList.add('d-none');
+                limparUndo(); // Limpar histórico de undo após salvamento
                 
                 if (d.message) alert('✅ ' + d.message + '\n\nVocê pode continuar editando ou voltar à lista de orçamentos.');
                 else if (d.error) alert('❌ Erro: ' + d.error);
@@ -855,6 +974,7 @@
             salvarSpinner.classList.add('d-none');
             btnSalvar.disabled = false;
             progressContainer.classList.add('d-none');
+            limparUndo(); // Limpar histórico de undo após salvamento
             
             if (data.message) alert('✅ ' + data.message + '\n\nVocê pode continuar editando ou voltar à lista de orçamentos.');
             else if (data.error) alert('❌ Erro: ' + data.error);
@@ -901,6 +1021,16 @@
     }
 
     // escutar mudanças nos inputs de valor para recalcular
+    // Capturar valor anterior ao focar (para sistema de Undo)
+    document.addEventListener('focus', function(e){ 
+      if (e.target && e.target.tagName === 'INPUT' && 
+          (e.target.classList.contains('valor') || 
+           e.target.classList.contains('quantidade') || 
+           e.target.classList.contains('categoria'))) {
+        salvarEstadoAnterior(e.target);
+      }
+    }, true);
+    
     document.addEventListener('input', function(e){ 
       if (e.target && e.target.classList && e.target.classList.contains('valor')) {
         // Verificar se está usando formato americano (ponto como decimal)

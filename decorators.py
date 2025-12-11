@@ -30,9 +30,26 @@ def requires_access(modulo):
             
             # Verificar se o usuário tem acesso ao módulo
             acessos = session.get('acessos', '')
+            
+            # FALLBACK: Se sessão não tem acessos, buscar do banco
+            if not acessos and 'user_id' in session:
+                from db import get_cursor
+                try:
+                    cursor = get_cursor()
+                    cursor.execute("""
+                        SELECT acessos FROM usuarios WHERE id = %s
+                    """, (session['user_id'],))
+                    result = cursor.fetchone()
+                    if result:
+                        acessos = result['acessos'] or ''
+                        session['acessos'] = acessos  # Atualizar sessão
+                except Exception as e:
+                    print(f"[ERRO FALLBACK ACESSOS] {e}")
+                    acessos = ''
+            
             if not acessos:
                 # Se não tem acessos definidos, negar acesso
-                flash(f'Você não tem permissão para acessar o módulo: {modulo}', 'danger')
+                flash(f'Você não tem permissão para acessar o módulo: {modulo}. Faça login novamente.', 'danger')
                 return redirect(url_for('main.index'))
             
             # Verificar se o módulo está na lista de acessos

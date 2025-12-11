@@ -499,26 +499,56 @@ def api_listar_analistas():
 @bp.route('/api/numeros-termo', methods=['GET'])
 @login_required
 @requires_access('parcerias_notificacoes')
-def api_listar_numeros_termo():
+def api_numeros_termo():
     """
-    API para listar números de termo da tabela parcerias
+    API unificada para buscar números de termo com autocomplete
+    Query params: q (query de busca opcional)
+    
+    - Com parâmetro 'q': retorna termos filtrados (autocomplete)
+    - Sem parâmetro 'q': retorna todos os termos (inicialização)
     """
     try:
+        query_busca = request.args.get('q', '').strip()
+        
         cur = get_cursor()
         
-        cur.execute("""
-            SELECT DISTINCT numero_termo
-            FROM parcerias
-            WHERE numero_termo IS NOT NULL AND numero_termo != ''
-            ORDER BY numero_termo DESC
-        """)
-        
-        termos = cur.fetchall()
-        
-        return jsonify([t['numero_termo'] for t in termos]), 200
+        if query_busca:
+            # Buscar termos que contenham a string (case-insensitive) - AUTOCOMPLETE
+            print(f"[DEBUG] Buscando termos com filtro: '{query_busca}'")
+            cur.execute("""
+                SELECT DISTINCT numero_termo
+                FROM public.parcerias
+                WHERE LOWER(numero_termo) LIKE LOWER(%s)
+                ORDER BY numero_termo DESC
+                LIMIT 20
+            """, (f'%{query_busca}%',))
+            
+            termos = [row['numero_termo'] for row in cur.fetchall()]
+            print(f"[DEBUG] Encontrados {len(termos)} termos com filtro")
+            
+            # Retornar no formato esperado pelo frontend (com chave 'termos')
+            return jsonify({'termos': termos}), 200
+        else:
+            # Retornar todos os termos (limitado a 100 para performance) - INICIALIZAÇÃO
+            print(f"[DEBUG] Carregando todos os termos (limite 100)")
+            cur.execute("""
+                SELECT DISTINCT numero_termo
+                FROM public.parcerias
+                WHERE numero_termo IS NOT NULL AND numero_termo != ''
+                ORDER BY numero_termo DESC
+                LIMIT 100
+            """)
+            
+            termos = [row['numero_termo'] for row in cur.fetchall()]
+            print(f"[DEBUG] Carregados {len(termos)} termos iniciais")
+            
+            # Retornar como array simples (compatibilidade com código antigo)
+            return jsonify(termos), 200
         
     except Exception as e:
-        print(f"[ERRO] ao listar números de termo: {e}")
+        print(f"[ERRO] ao buscar números de termo: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'erro': str(e)}), 500
 
 
@@ -552,6 +582,9 @@ def api_proximo_numero():
     except Exception as e:
         print(f"[ERRO] ao calcular próximo número: {e}")
         return jsonify({'erro': str(e)}), 500
+
+
+
 
 
 @bp.route('/api/calcular-prazo', methods=['GET'])

@@ -159,11 +159,27 @@
       {% endif %}
     </div>
 
-    <!-- Campo de pesquisa -->
-    <div class="mb-3">
-      <div class="input-group" style="max-width: 400px;">
-        <span class="input-group-text">🔍</span>
-        <input type="text" class="form-control" id="filtroTitulo" placeholder="Pesquisar por título...">
+    <!-- Campos de pesquisa e filtro -->
+    <div class="mb-3 row">
+      <div class="col-md-5">
+        <div class="input-group">
+          <span class="input-group-text">🔍</span>
+          <input type="text" class="form-control" id="filtroTitulo" placeholder="Pesquisar por título...">
+        </div>
+      </div>
+      <div class="col-md-4">
+        <select class="form-select" id="filtroCategoria">
+          <option value="">Todas as categorias</option>
+          <!-- preenchido via JS -->
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select class="form-select" id="ordenacao">
+          <option value="titulo_asc" selected>Título (A-Z)</option>
+          <option value="titulo_desc">Título (Z-A)</option>
+          <option value="categoria_asc">Categoria (A-Z)</option>
+          <option value="categoria_desc">Categoria (Z-A)</option>
+        </select>
       </div>
     </div>
 
@@ -172,6 +188,7 @@
         <thead class="table-light">
           <tr>
             <th>Título</th>
+            <th style="width:150px">Categoria</th>
             <th style="width:220px">Ações</th>
           </tr>
         </thead>
@@ -194,6 +211,15 @@
           <div class="mb-3">
             <label class="form-label fw-bold">Título</label>
             <input id="inputTitulo" class="form-control" placeholder="Digite o título do modelo" />
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">Categoria de Texto</label>
+            <input id="inputCategoria" class="form-control" list="listaCategorias" placeholder="Digite ou selecione uma categoria" />
+            <datalist id="listaCategorias">
+              <!-- preenchido via JS -->
+            </datalist>
+            <small class="text-muted">Use para agrupar modelos por tipo (ex: Análises, Relatórios, Oficios, etc.)</small>
           </div>
           
           <!-- Abas para escolher entre Editor Rico ou HTML Puro -->
@@ -227,6 +253,15 @@
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.execCommand('underline');" title="Sublinhado">
                       <u>U</u>
+                    </button>
+                    
+                    <span class="mx-1">|</span>
+                    
+                    <!-- Cores de texto e preenchimento -->
+                    <input type="color" id="corTexto" class="form-control form-control-sm d-inline-block" style="width: 40px; height: 32px; padding: 2px;" title="Cor do texto" onchange="mudarCorTexto(this.value)">
+                    <input type="color" id="corPreenchimento" class="form-control form-control-sm d-inline-block" style="width: 40px; height: 32px; padding: 2px;" title="Cor de preenchimento" value="#ffff00" onchange="mudarCorPreenchimento(this.value)">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="removerCorPreenchimento();" title="Remover preenchimento">
+                      🚫
                     </button>
                     
                     <span class="mx-1">|</span>
@@ -357,6 +392,30 @@
       }
     }
 
+    function mudarCorTexto(cor) {
+      if (cor) {
+        document.execCommand('foreColor', false, cor);
+      }
+    }
+
+    function mudarCorPreenchimento(cor) {
+      if (cor) {
+        document.execCommand('hiliteColor', false, cor);
+        // Fallback para alguns navegadores
+        if (!document.queryCommandSupported('hiliteColor')) {
+          document.execCommand('backColor', false, cor);
+        }
+      }
+    }
+
+    function removerCorPreenchimento() {
+      // Remover cor de preenchimento do texto selecionado
+      document.execCommand('hiliteColor', false, 'transparent');
+      if (!document.queryCommandSupported('hiliteColor')) {
+        document.execCommand('backColor', false, 'transparent');
+      }
+    }
+
     // Configurar editor rico para suportar Tab em listas
     document.addEventListener('DOMContentLoaded', function() {
       const editor = document.getElementById('editorRico');
@@ -403,6 +462,7 @@
       
       if (data.dados) {
         todosModelos = data.dados;
+        popularFiltrosCategorias();
         aplicarFiltro();
       } else {
         todosModelos = [];
@@ -410,11 +470,58 @@
       }
     }
 
+    function popularFiltrosCategorias() {
+      // Extrair categorias únicas
+      const categorias = [...new Set(todosModelos.map(m => m.categoria_texto).filter(Boolean))].sort();
+      
+      // Popular select de filtro
+      const selectFiltro = document.getElementById('filtroCategoria');
+      selectFiltro.innerHTML = '<option value="">Todas as categorias</option>';
+      categorias.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        selectFiltro.appendChild(option);
+      });
+      
+      // Popular datalist do formulário
+      const datalist = document.getElementById('listaCategorias');
+      datalist.innerHTML = '';
+      categorias.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        datalist.appendChild(option);
+      });
+    }
+
     function aplicarFiltro() {
-      const filtro = document.getElementById('filtroTitulo').value.toLowerCase();
-      const modelosFiltrados = todosModelos.filter(m => 
-        (m.titulo_texto || '').toLowerCase().includes(filtro)
-      );
+      const filtroTitulo = document.getElementById('filtroTitulo').value.toLowerCase();
+      const filtroCategoria = document.getElementById('filtroCategoria').value;
+      const ordenacao = document.getElementById('ordenacao').value;
+      
+      // Filtrar
+      let modelosFiltrados = todosModelos.filter(m => {
+        const matchTitulo = (m.titulo_texto || '').toLowerCase().includes(filtroTitulo);
+        const matchCategoria = !filtroCategoria || (m.categoria_texto || '') === filtroCategoria;
+        return matchTitulo && matchCategoria;
+      });
+      
+      // Ordenar
+      modelosFiltrados.sort((a, b) => {
+        const tituloA = (a.titulo_texto || '').toLowerCase();
+        const tituloB = (b.titulo_texto || '').toLowerCase();
+        const categoriaA = (a.categoria_texto || '').toLowerCase();
+        const categoriaB = (b.categoria_texto || '').toLowerCase();
+        
+        switch(ordenacao) {
+          case 'titulo_asc': return tituloA.localeCompare(tituloB);
+          case 'titulo_desc': return tituloB.localeCompare(tituloA);
+          case 'categoria_asc': return categoriaA.localeCompare(categoriaB) || tituloA.localeCompare(tituloB);
+          case 'categoria_desc': return categoriaB.localeCompare(categoriaA) || tituloA.localeCompare(tituloB);
+          default: return tituloA.localeCompare(tituloB);
+        }
+      });
+      
       renderizarTabela(modelosFiltrados);
     }
 
@@ -427,6 +534,7 @@
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${m.titulo_texto || ''}</td>
+            <td><span class="badge bg-info">${m.categoria_texto || 'Sem categoria'}</span></td>
             <td>
               <button class="btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="${m.id}">Editar</button>
               ${m.oculto ? '<span class="badge bg-secondary me-1">Oculto</span>' : ''}
@@ -436,12 +544,14 @@
           body.appendChild(tr);
         })
       } else {
-        body.innerHTML = `<tr><td colspan="2" class="text-center text-muted">Nenhum modelo encontrado</td></tr>`;
+        body.innerHTML = `<tr><td colspan="3" class="text-center text-muted">Nenhum modelo encontrado</td></tr>`;
       }
     }
 
-    // Filtro em tempo real
+    // Filtros em tempo real
     document.getElementById('filtroTitulo').addEventListener('input', aplicarFiltro);
+    document.getElementById('filtroCategoria').addEventListener('change', aplicarFiltro);
+    document.getElementById('ordenacao').addEventListener('change', aplicarFiltro);
 
     // Delegação de eventos para ações
     document.addEventListener('click', async function(e){
@@ -459,6 +569,7 @@
         if (item){
           document.getElementById('modalTitle').textContent = 'Editar Modelo';
           document.getElementById('inputTitulo').value = item.titulo_texto || '';
+          document.getElementById('inputCategoria').value = item.categoria_texto || '';
           
           // Carregar no editor rico e no HTML
           const htmlContent = item.modelo_texto || '';
@@ -490,6 +601,7 @@
     document.getElementById('novoModeloBtn').addEventListener('click', function(){
       document.getElementById('modalTitle').textContent = 'Novo Modelo';
       document.getElementById('inputTitulo').value = '';
+      document.getElementById('inputCategoria').value = '';
       document.getElementById('inputModelo').value = '';
       document.getElementById('editorRico').innerHTML = '<p>Cole aqui o conteúdo formatado do SEI ou digite livremente...</p>';
       document.getElementById('inputOculto').checked = false;
@@ -505,6 +617,7 @@
     document.getElementById('salvarModeloBtn').addEventListener('click', async function(){
       const id = this.getAttribute('data-id');
       const titulo = document.getElementById('inputTitulo').value.trim();
+      const categoria = document.getElementById('inputCategoria').value.trim();
       
       // Sincronizar editor rico com textarea HTML antes de salvar
       document.getElementById('inputModelo').value = document.getElementById('editorRico').innerHTML;
@@ -519,7 +632,7 @@
 
       try {
         if (id){
-          const res = await fetch(`/modelos-textos/api/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({titulo_texto: titulo, modelo_texto: modelo})});
+          const res = await fetch(`/modelos-textos/api/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({titulo_texto: titulo, modelo_texto: modelo, categoria_texto: categoria})});
           if (res.ok){
             fecharModal();
             carregarModelos();
@@ -529,7 +642,7 @@
             this.textContent = '💾 Salvar';
           }
         } else {
-          const res = await fetch(`/modelos-textos/api`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({titulo_texto: titulo, modelo_texto: modelo})});
+          const res = await fetch(`/modelos-textos/api`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({titulo_texto: titulo, modelo_texto: modelo, categoria_texto: categoria})});
           if (res.ok){
             fecharModal();
             carregarModelos();

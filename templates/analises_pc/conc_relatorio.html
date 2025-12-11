@@ -90,11 +90,11 @@
     <div class="relatorio-card">
         <div class="info-termo">
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <strong>Número do Termo:</strong>
                     <span id="numeroTermoDisplay">-</span>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <strong>Tipo de Relatório:</strong>
                     <span class="badge bg-primary badge-tipo" id="tipoRelatorio">Pessoa Gestora</span>
                 </div>
@@ -220,9 +220,12 @@
         }
 
         const considerarLiquido = document.getElementById('checkRendimentoLiquido').checked;
+        
+        // Construir URL simples (sem prestação)
+        let url = `/conc_relatorio/api/dados-relatorio?numero_termo=${encodeURIComponent(termo)}&considerar_liquido=${considerarLiquido}`;
 
         try {
-            const response = await fetch(`/conc_relatorio/api/dados-relatorio?numero_termo=${encodeURIComponent(termo)}&considerar_liquido=${considerarLiquido}`);
+            const response = await fetch(url);
             
             if (!response.ok) {
                 let errorMsg = 'Erro ao carregar dados';
@@ -282,6 +285,13 @@
             } else {
                 btnAlternar.style.display = 'none';
             }
+        } else if (modoAtual === 'misto') {
+            badgeTipo.textContent = 'Responsabilidade Mista (DP + PG)';
+            badgeTipo.className = 'badge bg-warning badge-tipo';
+            btnDebug.style.display = 'none';
+            tituloTabela.textContent = 'Relatório de Responsabilidade Compartilhada';
+            renderizarTabelaMisto(dados, tbody);
+            btnAlternar.style.display = 'none';
         } else {
             badgeTipo.textContent = 'Pessoa Gestora';
             badgeTipo.className = 'badge bg-primary badge-tipo';
@@ -361,7 +371,12 @@
         row = document.createElement('tr');
         row.innerHTML = `
             <td><strong>Valor Executado e Aprovado</strong></td>
-            <td class="text-end text-success">${formatarMoeda(dados.valor_executado_aprovado)}</td>
+            <td class="text-end text-success">
+                ${formatarMoeda(dados.valor_executado_aprovado)}
+                <button class="btn btn-sm btn-info text-white ms-2" onclick="baixarRelatorioExecutadoAprovado()" title="Baixar relatório detalhado CSV">
+                    📊 Detalhes
+                </button>
+            </td>
         `;
         tbody.appendChild(row);
 
@@ -382,11 +397,31 @@
         `;
         tbody.appendChild(row);
 
-        // Descontos já Realizados
+        // Descontos já Realizados (EDITÁVEL COM CHECKBOX)
         row = document.createElement('tr');
         row.innerHTML = `
-            <td class="ps-4">• Descontos já Realizados</td>
-            <td class="text-end">${formatarMoeda(dados.descontos_realizados)}</td>
+            <td class="ps-4">
+                <div class="d-flex align-items-center gap-2">
+                    <input type="checkbox" id="checkbox-descontos-dp" onchange="toggleCampoDescontos('dp')" class="form-check-input">
+                    <label for="checkbox-descontos-dp" class="mb-0">• Descontos já Realizados</label>
+                </div>
+            </td>
+            <td class="text-end">
+                <div id="campo-descontos-dp" style="display: none;">
+                    <div class="d-flex align-items-center justify-content-end gap-2">
+                        <span class="text-muted small">R$</span>
+                        <input type="number" id="input-descontos-dp" class="form-control form-control-sm" 
+                               style="width: 120px; text-align: right;" step="0.01" min="0" 
+                               value="${dados.descontos_realizados.toFixed(2)}"
+                               onchange="mostrarBotaoSalvar('dp')">
+                        <button id="btn-salvar-descontos-dp" class="btn btn-sm btn-success" 
+                                style="display: none;" onclick="salvarDescontos('dp')">
+                            💾 Salvar
+                        </button>
+                    </div>
+                </div>
+                <span id="valor-descontos-display-dp">${formatarMoeda(dados.descontos_realizados)}</span>
+            </td>
         `;
         tbody.appendChild(row);
 
@@ -428,6 +463,224 @@
         row.innerHTML = `
             <td><strong>Valor a ser Ressarcido</strong></td>
             <td class="text-end fw-bold text-danger">${formatarMoeda(dados.valor_ressarcido)}</td>
+        `;
+        tbody.appendChild(row);
+    }
+    
+    function renderizarTabelaMisto(dados, tbody) {
+        let row;
+        
+        // Aviso de cálculos pendentes
+        if (dados.calculos_pendentes) {
+            row = document.createElement('tr');
+            row.className = 'table-warning';
+            row.innerHTML = `
+                <td colspan="2" class="text-center">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Nota:</strong> Os cálculos detalhados para relatórios mistos serão implementados posteriormente.
+                    Estrutura criada com base nas regras de divisão entre DP e Pessoa Gestora.
+                </td>
+            `;
+            tbody.appendChild(row);
+        }
+        
+        // === TABELA 1 - ANÁLISE DAC ===
+        row = document.createElement('tr');
+        row.className = 'table-primary';
+        row.innerHTML = `
+            <td colspan="2" class="fw-bold"><i class="bi bi-table me-2"></i>Tabela 1 - Análise da DAC (Departamento de Parcerias)</td>
+        `;
+        tbody.appendChild(row);
+        
+        // Valor Total do Projeto
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Total do Projeto</strong></td>
+            <td class="text-end valor-destaque">${formatarMoeda(dados.tabela_dac.valor_total_projeto)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        // Componentes indentados
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Valor Repassado</td>
+            <td class="text-end">${formatarMoeda(dados.tabela_dac.valor_repassado)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Rendimentos</td>
+            <td class="text-end">${formatarMoeda(dados.tabela_dac.rendimentos)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Contrapartida</td>
+            <td class="text-end">${formatarMoeda(dados.tabela_dac.contrapartida)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        // Provisões executadas
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Provisões executadas</strong></td>
+            <td class="text-end">${formatarMoeda(dados.tabela_dac.provisoes_executadas)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        // Valor Executado e Aprovado
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valor Executado e Aprovado</strong></td>
+            <td class="text-end text-success">
+                ${formatarMoeda(dados.tabela_dac.valor_executado_aprovado)}
+                <button class="btn btn-sm btn-info text-white ms-2" onclick="baixarRelatorioExecutadoAprovado()" title="Baixar relatório detalhado CSV">
+                    📊 Detalhes
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+        
+        // Total de Descontos
+        row = document.createElement('tr');
+        row.className = 'table-warning';
+        row.innerHTML = `
+            <td><strong>Total de Descontos</strong></td>
+            <td class="text-end fw-bold">${formatarMoeda(dados.tabela_dac.total_descontos)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        // Componentes de descontos indentados
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Saldos não Utilizados Remanescentes</td>
+            <td class="text-end">${formatarMoeda(dados.tabela_dac.saldos_nao_utilizados)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">
+                <div class="d-flex align-items-center gap-2">
+                    <input type="checkbox" id="checkbox-descontos-misto" onchange="toggleCampoDescontos('misto')" class="form-check-input">
+                    <label for="checkbox-descontos-misto" class="mb-0">• Descontos já Realizados</label>
+                </div>
+            </td>
+            <td class="text-end">
+                <div id="campo-descontos-misto" style="display: none;">
+                    <div class="d-flex align-items-center justify-content-end gap-2">
+                        <span class="text-muted small">R$</span>
+                        <input type="number" id="input-descontos-misto" class="form-control form-control-sm" 
+                               style="width: 120px; text-align: right;" step="0.01" min="0" 
+                               value="${dados.tabela_dac.descontos_realizados.toFixed(2)}"
+                               onchange="mostrarBotaoSalvar('misto')">
+                        <button id="btn-salvar-descontos-misto" class="btn btn-sm btn-success" 
+                                style="display: none;" onclick="salvarDescontos('misto')">
+                            💾 Salvar
+                        </button>
+                    </div>
+                </div>
+                <span id="valor-descontos-display-misto">${formatarMoeda(dados.tabela_dac.descontos_realizados)}</span>
+            </td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Descontos de Contrapartida</td>
+            <td class="text-end">${formatarMoeda(dados.tabela_dac.descontos_contrapartida)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Despesas Passíveis de Glosa</td>
+            <td class="text-end text-danger">${formatarMoeda(dados.tabela_dac.despesas_glosa)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        // Valores já devolvidos
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Valores já devolvidos</strong></td>
+            <td class="text-end text-success">${formatarMoeda(dados.tabela_dac.valores_devolvidos)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        // Valor a ser Ressarcido
+        row = document.createElement('tr');
+        row.className = 'table-danger';
+        row.innerHTML = `
+            <td><strong>Valor a ser Ressarcido</strong></td>
+            <td class="text-end fw-bold text-danger">${formatarMoeda(dados.tabela_dac.valor_ressarcido)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        // === TABELA 2 - ANÁLISE PESSOA GESTORA ===
+        row = document.createElement('tr');
+        row.className = 'table-success';
+        row.innerHTML = `
+            <td colspan="2" class="fw-bold"><i class="bi bi-person-check me-2"></i>Tabela 2 - Análise da Pessoa Gestora</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Rendimentos</td>
+            <td class="text-end">${formatarMoeda(dados.tabela_pg.rendimentos)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Saldos de Provisões Residuais</td>
+            <td class="text-end">${formatarMoeda(dados.tabela_pg.saldos_provisoes_residuais)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Saldos para Execução</td>
+            <td class="text-end">${formatarMoeda(dados.tabela_pg.saldos_execucao)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>Total para análise do Gestor</strong></td>
+            <td class="text-end fw-bold">${formatarMoeda(dados.tabela_pg.total_analise_gestor)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        // === QUADRO GERAL ===
+        row = document.createElement('tr');
+        row.className = 'table-info';
+        row.innerHTML = `
+            <td colspan="2" class="fw-bold"><i class="bi bi-calculator me-2"></i>Quadro Geral</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Valor de análise DAC</td>
+            <td class="text-end">${formatarMoeda(dados.quadro_geral.valor_analise_dac)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="ps-4">• Valor de análise Gestor</td>
+            <td class="text-end">${formatarMoeda(dados.quadro_geral.valor_analise_gestor)}</td>
+        `;
+        tbody.appendChild(row);
+        
+        row = document.createElement('tr');
+        row.className = 'table-secondary';
+        row.innerHTML = `
+            <td><strong>Total</strong></td>
+            <td class="text-end fw-bold valor-destaque">${formatarMoeda(dados.quadro_geral.total)}</td>
         `;
         tbody.appendChild(row);
     }
@@ -581,9 +834,16 @@
         
         const considerarLiquido = document.getElementById('checkRendimentoLiquido').checked;
         
+        // Construir URL com parâmetros da prestação selecionada
+        let url = `/conc_relatorio/api/dados-relatorio?numero_termo=${encodeURIComponent(termo)}&considerar_liquido=${considerarLiquido}&forcar_modo=${modoVisualizacao}`;
+        
+        if (prestacaoAtual) {
+            url += `&tipo_prestacao=${encodeURIComponent(prestacaoAtual.tipo_prestacao)}&numero_prestacao=${prestacaoAtual.numero_prestacao}`;
+        }
+        
         try {
             // Forçar recalcular como DP ou PG
-            const response = await fetch(`/conc_relatorio/api/dados-relatorio?numero_termo=${encodeURIComponent(termo)}&considerar_liquido=${considerarLiquido}&forcar_modo=${modoVisualizacao}`);
+            const response = await fetch(url);
             
             if (!response.ok) {
                 throw new Error('Erro ao carregar dados');
@@ -867,6 +1127,106 @@
         printWindow.onload = function() {
             printWindow.print();
         };
+    }
+    
+    function toggleCampoDescontos(tipo) {
+        const checkbox = document.getElementById(`checkbox-descontos-${tipo}`);
+        const campo = document.getElementById(`campo-descontos-${tipo}`);
+        const display = document.getElementById(`valor-descontos-display-${tipo}`);
+        
+        if (checkbox.checked) {
+            campo.style.display = 'block';
+            display.style.display = 'none';
+        } else {
+            campo.style.display = 'none';
+            display.style.display = 'inline';
+            // Esconder botão salvar se estava visível
+            const btnSalvar = document.getElementById(`btn-salvar-descontos-${tipo}`);
+            if (btnSalvar) btnSalvar.style.display = 'none';
+        }
+    }
+    
+    function mostrarBotaoSalvar(tipo) {
+        const btnSalvar = document.getElementById(`btn-salvar-descontos-${tipo}`);
+        const input = document.getElementById(`input-descontos-${tipo}`);
+        
+        // Mostrar botão apenas se tiver valor diferente de zero ou foi alterado
+        if (input && input.value && parseFloat(input.value) >= 0) {
+            btnSalvar.style.display = 'inline-block';
+        }
+    }
+    
+    function salvarDescontos(tipo) {
+        const params = new URLSearchParams(window.location.search);
+        const termo = params.get('termo');
+        
+        if (!termo) {
+            alert('Nenhum termo selecionado');
+            return;
+        }
+        
+        const input = document.getElementById(`input-descontos-${tipo}`);
+        const valor = parseFloat(input.value || 0);
+        
+        if (isNaN(valor) || valor < 0) {
+            alert('Valor inválido. Digite um número válido (ex: 1234.56)');
+            return;
+        }
+        
+        const btnSalvar = document.getElementById(`btn-salvar-descontos-${tipo}`);
+        const textOriginal = btnSalvar.innerHTML;
+        btnSalvar.innerHTML = '⏳ Salvando...';
+        btnSalvar.disabled = true;
+        
+        // Salvar no banco
+        fetch('/conc_relatorio/api/descontos-realizados', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                numero_termo: termo,
+                valor: valor
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.erro) {
+                alert('Erro ao salvar: ' + data.erro);
+                btnSalvar.innerHTML = textOriginal;
+                btnSalvar.disabled = false;
+                return;
+            }
+            
+            // Sucesso - esconder botão e recarregar
+            btnSalvar.style.display = 'none';
+            btnSalvar.innerHTML = textOriginal;
+            btnSalvar.disabled = false;
+            
+            alert('Valor salvo com sucesso!');
+            carregarDadosRelatorio();
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao salvar valor');
+            btnSalvar.innerHTML = textOriginal;
+            btnSalvar.disabled = false;
+        });
+    }
+    
+    function baixarRelatorioExecutadoAprovado() {
+        // Pegar termo da URL
+        const params = new URLSearchParams(window.location.search);
+        const termo = params.get('termo');
+        
+        if (!termo) {
+            alert('Nenhum termo selecionado');
+            return;
+        }
+        
+        // Abrir relatório em nova aba (download automático do CSV)
+        const url = `/conc_relatorio/api/relatorio-valor-executado-aprovado?numero_termo=${encodeURIComponent(termo)}`;
+        window.open(url, '_blank');
     }
 </script>
 </body>

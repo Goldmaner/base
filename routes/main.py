@@ -246,11 +246,11 @@ def modelos_textos_list():
 
         # Montar query
         if mostrar_ocultos and session.get('tipo_usuario') == 'Agente Público':
-            query = "SELECT id, titulo_texto, modelo_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_modelo_textos ORDER BY id"
+            query = "SELECT id, titulo_texto, modelo_texto, categoria_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_modelo_textos ORDER BY titulo_texto"
             print(f"DEBUG: Usando query TODOS (admin)")
             cur.execute(query)
         else:
-            query = "SELECT id, titulo_texto, modelo_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_modelo_textos WHERE COALESCE(oculto, false) = false ORDER BY id"
+            query = "SELECT id, titulo_texto, modelo_texto, categoria_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_modelo_textos WHERE COALESCE(oculto, false) = false ORDER BY titulo_texto"
             print(f"DEBUG: Usando query NÃO OCULTOS")
             cur.execute(query)
 
@@ -265,6 +265,7 @@ def modelos_textos_list():
                 'id': row['id'],
                 'titulo_texto': row['titulo_texto'],
                 'modelo_texto': row['modelo_texto'],
+                'categoria_texto': row.get('categoria_texto'),
                 'oculto': bool(row.get('oculto'))
             })
 
@@ -284,12 +285,13 @@ def modelos_textos_create():
         dados = request.json
         titulo = dados.get('titulo_texto')
         modelo = dados.get('modelo_texto')
+        categoria = dados.get('categoria_texto')
         if not titulo:
             return jsonify({'erro': 'titulo_texto é obrigatório'}), 400
 
         cur = get_cursor()
-        cur.execute("INSERT INTO categoricas.c_modelo_textos (titulo_texto, modelo_texto, oculto) VALUES (%s, %s, false) RETURNING id",
-                    (titulo, modelo))
+        cur.execute("INSERT INTO categoricas.c_modelo_textos (titulo_texto, modelo_texto, categoria_texto, oculto) VALUES (%s, %s, %s, false) RETURNING id",
+                    (titulo, modelo, categoria))
         novo = cur.fetchone()
         get_db().commit()
         cur.close()
@@ -313,7 +315,8 @@ def modelos_textos_update(id):
         dados = request.json
         titulo = dados.get('titulo_texto')
         modelo = dados.get('modelo_texto')
-        if titulo is None and modelo is None:
+        categoria = dados.get('categoria_texto')
+        if titulo is None and modelo is None and categoria is None:
             return jsonify({'erro': 'Nenhum campo para atualizar'}), 400
 
         cur = get_cursor()
@@ -326,6 +329,9 @@ def modelos_textos_update(id):
         if modelo is not None:
             sets.append('modelo_texto = %s')
             params.append(modelo)
+        if categoria is not None:
+            sets.append('categoria_texto = %s')
+            params.append(categoria)
         params.append(id)
 
         query = f"UPDATE categoricas.c_modelo_textos SET {', '.join(sets)} WHERE id = %s"
@@ -393,3 +399,31 @@ def modelos_textos_delete(id):
             pass
         return jsonify({'erro': str(e)}), 500
 
+
+
+@main_bp.route('/api/termos-com-analise-dp')
+@login_required
+def listar_termos_com_analise_dp():
+    """
+    Retorna lista de termos que possuem análise do DP ou Mista
+    (responsabilidade_analise = 1 ou 2)
+    """
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT DISTINCT p.numero_termo
+            FROM public.parcerias p
+            INNER JOIN public.parcerias_analises pa 
+                ON p.numero_termo = pa.numero_termo
+            WHERE pa.responsabilidade_analise IN (1, 2)
+            ORDER BY p.numero_termo DESC
+        """)
+        
+        termos = [{'numero_termo': row['numero_termo']} for row in cur.fetchall()]
+        cur.close()
+        
+        return jsonify({'termos': termos})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500

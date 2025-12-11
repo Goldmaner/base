@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Inconsistências - Conciliação Bancária</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 30px 0;
+        }
+        
+        .container-main {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 1200px;
+        }
+        
+        .header-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .header-title h3 {
+            margin: 0;
+            font-weight: bold;
+        }
+        
+        .btn-voltar {
+            background: #6c757d;
+            color: white;
+            border: none;
+            transition: all 0.3s;
+        }
+        
+        .btn-voltar:hover {
+            background: #5a6268;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .modelo-texto-container {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 20px;
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 12pt;
+            line-height: 1.6;
+        }
+        
+        .alert-info-custom {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="container-main">
+            <!-- Header -->
+            <div class="header-title">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3>
+                        <i class="bi bi-file-earmark-text me-2"></i>
+                        Relatório de Inconsistências
+                    </h3>
+                    <a href="{{ url_for('conc_bancaria.index') }}" id="btnVoltar" class="btn btn-voltar btn-lg">
+                        <i class="bi bi-arrow-left me-2"></i>Voltar
+                    </a>
+                </div>
+            </div>
+
+            <!-- Informações -->
+            <div class="alert-info-custom">
+                <h5 class="mb-2">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    Sobre este Relatório
+                </h5>
+                <p class="mb-0">
+                    Este documento apresenta o modelo de texto para emissão do <strong>Relatório de Inconsistências</strong> 
+                    identificadas durante a análise de conciliação bancária da prestação de contas.
+                </p>
+                <p class="mb-0 mt-2">
+                    <small class="text-muted">
+                        <i class="bi bi-lightbulb me-1"></i>
+                        <strong>Instruções:</strong> Preencha o formulário abaixo para gerar o relatório personalizado com os dados da parceria.
+                    </small>
+                </p>
+            </div>
+
+            <!-- Formulário de Geração -->
+            <div class="card border-info mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pencil-square me-2"></i>
+                        Dados para Geração do Relatório
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="formRelatorio">
+                        <div class="row">
+                            <!-- Seleção de Relatório -->
+                            <div class="col-md-6 mb-3">
+                                <label for="selectRelatorio" class="form-label fw-bold">
+                                    <i class="bi bi-file-earmark-text me-1"></i>
+                                    Número do Relatório de Inconsistências
+                                </label>
+                                <select class="form-select" id="selectRelatorio" required>
+                                    <option value="">Carregando...</option>
+                                </select>
+                                <small class="text-muted">Selecione o número do documento que será emitido</small>
+                            </div>
+
+                            <!-- Termo (preenchido automaticamente) -->
+                            <div class="col-md-6 mb-3">
+                                <label for="inputTermo" class="form-label fw-bold">
+                                    <i class="bi bi-file-text me-1"></i>
+                                    Número do Termo
+                                </label>
+                                <input type="text" class="form-control" id="inputTermo" readonly>
+                                <small class="text-muted">Preenchido automaticamente após seleção</small>
+                            </div>
+
+                            <!-- OSC (preenchido automaticamente) -->
+                            <div class="col-md-6 mb-3">
+                                <label for="inputOSC" class="form-label fw-bold">
+                                    <i class="bi bi-building me-1"></i>
+                                    OSC
+                                </label>
+                                <input type="text" class="form-control" id="inputOSC" readonly>
+                            </div>
+
+                            <!-- Projeto (preenchido automaticamente) -->
+                            <div class="col-md-6 mb-3">
+                                <label for="inputProjeto" class="form-label fw-bold">
+                                    <i class="bi bi-folder me-1"></i>
+                                    Projeto
+                                </label>
+                                <input type="text" class="form-control" id="inputProjeto" readonly>
+                            </div>
+
+                            <!-- Mês Inicial -->
+                            <div class="col-md-6 mb-3">
+                                <label for="selectMesInicio" class="form-label fw-bold">
+                                    <i class="bi bi-calendar-check me-1"></i>
+                                    Mês Inicial de Análise
+                                </label>
+                                <select class="form-select" id="selectMesInicio" required>
+                                    <option value="">Selecione o termo primeiro</option>
+                                </select>
+                                <small class="text-muted">Primeiro mês do período analisado</small>
+                            </div>
+
+                            <!-- Mês Final -->
+                            <div class="col-md-6 mb-3">
+                                <label for="selectMesFim" class="form-label fw-bold">
+                                    <i class="bi bi-calendar-x me-1"></i>
+                                    Mês Final de Análise
+                                </label>
+                                <select class="form-select" id="selectMesFim" required>
+                                    <option value="">Selecione o termo primeiro</option>
+                                </select>
+                                <small class="text-muted">Último mês do período analisado</small>
+                            </div>
+                        </div>
+
+                        <!-- Botão de Geração -->
+                        <div class="text-center mt-3">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-gear-fill me-2"></i>
+                                Gerar Relatório Personalizado
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="loadingRelatorio" class="text-center my-4" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Gerando...</span>
+                </div>
+                <p class="mt-2 text-muted">Gerando relatório personalizado...</p>
+            </div>
+
+            <!-- Área de Resultado -->
+            <div id="areaResultado" style="display: none;">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-check-circle me-2"></i>
+                            Relatório Gerado com Sucesso
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="modelo-texto-container" id="textoGerado">
+                            <!-- Preenchido via JavaScript -->
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-pencil-square me-1"></i>
+                                Para editar este modelo, acesse: 
+                                <a href="{{ url_for('main.modelos_textos_list') }}" target="_blank">Modelos de Texto</a>
+                            </small>
+                            <button class="btn btn-outline-success btn-sm" onclick="copiarTextoGerado()">
+                                <i class="bi bi-clipboard me-1"></i>Copiar Texto
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nota sobre lista_inconsistencias -->
+                <div class="alert alert-warning mt-3">
+                    <h6>
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Observação Importante
+                    </h6>
+                    <p class="mb-0">
+                        O campo <code>lista_inconsistencias</code> será preenchido manualmente ou através de funcionalidade futura.
+                        Substitua este placeholder no texto copiado com as inconsistências identificadas na análise.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // ============================================================
+        // Variáveis Globais
+        // ============================================================
+        let relatoriosDisponiveis = [];
+        let mesesDisponiveis = [];
+        let dadosRelatorioSelecionado = null;
+
+        // ============================================================
+        // Carregar dados ao iniciar página
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('[DEBUG] ========================================');
+            console.log('[DEBUG] Página conc_inconsistencias.html carregada');
+            console.log('[DEBUG] ========================================');
+            
+            // Capturar termo da URL de origem (referrer)
+            const referrer = document.referrer;
+            console.log('[DEBUG] Página de origem (referrer):', referrer);
+            
+            let termoOrigem = null;
+            if (referrer && referrer.includes('/conc_bancaria/')) {
+                // Extrair parâmetro 'termo' da URL de origem
+                try {
+                    const urlReferrer = new URL(referrer);
+                    termoOrigem = urlReferrer.searchParams.get('termo');
+                    console.log('[DEBUG] Termo extraído da URL de origem:', termoOrigem);
+                } catch (e) {
+                    console.log('[DEBUG] Não foi possível extrair termo do referrer');
+                }
+            }
+            
+            // Testar se botão Voltar está acessível e configurar href inicial
+            const btnVoltar = document.getElementById('btnVoltar');
+            if (btnVoltar) {
+                console.log('[DEBUG] ✅ Botão Voltar encontrado!');
+                
+                // Se há termo de origem, configurar botão para voltar com o termo
+                if (termoOrigem) {
+                    btnVoltar.href = `/conc_bancaria/?termo=${encodeURIComponent(termoOrigem)}`;
+                    console.log('[DEBUG] 🎯 Botão Voltar configurado com termo de origem!');
+                    console.log('[DEBUG] URL de retorno:', btnVoltar.href);
+                } else {
+                    console.log('[DEBUG] Href inicial (sem termo):', btnVoltar.href);
+                }
+            } else {
+                console.error('[DEBUG] ❌ Botão Voltar NÃO encontrado!');
+            }
+            
+            await carregarRelatoriosDisponiveis();
+            configurarEventListeners();
+            console.log('[DEBUG] Inicialização completa. Aguardando seleção de relatório...');
+        });
+
+        // ============================================================
+        // Carregar lista de relatórios disponíveis
+        // ============================================================
+        async function carregarRelatoriosDisponiveis() {
+            try {
+                const response = await fetch('/analises_pc/api/listar-relatorios-inconsistencias');
+                const data = await response.json();
+
+                if (data.dados && data.dados.length > 0) {
+                    relatoriosDisponiveis = data.dados;
+                    
+                    const selectRelatorio = document.getElementById('selectRelatorio');
+                    selectRelatorio.innerHTML = '<option value="">Selecione um relatório...</option>';
+                    
+                    data.dados.forEach(rel => {
+                        const option = document.createElement('option');
+                        option.value = rel.id;
+                        option.textContent = `${rel.formatado} - ${rel.osc || 'OSC não informada'} (Termo: ${rel.numero_termo})`;
+                        option.dataset.numeroDoc = rel.numero_doc;
+                        option.dataset.anoDoc = rel.ano_doc;
+                        option.dataset.numeroTermo = rel.numero_termo;
+                        option.dataset.osc = rel.osc || '';
+                        option.dataset.projeto = rel.projeto || '';
+                        selectRelatorio.appendChild(option);
+                    });
+                } else {
+                    document.getElementById('selectRelatorio').innerHTML = '<option value="">Nenhum relatório cadastrado</option>';
+                }
+            } catch (error) {
+                console.error('Erro ao carregar relatórios:', error);
+                alert('❌ Erro ao carregar lista de relatórios. Verifique o console.');
+            }
+        }
+
+        // ============================================================
+        // Configurar event listeners
+        // ============================================================
+        function configurarEventListeners() {
+            console.log('[DEBUG] Configurando event listeners...');
+            
+            // Quando selecionar relatório
+            document.getElementById('selectRelatorio').addEventListener('change', async function() {
+                console.log('[DEBUG] Dropdown de relatório alterado, valor:', this.value);
+                const selectedOption = this.options[this.selectedIndex];
+                
+                if (this.value) {
+                    console.log('[DEBUG] Relatório selecionado:', {
+                        id: this.value,
+                        numeroTermo: selectedOption.dataset.numeroTermo,
+                        osc: selectedOption.dataset.osc
+                    });
+                    
+                    // Preencher campos automaticamente
+                    document.getElementById('inputTermo').value = selectedOption.dataset.numeroTermo;
+                    document.getElementById('inputOSC').value = selectedOption.dataset.osc;
+                    document.getElementById('inputProjeto').value = selectedOption.dataset.projeto;
+                    
+                    // Armazenar dados do relatório
+                    dadosRelatorioSelecionado = {
+                        id: this.value,
+                        numero_doc: selectedOption.dataset.numeroDoc,
+                        ano_doc: selectedOption.dataset.anoDoc,
+                        numero_termo: selectedOption.dataset.numeroTermo,
+                        osc: selectedOption.dataset.osc,
+                        projeto: selectedOption.dataset.projeto
+                    };
+                    
+                    // Atualizar botão Voltar para retornar ao termo específico em conc_bancaria
+                    const btnVoltar = document.getElementById('btnVoltar');
+                    const termoParam = selectedOption.dataset.numeroTermo;
+                    const urlVoltar = `/conc_bancaria/?termo=${encodeURIComponent(termoParam)}`;
+                    btnVoltar.href = urlVoltar;
+                    console.log('[DEBUG IMPORTANTE] Botão Voltar atualizado!');
+                    console.log('[DEBUG IMPORTANTE] Termo:', termoParam);
+                    console.log('[DEBUG IMPORTANTE] URL completa:', urlVoltar);
+                    console.log('[DEBUG IMPORTANTE] Href do botão:', btnVoltar.href);
+                    
+                    // Carregar meses disponíveis para o termo
+                    await carregarMesesDisponiveis(selectedOption.dataset.numeroTermo);
+                } else {
+                    console.log('[DEBUG] Relatório desmarcado, limpando campos');
+                    // Limpar campos
+                    document.getElementById('inputTermo').value = '';
+                    document.getElementById('inputOSC').value = '';
+                    document.getElementById('inputProjeto').value = '';
+                    document.getElementById('selectMesInicio').innerHTML = '<option value="">Selecione o termo primeiro</option>';
+                    document.getElementById('selectMesFim').innerHTML = '<option value="">Selecione o termo primeiro</option>';
+                    dadosRelatorioSelecionado = null;
+                    
+                    // Restaurar link padrão do botão Voltar
+                    const btnVoltar = document.getElementById('btnVoltar');
+                    btnVoltar.href = '/conc_bancaria/';
+                    console.log('[DEBUG] Botão Voltar restaurado para:', btnVoltar.href);
+                }
+            });
+
+            // Submit do formulário
+            document.getElementById('formRelatorio').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await gerarRelatorioPersonalizado();
+            });
+        }
+
+        // ============================================================
+        // Carregar meses disponíveis para o termo
+        // ============================================================
+        async function carregarMesesDisponiveis(numeroTermo) {
+            try {
+                const response = await fetch(`/analises_pc/api/meses-disponiveis/${encodeURIComponent(numeroTermo)}`);
+                const data = await response.json();
+
+                if (data.meses && data.meses.length > 0) {
+                    mesesDisponiveis = data.meses;
+                    
+                    const selectMesInicio = document.getElementById('selectMesInicio');
+                    const selectMesFim = document.getElementById('selectMesFim');
+                    
+                    selectMesInicio.innerHTML = '<option value="">Selecione o mês inicial...</option>';
+                    selectMesFim.innerHTML = '<option value="">Selecione o mês final...</option>';
+                    
+                    data.meses.forEach(mes => {
+                        const optionInicio = document.createElement('option');
+                        optionInicio.value = mes.valor;
+                        optionInicio.textContent = mes.valor;
+                        selectMesInicio.appendChild(optionInicio);
+                        
+                        const optionFim = document.createElement('option');
+                        optionFim.value = mes.valor;
+                        optionFim.textContent = mes.valor;
+                        selectMesFim.appendChild(optionFim);
+                    });
+
+                    // Pré-selecionar primeiro e último mês
+                    if (data.meses.length > 0) {
+                        selectMesInicio.value = data.meses[0].valor;
+                        selectMesFim.value = data.meses[data.meses.length - 1].valor;
+                    }
+                } else {
+                    document.getElementById('selectMesInicio').innerHTML = '<option value="">Nenhum mês disponível</option>';
+                    document.getElementById('selectMesFim').innerHTML = '<option value="">Nenhum mês disponível</option>';
+                    alert('⚠️ Nenhum mês de análise encontrado para este termo. Verifique se há dados em conc_extrato.');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar meses:', error);
+                alert('❌ Erro ao carregar meses disponíveis. Verifique o console.');
+            }
+        }
+
+        // ============================================================
+        // Gerar relatório personalizado
+        // ============================================================
+        async function gerarRelatorioPersonalizado() {
+            // Validações
+            if (!dadosRelatorioSelecionado) {
+                alert('⚠️ Selecione um relatório antes de gerar!');
+                return;
+            }
+
+            const mesInicio = document.getElementById('selectMesInicio').value;
+            const mesFim = document.getElementById('selectMesFim').value;
+
+            if (!mesInicio || !mesFim) {
+                alert('⚠️ Selecione os meses de início e fim!');
+                return;
+            }
+
+            // Mostrar loading
+            document.getElementById('loadingRelatorio').style.display = 'block';
+            document.getElementById('areaResultado').style.display = 'none';
+
+            try {
+                const response = await fetch('/analises_pc/api/gerar-texto-relatorio-inconsistencias', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        numero_doc: dadosRelatorioSelecionado.numero_doc,
+                        ano_doc: dadosRelatorioSelecionado.ano_doc,
+                        numero_termo: dadosRelatorioSelecionado.numero_termo,
+                        mes_inicio: mesInicio,
+                        mes_fim: mesFim
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.texto_gerado) {
+                    // Mostrar resultado
+                    document.getElementById('textoGerado').innerHTML = data.texto_gerado;
+                    document.getElementById('areaResultado').style.display = 'block';
+                    
+                    // Scroll suave até o resultado
+                    document.getElementById('areaResultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    alert('❌ Erro ao gerar relatório: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro ao gerar relatório:', error);
+                alert('❌ Erro ao gerar relatório. Verifique o console.');
+            } finally {
+                document.getElementById('loadingRelatorio').style.display = 'none';
+            }
+        }
+
+        // ============================================================
+        // Copiar texto gerado
+        // ============================================================
+        function copiarTextoGerado() {
+            const textoDiv = document.getElementById('textoGerado');
+            const range = document.createRange();
+            range.selectNode(textoDiv);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            
+            try {
+                document.execCommand('copy');
+                alert('✅ Texto copiado para a área de transferência!');
+            } catch (err) {
+                console.error('Erro ao copiar:', err);
+                alert('❌ Erro ao copiar texto. Use Ctrl+C manualmente.');
+            }
+            
+            window.getSelection().removeAllRanges();
+        }
+    </script>
+</body>
+</html>

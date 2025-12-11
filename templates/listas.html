@@ -279,6 +279,24 @@
 
           // Adicionar ações
           const tdAcoes = document.createElement('td');
+          tdAcoes.style.whiteSpace = 'nowrap';
+          
+          // Se permite reordenação, adicionar botões de mover
+          if (configAtual.permite_reordenar) {
+            const btnCima = document.createElement('button');
+            btnCima.className = 'btn btn-sm btn-secondary me-1';
+            btnCima.onclick = () => moverItem(registro.id, 'cima');
+            btnCima.innerHTML = '<i class="bi bi-arrow-up"></i>';
+            btnCima.title = 'Mover para cima';
+            tdAcoes.appendChild(btnCima);
+            
+            const btnBaixo = document.createElement('button');
+            btnBaixo.className = 'btn btn-sm btn-secondary me-1';
+            btnBaixo.onclick = () => moverItem(registro.id, 'baixo');
+            btnBaixo.innerHTML = '<i class="bi bi-arrow-down"></i>';
+            btnBaixo.title = 'Mover para baixo';
+            tdAcoes.appendChild(btnBaixo);
+          }
           
           // Se tem inline_edit, adicionar botão de salvar individual
           if (configAtual.inline_edit) {
@@ -295,12 +313,14 @@
           btnEditar.className = 'btn btn-sm btn-primary me-1';
           btnEditar.onclick = () => editarRegistro(registro);
           btnEditar.innerHTML = '<i class="bi bi-pencil"></i>';
+          btnEditar.title = 'Editar';
           tdAcoes.appendChild(btnEditar);
           
           const btnExcluir = document.createElement('button');
           btnExcluir.className = 'btn btn-sm btn-danger';
           btnExcluir.onclick = () => excluirRegistro(registro.id);
           btnExcluir.innerHTML = '<i class="bi bi-trash"></i>';
+          btnExcluir.title = 'Excluir';
           tdAcoes.appendChild(btnExcluir);
           
           tr.appendChild(tdAcoes);
@@ -423,7 +443,16 @@
           checkDiv.appendChild(input);
           checkDiv.appendChild(checkLabel);
           div.appendChild(checkDiv);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'textarea') {
+          // Textarea genérico com suporte a rows configurável
+          input = document.createElement('textarea');
+          input.rows = configAtual.tipos_campo[`rows_${col}`] || 3; // Default 3 rows
+          input.className = 'form-control';
+          
+          div.appendChild(label);
+          div.appendChild(input);
         } else if (col === 'descricao') {
+          // Mantém compatibilidade com código antigo
           input = document.createElement('textarea');
           input.rows = 3;
           input.className = 'form-control';
@@ -440,8 +469,8 @@
         }
         
         input.id = `campo_${col}`;
-        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição e correspondente
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente'];
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto e oculto
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
@@ -561,7 +590,17 @@
           checkDiv.appendChild(input);
           checkDiv.appendChild(checkLabel);
           div.appendChild(checkDiv);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'textarea') {
+          // Textarea genérico com suporte a rows configurável
+          input = document.createElement('textarea');
+          input.rows = configAtual.tipos_campo[`rows_${col}`] || 3; // Default 3 rows
+          input.className = 'form-control';
+          input.value = registro[col] || '';
+          
+          div.appendChild(label);
+          div.appendChild(input);
         } else if (col === 'descricao') {
+          // Mantém compatibilidade com código antigo
           input = document.createElement('textarea');
           input.rows = 3;
           input.className = 'form-control';
@@ -580,8 +619,8 @@
         }
         
         input.id = `campo_${col}`;
-        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição e correspondente
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente'];
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto e oculto
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
@@ -602,8 +641,8 @@
         if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox') {
           dados[col] = input.checked;
         } else {
-          // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente e aplicacao
-          const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'aplicacao'];
+          // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, aplicacao, categoria_texto e oculto
+          const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'aplicacao', 'categoria_texto', 'oculto'];
           if (!input.value.trim() && !camposOpcionais.includes(col)) {
             alert(`O campo ${configAtual.labels[col]} é obrigatório`);
             return;
@@ -695,6 +734,32 @@
       } catch (error) {
         console.error('Erro ao excluir:', error);
         alert('Erro ao excluir registro');
+      }
+    }
+
+    async function moverItem(id, direcao) {
+      try {
+        const response = await fetch(`/listas/api/dados/${tabelaAtual}/${id}/mover`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ direcao: direcao })
+        });
+
+        const result = await response.json();
+
+        if (result.erro) {
+          alert('Erro: ' + result.erro);
+          return;
+        }
+
+        // Recarregar tabela para mostrar nova ordem
+        carregarTabela();
+
+      } catch (error) {
+        console.error('Erro ao mover item:', error);
+        alert('Erro ao mover item');
       }
     }
 

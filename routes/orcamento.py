@@ -269,9 +269,10 @@ def dicionario_despesas():
 def atualizar_categoria():
     """
     Atualiza em massa uma categoria de despesa no banco de dados
+    Sincroniza com a tabela analises_pc.conc_extrato (cat_transacao)
     """
     from flask import request, jsonify
-    from db import execute_query
+    from db import execute_query, get_db
     
     try:
         data = request.get_json()
@@ -284,18 +285,60 @@ def atualizar_categoria():
         if not categoria_nova or categoria_nova.strip() == '':
             return jsonify({"error": "Categoria nova não pode estar vazia"}), 400
         
-        # Atualizar todas as ocorrências da categoria antiga para a nova
-        query = """
+        # Contar registros que serão afetados em conc_extrato
+        db = get_db()
+        cur = db.cursor()
+        
+        count_query = """
+            SELECT COUNT(*) as total
+            FROM analises_pc.conc_extrato
+            WHERE cat_transacao = %s
+        """
+        cur.execute(count_query, (categoria_antiga,))
+        conc_count = cur.fetchone()[0]
+        
+        # Contar registros em Parcerias_Despesas
+        count_query_pd = """
+            SELECT COUNT(*) as total
+            FROM Parcerias_Despesas
+            WHERE categoria_despesa = %s
+        """
+        cur.execute(count_query_pd, (categoria_antiga,))
+        pd_count = cur.fetchone()[0]
+        
+        # Atualizar em Parcerias_Despesas
+        query_pd = """
             UPDATE Parcerias_Despesas
             SET categoria_despesa = %s
             WHERE categoria_despesa = %s
         """
         
-        if execute_query(query, (categoria_nova.strip(), categoria_antiga)):
+        # Atualizar em conc_extrato
+        query_conc = """
+            UPDATE analises_pc.conc_extrato
+            SET cat_transacao = %s
+            WHERE cat_transacao = %s
+        """
+        
+        # Executar ambas as atualizações
+        success_pd = execute_query(query_pd, (categoria_nova.strip(), categoria_antiga))
+        success_conc = execute_query(query_conc, (categoria_nova.strip(), categoria_antiga))
+        
+        if success_pd and success_conc:
+            message = f"✅ Categoria atualizada com sucesso!\n\n"
+            message += f"• Parcerias_Despesas: {pd_count} registro(s)\n"
+            message += f"• Conc_Extrato: {conc_count} registro(s)\n"
+            message += f"\nTotal: {pd_count + conc_count} registro(s) atualizados"
+            
             return jsonify({
-                "message": f"Categoria atualizada com sucesso!",
+                "message": message,
                 "categoria_antiga": categoria_antiga,
-                "categoria_nova": categoria_nova.strip()
+                "categoria_nova": categoria_nova.strip(),
+                "registros_afetados": {
+                    "parcerias_despesas": pd_count,
+                    "conc_extrato": conc_count,
+                    "total": pd_count + conc_count
+                }
             }), 200
         else:
             return jsonify({"error": "Falha ao atualizar categoria em ambos os bancos"}), 500

@@ -285,15 +285,7 @@ def api_salvar_extrato():
             # Aplicar automação apenas se houver data de corte definida
             if data_corte:
                 print(f"[AUTOMAÇÃO] Aplicando regra para competências >= {data_corte}")
-                
-                # Buscar categorias da Lista de Despesas (não devem ser alteradas)
-                cur.execute("""
-                    SELECT DISTINCT categoria_extra 
-                    FROM categoricas.c_despesas_analise
-                    WHERE categoria_extra IS NOT NULL
-                """)
-                categorias_despesas = {row['categoria_extra'] for row in cur.fetchall()}
-                print(f"[AUTOMAÇÃO] Categorias de despesas (não alterar): {len(categorias_despesas)}")
+                print(f"[AUTOMAÇÃO] Regras: Apenas células VAZIAS + Competência >= corte + Créditos E Débitos")
                 
                 linhas_atualizadas = 0
                 
@@ -310,42 +302,48 @@ def api_salvar_extrato():
                         continue
                     
                     competencia = linha_data['competencia']
-                    cat_transacao_atual = linha_data['cat_transacao'] or ''
+                    cat_transacao_atual = (linha_data['cat_transacao'] or '').strip()
                     origem_destino = (linha_data['origem_destino'] or '').strip()
                     credito = linha_data['credito'] or 0
                     debito = linha_data['debito'] or 0
                     
-                    # Verificar se competência é >= data de corte
-                    # IMPORTANTE: Se competência não está preenchida, pular
+                    # REGRA 1: Se competência não está preenchida, pular
                     if not competencia:
                         continue
                     
-                    # IMPORTANTE: Regra só se aplica a DÉBITOS
-                    if debito <= 0:
+                    # REGRA 2: Verificar se competência é >= data de corte
+                    if competencia < data_corte:
                         continue
-                        
-                    if competencia >= data_corte:
-                        # Apenas aplicar se categoria atual NÃO está na Lista de Despesas
-                        # E também se não está vazia (não sobrescrever categorias já definidas da lista)
-                        if cat_transacao_atual not in categorias_despesas:
-                            nova_categoria = None
-                            
-                            if origem_destino:
-                                # Origem/Destino preenchido → Destinatário Identificado
-                                nova_categoria = 'Destinatário Identificado'
-                            else:
-                                # Origem/Destino vazio → Destinatário não Identificado
-                                nova_categoria = 'Destinatário não Identificado'
-                            
-                            # Atualizar categoria e marcar como "Avaliado"
-                            if nova_categoria:
-                                cur.execute("""
-                                    UPDATE analises_pc.conc_extrato
-                                    SET cat_transacao = %s,
-                                        cat_avaliacao = 'Avaliado'
-                                    WHERE id = %s
-                                """, (nova_categoria, linha_id))
-                                linhas_atualizadas += 1
+                    
+                    # REGRA 3: NUNCA sobrescrever categoria já preenchida (proteção total)
+                    if cat_transacao_atual:
+                        continue
+                    
+                    # REGRA 4: Aplicar apenas a DÉBITOS e CRÉDITOS (qualquer tipo de transação)
+                    # (Removida a restrição de apenas débitos)
+                    
+                    # Determinar nova categoria baseada em Origem/Destino
+                    nova_categoria = None
+                    
+                    if origem_destino:
+                        # Origem/Destino preenchido → Destinatário Identificado
+                        nova_categoria = 'Destinatário Identificado'
+                    else:
+                        # Origem/Destino vazio → Destinatário não Identificado
+                        nova_categoria = 'Destinatário não Identificado'
+                    
+                    # Atualizar categoria e marcar como "Avaliado"
+                    if nova_categoria:
+                        cur.execute("""
+                            UPDATE analises_pc.conc_extrato
+                            SET cat_transacao = %s,
+                                cat_avaliacao = 'Avaliado'
+                            WHERE id = %s
+                        """, (nova_categoria, linha_id))
+                        linhas_atualizadas += 1
+                
+                if linhas_atualizadas > 0:
+                    print(f"[AUTOMAÇÃO] ✅ {linhas_atualizadas} linhas categorizadas automaticamente")
         
         db.commit()
         
@@ -419,6 +417,8 @@ def api_listar_termos():
 @requires_access('conc_bancaria')
 def api_categorias_despesas():
     """API para listar categorias de despesas de um termo específico"""
+    import time
+    start_time = time.time()
     try:
         cur = get_cursor()
         numero_termo = request.args.get('numero_termo', '').strip()
@@ -445,6 +445,8 @@ def api_categorias_despesas():
         
         categorias = [{'categoria_despesa': row['categoria_despesa']} for row in cur.fetchall()]
         
+        elapsed = (time.time() - start_time) * 1000
+        print(f"[BACKEND PERF] /api/categorias-despesas: {elapsed:.2f}ms")
         return jsonify(categorias), 200
         
     except Exception as e:
@@ -457,6 +459,8 @@ def api_categorias_despesas():
 @requires_access('conc_bancaria')
 def api_categorias_analise():
     """API para listar categorias de análise"""
+    import time
+    start_time = time.time()
     try:
         cur = get_cursor()
         filtro = request.args.get('filtro', '').strip()
@@ -477,6 +481,8 @@ def api_categorias_analise():
         
         categorias = [dict(row) for row in cur.fetchall()]
         
+        elapsed = (time.time() - start_time) * 1000
+        print(f"[BACKEND PERF] /api/categorias-analise: {elapsed:.2f}ms")
         return jsonify(categorias), 200
         
     except Exception as e:
@@ -489,6 +495,8 @@ def api_categorias_analise():
 @requires_access('conc_bancaria')
 def api_periodo_termo():
     """API para obter período (datas início e final) de um termo de parceria"""
+    import time
+    start_time = time.time()
     try:
         cur = get_cursor()
         numero_termo = request.args.get('numero_termo', '').strip()
@@ -516,6 +524,9 @@ def api_periodo_termo():
         if periodo.get('final'):
             periodo['final'] = periodo['final'].isoformat()
         
+        elapsed = (time.time() - start_time) * 1000
+        print(f"[BACKEND PERF] /api/periodo-termo: {elapsed:.2f}ms")
+        
         return jsonify(periodo), 200
         
     except Exception as e:
@@ -527,7 +538,7 @@ def api_periodo_termo():
 @login_required
 @requires_access('conc_bancaria')
 def api_get_banco():
-    """API para obter o banco do extrato de um termo"""
+    """API para obter o banco do extrato e conta específica de um termo"""
     try:
         cur = get_cursor()
         numero_termo = request.args.get('numero_termo', '').strip()
@@ -535,19 +546,31 @@ def api_get_banco():
         if not numero_termo:
             return jsonify({'erro': 'numero_termo é obrigatório'}), 400
         
-        query = """
-            SELECT banco_extrato
+        # Buscar banco_extrato e conta_execucao de analises_pc.conc_banco
+        query_banco = """
+            SELECT banco_extrato, conta_execucao
             FROM analises_pc.conc_banco
             WHERE numero_termo = %s
         """
         
-        cur.execute(query, (numero_termo,))
-        resultado = cur.fetchone()
+        cur.execute(query_banco, (numero_termo,))
+        resultado_banco = cur.fetchone()
         
-        if not resultado:
-            return jsonify({'banco_extrato': None}), 200
+        # Buscar conta de public.parcerias
+        query_conta = """
+            SELECT conta
+            FROM public.parcerias
+            WHERE numero_termo = %s
+        """
         
-        return jsonify(dict(resultado)), 200
+        cur.execute(query_conta, (numero_termo,))
+        resultado_conta = cur.fetchone()
+        
+        return jsonify({
+            'banco_extrato': resultado_banco['banco_extrato'] if resultado_banco else None,
+            'conta': resultado_conta['conta'] if resultado_conta else None,
+            'conta_execucao': resultado_banco['conta_execucao'] if resultado_banco else None
+        }), 200
         
     except Exception as e:
         print(f"[ERRO] ao buscar banco: {e}")
@@ -578,11 +601,13 @@ def api_salvar_termo_session():
 @login_required
 @requires_access('conc_bancaria')
 def api_save_banco():
-    """API para salvar o banco do extrato de um termo"""
+    """API para salvar o banco do extrato e conta específica de um termo"""
     try:
         dados = request.get_json()
         numero_termo = dados.get('numero_termo')
         banco_extrato = dados.get('banco_extrato')
+        conta = dados.get('conta')
+        conta_execucao = dados.get('conta_execucao')
         
         if not numero_termo:
             return jsonify({'erro': 'numero_termo é obrigatório'}), 400
@@ -590,31 +615,49 @@ def api_save_banco():
         cur = get_cursor()
         db = get_db()
         
-        # Verificar se já existe
-        cur.execute("""
-            SELECT id FROM analises_pc.conc_banco 
-            WHERE numero_termo = %s
-        """, (numero_termo,))
-        
-        existe = cur.fetchone()
-        
-        if existe:
-            # Atualizar
+        # Salvar banco_extrato e conta_execucao em analises_pc.conc_banco
+        if banco_extrato is not None or conta_execucao is not None:
+            # Verificar se já existe
             cur.execute("""
-                UPDATE analises_pc.conc_banco 
-                SET banco_extrato = %s
+                SELECT id FROM analises_pc.conc_banco 
                 WHERE numero_termo = %s
-            """, (banco_extrato, numero_termo))
-        else:
-            # Inserir
+            """, (numero_termo,))
+            
+            existe = cur.fetchone()
+            
+            if existe:
+                # Atualizar campos individualmente
+                if banco_extrato is not None:
+                    cur.execute("""
+                        UPDATE analises_pc.conc_banco 
+                        SET banco_extrato = %s
+                        WHERE numero_termo = %s
+                    """, (banco_extrato, numero_termo))
+                
+                if conta_execucao is not None:
+                    cur.execute("""
+                        UPDATE analises_pc.conc_banco 
+                        SET conta_execucao = %s
+                        WHERE numero_termo = %s
+                    """, (conta_execucao, numero_termo))
+            else:
+                # Inserir
+                cur.execute("""
+                    INSERT INTO analises_pc.conc_banco (numero_termo, banco_extrato, conta_execucao)
+                    VALUES (%s, %s, %s)
+                """, (numero_termo, banco_extrato, conta_execucao))
+        
+        # Salvar conta em public.parcerias
+        if conta is not None:
             cur.execute("""
-                INSERT INTO analises_pc.conc_banco (numero_termo, banco_extrato)
-                VALUES (%s, %s)
-            """, (numero_termo, banco_extrato))
+                UPDATE public.parcerias
+                SET conta = %s
+                WHERE numero_termo = %s
+            """, (conta, numero_termo))
         
         db.commit()
         
-        return jsonify({'mensagem': 'Banco salvo com sucesso'}), 200
+        return jsonify({'mensagem': 'Banco e conta salvos com sucesso'}), 200
         
     except Exception as e:
         print(f"[ERRO] ao salvar banco: {e}")
@@ -771,6 +814,8 @@ def api_salvar_notas_fiscais():
 @requires_access('conc_bancaria')
 def api_categorias_aplicabilidade():
     """API para buscar aplicabilidade de documentos por categoria"""
+    import time
+    start_time = time.time()
     try:
         cur = get_cursor()
         
@@ -786,6 +831,8 @@ def api_categorias_aplicabilidade():
         # Retornar como dicionário { categoria: aplicacao }
         resultado = {cat['categoria_extra']: cat['aplicacao'] for cat in categorias}
         
+        elapsed = (time.time() - start_time) * 1000
+        print(f"[BACKEND PERF] /api/categorias-aplicabilidade: {elapsed:.2f}ms")
         return jsonify(resultado), 200
         
     except Exception as e:
@@ -798,6 +845,8 @@ def api_categorias_aplicabilidade():
 @requires_access('conc_bancaria')
 def api_categorias_rubricas():
     """API para buscar rubricas das categorias por termo"""
+    import time
+    start_time = time.time()
     try:
         cur = get_cursor()
         numero_termo = request.args.get('numero_termo', '').strip()
@@ -819,6 +868,8 @@ def api_categorias_rubricas():
         # Retornar como dicionário { categoria: rubrica }
         resultado = {cat['categoria_despesa']: cat['rubrica'] for cat in categorias}
         
+        elapsed = (time.time() - start_time) * 1000
+        print(f"[BACKEND PERF] /api/categorias-rubricas: {elapsed:.2f}ms")
         return jsonify(resultado), 200
         
     except Exception as e:
@@ -1017,6 +1068,69 @@ def api_salvar_documentos_analise():
         
     except Exception as e:
         print(f"[ERRO] ao salvar documentos de análise: {e}")
+        if get_db():
+            get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/limpar-termo', methods=['DELETE'])
+@login_required
+@requires_access('conc_bancaria')
+def api_limpar_termo():
+    """
+    API para limpar TODOS os dados de um termo específico
+    Remove: extrato, rendimentos, notas fiscais e contrapartida
+    """
+    try:
+        numero_termo = request.args.get('numero_termo', '').strip()
+        
+        if not numero_termo:
+            return jsonify({'erro': 'Número do termo é obrigatório'}), 400
+        
+        db = get_db()
+        cur = get_cursor()
+        
+        # Contar registros antes da exclusão
+        cur.execute("SELECT COUNT(*) as total FROM analises_pc.conc_extrato WHERE numero_termo = %s", (numero_termo,))
+        total_extrato = cur.fetchone()['total']
+        
+        cur.execute("SELECT COUNT(*) as total FROM analises_pc.conc_rendimentos WHERE numero_termo = %s", (numero_termo,))
+        total_rendimentos = cur.fetchone()['total']
+        
+        cur.execute("SELECT COUNT(*) as total FROM analises_pc.conc_extrato_notas_fiscais WHERE numero_termo = %s", (numero_termo,))
+        total_notas = cur.fetchone()['total']
+        
+        cur.execute("SELECT COUNT(*) as total FROM analises_pc.conc_contrapartida WHERE numero_termo = %s", (numero_termo,))
+        total_contrapartida = cur.fetchone()['total']
+        
+        # Deletar todos os dados do termo
+        cur.execute("DELETE FROM analises_pc.conc_extrato_notas_fiscais WHERE numero_termo = %s", (numero_termo,))
+        cur.execute("DELETE FROM analises_pc.conc_rendimentos WHERE numero_termo = %s", (numero_termo,))
+        cur.execute("DELETE FROM analises_pc.conc_contrapartida WHERE numero_termo = %s", (numero_termo,))
+        cur.execute("DELETE FROM analises_pc.conc_extrato WHERE numero_termo = %s", (numero_termo,))
+        
+        db.commit()
+        
+        print(f"[LIMPAR TERMO] Termo: {numero_termo}")
+        print(f"  - Extrato: {total_extrato} registros deletados")
+        print(f"  - Rendimentos: {total_rendimentos} registros deletados")
+        print(f"  - Notas Fiscais: {total_notas} registros deletados")
+        print(f"  - Contrapartida: {total_contrapartida} registros deletados")
+        
+        return jsonify({
+            'mensagem': 'Dados do termo limpos com sucesso',
+            'termo': numero_termo,
+            'registros_deletados': {
+                'extrato': total_extrato,
+                'rendimentos': total_rendimentos,
+                'notas_fiscais': total_notas,
+                'contrapartida': total_contrapartida,
+                'total': total_extrato + total_rendimentos + total_notas + total_contrapartida
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERRO] ao limpar termo: {e}")
         if get_db():
             get_db().rollback()
         return jsonify({'erro': str(e)}), 500

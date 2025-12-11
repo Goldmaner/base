@@ -647,10 +647,24 @@ const categoriaAntiga = input.dataset.original;
 const categoriaNova = input.value.trim();
 if (!categoriaNova) { alert('⚠ Categoria não pode estar vazia!'); return; }
 if (categoriaAntiga === categoriaNova) { alert('ℹ Nenhuma alteração detectada.'); return; }
-if (!confirm('⚠ Atualizar TODOS os registros de:\n"' + categoriaAntiga + '"\n\nPara:\n"' + categoriaNova + '"?')) return;
+
+// Primeiro, buscar informações sobre quantos registros serão afetados
 btn.disabled = true;
 const htmlOriginal = btn.innerHTML;
 btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+// Fazer uma chamada prévia para verificar o impacto
+if (!confirm('⚠ ATENÇÃO: Esta ação irá atualizar:\n\n' +
+             '1. Todos os registros em Parcerias_Despesas\n' +
+             '2. Todos os registros em Conc_Extrato (cat_transacao)\n\n' +
+             'De: "' + categoriaAntiga + '"\n' +
+             'Para: "' + categoriaNova + '"\n\n' +
+             'Deseja continuar?')) {
+    btn.disabled = false;
+    btn.innerHTML = htmlOriginal;
+    return;
+}
+
 fetch('/orcamento/atualizar-categoria', {
 method: 'POST',
 headers: {'Content-Type': 'application/json'},
@@ -663,7 +677,7 @@ alert('❌ Erro: ' + data.error);
 btn.disabled = false;
 btn.innerHTML = htmlOriginal;
 } else {
-alert('✅ ' + data.message);
+alert(data.message);
 input.dataset.original = categoriaNova;
 input.classList.remove('modified');
 setTimeout(() => location.reload(), 1000);

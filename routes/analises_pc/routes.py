@@ -912,71 +912,73 @@ def historico_auditoria():
 def central_modelos():
     """Página da Central de Modelos de Documentos"""
     
-    # Lista de modelos disponíveis
-    modelos = [
-        {
-            'nome': 'Termo Celebrado',
-            'arquivo': 'modelo_termo_celebrado.pdf',
-            'icone': '📄',
-            'descricao': 'Modelo de termo de colaboração/fomento/parceria'
-        },
-        {
-            'nome': 'Solicitações de Alterações',
-            'arquivo': 'modelo_solicitacao_alteracao.pdf',
-            'icone': '📨',
-            'descricao': 'Documentos que registram pedidos de modificação em cláusulas, cronogramas, valores ou demais aspectos do termo celebrado.'
-        },
-        {
-            'nome': 'Termo de Aditamento',
-            'arquivo': 'modelo_termo_aditamento.pdf',
-            'icone': '📝',
-            'descricao': 'Instrumentos formais utilizados para alterar, prorrogar ou suplementar cláusulas do termo celebrado original.'
-        },
-        {
-            'nome': 'Termo de Apostilamento',
-            'arquivo': 'modelo_termo_apostilamento.pdf',
-            'icone': '📋',
-            'descricao': 'Registros administrativos de ajustes que não modificam o objeto principal do termo, como correções de dados ou atualizações cadastrais.'
-        },
-        {
-            'nome': 'Manifestações - Plano de Trabalho',
-            'arquivo': 'modelo_manifestacao_plano.pdf',
-            'icone': '�',
-            'descricao': 'Pareceres, comunicações ou documentos que resultem em mudanças relevantes no cronograma, atividades ou objetivos do plano de trabalho.'
-        },
-        {
-            'nome': 'Cronograma de Desembolso',
-            'arquivo': 'modelo_cronograma_desembolso.xlsx',
-            'icone': '�',
-            'descricao': 'Documento que apresenta as datas e valores previstos para liberação dos recursos financeiros ao longo da execução do termo.'
-        },
-        {
-            'nome': 'Plano de Trabalho',
-            'arquivo': 'modelo_plano_trabalho.pdf',
-            'icone': '📊',
-            'descricao': 'Documento detalhado das atividades, metas, prazos e responsabilidades para a execução do objeto do termo celebrado.'
-        },
-        {
-            'nome': 'Orçamento Anual',
-            'arquivo': 'modelo_orcamento_anual.xlsx',
-            'icone': '💰',
-            'descricao': 'Relação detalhada dos recursos financeiros previstos para o exercício, com a discriminação das fontes e aplicações.'
-        },
-        {
-            'nome': 'FACC',
-            'arquivo': 'modelo_facc.pdf',
-            'icone': '🏦',
-            'descricao': 'Ficha de Atualização de Cadastro de Credores: Formulário utilizado para atualizar ou confirmar os dados cadastrais dos credores envolvidos no processo.'
-        },
-        {
-            'nome': 'Memória de Cálculo',
-            'arquivo': 'modelo_memoria_calculo.xlsx',
-            'icone': '🧮',
-            'descricao': 'Documento que detalha e justifica os cálculos realizados para apuração de valores, quantitativos e estimativas financeiras relacionadas ao termo.'
-        }
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Verificar se tabela existe, senão criar
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS categoricas.central_modelos (
+                id SERIAL PRIMARY KEY,
+                nome VARCHAR(255) NOT NULL,
+                arquivo VARCHAR(255) NOT NULL,
+                icone VARCHAR(10) DEFAULT '📄',
+                descricao TEXT,
+                ordem INTEGER DEFAULT 0,
+                ativo BOOLEAN DEFAULT true,
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        
+        # Buscar modelos ativos ordenados
+        cur.execute("""
+            SELECT id, nome, arquivo, icone, descricao, ordem
+            FROM categoricas.central_modelos
+            WHERE ativo = true
+            ORDER BY ordem ASC, nome ASC
+        """)
+        modelos = cur.fetchall()
+        
+        cur.close()
+        
+        # Se não houver modelos, inserir os padrões
+        if not modelos:
+            inserir_modelos_padrao()
+            return redirect(url_for('analises_pc.central_modelos'))
+        
+        is_admin = session.get('tipo_usuario') == 'Agente Público'
+        return render_template('analises_pc/central_modelos.html', modelos=modelos, is_admin=is_admin)
+        
+    except Exception as e:
+        cur.close()
+        print(f"[ERRO] central_modelos: {str(e)}")
+        return render_template('analises_pc/central_modelos.html', modelos=[], is_admin=False)
+
+
+def inserir_modelos_padrao():
+    """Insere modelos padrão no banco de dados"""
+    conn = get_db()
+    cur = conn.cursor()
+    
+    modelos_padrao = [
+        ('Termo Celebrado', 'modelo_termo_celebrado.pdf', '📄', 'Modelo de termo de colaboração/fomento/parceria', 1),
+        ('Termo de Aditamento', 'modelo_termo_aditamento.pdf', '📝', 'Instrumentos formais utilizados para alterar, prorrogar ou suplementar cláusulas do termo celebrado original.', 2),
+        ('Termo de Apostilamento', 'modelo_termo_apostilamento.pdf', '📋', 'Registros administrativos de ajustes que não modificam o objeto principal do termo.', 3),
+        ('Plano de Trabalho', 'modelo_plano_trabalho.pdf', '📊', 'Documento detalhado das atividades, metas, prazos e responsabilidades.', 4),
+        ('Orçamento Anual', 'modelo_orcamento_anual.xlsx', '💰', 'Relação detalhada dos recursos financeiros previstos.', 5),
+        ('FACC', 'modelo_facc.pdf', '🏦', 'Ficha de Atualização de Cadastro de Credores.', 6),
+        ('Memória de Cálculo', 'modelo_memoria_calculo.xlsx', '🧮', 'Documento que detalha os cálculos realizados.', 7),
     ]
     
-    return render_template('analises_pc/central_modelos.html', modelos=modelos)
+    for nome, arquivo, icone, descricao, ordem in modelos_padrao:
+        cur.execute("""
+            INSERT INTO categoricas.central_modelos (nome, arquivo, icone, descricao, ordem)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (nome, arquivo, icone, descricao, ordem))
+    
+    conn.commit()
+    cur.close()
 
 
 @analises_pc_bp.route('/download_modelo/<filename>')
@@ -1075,3 +1077,209 @@ def upload_modelo():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Erro ao fazer upload: {str(e)}'}), 500
+
+
+@analises_pc_bp.route('/api/modelo_texto', methods=['GET'])
+def buscar_modelo_texto():
+    """Busca um modelo de texto pelo título"""
+    try:
+        titulo = request.args.get('titulo')
+        
+        if not titulo:
+            return jsonify({'error': 'Título não fornecido'}), 400
+        
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Buscar modelo de texto
+        cur.execute("""
+            SELECT id, titulo_texto, modelo_texto, oculto
+            FROM categoricas.c_modelo_textos
+            WHERE titulo_texto = %s AND (oculto IS NULL OR oculto = FALSE)
+        """, (titulo,))
+        
+        modelo = cur.fetchone()
+        
+        if not modelo:
+            return jsonify({'error': 'Modelo não encontrado'}), 404
+        
+        return jsonify({
+            'id': modelo['id'],
+            'titulo': modelo['titulo_texto'],
+            'conteudo': modelo['modelo_texto']
+        }), 200
+    
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar modelo de texto: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Erro ao buscar modelo: {str(e)}'}), 500
+
+
+@analises_pc_bp.route('/api/modelos', methods=['GET'])
+def listar_modelos_api():
+    """API para listar todos os modelos (incluindo inativos para admin)"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        is_admin = session.get('tipo_usuario') == 'Agente Público'
+        
+        if is_admin:
+            cur.execute("""
+                SELECT id, nome, arquivo, icone, descricao, ordem, ativo
+                FROM categoricas.central_modelos
+                ORDER BY ordem ASC, nome ASC
+            """)
+        else:
+            cur.execute("""
+                SELECT id, nome, arquivo, icone, descricao, ordem
+                FROM categoricas.central_modelos
+                WHERE ativo = true
+                ORDER BY ordem ASC, nome ASC
+            """)
+        
+        modelos = cur.fetchall()
+        cur.close()
+        
+        return jsonify({'modelos': modelos})
+        
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/modelos/<int:modelo_id>', methods=['GET', 'PUT', 'DELETE'])
+def gerenciar_modelo(modelo_id):
+    """API para gerenciar um modelo específico"""
+    if session.get('tipo_usuario') != 'Agente Público':
+        return jsonify({'error': 'Acesso negado'}), 403
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        if request.method == 'GET':
+            cur.execute("""
+                SELECT id, nome, arquivo, icone, descricao, ordem, ativo
+                FROM categoricas.central_modelos
+                WHERE id = %s
+            """, (modelo_id,))
+            modelo = cur.fetchone()
+            cur.close()
+            
+            if not modelo:
+                return jsonify({'error': 'Modelo não encontrado'}), 404
+            
+            return jsonify(dict(modelo))
+        
+        elif request.method == 'PUT':
+            data = request.get_json()
+            cur.execute("""
+                UPDATE categoricas.central_modelos
+                SET nome = %s, arquivo = %s, icone = %s, descricao = %s, ordem = %s
+                WHERE id = %s
+            """, (data['nome'], data['arquivo'], data['icone'], data['descricao'], data.get('ordem', 0), modelo_id))
+            conn.commit()
+            cur.close()
+            
+            return jsonify({'mensagem': 'Modelo atualizado com sucesso'})
+        
+        elif request.method == 'DELETE':
+            # Soft delete
+            cur.execute("""
+                UPDATE categoricas.central_modelos
+                SET ativo = false
+                WHERE id = %s
+            """, (modelo_id,))
+            conn.commit()
+            cur.close()
+            
+            return jsonify({'mensagem': 'Modelo removido com sucesso'})
+    
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/modelos', methods=['POST'])
+def criar_modelo():
+    """API para criar um novo modelo"""
+    if session.get('tipo_usuario') != 'Agente Público':
+        return jsonify({'error': 'Acesso negado'}), 403
+    
+    conn = get_db()
+    cur = conn.cursor()
+    
+    try:
+        data = request.get_json()
+        cur.execute("""
+            INSERT INTO categoricas.central_modelos (nome, arquivo, icone, descricao, ordem)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """, (data['nome'], data['arquivo'], data['icone'], data['descricao'], data.get('ordem', 999)))
+        
+        novo_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        
+        return jsonify({'mensagem': 'Modelo criado com sucesso', 'id': novo_id})
+    
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/arquivos-disponiveis', methods=['GET'])
+def listar_arquivos_disponiveis():
+    """Lista arquivos disponíveis na pasta modelos/"""
+    if session.get('tipo_usuario') != 'Agente Público':
+        return jsonify({'error': 'Acesso negado'}), 403
+    
+    import os
+    modelos_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'modelos')
+    
+    try:
+        arquivos = []
+        for arquivo in os.listdir(modelos_dir):
+            if arquivo.endswith(('.pdf', '.xlsx', '.xls', '.docx', '.doc')):
+                arquivos.append(arquivo)
+        
+        return jsonify({'arquivos': sorted(arquivos)})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/conc_inconsistencias')
+def conc_inconsistencias():
+    """Página de Relatório de Inconsistências da Conciliação Bancária"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Buscar modelo de texto
+        cur.execute("""
+            SELECT titulo_texto, modelo_texto
+            FROM categoricas.c_modelo_textos
+            WHERE titulo_texto = 'Análise de Contas: Relatório de Inconsistências'
+            LIMIT 1
+        """)
+        
+        modelo = cur.fetchone()
+        cur.close()
+        
+        if not modelo:
+            # Se não encontrar, criar placeholder
+            modelo = {
+                'titulo_texto': 'Análise de Contas: Relatório de Inconsistências',
+                'modelo_texto': '<p>Modelo de texto ainda não cadastrado. Acesse Modelos de Texto para criar.</p>'
+            }
+        
+        return render_template('analises_pc/conc_inconsistencias.html', modelo=modelo)
+    
+    except Exception as e:
+        cur.close()
+        print(f"[ERRO] conc_inconsistencias: {str(e)}")
+        return render_template('analises_pc/conc_inconsistencias.html', 
+                             modelo={'titulo_texto': 'Erro', 'modelo_texto': f'<p>Erro ao carregar modelo: {str(e)}</p>'})
