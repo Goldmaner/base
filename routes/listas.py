@@ -98,7 +98,8 @@ TABELAS_CONFIG = {
             'e_mail_c': 'E-mail',
             'setor_sei': 'Setor SEI'
         },
-        'colunas_filtro': ['secretaria', 'coordenacao', 'nome_c', 'status_c'],
+        'colunas_filtro': ['secretaria', 'coordenacao', 'nome_c', 'status_c', 'setor_sei'],
+        'colunas_ordenacao': ['setor_sei'],
         'ordem': 'nome_c',
         'tipos_campo': {
             'secretaria': 'select_dinamico',

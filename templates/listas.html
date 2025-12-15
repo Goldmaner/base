@@ -155,6 +155,20 @@
             th.appendChild(filterIcon);
           }
           
+          // Adicionar ordenação se a coluna estiver na lista de ordenação
+          if (configAtual.colunas_ordenacao && configAtual.colunas_ordenacao.includes(col)) {
+            th.style.cursor = 'pointer';
+            th.setAttribute('data-ordem', 'asc');
+            th.setAttribute('data-coluna', col);
+            
+            const sortIcon = document.createElement('i');
+            sortIcon.className = 'bi bi-sort-alpha-down ms-2';
+            sortIcon.id = `iconOrdem_${col}`;
+            th.appendChild(sortIcon);
+            
+            th.onclick = () => ordenarPorColunaTexto(col);
+          }
+          
           cabecalho.appendChild(th);
         }
         
@@ -195,6 +209,16 @@
         // Construir corpo da tabela
         const corpo = document.getElementById('corpoTabela');
         corpo.innerHTML = '';
+
+        // Se for coordenadores, criar mapa de setores com coordenadores ativos
+        let setoresComAtivos = new Set();
+        if (tabelaAtual === 'c_coordenadores') {
+          for (const registro of dados) {
+            if (registro.status_c === 'Ativo' && registro.setor_sei) {
+              setoresComAtivos.add(registro.setor_sei);
+            }
+          }
+        }
 
         for (const registro of dados) {
           const tr = document.createElement('tr');
@@ -259,6 +283,15 @@
               td.appendChild(checkbox);
             } else {
               td.textContent = registro[col] || '-';
+            }
+            
+            // Se for coordenadores e coluna setor_sei, verificar se há coordenador ativo
+            if (tabelaAtual === 'c_coordenadores' && col === 'setor_sei' && registro[col]) {
+              if (!setoresComAtivos.has(registro[col])) {
+                td.style.backgroundColor = '#ffc107'; // Laranja (Bootstrap warning color)
+                td.style.fontWeight = 'bold';
+                td.title = 'Nenhum coordenador ativo neste setor';
+              }
             }
             
             tr.appendChild(td);
@@ -1152,6 +1185,74 @@
     // Manter compatibilidade com nome antigo
     function ordenarPorPareceres() {
       ordenarPorColuna('total_pareceres');
+    }
+    
+    function ordenarPorColunaTexto(nomeColuna) {
+      const tbody = document.getElementById('corpoTabela');
+      const linhas = Array.from(tbody.getElementsByTagName('tr'));
+      
+      // Obter ordem atual do cabeçalho
+      const thColuna = document.querySelector(`th[data-coluna="${nomeColuna}"]`);
+      if (!thColuna) {
+        console.error(`Cabeçalho não encontrado para coluna: ${nomeColuna}`);
+        return;
+      }
+      
+      const ordemAtual = thColuna.getAttribute('data-ordem');
+      const novaOrdem = ordemAtual === 'desc' ? 'asc' : 'desc';
+      
+      // Filtrar apenas linhas visíveis para ordenar
+      const linhasVisiveis = linhas.filter(linha => linha.style.display !== 'none');
+      const linhasOcultas = linhas.filter(linha => linha.style.display === 'none');
+      
+      // Ordenar linhas visíveis
+      linhasVisiveis.sort((a, b) => {
+        let valorA = '';
+        let valorB = '';
+        
+        // Encontrar célula da coluna especificada
+        const celulasA = a.getElementsByTagName('td');
+        const celulasB = b.getElementsByTagName('td');
+        
+        for (let celula of celulasA) {
+          if (celula.getAttribute('data-col') === nomeColuna) {
+            valorA = celula.textContent.trim().toLowerCase();
+            break;
+          }
+        }
+        
+        for (let celula of celulasB) {
+          if (celula.getAttribute('data-col') === nomeColuna) {
+            valorB = celula.textContent.trim().toLowerCase();
+            break;
+          }
+        }
+        
+        if (novaOrdem === 'desc') {
+          return valorB.localeCompare(valorA);
+        } else {
+          return valorA.localeCompare(valorB);
+        }
+      });
+      
+      // Limpar tbody e reinserir linhas ordenadas, seguidas pelas ocultas
+      tbody.innerHTML = '';
+      linhasVisiveis.forEach(linha => tbody.appendChild(linha));
+      linhasOcultas.forEach(linha => tbody.appendChild(linha));
+      
+      // Atualizar ícone e atributo de ordem
+      thColuna.setAttribute('data-ordem', novaOrdem);
+      const icone = document.getElementById(`iconOrdem_${nomeColuna}`);
+      if (icone) {
+        if (novaOrdem === 'desc') {
+          icone.className = 'bi bi-sort-alpha-down-alt ms-2';
+        } else {
+          icone.className = 'bi bi-sort-alpha-down ms-2';
+        }
+      }
+      
+      // Atualizar rodapé
+      atualizarRodape();
     }
   </script>
 </body>
