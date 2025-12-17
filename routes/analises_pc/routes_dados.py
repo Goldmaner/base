@@ -128,15 +128,14 @@ def listar_portarias():
 
 @analises_pc_bp.route('/api/listar_pessoas_gestoras', methods=['GET'])
 def listar_pessoas_gestoras():
-    """Lista todas as pessoas gestoras únicas do sistema (incluindo inativas)"""
+    """Lista todas as pessoas gestoras do sistema"""
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         cur.execute("""
-            SELECT DISTINCT nome_pg
-            FROM public.parcerias_pg
-            WHERE nome_pg IS NOT NULL AND nome_pg != ''
+            SELECT nome_pg, setor, numero_rf, status_pg
+            FROM categoricas.c_pessoa_gestora
             ORDER BY nome_pg
         """)
         pessoas_gestoras = cur.fetchall()

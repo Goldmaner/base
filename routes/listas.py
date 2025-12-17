@@ -218,7 +218,8 @@ TABELAS_CONFIG = {
         'colunas_editaveis': [
             'nome_item', 
             'tipo_inconsistencia', 
-            'modelo_texto', 
+            'modelo_texto',
+            'solucao',
             'genero_inconsistencia',
             'situacao',
             'nivel_gravidade',
@@ -230,6 +231,7 @@ TABELAS_CONFIG = {
             'nome_item': 'Nome do Item',
             'tipo_inconsistencia': 'Tipo de Inconsistência',
             'modelo_texto': 'Modelo de Texto',
+            'solucao': 'Forma de Resolução',
             'genero_inconsistencia': 'Gênero',
             'situacao': 'Situação',
             'nivel_gravidade': 'Nível de Gravidade',
@@ -254,6 +256,8 @@ TABELAS_CONFIG = {
             ],
             'modelo_texto': 'textarea',
             'rows_modelo_texto': 15,  # Campo maior para textos longos
+            'solucao': 'textarea',
+            'rows_solucao': 15,  # Campo maior para textos longos
             'genero_inconsistencia': 'select',
             'opcoes_genero_inconsistencia': ['Material', 'Formal'],
             'situacao': 'select',

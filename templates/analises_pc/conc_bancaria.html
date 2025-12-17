@@ -1328,6 +1328,18 @@
         console.log('');
         
         carregarTermos();
+        
+        // Adicionar event listeners para remover destaque ao preencher
+        ['bancoExtrato', 'contaEspecifica', 'contaExecucao'].forEach(campoId => {
+            const campo = document.getElementById(campoId);
+            if (campo) {
+                campo.addEventListener('change', function() {
+                    if (this.value.trim()) {
+                        destacarCampoObrigatorio(campoId, false);
+                    }
+                });
+            }
+        });
     });
 
     let todosOsTermos = []; // Lista completa de termos
@@ -1394,6 +1406,78 @@
         );
         
         atualizarDatalistTermos(termosFiltrados);
+    }
+
+    async function validarCamposObrigatorios(numeroTermo) {
+        // Verifica se há dados em conc_extrato para o termo
+        try {
+            const response = await fetch(`/conc_bancaria/api/extrato?numero_termo=${encodeURIComponent(numeroTermo)}&limite=1`);
+            const data = await response.json();
+            
+            const temDados = data.dados && data.dados.length > 0;
+            
+            if (!temDados) {
+                // Sem dados salvos, não precisa validar
+                limparDestaquesCamposObrigatorios();
+                return { valido: true, camposFaltantes: [] };
+            }
+            
+            // Tem dados, validar campos obrigatórios
+            const camposFaltantes = [];
+            
+            const bancoExtrato = document.getElementById('bancoExtrato').value.trim();
+            const contaEspecifica = document.getElementById('contaEspecifica').value.trim();
+            const contaExecucao = document.getElementById('contaExecucao').value.trim();
+            
+            if (!bancoExtrato) {
+                camposFaltantes.push('banco_extrato');
+                destacarCampoObrigatorio('bancoExtrato', true);
+            } else {
+                destacarCampoObrigatorio('bancoExtrato', false);
+            }
+            
+            if (!contaEspecifica) {
+                camposFaltantes.push('conta_especifica');
+                destacarCampoObrigatorio('contaEspecifica', true);
+            } else {
+                destacarCampoObrigatorio('contaEspecifica', false);
+            }
+            
+            if (!contaExecucao) {
+                camposFaltantes.push('conta_execucao');
+                destacarCampoObrigatorio('contaExecucao', true);
+            } else {
+                destacarCampoObrigatorio('contaExecucao', false);
+            }
+            
+            return {
+                valido: camposFaltantes.length === 0,
+                camposFaltantes: camposFaltantes
+            };
+            
+        } catch (error) {
+            console.error('Erro ao validar campos obrigatórios:', error);
+            return { valido: true, camposFaltantes: [] };
+        }
+    }
+
+    function destacarCampoObrigatorio(campoId, destacar) {
+        const campo = document.getElementById(campoId);
+        if (!campo) return;
+        
+        if (destacar) {
+            campo.style.border = '2px solid #dc3545';
+            campo.style.backgroundColor = '#ffe6e6';
+        } else {
+            campo.style.border = '';
+            campo.style.backgroundColor = '';
+        }
+    }
+
+    function limparDestaquesCamposObrigatorios() {
+        ['bancoExtrato', 'contaEspecifica', 'contaExecucao'].forEach(campoId => {
+            destacarCampoObrigatorio(campoId, false);
+        });
     }
 
     async function carregarExtrato() {
@@ -1530,6 +1614,11 @@
                 await carregarNotasFiscais();
                 performanceMetrics.end(timerNF);
             }
+            
+            // Validar campos obrigatórios após carregar
+            const timerValidacao = performanceMetrics.start('carregarExtrato - Validar campos obrigatórios');
+            await validarCamposObrigatorios(numeroTermo);
+            performanceMetrics.end(timerValidacao);
             
             performanceMetrics.end(timerTotal);
             
@@ -4273,12 +4362,39 @@
         agendarAutosave();
     }
 
-    function excluirLinha(index) {
-        if (!confirm('Deseja realmente excluir esta linha?')) return;
+    async function excluirLinha(index) {
+        // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
+        // para garantir que a deleção seja persistida corretamente
+        if (limiteAtual !== 'todas') {
+            // Salvar índice da linha a ser excluída antes de recarregar
+            const linhaParaExcluir = linhas[index];
+            const idParaExcluir = linhaParaExcluir.id; // Usar ID se existir
+            
+            // Carregar todas as linhas
+            limiteAtual = 'todas';
+            await carregarExtrato();
+            
+            // Encontrar a linha novamente após recarregar (por ID ou índice)
+            let novoIndex = -1;
+            if (idParaExcluir) {
+                novoIndex = linhas.findIndex(l => l.id === idParaExcluir);
+            } else {
+                // Se não tem ID, procurar por índice (menos confiável)
+                novoIndex = linhas.findIndex(l => l.indice === linhaParaExcluir.indice);
+            }
+            
+            if (novoIndex === -1) {
+                console.error('Erro: Não foi possível encontrar a linha após recarregar');
+                return;
+            }
+            
+            index = novoIndex;
+        }
         
         linhas.splice(index, 1);
         recalcularIndices();
         renderizarTabela();
+        document.getElementById('btnSalvar').style.display = 'block';
         agendarAutosave();
     }
 
@@ -4683,6 +4799,13 @@
         if (!numeroTermo) {
             alert('Selecione um número de termo');
             return;
+        }
+
+        // Validar campos obrigatórios se já houver dados salvos
+        const camposObrigatorios = await validarCamposObrigatorios(numeroTermo);
+        if (!camposObrigatorios.valido) {
+            // Não bloquear salvamento, apenas alertar visualmente
+            console.warn('⚠️ Campos obrigatórios não preenchidos:', camposObrigatorios.camposFaltantes);
         }
 
         // Filtrar linhas com pelo menos um campo preenchido

@@ -67,6 +67,26 @@
             border-radius: 5px;
             margin-bottom: 20px;
         }
+        
+        /* Animação para cards de inconsistência */
+        .card {
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+        
+        /* Tabela de transações */
+        .table-responsive {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: #f8f9fa;
+        }
     </style>
 </head>
 <body>
@@ -238,6 +258,40 @@
                     </p>
                 </div>
             </div>
+
+            <!-- ========================================================== -->
+            <!-- SEÇÃO: INCONSISTÊNCIAS IDENTIFICADAS -->
+            <!-- ========================================================== -->
+            <div id="secaoInconsistencias" style="display: none;" class="mt-5">
+                <hr class="my-5">
+                
+                <div class="header-title">
+                    <h3>
+                        <i class="bi bi-exclamation-diamond me-2"></i>
+                        Inconsistências Identificadas
+                    </h3>
+                </div>
+
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Instruções:</strong> Revise as inconsistências identificadas automaticamente e clique em "Ratificar" para confirmar 
+                    e registrar na lista de inconsistências do termo.
+                </div>
+
+                <!-- Container das inconsistências -->
+                <div id="containerInconsistencias">
+                    <!-- Preenchido dinamicamente via JavaScript -->
+                </div>
+
+                <!-- Mensagem quando não houver inconsistências -->
+                <div id="msgSemInconsistencias" style="display: none;">
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <strong>Nenhuma inconsistência identificada!</strong> 
+                        Todas as verificações foram aprovadas para este termo.
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -397,6 +451,19 @@
                 e.preventDefault();
                 await gerarRelatorioPersonalizado();
             });
+
+            // Mudança no select de relatório deve carregar inconsistências
+            document.getElementById('selectRelatorio').addEventListener('change', async function() {
+                const selectedOption = this.options[this.selectedIndex];
+                if (this.value && selectedOption.dataset.numeroTermo) {
+                    console.log('[DEBUG TERMO] Número do termo selecionado:', selectedOption.dataset.numeroTermo);
+                    console.log('[DEBUG TERMO] Tipo:', typeof selectedOption.dataset.numeroTermo);
+                    console.log('[DEBUG TERMO] Valor após encodeURIComponent:', encodeURIComponent(selectedOption.dataset.numeroTermo));
+                    await carregarInconsistencias(selectedOption.dataset.numeroTermo);
+                } else {
+                    document.getElementById('secaoInconsistencias').style.display = 'none';
+                }
+            });
         }
 
         // ============================================================
@@ -520,6 +587,553 @@
             }
             
             window.getSelection().removeAllRanges();
+        }
+
+        // ============================================================
+        // Carregar inconsistências identificadas
+        // ============================================================
+        async function carregarInconsistencias(numeroTermo) {
+            console.log('[DEBUG] ==========================================');
+            console.log('[DEBUG] Carregando inconsistências para termo:', numeroTermo);
+            console.log('[DEBUG] Tipo do termo:', typeof numeroTermo);
+            console.log('[DEBUG] Termo é undefined?', numeroTermo === undefined);
+            console.log('[DEBUG] Termo é null?', numeroTermo === null);
+            console.log('[DEBUG] Termo vazio?', numeroTermo === '');
+            
+            try {
+                const termoEncoded = encodeURIComponent(numeroTermo);
+                console.log('[DEBUG] Termo após encodeURIComponent:', termoEncoded);
+                
+                const url = `/analises_pc/api/identificar-inconsistencias/${termoEncoded}`;
+                console.log('[DEBUG] URL COMPLETA da requisição:', url);
+                console.log('[DEBUG] URL com protocolo:', window.location.origin + url);
+                
+                const response = await fetch(url);
+                console.log('[DEBUG] Status da resposta:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('[DEBUG] Erro na resposta:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('[DEBUG] Inconsistências recebidas:', data);
+
+                if (response.ok && data.inconsistencias) {
+                    const container = document.getElementById('containerInconsistencias');
+                    const secao = document.getElementById('secaoInconsistencias');
+                    const msgSem = document.getElementById('msgSemInconsistencias');
+
+                    if (data.inconsistencias.length === 0) {
+                        // Sem inconsistências
+                        container.innerHTML = '';
+                        msgSem.style.display = 'block';
+                        secao.style.display = 'block';
+                    } else {
+                        // Renderizar inconsistências
+                        msgSem.style.display = 'none';
+                        container.innerHTML = '';
+                        
+                        data.inconsistencias.forEach((inc, index) => {
+                            const cardHtml = criarCardInconsistencia(inc, index, numeroTermo, index + 1);
+                            container.insertAdjacentHTML('beforeend', cardHtml);
+                        });
+                        
+                        // Adicionar botão de ratificação no final
+                        const totalTransacoes = data.inconsistencias.reduce((sum, inc) => sum + (inc.transacoes?.length || 0), 0);
+                        const pendentes = data.inconsistencias.filter(inc => !inc.ratificada).length;
+                        const ratificadas = data.inconsistencias.filter(inc => inc.ratificada).length;
+                        
+                        const btnRatificarTodas = `
+                            <div class="alert alert-info d-flex justify-content-between align-items-center mt-4">
+                                <div>
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>${data.inconsistencias.length} inconsistência(s) identificada(s)</strong>
+                                    ${totalTransacoes > 0 ? ` - ${totalTransacoes} registro(s) no total` : ''}
+                                    <br>
+                                    <small class="text-muted">
+                                        <span class="badge bg-warning text-dark me-1">${pendentes} Pendente(s)</span>
+                                        <span class="badge bg-success">${ratificadas} Ratificada(s)</span>
+                                    </small>
+                                </div>
+                                ${pendentes > 0 ? `
+                                <button class="btn btn-success btn-lg" onclick="ratificarTodasInconsistencias('${numeroTermo}')">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    Ratificar Pendentes (${pendentes})
+                                </button>
+                                ` : '<span class="text-success"><i class="bi bi-check-circle me-2"></i>Todas ratificadas!</span>'}
+                            </div>
+                        `;
+                        container.insertAdjacentHTML('beforeend', btnRatificarTodas);
+                        
+                        secao.style.display = 'block';
+                        
+                        // Scroll suave até a seção
+                        setTimeout(() => {
+                            secao.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 300);
+                    }
+                } else {
+                    console.error('Erro na resposta:', data);
+                    alert('❌ Erro ao carregar inconsistências: ' + (data.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro ao carregar inconsistências:', error);
+                
+                let mensagemErro = '❌ Erro ao carregar inconsistências.\n\n';
+                
+                if (error.message.includes('404')) {
+                    mensagemErro += '🔍 CAUSA: A rota /analises_pc/api/identificar-inconsistencias não foi encontrada.\n\n';
+                    mensagemErro += '✅ SOLUÇÃO:\n';
+                    mensagemErro += '1. Verifique se o servidor Flask foi REINICIADO após adicionar a rota\n';
+                    mensagemErro += '2. Verifique se a rota está registrada em routes/analises_pc/routes.py\n';
+                    mensagemErro += '3. Verifique se o blueprint analises_pc_bp está registrado corretamente\n\n';
+                    mensagemErro += '📝 Detalhes técnicos no console do navegador.';
+                } else if (error.message.includes('JSON')) {
+                    mensagemErro += '🔍 CAUSA: O servidor retornou HTML em vez de JSON (provavelmente erro 500).\n\n';
+                    mensagemErro += '✅ SOLUÇÃO:\n';
+                    mensagemErro += '1. Verifique os logs do servidor Flask para ver o erro\n';
+                    mensagemErro += '2. Verifique se há erro de sintaxe na rota\n';
+                    mensagemErro += '3. Verifique se todas as dependências estão corretas\n\n';
+                    mensagemErro += '📝 Detalhes técnicos no console do navegador.';
+                } else {
+                    mensagemErro += 'Detalhes: ' + error.message;
+                }
+                
+                alert(mensagemErro);
+            }
+        }
+
+        // ============================================================
+        // Criar card de inconsistência
+        // ============================================================
+        function criarCardInconsistencia(inc, index, numeroTermo, numero) {
+            // Verificar se é um card composto
+            if (inc.tipo_card === 'composto') {
+                return criarCardComposto(inc, index, numeroTermo, numero);
+            }
+            
+            // Construir HTML da tabela apenas se houver transações e mostrar_tabela não for false
+            let tabelaHtml = '';
+            if (inc.transacoes && inc.transacoes.length > 0 && inc.mostrar_tabela !== false) {
+                const transacoesHtml = inc.transacoes.map(t => `
+                    <tr>
+                        <td class="text-center">${t.indice || '-'}</td>
+                        <td class="text-center">${formatarData(t.data)}</td>
+                        <td class="text-end">${formatarMoeda(t.credito)}</td>
+                        <td class="text-end">${formatarMoeda(t.debito)}</td>
+                        <td class="text-end">${formatarMoeda(t.discriminacao)}</td>
+                        <td class="text-center"><span class="badge bg-secondary">${t.cat_transacao || '-'}</span></td>
+                        <td class="text-center">${formatarCompetencia(t.competencia)}</td>
+                        <td>${t.origem_destino || '-'}</td>
+                    </tr>
+                `).join('');
+                
+                tabelaHtml = `
+                    <!-- Tabela de transações -->
+                    <h6 class="mb-3">
+                        <i class="bi bi-table me-2"></i>
+                        Transações Identificadas (${inc.transacoes.length})
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover table-bordered">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="text-center">Índice</th>
+                                    <th class="text-center">Data</th>
+                                    <th class="text-center">Crédito (R$)</th>
+                                    <th class="text-center">Débito (R$)</th>
+                                    <th class="text-center">Discriminação (R$)</th>
+                                    <th class="text-center">Categoria</th>
+                                    <th class="text-center">Competência</th>
+                                    <th>Origem/Destino</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${transacoesHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            const classeStatus = inc.ratificada ? 'border-success' : 'border-warning';
+            const corHeader = inc.ratificada ? 'bg-success' : 'bg-warning';
+            const textoHeader = inc.ratificada ? 'text-white' : 'text-dark';
+            const iconeStatus = inc.ratificada ? 'bi-check-circle-fill' : 'bi-exclamation-triangle';
+            const badgeStatus = inc.ratificada ? '<span class="badge bg-light text-success ms-2"><i class="bi bi-check-circle me-1"></i>Ratificada</span>' : '<span class="badge bg-light text-warning ms-2"><i class="bi bi-clock me-1"></i>Pendente</span>';
+            
+            return `
+                <div class="card ${classeStatus} mb-4" id="card-inconsistencia-${index}" data-nome-item="${inc.nome_item}" data-ratificada="${inc.ratificada}">
+                    <div class="card-header ${corHeader} ${textoHeader}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi ${iconeStatus} me-2"></i>
+                                ${numero}. ${inc.nome_item}
+                                ${inc.transacoes && inc.transacoes.length > 0 ? `<span class="badge bg-dark ms-2">${inc.transacoes.length} registro(s)</span>` : ''}
+                                ${badgeStatus}
+                            </h5>
+                            ${!inc.ratificada ? `<button class="btn btn-sm btn-outline-danger" onclick="excluirCard(${index}, event)" title="Excluir desta visualização"><i class="bi bi-trash"></i></button>` : ''}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Descrição -->
+                        <div class="alert alert-light border-start border-warning border-4 mb-3">
+                            <strong>Descrição:</strong>
+                            <p class="mb-0 mt-2">${inc.modelo_texto}</p>
+                        </div>
+
+                        ${tabelaHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================================================
+        // Criar card composto (múltiplas inconsistências nas mesmas transações)
+        // ============================================================
+        function criarCardComposto(inc, index, numeroTermo, numero) {
+            // Construir títulos e descrições dos itens compostos
+            const titulosHtml = inc.itens_compostos.map((item, idx) => 
+                `<h5 class="mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    ${numero}.${idx + 1} ${item.nome_item}
+                </h5>`
+            ).join('<div class="my-2"></div>');
+            
+            const descricoesHtml = inc.itens_compostos.map((item, idx) => 
+                `<div class="mb-3">
+                    <strong>${numero}.${idx + 1} Descrição:</strong>
+                    <p class="mb-0 mt-1">${item.modelo_texto}</p>
+                </div>`
+            ).join('');
+            
+            // Construir tabela de transações (compartilhada)
+            const transacoesHtml = inc.transacoes.map(t => `
+                <tr>
+                    <td class="text-center">${t.indice || '-'}</td>
+                    <td class="text-center">${formatarData(t.data)}</td>
+                    <td class="text-end">${formatarMoeda(t.credito)}</td>
+                    <td class="text-end">${formatarMoeda(t.debito)}</td>
+                    <td class="text-end">${formatarMoeda(t.discriminacao)}</td>
+                    <td class="text-center"><span class="badge bg-secondary">${t.cat_transacao || '-'}</span></td>
+                    <td class="text-center">${formatarCompetencia(t.competencia)}</td>
+                    <td>${t.origem_destino || '-'}</td>
+                </tr>
+            `).join('');
+            
+            const tabelaHtml = `
+                <h6 class="mb-3">
+                    <i class="bi bi-table me-2"></i>
+                    Transações Identificadas (${inc.transacoes.length})
+                </h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="text-center">Índice</th>
+                                <th class="text-center">Data</th>
+                                <th class="text-center">Crédito (R$)</th>
+                                <th class="text-center">Débito (R$)</th>
+                                <th class="text-center">Discriminação (R$)</th>
+                                <th class="text-center">Categoria</th>
+                                <th class="text-center">Competência</th>
+                                <th>Origem/Destino</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${transacoesHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            const classeStatus = inc.ratificada ? 'border-success' : 'border-warning';
+            const corHeader = inc.ratificada ? 'bg-success' : 'bg-warning';
+            const textoHeader = inc.ratificada ? 'text-white' : 'text-dark';
+            const iconeStatus = inc.ratificada ? 'bi-check-circle-fill' : 'bi-exclamation-triangle';
+            const badgeStatus = inc.ratificada ? '<span class="badge bg-light text-success ms-2"><i class="bi bi-check-circle me-1"></i>Ratificada</span>' : '<span class="badge bg-light text-warning ms-2"><i class="bi bi-clock me-1"></i>Pendente</span>';
+            
+            // Contar total de inconsistências compostas
+            const totalItens = inc.itens_compostos.length;
+            
+            // Serializar nomes dos itens para o data attribute
+            const nomesItensJson = JSON.stringify(inc.itens_compostos.map(item => item.nome_item));
+            
+            return `
+                <div class="card ${classeStatus} mb-4" id="card-inconsistencia-${index}" data-tipo-card="composto" data-nomes-itens='${nomesItensJson}' data-ratificada="${inc.ratificada}">
+                    <div class="card-header ${corHeader} ${textoHeader}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-dark me-2">CARD COMPOSTO</span>
+                                ${titulosHtml}
+                                <span class="badge bg-dark ms-2 mt-2">${inc.transacoes.length} registro(s)</span>
+                                ${badgeStatus}
+                            </div>
+                            ${!inc.ratificada ? `<button class="btn btn-sm btn-outline-danger" onclick="excluirCard(${index}, event)" title="Excluir desta visualização"><i class="bi bi-trash"></i></button>` : ''}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Descrições -->
+                        <div class="alert alert-light border-start border-warning border-4 mb-3">
+                            ${descricoesHtml}
+                        </div>
+
+                        ${tabelaHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================================================
+        // Excluir card (apenas visual, não afeta banco de dados)
+        // ============================================================
+        function excluirCard(index, event) {
+            event.stopPropagation();
+            
+            const card = document.getElementById(`card-inconsistencia-${index}`);
+            const nomeItem = card.dataset.nomeItem;
+            
+            if (!confirm(`Deseja remover "${nomeItem}" desta visualização?\n\nNota: Isso é apenas visual. A inconsistência será identificada novamente ao recarregar.`)) {
+                return;
+            }
+            
+            // Animação de remoção
+            card.style.transition = 'all 0.3s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(-100%)';
+            
+            setTimeout(() => {
+                card.remove();
+                
+                // Atualizar contador do botão de ratificação
+                const cardsRestantes = document.querySelectorAll('[id^="card-inconsistencia-"]').length;
+                if (cardsRestantes === 0) {
+                    document.getElementById('containerInconsistencias').innerHTML = '';
+                    document.getElementById('msgSemInconsistencias').style.display = 'block';
+                }
+            }, 300);
+        }
+
+        // ============================================================
+        // Ratificar todas as inconsistências
+        // ============================================================
+        async function ratificarTodasInconsistencias(numeroTermo) {
+            // Coletar todos os nomes de itens dos cards NÃO RATIFICADOS
+            const cards = document.querySelectorAll('[id^="card-inconsistencia-"][data-ratificada="false"]');
+            const nomesItens = [];
+            
+            cards.forEach(card => {
+                if (card.dataset.tipoCard === 'composto') {
+                    // Card composto - adicionar todos os itens compostos
+                    const nomesCompostos = JSON.parse(card.dataset.nomesItens);
+                    nomesItens.push(...nomesCompostos);
+                } else {
+                    // Card simples
+                    nomesItens.push(card.dataset.nomeItem);
+                }
+            });
+            
+            if (nomesItens.length === 0) {
+                alert('⚠️ Nenhuma inconsistência para ratificar.');
+                return;
+            }
+            
+            if (!confirm(`Confirma a ratificação de ${nomesItens.length} inconsistência(s)?\n\nIsso irá registrar todas as transações identificadas na lista de inconsistências do termo.\n\nInconsistências:\n${nomesItens.map((n, i) => `${i+1}. ${n}`).join('\n')}`)) {
+                return;
+            }
+
+            const btn = event.target.closest('button');
+            const textOriginal = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ratificando todas...';
+            btn.disabled = true;
+
+            try {
+                let totalRegistros = 0;
+                let erros = [];
+                
+                // Ratificar cada inconsistência
+                for (const nomeItem of nomesItens) {
+                    try {
+                        const response = await fetch('/analises_pc/api/ratificar-inconsistencia', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                nome_item: nomeItem,
+                                numero_termo: numeroTermo
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.sucesso) {
+                            totalRegistros += data.registros_inseridos || 0;
+                        } else {
+                            erros.push(`${nomeItem}: ${data.erro || 'Erro desconhecido'}`);
+                        }
+                    } catch (error) {
+                        erros.push(`${nomeItem}: ${error.message}`);
+                    }
+                }
+                
+                // Remover todos os cards com animação
+                cards.forEach((card, index) => {
+                    setTimeout(() => {
+                        card.style.transition = 'all 0.5s ease';
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateX(100%)';
+                        
+                        setTimeout(() => {
+                            card.remove();
+                            
+                            // Se foi o último card
+                            if (index === cards.length - 1) {
+                                const container = document.getElementById('containerInconsistencias');
+                                container.innerHTML = '';
+                                document.getElementById('msgSemInconsistencias').style.display = 'block';
+                            }
+                        }, 500);
+                    }, index * 100);
+                });
+
+                // Mostrar resultado
+                if (erros.length === 0) {
+                    alert(`✅ Todas as inconsistências foram ratificadas com sucesso!\n\n${totalRegistros} registro(s) adicionado(s) à lista de inconsistências.`);
+                } else {
+                    alert(`⚠️ Ratificação concluída com alguns erros:\n\n✅ Sucesso: ${nomesItens.length - erros.length}/${nomesItens.length}\n❌ Erros: ${erros.length}\n\nRegistros inseridos: ${totalRegistros}\n\nErros:\n${erros.join('\n')}`);
+                }
+            } catch (error) {
+                console.error('Erro ao ratificar inconsistências:', error);
+                alert('❌ Erro ao ratificar inconsistências. Verifique o console.');
+                btn.innerHTML = textOriginal;
+                btn.disabled = false;
+            }
+        }
+
+        // ============================================================
+        // Ratificar inconsistência individual (mantida para compatibilidade)
+        // ============================================================
+        async function ratificarInconsistencia(nomeItem, index, numeroTermo) {
+            if (!confirm(`Confirma a ratificação da inconsistência "${nomeItem}"?\n\nIsso irá registrar todas as transações identificadas na lista de inconsistências do termo.`)) {
+                return;
+            }
+
+            const btn = event.target.closest('button');
+            const textOriginal = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ratificando...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/analises_pc/api/ratificar-inconsistencia', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        nome_item: nomeItem,
+                        numero_termo: numeroTermo
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.sucesso) {
+                    // Remover card da tela
+                    const card = document.getElementById(`card-inconsistencia-${index}`);
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(100%)';
+                    
+                    setTimeout(() => {
+                        card.remove();
+                        
+                        // Verificar se ainda há inconsistências
+                        const container = document.getElementById('containerInconsistencias');
+                        if (container.children.length === 0) {
+                            document.getElementById('msgSemInconsistencias').style.display = 'block';
+                        }
+                    }, 500);
+
+                    alert(`✅ Inconsistência ratificada com sucesso!\n\n${data.registros_inseridos} registro(s) adicionado(s) à lista de inconsistências.`);
+                } else {
+                    alert('❌ Erro ao ratificar: ' + (data.erro || 'Erro desconhecido'));
+                    btn.innerHTML = textOriginal;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Erro ao ratificar:', error);
+                alert('❌ Erro ao ratificar inconsistência. Verifique o console.');
+                btn.innerHTML = textOriginal;
+                btn.disabled = false;
+            }
+        }
+
+        // ============================================================
+        // Funções auxiliares de formatação
+        // ============================================================
+        function formatarData(data) {
+            if (!data) return '-';
+            
+            // Se já vier como string DD/MM/YYYY, retornar direto
+            if (typeof data === 'string' && data.includes('/')) {
+                return data;
+            }
+            
+            // Tentar parsear diferentes formatos
+            let d;
+            if (typeof data === 'string' && data.includes('-')) {
+                // Formato YYYY-MM-DD ou ISO
+                d = new Date(data + 'T00:00:00');
+            } else {
+                d = new Date(data);
+            }
+            
+            // Verificar se a data é válida
+            if (isNaN(d.getTime())) {
+                console.warn('[WARN] Data inválida:', data);
+                return String(data); // Retornar valor original como fallback
+            }
+            
+            return d.toLocaleDateString('pt-BR');
+        }
+
+        function formatarCompetencia(competencia) {
+            if (!competencia) return '-';
+            
+            // Se já vier formatado (ex: "Janeiro/2024"), retornar direto
+            if (typeof competencia === 'string' && competencia.includes('/') && !competencia.includes('-')) {
+                return competencia;
+            }
+            
+            // Tentar parsear a data
+            let d;
+            if (typeof competencia === 'string' && competencia.includes('-')) {
+                // Formato YYYY-MM-DD ou ISO
+                d = new Date(competencia + 'T00:00:00');
+            } else {
+                d = new Date(competencia);
+            }
+            
+            // Verificar se a data é válida
+            if (isNaN(d.getTime())) {
+                console.warn('[WARN] Competência inválida:', competencia);
+                return String(competencia); // Retornar valor original como fallback
+            }
+            
+            const mes = d.toLocaleDateString('pt-BR', { month: 'long' });
+            const ano = d.getFullYear();
+            return `${mes.charAt(0).toUpperCase() + mes.slice(1)}/${ano}`;
+        }
+
+        function formatarMoeda(valor) {
+            if (!valor || isNaN(valor)) return 'R$ 0,00';
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(valor);
         }
     </script>
 </body>

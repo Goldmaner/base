@@ -834,12 +834,8 @@
         
         const considerarLiquido = document.getElementById('checkRendimentoLiquido').checked;
         
-        // Construir URL com parâmetros da prestação selecionada
+        // Construir URL simples (sem prestação)
         let url = `/conc_relatorio/api/dados-relatorio?numero_termo=${encodeURIComponent(termo)}&considerar_liquido=${considerarLiquido}&forcar_modo=${modoVisualizacao}`;
-        
-        if (prestacaoAtual) {
-            url += `&tipo_prestacao=${encodeURIComponent(prestacaoAtual.tipo_prestacao)}&numero_prestacao=${prestacaoAtual.numero_prestacao}`;
-        }
         
         try {
             // Forçar recalcular como DP ou PG

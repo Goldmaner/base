@@ -97,7 +97,7 @@
 
     <div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
       <a class="btn btn-light btn-sm" href="{{ url_for('orcamento.listar') }}">&larr; Voltar</a>
-      <button id="listarTudoBtn" class="btn btn-success btn-sm" title="Replica o valor do Mês 1 para todos os meses em TODAS as linhas">
+      <button id="listarTudoBtn" class="btn btn-success btn-sm" title="Replica o último valor preenchido para todos os meses seguintes em TODAS as linhas">
         📋 Listar Tudo
       </button>
       <button id="toggleMonthsBtn" class="btn btn-outline-secondary btn-sm">
@@ -170,7 +170,7 @@
             <td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>
             <td class="col-total-linha text-end total-linha">0,00</td>
             <td>
-              <button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar valor do Mês 1 para todos os meses">Listar</button>
+              <button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar último valor preenchido para todos os meses seguintes">Listar</button>
               <button type="button" class="btn btn-danger btn-sm remover">Remover</button>
             </td>
           </tr>
@@ -590,27 +590,42 @@
         <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I" list="categoriasDisponiveis"></td>`;
   for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
       cols += `<td class="col-total-linha text-end total-linha">0,00</td>`;
-      cols += `<td><button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar valor do Mês 1 para todos os meses">Listar</button><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
+      cols += `<td><button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar último valor preenchido para todos os meses seguintes">Listar</button><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
       tr.innerHTML = cols; tbody.appendChild(tr); recalcTotals(); numerarLinhas();
     });
 
     // remover linha
     document.getElementById('bodyOrc2').addEventListener('click', function(e){ if (e.target && e.target.classList.contains('remover')){ e.target.closest('tr').remove(); recalcTotals(); numerarLinhas(); }});
 
-    // listar valor do Mês 1 para todos os meses
+    // listar valor do último mês preenchido para todos os meses seguintes
     document.getElementById('bodyOrc2').addEventListener('click', function(e) {
       if (e.target && e.target.classList.contains('listar-valor')) {
         const linha = e.target.closest('tr');
         const inputsMeses = linha.querySelectorAll('.month-td input.valor');
         
         if (inputsMeses.length > 0) {
-          // Pegar o valor do primeiro mês (Mês 1)
-          const valorMes1 = inputsMeses[0].value.trim();
+          // Encontrar o último valor preenchido (não-vazio e diferente de 0)
+          let ultimoIndice = -1;
+          let ultimoValor = '';
           
-          // Replicar para todos os outros meses
-          inputsMeses.forEach(input => {
-            input.value = valorMes1;
+          inputsMeses.forEach((input, idx) => {
+            const val = input.value.trim();
+            // Normalizar: converter para número e verificar se não é zero
+            const normalized = val.replace(/\./g,'').replace(',', '.');
+            const num = parseFloat(normalized);
+            
+            if (val !== '' && !isNaN(num) && num !== 0) {
+              ultimoIndice = idx;
+              ultimoValor = val;
+            }
           });
+          
+          // Se encontrou algum valor preenchido, replicar para as colunas à direita
+          if (ultimoIndice >= 0 && ultimoValor !== '') {
+            for (let i = ultimoIndice + 1; i < inputsMeses.length; i++) {
+              inputsMeses[i].value = ultimoValor;
+            }
+          }
           
           // Recalcular totais
           recalcTotals();
@@ -618,7 +633,7 @@
       }
     });
 
-    // LISTAR TUDO - Replica Mês 1 para todos os meses em TODAS as linhas
+    // LISTAR TUDO - Replica último valor preenchido para todos os meses seguintes em TODAS as linhas
     document.getElementById('listarTudoBtn').addEventListener('click', function() {
       const todasLinhas = document.querySelectorAll('#bodyOrc2 tr');
       let linhasAfetadas = 0;
@@ -626,18 +641,34 @@
       todasLinhas.forEach(linha => {
         const inputsMeses = linha.querySelectorAll('.month-td input.valor');
         if (inputsMeses.length > 0) {
-          const valorMes1 = inputsMeses[0].value.trim();
-          if (valorMes1) { // Só replica se tiver valor no Mês 1
-            inputsMeses.forEach(input => {
-              input.value = valorMes1;
-            });
+          // Encontrar o último valor preenchido (não-vazio e diferente de 0)
+          let ultimoIndice = -1;
+          let ultimoValor = '';
+          
+          inputsMeses.forEach((input, idx) => {
+            const val = input.value.trim();
+            // Normalizar: converter para número e verificar se não é zero
+            const normalized = val.replace(/\./g,'').replace(',', '.');
+            const num = parseFloat(normalized);
+            
+            if (val !== '' && !isNaN(num) && num !== 0) {
+              ultimoIndice = idx;
+              ultimoValor = val;
+            }
+          });
+          
+          // Se encontrou algum valor preenchido, replicar para as colunas à direita
+          if (ultimoIndice >= 0 && ultimoValor !== '') {
+            for (let i = ultimoIndice + 1; i < inputsMeses.length; i++) {
+              inputsMeses[i].value = ultimoValor;
+            }
             linhasAfetadas++;
           }
         }
       });
       
       recalcTotals();
-      alert(`✅ ${linhasAfetadas} linha(s) foram replicadas com o valor do Mês 1!`);
+      alert(`✅ ${linhasAfetadas} linha(s) foram replicadas com o último valor preenchido!`);
     });
 
     // MOVER LINHA PARA CIMA
@@ -697,7 +728,7 @@
           <td><input type="text" class="form-control form-control-sm categoria" placeholder="Ex: Gerente de Serviço I" list="categoriasDisponiveis"></td>`;
         for (let i=0;i<monthCount;i++) cols += `<td class="month-td"><input type="text" class="form-control form-control-sm valor" placeholder="0,00"></td>`;
         cols += `<td class="col-total-linha text-end total-linha">0,00</td>`;
-        cols += `<td><button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar valor do Mês 1 para todos os meses">Listar</button><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
+        cols += `<td><button type="button" class="btn btn-primary btn-sm listar-valor me-1" title="Replicar último valor preenchido para todos os meses seguintes">Listar</button><button type="button" class="btn btn-danger btn-sm remover">Remover</button></td>`;
         
         novaLinha.innerHTML = cols;
         linhaAtual.parentNode.insertBefore(novaLinha, linhaAtual.nextSibling);

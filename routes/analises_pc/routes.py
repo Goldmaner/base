@@ -1251,6 +1251,30 @@ def listar_arquivos_disponiveis():
         return jsonify({'error': str(e)}), 500
 
 
+def verificar_ratificacao(cursor, numero_termo, nome_item):
+    """
+    Verifica se uma inconsistência já foi ratificada.
+    """
+    cursor.execute("""
+        SELECT COUNT(*) as count
+        FROM analises_pc.lista_inconsistencias
+        WHERE numero_termo = %s
+          AND nome_item = %s
+        LIMIT 1
+    """, (numero_termo, nome_item))
+    resultado = cursor.fetchone()
+    return resultado['count'] > 0 if resultado else False
+
+
+def agrupar_cards_compostos(inconsistencias):
+    """
+    DESABILITADO: Retorna lista de inconsistências sem agrupamento.
+    Cada inconsistência é mantida individualmente.
+    """
+    # Retornar lista sem modificações
+    return inconsistencias
+
+
 @analises_pc_bp.route('/conc_inconsistencias')
 def conc_inconsistencias():
     """Página de Relatório de Inconsistências da Conciliação Bancária"""
@@ -1283,3 +1307,1024 @@ def conc_inconsistencias():
         print(f"[ERRO] conc_inconsistencias: {str(e)}")
         return render_template('analises_pc/conc_inconsistencias.html', 
                              modelo={'titulo_texto': 'Erro', 'modelo_texto': f'<p>Erro ao carregar modelo: {str(e)}</p>'})
+
+
+@analises_pc_bp.route('/api/identificar-inconsistencias/<path:numero_termo>')
+def identificar_inconsistencias(numero_termo):
+    """
+    Identifica inconsistências automaticamente para um termo específico.
+    Retorna lista de inconsistências com transações identificadas.
+    
+    Nota: Usa <path:numero_termo> para aceitar barras (/) no número do termo.
+    """
+    print(f"[DEBUG] ===== INÍCIO identificar_inconsistencias =====")
+    print(f"[DEBUG] Termo recebido: '{numero_termo}'")
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        inconsistencias_identificadas = []
+        
+        # ========================================
+        # 1. APRESENTAÇÃO DE TODAS AS GUIAS
+        # ========================================
+        print("[DEBUG] Card 1: Iniciando verificação - Apresentação de todas as guias")
+        # Verifica se TODOS os registros PREENCHIDOS (desconsiderando vazios/null) têm avaliacao_guia = 'Não apresentada'
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total_preenchidos,
+                COALESCE(SUM(CASE WHEN avaliacao_guia = 'Não apresentada' THEN 1 ELSE 0 END), 0) as nao_apresentadas
+            FROM analises_pc.conc_analise ca
+            INNER JOIN analises_pc.conc_extrato ce ON ca.conc_extrato_id = ce.id
+            WHERE ce.numero_termo = %s
+              AND ca.avaliacao_guia IS NOT NULL
+              AND ca.avaliacao_guia != ''
+        """, (numero_termo,))
+        
+        resultado_guias = cur.fetchone()
+        
+        # Só identifica inconsistência se:
+        # 1. Há registros preenchidos (total_preenchidos > 0)
+        # 2. TODOS os preenchidos são "Não apresentada"
+        if resultado_guias and resultado_guias['total_preenchidos'] > 0:
+            if resultado_guias['total_preenchidos'] == resultado_guias['nao_apresentadas']:
+                # TODOS os registros preenchidos são "Não apresentada" - inconsistência identificada!
+                
+                # Buscar modelo de texto pelo ID
+                cur.execute("""
+                    SELECT id, nome_item, modelo_texto, solucao, ordem
+                    FROM categoricas.c_modelo_textos_inconsistencias
+                    WHERE id = 8
+                    LIMIT 1
+                """)
+                modelo = cur.fetchone()
+                
+                if modelo:
+                    # Buscar transações relacionadas
+                    cur.execute("""
+                        SELECT 
+                            ce.id,
+                            ce.indice,
+                            ce.data,
+                            ce.credito,
+                            ce.debito,
+                            ce.discriminacao,
+                            ce.cat_transacao,
+                            ce.competencia,
+                            ce.origem_destino
+                        FROM analises_pc.conc_extrato ce
+                        INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                        WHERE ce.numero_termo = %s
+                          AND ca.avaliacao_guia = 'Não apresentada'
+                        ORDER BY ce.data, ce.indice
+                    """, (numero_termo,))
+                    
+                    transacoes = cur.fetchall()
+                    
+                    inconsistencias_identificadas.append({
+                        'id': modelo['id'],
+                        'nome_item': modelo['nome_item'],
+                        'modelo_texto': modelo['modelo_texto'],
+                        'solucao': modelo['solucao'],
+                        'transacoes': transacoes,
+                        'ordem': modelo.get('ordem', 999)
+                    })
+        
+        # ========================================
+        # 2. TAXAS BANCÁRIAS
+        # ========================================
+        print("[DEBUG] Card 2: Iniciando verificação - Taxas Bancárias")
+        # Verifica se (Soma de Taxas Bancárias) - (Soma de Devoluções) > 0
+        cur.execute("""
+            SELECT 
+                ce.id,
+                ce.indice,
+                ce.data,
+                ce.credito,
+                ce.debito,
+                ce.discriminacao,
+                ce.cat_transacao,
+                ce.competencia,
+                ce.origem_destino
+            FROM analises_pc.conc_extrato ce
+            WHERE ce.numero_termo = %s
+              AND ce.cat_transacao IN ('Taxas Bancárias', 'Devolução de Taxas Bancárias')
+            ORDER BY ce.data, ce.indice
+        """, (numero_termo,))
+        
+        transacoes_taxas = cur.fetchall()
+        
+        if transacoes_taxas:
+            # Calcular saldo líquido: Taxas - Devoluções
+            total_taxas = sum(
+                float(t['discriminacao'] or 0) 
+                for t in transacoes_taxas 
+                if t['cat_transacao'] == 'Taxas Bancárias'
+            )
+            total_devolucoes = sum(
+                float(t['discriminacao'] or 0) 
+                for t in transacoes_taxas 
+                if t['cat_transacao'] == 'Devolução de Taxas Bancárias'
+            )
+            
+            saldo_taxas = total_taxas - total_devolucoes
+            
+            # Se saldo > 0, há inconsistência
+            if saldo_taxas > 0:
+                # Buscar modelo de texto pelo ID
+                cur.execute("""
+                    SELECT id, nome_item, modelo_texto, solucao, ordem
+                    FROM categoricas.c_modelo_textos_inconsistencias
+                    WHERE id = 1
+                    LIMIT 1
+                """)
+                modelo_taxas = cur.fetchone()
+                
+                if modelo_taxas:
+                    # Formatar valor para moeda brasileira
+                    valor_formatado = f"R$ {saldo_taxas:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    
+                    # Substituir valor_taxa_usuario no modelo
+                    texto_formatado = modelo_taxas['modelo_texto'].replace('valor_taxa_usuario', valor_formatado)
+                    
+                    inconsistencias_identificadas.append({
+                        'id': modelo_taxas['id'],
+                        'nome_item': modelo_taxas['nome_item'],
+                        'modelo_texto': texto_formatado,
+                        'solucao': modelo_taxas['solucao'],
+                        'transacoes': [],  # Taxas Bancárias não mostra tabela de transações
+                        'valor_calculado': saldo_taxas,
+                        'ordem': modelo_taxas.get('ordem', 999),
+                        'mostrar_tabela': False  # Flag para ocultar tabela no frontend
+                    })
+        
+        # ========================================
+        # 3. JUROS E MULTAS
+        # ========================================
+        print("[DEBUG] Card 3: Iniciando verificação - Juros e Multas")
+        # Verifica se (Soma de Juros e/ou Multas) - (Soma de Devoluções) > 0
+        cur.execute("""
+            SELECT 
+                ce.id,
+                ce.indice,
+                ce.data,
+                ce.credito,
+                ce.debito,
+                ce.discriminacao,
+                ce.cat_transacao,
+                ce.competencia,
+                ce.origem_destino
+            FROM analises_pc.conc_extrato ce
+            WHERE ce.numero_termo = %s
+              AND ce.cat_transacao IN ('Juros e/ou Multas', 'Devolução de Juros e/ou Multas')
+            ORDER BY ce.data, ce.indice
+        """, (numero_termo,))
+        
+        transacoes_juros = cur.fetchall()
+        
+        if transacoes_juros:
+            # Calcular saldo líquido: Juros - Devoluções
+            total_juros = sum(
+                float(t['discriminacao'] or 0) 
+                for t in transacoes_juros 
+                if t['cat_transacao'] == 'Juros e/ou Multas'
+            )
+            total_devolucoes_juros = sum(
+                float(t['discriminacao'] or 0) 
+                for t in transacoes_juros 
+                if t['cat_transacao'] == 'Devolução de Juros e/ou Multas'
+            )
+            
+            saldo_juros = total_juros - total_devolucoes_juros
+            
+            # Se saldo > 0, há inconsistência
+            if saldo_juros > 0:
+                # Buscar modelo de texto pelo ID
+                cur.execute("""
+                    SELECT id, nome_item, modelo_texto, solucao, ordem
+                    FROM categoricas.c_modelo_textos_inconsistencias
+                    WHERE id = 2
+                    LIMIT 1
+                """)
+                modelo_juros = cur.fetchone()
+                
+                if modelo_juros:
+                    # Formatar valor para moeda brasileira
+                    valor_formatado = f"R$ {saldo_juros:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    
+                    # Substituir valor_juros_usuario no modelo
+                    texto_formatado = modelo_juros['modelo_texto'].replace('valor_juros_usuario', valor_formatado)
+                    
+                    inconsistencias_identificadas.append({
+                        'id': modelo_juros['id'],
+                        'nome_item': modelo_juros['nome_item'],
+                        'modelo_texto': texto_formatado,
+                        'solucao': modelo_juros['solucao'],
+                        'transacoes': transacoes_juros,
+                        'valor_calculado': saldo_juros,
+                        'ordem': modelo_juros.get('ordem', 999)
+                    })
+        
+        # ========================================
+        # 4. NÃO USO DA CONTA ESPECÍFICA
+        # ========================================
+        print("[DEBUG] Card 4: Iniciando verificação - Não uso da conta específica")
+        # Verifica se a conta de execução difere da conta prevista no termo
+        # Buscar conta prevista em public.parcerias
+        cur.execute("""
+            SELECT conta
+            FROM public.parcerias
+            WHERE numero_termo = %s
+            LIMIT 1
+        """, (numero_termo,))
+        
+        parceria = cur.fetchone()
+        
+        if parceria and parceria['conta']:
+            conta_prevista = parceria['conta'].strip()
+            
+            # Buscar conta de execução em analises_pc.conc_banco
+            cur.execute("""
+                SELECT conta_execucao
+                FROM analises_pc.conc_banco
+                WHERE numero_termo = %s
+                LIMIT 1
+            """, (numero_termo,))
+            
+            conc_banco = cur.fetchone()
+            
+            if conc_banco and conc_banco['conta_execucao']:
+                conta_executada = conc_banco['conta_execucao'].strip()
+                
+                # Se as contas forem divergentes, há inconsistência
+                if conta_prevista != conta_executada:
+                    # Buscar modelo de texto pelo ID
+                    cur.execute("""
+                        SELECT id, nome_item, modelo_texto, solucao, ordem
+                        FROM categoricas.c_modelo_textos_inconsistencias
+                        WHERE id = 3
+                        LIMIT 1
+                    """)
+                    modelo_conta = cur.fetchone()
+                    
+                    if modelo_conta:
+                        # Substituir placeholders
+                        texto_formatado = modelo_conta['modelo_texto']
+                        texto_formatado = texto_formatado.replace('conta_prevista', conta_prevista)
+                        texto_formatado = texto_formatado.replace('conta_executada', conta_executada)
+                        
+                        # Não buscar transações - apenas descrição
+                        inconsistencias_identificadas.append({
+                            'id': modelo_conta['id'],
+                            'nome_item': modelo_conta['nome_item'],
+                            'modelo_texto': texto_formatado,
+                            'solucao': modelo_conta['solucao'],
+                            'transacoes': [],  # Vazio - não mostrar tabela
+                            'conta_prevista': conta_prevista,
+                            'conta_executada': conta_executada,
+                            'ordem': modelo_conta.get('ordem', 999)
+                        })
+        
+        # ========================================
+        # 5. RESTITUIÇÃO FINAL
+        # ========================================
+        print("[DEBUG] Card 5: Iniciando verificação - Restituição Final")
+        # Calcular valor residual (Saldos não Utilizados Remanescentes)
+        # Fórmula: Valor Total Projeto - Executado Aprovado - Despesas Glosa
+        
+        # Buscar dados necessários para o cálculo
+        cur.execute("""
+            SELECT total_pago, contrapartida
+            FROM public.parcerias
+            WHERE numero_termo = %s
+            LIMIT 1
+        """, (numero_termo,))
+        parceria_rest = cur.fetchone()
+        
+        if parceria_rest:
+            # Calcular rendimentos (bruto por padrão)
+            cur.execute("""
+                SELECT SUM(discriminacao) as total
+                FROM analises_pc.conc_extrato
+                WHERE numero_termo = %s
+                  AND cat_transacao = 'Rendimentos'
+            """, (numero_termo,))
+            rendimentos_rest = cur.fetchone()
+            total_rendimentos = float(rendimentos_rest['total'] or 0) if rendimentos_rest else 0
+            
+            # Valor executado e aprovado - MESMA LÓGICA DO CONC_RELATORIO
+            # Usar ABS() e verificar se categoria existe em parcerias_despesas
+            cur.execute("""
+                SELECT COALESCE(SUM(ABS(ce.discriminacao)), 0) as total
+                FROM analises_pc.conc_extrato ce
+                WHERE ce.numero_termo = %s 
+                    AND ce.cat_avaliacao = 'Avaliado'
+                    AND ce.discriminacao IS NOT NULL
+                    AND EXISTS (
+                        SELECT 1 
+                        FROM public.parcerias_despesas pd
+                        WHERE LOWER(pd.categoria_despesa) = LOWER(ce.cat_transacao)
+                            AND pd.numero_termo = ce.numero_termo
+                    )
+            """, (numero_termo,))
+            exec_aprovado = cur.fetchone()
+            valor_exec_aprovado = float(exec_aprovado['total'] or 0) if exec_aprovado else 0
+            
+            # Despesas passíveis de glosa - USAR ABS() para consistência
+            cur.execute("""
+                SELECT COALESCE(SUM(ABS(discriminacao)), 0) as total
+                FROM analises_pc.conc_extrato
+                WHERE numero_termo = %s 
+                    AND cat_avaliacao = 'Glosar'
+                    AND LOWER(cat_transacao) != 'taxas bancárias'
+                    AND discriminacao IS NOT NULL
+            """, (numero_termo,))
+            glosas_rest = cur.fetchone()
+            despesas_glosa = float(glosas_rest['total'] or 0) if glosas_rest else 0
+            
+            # Taxas Bancárias não Devolvidas
+            cur.execute("""
+                SELECT 
+                    COALESCE(SUM(CASE WHEN LOWER(cat_transacao) = 'taxas bancárias' THEN ABS(discriminacao) ELSE 0 END), 0) as total_taxas,
+                    COALESCE(SUM(CASE WHEN LOWER(cat_transacao) = 'devolução de taxas bancárias' THEN ABS(discriminacao) ELSE 0 END), 0) as total_devolucao
+                FROM analises_pc.conc_extrato
+                WHERE numero_termo = %s AND discriminacao IS NOT NULL
+            """, (numero_termo,))
+            taxas_data_rest = cur.fetchone()
+            taxas_bancarias_rest = float(taxas_data_rest['total_taxas'] or 0) if taxas_data_rest else 0
+            devolucao_taxas_rest = float(taxas_data_rest['total_devolucao'] or 0) if taxas_data_rest else 0
+            taxas_nao_devolvidas_rest = taxas_bancarias_rest - devolucao_taxas_rest
+            
+            # Calcular Valor Total do Projeto
+            contrapartida_rest = float(parceria_rest['contrapartida'] or 0)
+            valor_total_projeto_rest = float(parceria_rest['total_pago']) + total_rendimentos + contrapartida_rest
+            
+            # Saldos não Utilizados Remanescentes = Valor Total - Executado - Glosas - Taxas não Devolvidas
+            saldos_remanescentes = valor_total_projeto_rest - valor_exec_aprovado - despesas_glosa - taxas_nao_devolvidas_rest
+            
+            # Se houver saldo positivo, identificar inconsistência
+            if saldos_remanescentes > 0:
+                # Buscar modelo de texto pelo ID
+                cur.execute("""
+                    SELECT id, nome_item, modelo_texto, solucao, ordem
+                    FROM categoricas.c_modelo_textos_inconsistencias
+                    WHERE id = 4
+                    LIMIT 1
+                """)
+                modelo_rest = cur.fetchone()
+                
+                if modelo_rest:
+                    # Formatar valor para moeda brasileira
+                    valor_formatado = f"R$ {saldos_remanescentes:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    
+                    # Substituir placeholder
+                    texto_formatado = modelo_rest['modelo_texto'].replace('valor_residual_usuario', valor_formatado)
+                    
+                    inconsistencias_identificadas.append({
+                        'id': modelo_rest['id'],
+                        'nome_item': modelo_rest['nome_item'],
+                        'modelo_texto': texto_formatado,
+                        'solucao': modelo_rest['solucao'],
+                        'transacoes': [],  # Sem tabela de transações
+                        'valor_calculado': saldos_remanescentes,
+                        'ordem': modelo_rest.get('ordem', 999)
+                    })
+        
+        # ========================================
+        # 6. APRESENTAR TODOS OS CONTRATOS
+        # ========================================
+        print("[DEBUG] Card 6: Iniciando verificação - Apresentar todos os Contratos")
+        # Verifica se há transações com contratos não apresentados
+        # Condição: avaliacao_contratos = 'Não apresentado'
+        
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total_preenchidos,
+                COALESCE(SUM(CASE WHEN ca.avaliacao_contratos = 'Não apresentado' THEN 1 ELSE 0 END), 0) as nao_apresentados
+            FROM analises_pc.conc_analise ca
+            INNER JOIN analises_pc.conc_extrato ce ON ca.conc_extrato_id = ce.id
+            WHERE ce.numero_termo = %s
+              AND ca.avaliacao_contratos IS NOT NULL
+              AND ca.avaliacao_contratos != ''
+        """, (numero_termo,))
+        
+        resultado_contratos = cur.fetchone()
+        
+        # Só identifica inconsistência se há registros com "Não apresentado"
+        if resultado_contratos and resultado_contratos['nao_apresentados'] > 0:
+            # Buscar modelo de texto pelo ID
+            cur.execute("""
+                SELECT id, nome_item, modelo_texto, solucao, ordem
+                FROM categoricas.c_modelo_textos_inconsistencias
+                WHERE id = 5
+                LIMIT 1
+            """)
+            modelo_contratos = cur.fetchone()
+            
+            if modelo_contratos:
+                # Buscar transações relacionadas
+                cur.execute("""
+                    SELECT 
+                        ce.id,
+                        ce.indice,
+                        ce.data,
+                        ce.credito,
+                        ce.debito,
+                        ce.discriminacao,
+                        ce.cat_transacao,
+                        ce.competencia,
+                        ce.origem_destino
+                    FROM analises_pc.conc_extrato ce
+                    INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                    WHERE ce.numero_termo = %s
+                      AND ca.avaliacao_contratos = 'Não apresentado'
+                    ORDER BY ce.data, ce.indice
+                """, (numero_termo,))
+                
+                transacoes_contratos = cur.fetchall()
+                
+                inconsistencias_identificadas.append({
+                    'id': modelo_contratos['id'],
+                    'nome_item': modelo_contratos['nome_item'],
+                    'modelo_texto': modelo_contratos['modelo_texto'],
+                    'solucao': modelo_contratos['solucao'],
+                    'transacoes': transacoes_contratos,
+                    'ordem': modelo_contratos.get('ordem', 999)
+                })
+        
+        # ========================================
+        # 7. CRÉDITOS NÃO JUSTIFICADOS
+        # ========================================
+        print("[DEBUG] Card 7: Iniciando verificação - Créditos não justificados")
+        # Verifica transações com crédito > 0 e cat_avaliacao != 'Avaliado'
+        cur.execute("""
+            SELECT 
+                ce.id,
+                ce.indice,
+                ce.data,
+                ce.credito,
+                ce.debito,
+                ce.discriminacao,
+                ce.cat_transacao,
+                ce.competencia,
+                ce.origem_destino
+            FROM analises_pc.conc_extrato ce
+            WHERE ce.numero_termo = %s
+              AND ce.credito > 0
+              AND (ce.cat_avaliacao IS NULL OR ce.cat_avaliacao != 'Avaliado')
+            ORDER BY ce.data, ce.indice
+        """, (numero_termo,))
+        
+        transacoes_creditos = cur.fetchall()
+        
+        if transacoes_creditos:
+            # Buscar modelo de texto pelo ID
+            cur.execute("""
+                SELECT id, nome_item, modelo_texto, solucao, ordem
+                FROM categoricas.c_modelo_textos_inconsistencias
+                WHERE id = 6
+                LIMIT 1
+            """)
+            modelo_creditos = cur.fetchone()
+            
+            if modelo_creditos:
+                inconsistencias_identificadas.append({
+                    'id': modelo_creditos['id'],
+                    'nome_item': modelo_creditos['nome_item'],
+                    'modelo_texto': modelo_creditos['modelo_texto'],
+                    'solucao': modelo_creditos['solucao'],
+                    'transacoes': transacoes_creditos,
+                    'ordem': modelo_creditos.get('ordem', 999)
+                })
+        
+        # ========================================
+        # 8. DESPESAS NÃO PREVISTAS
+        # ========================================
+        print("[DEBUG] Card 8: Iniciando verificação - Despesas não previstas")
+        # Verifica transações categorizadas como "Débitos Indevidos"
+        cur.execute("""
+            SELECT 
+                ce.id,
+                ce.indice,
+                ce.data,
+                ce.credito,
+                ce.debito,
+                ce.discriminacao,
+                ce.cat_transacao,
+                ce.competencia,
+                ce.origem_destino
+            FROM analises_pc.conc_extrato ce
+            WHERE ce.numero_termo = %s
+              AND ce.cat_transacao = 'Débitos Indevidos'
+            ORDER BY ce.data, ce.indice
+        """, (numero_termo,))
+        
+        transacoes_debitos_indevidos = cur.fetchall()
+        
+        if transacoes_debitos_indevidos:
+            # Buscar modelo de texto pelo ID
+            cur.execute("""
+                SELECT id, nome_item, modelo_texto, solucao, ordem
+                FROM categoricas.c_modelo_textos_inconsistencias
+                WHERE id = 7
+                LIMIT 1
+            """)
+            modelo_debitos = cur.fetchone()
+            
+            if modelo_debitos:
+                inconsistencias_identificadas.append({
+                    'id': modelo_debitos['id'],
+                    'nome_item': modelo_debitos['nome_item'],
+                    'modelo_texto': modelo_debitos['modelo_texto'],
+                    'solucao': modelo_debitos['solucao'],
+                    'transacoes': transacoes_debitos_indevidos,
+                    'ordem': modelo_debitos.get('ordem', 999)
+                })
+        
+        # ========================================
+        # 9. DESPESA SEM GUIA (ALGUMAS, NÃO TODAS)
+        # ========================================
+        print("[DEBUG] Card 9: Iniciando verificação - Despesa sem guia")
+        # Verifica se ALGUMAS (mas não todas) guias não foram apresentadas
+        # Este card é excludente com Card 1 (que verifica se TODAS não foram apresentadas)
+        
+        # Verificar se há registros com "Não apresentada" mas não é o caso de TODOS
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total_preenchidos,
+                COALESCE(SUM(CASE WHEN avaliacao_guia = 'Não apresentada' THEN 1 ELSE 0 END), 0) as nao_apresentadas
+            FROM analises_pc.conc_analise ca
+            INNER JOIN analises_pc.conc_extrato ce ON ca.conc_extrato_id = ce.id
+            WHERE ce.numero_termo = %s
+              AND ca.avaliacao_guia IS NOT NULL
+              AND ca.avaliacao_guia != ''
+        """, (numero_termo,))
+        
+        resultado_guias_parcial = cur.fetchone()
+        
+        # Só identifica se:
+        # 1. Há registros com "Não apresentada" (nao_apresentadas > 0)
+        # 2. MAS não são TODOS (nao_apresentadas < total_preenchidos)
+        if resultado_guias_parcial and resultado_guias_parcial['nao_apresentadas'] > 0:
+            if resultado_guias_parcial['nao_apresentadas'] < resultado_guias_parcial['total_preenchidos']:
+                # ALGUMAS guias não foram apresentadas (mas não todas)
+                
+                # Buscar modelo de texto pelo ID
+                cur.execute("""
+                    SELECT id, nome_item, modelo_texto, solucao, ordem
+                    FROM categoricas.c_modelo_textos_inconsistencias
+                    WHERE id = 9
+                    LIMIT 1
+                """)
+                modelo_guias_parcial = cur.fetchone()
+                
+                if modelo_guias_parcial:
+                    # Buscar transações relacionadas (apenas as não apresentadas)
+                    cur.execute("""
+                        SELECT 
+                            ce.id,
+                            ce.indice,
+                            ce.data,
+                            ce.credito,
+                            ce.debito,
+                            ce.discriminacao,
+                            ce.cat_transacao,
+                            ce.competencia,
+                            ce.origem_destino
+                        FROM analises_pc.conc_extrato ce
+                        INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                        WHERE ce.numero_termo = %s
+                          AND ca.avaliacao_guia = 'Não apresentada'
+                        ORDER BY ce.data, ce.indice
+                    """, (numero_termo,))
+                    
+                    transacoes_guias_parcial = cur.fetchall()
+                    
+                    inconsistencias_identificadas.append({
+                        'id': modelo_guias_parcial['id'],
+                        'nome_item': modelo_guias_parcial['nome_item'],
+                        'modelo_texto': modelo_guias_parcial['modelo_texto'],
+                        'solucao': modelo_guias_parcial['solucao'],
+                        'transacoes': transacoes_guias_parcial,
+                        'ordem': modelo_guias_parcial.get('ordem', 999)
+                    })
+        
+        # ========================================
+        # 10. PAGO EM ESPÉCIE
+        # ========================================
+        print("[DEBUG] Card 10: Iniciando verificação - Pago em espécie")
+        # Verifica transações com comprovante "Pago em Espécie"
+        cur.execute("""
+            SELECT 
+                ce.id,
+                ce.indice,
+                ce.data,
+                ce.credito,
+                ce.debito,
+                ce.discriminacao,
+                ce.cat_transacao,
+                ce.competencia,
+                ce.origem_destino
+            FROM analises_pc.conc_extrato ce
+            INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+            WHERE ce.numero_termo = %s
+              AND ca.avaliacao_comprovante = 'Pago em Espécie'
+            ORDER BY ce.data, ce.indice
+        """, (numero_termo,))
+        
+        transacoes_especie = cur.fetchall()
+        
+        if transacoes_especie:
+            # Buscar modelo de texto pelo ID
+            cur.execute("""
+                SELECT id, nome_item, modelo_texto, solucao, ordem
+                FROM categoricas.c_modelo_textos_inconsistencias
+                WHERE id = 10
+                LIMIT 1
+            """)
+            modelo_especie = cur.fetchone()
+            
+            if modelo_especie:
+                inconsistencias_identificadas.append({
+                    'id': modelo_especie['id'],
+                    'nome_item': modelo_especie['nome_item'],
+                    'modelo_texto': modelo_especie['modelo_texto'],
+                    'solucao': modelo_especie['solucao'],
+                    'transacoes': transacoes_especie,
+                    'ordem': modelo_especie.get('ordem', 999)
+                })
+        
+        # ========================================
+        # 11. PAGO EM CARTÃO DE CRÉDITO
+        # ========================================
+        print("[DEBUG] Card 11: Iniciando verificação - Pago em cartão de crédito")
+        # Verifica transações com comprovante "Cartão de Crédito"
+        cur.execute("""
+            SELECT 
+                ce.id,
+                ce.indice,
+                ce.data,
+                ce.credito,
+                ce.debito,
+                ce.discriminacao,
+                ce.cat_transacao,
+                ce.competencia,
+                ce.origem_destino
+            FROM analises_pc.conc_extrato ce
+            INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+            WHERE ce.numero_termo = %s
+              AND ca.avaliacao_comprovante = 'Cartão de Crédito'
+            ORDER BY ce.data, ce.indice
+        """, (numero_termo,))
+        
+        transacoes_cartao = cur.fetchall()
+        
+        if transacoes_cartao:
+            # Buscar modelo de texto pelo ID
+            cur.execute("""
+                SELECT id, nome_item, modelo_texto, solucao, ordem
+                FROM categoricas.c_modelo_textos_inconsistencias
+                WHERE id = 11
+                LIMIT 1
+            """)
+            modelo_cartao = cur.fetchone()
+            
+            if modelo_cartao:
+                inconsistencias_identificadas.append({
+                    'id': modelo_cartao['id'],
+                    'nome_item': modelo_cartao['nome_item'],
+                    'modelo_texto': modelo_cartao['modelo_texto'],
+                    'solucao': modelo_cartao['solucao'],
+                    'transacoes': transacoes_cartao,
+                    'ordem': modelo_cartao.get('ordem', 999)
+                })
+        
+        # ========================================
+        # 12. PAGO EM CHEQUE
+        # ========================================
+        print("[DEBUG] Card 12: Iniciando verificação - Pago em cheque")
+        # Verifica transações com comprovante "Pago em Cheque"
+        cur.execute("""
+            SELECT 
+                ce.id,
+                ce.indice,
+                ce.data,
+                ce.credito,
+                ce.debito,
+                ce.discriminacao,
+                ce.cat_transacao,
+                ce.competencia,
+                ce.origem_destino
+            FROM analises_pc.conc_extrato ce
+            INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+            WHERE ce.numero_termo = %s
+              AND ca.avaliacao_comprovante = 'Pago em Cheque'
+            ORDER BY ce.data, ce.indice
+        """, (numero_termo,))
+        
+        transacoes_cheque = cur.fetchall()
+        
+        if transacoes_cheque:
+            # Buscar modelo de texto pelo ID
+            cur.execute("""
+                SELECT id, nome_item, modelo_texto, solucao, ordem
+                FROM categoricas.c_modelo_textos_inconsistencias
+                WHERE id = 12
+                LIMIT 1
+            """)
+            modelo_cheque = cur.fetchone()
+            
+            if modelo_cheque:
+                inconsistencias_identificadas.append({
+                    'id': modelo_cheque['id'],
+                    'nome_item': modelo_cheque['nome_item'],
+                    'modelo_texto': modelo_cheque['modelo_texto'],
+                    'solucao': modelo_cheque['solucao'],
+                    'transacoes': transacoes_cheque,
+                    'ordem': modelo_cheque.get('ordem', 999)
+                })
+        
+        # ========================================
+        # ADICIONAR MAIS INCONSISTÊNCIAS AQUI NO FUTURO
+        # ========================================
+        
+        # ========================================
+        # AGRUPAR INCONSISTÊNCIAS EM CARDS COMPOSTOS
+        # ========================================
+        print(f"[DEBUG] Total de inconsistências identificadas: {len(inconsistencias_identificadas)}")
+        # Identificar transações que aparecem em múltiplas inconsistências
+        inconsistencias_agrupadas = agrupar_cards_compostos(inconsistencias_identificadas)
+        print(f"[DEBUG] Total após agrupamento: {len(inconsistencias_agrupadas)}")
+        
+        # Verificar quais inconsistências já foram ratificadas
+        for inc in inconsistencias_agrupadas:
+            inc['ratificada'] = verificar_ratificacao(cur, numero_termo, inc['nome_item'])
+        
+        cur.close()
+        
+        # Ordenar inconsistências pela coluna 'ordem'
+        inconsistencias_agrupadas.sort(key=lambda x: x.get('ordem', 999))
+        
+        print(f"[DEBUG] ===== FIM identificar_inconsistencias - SUCESSO =====")
+        print(f"[DEBUG] Retornando {len(inconsistencias_agrupadas)} inconsistências")
+        
+        return jsonify({
+            'sucesso': True,
+            'numero_termo': numero_termo,
+            'inconsistencias': inconsistencias_agrupadas
+        })
+    
+    except Exception as e:
+        cur.close()
+        print(f"[ERRO] identificar_inconsistencias: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/ratificar-inconsistencia', methods=['POST'])
+def ratificar_inconsistencia():
+    """
+    Ratifica uma inconsistência e registra na tabela lista_inconsistencias.
+    Recebe: 
+    - nome_item (string ou array): nome único ou lista de nomes para cards compostos
+    - numero_termo (string)
+    - e_card_composto (boolean, opcional): indica se é card composto
+    """
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        dados = request.json
+        nome_item = dados.get('nome_item')
+        numero_termo = dados.get('numero_termo')
+        
+        if not nome_item or not numero_termo:
+            return jsonify({'erro': 'Parâmetros nome_item e numero_termo são obrigatórios'}), 400
+        
+        print(f"[DEBUG] Ratificando inconsistência: {nome_item}")
+        
+        # Buscar ID da inconsistência
+        cur.execute("""
+            SELECT id
+            FROM categoricas.c_modelo_textos_inconsistencias
+            WHERE nome_item = %s
+            LIMIT 1
+        """, (nome_item,))
+        modelo = cur.fetchone()
+        
+        if not modelo:
+            return jsonify({'erro': f'Inconsistência "{nome_item}" não encontrada'}), 404
+        
+        id_inconsistencia = modelo['id']
+        
+        # Buscar transações para ratificar baseado no ID
+        transacoes_para_ratificar = []
+        
+        if id_inconsistencia == 8:  # Apresentação de todas as guias
+            cur.execute("""
+                SELECT 
+                    ce.id as id_conc_extrato,
+                    ce.data,
+                    ce.credito,
+                    ce.debito,
+                    ce.discriminacao,
+                    ce.cat_transacao,
+                    ce.competencia,
+                    ce.origem_destino
+                FROM analises_pc.conc_extrato ce
+                INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                WHERE ce.numero_termo = %s
+                  AND ca.avaliacao_guia = 'Não apresentada'
+            """, (numero_termo,))
+            
+            transacoes_para_ratificar = cur.fetchall()
+        
+        elif id_inconsistencia == 5:  # Apresentar todos os Contratos
+            cur.execute("""
+                SELECT 
+                    ce.id as id_conc_extrato,
+                    ce.data,
+                    ce.credito,
+                    ce.debito,
+                    ce.discriminacao,
+                    ce.cat_transacao,
+                    ce.competencia,
+                    ce.origem_destino
+                FROM analises_pc.conc_extrato ce
+                INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                WHERE ce.numero_termo = %s
+                  AND ca.avaliacao_contratos = 'Não apresentado'
+            """, (numero_termo,))
+            
+            transacoes_para_ratificar = cur.fetchall()
+        
+        elif id_inconsistencia == 6:  # Créditos não justificados
+            cur.execute("""
+                SELECT 
+                    ce.id as id_conc_extrato,
+                    ce.data,
+                    ce.credito,
+                    ce.debito,
+                    ce.discriminacao,
+                    ce.cat_transacao,
+                    ce.competencia,
+                    ce.origem_destino
+                FROM analises_pc.conc_extrato ce
+                WHERE ce.numero_termo = %s
+                  AND ce.credito > 0
+                  AND (ce.cat_avaliacao IS NULL OR ce.cat_avaliacao != 'Avaliado')
+            """, (numero_termo,))
+            
+            transacoes_para_ratificar = cur.fetchall()
+        
+        elif id_inconsistencia == 7:  # Despesas não previstas
+            cur.execute("""
+                SELECT 
+                    ce.id as id_conc_extrato,
+                    ce.data,
+                    ce.credito,
+                    ce.debito,
+                    ce.discriminacao,
+                    ce.cat_transacao,
+                    ce.competencia,
+                    ce.origem_destino
+                FROM analises_pc.conc_extrato ce
+                WHERE ce.numero_termo = %s
+                  AND ce.cat_transacao = 'Débitos Indevidos'
+            """, (numero_termo,))
+            
+            transacoes_para_ratificar = cur.fetchall()
+        
+        elif id_inconsistencia == 9:  # Despesa sem guia (algumas, não todas)
+            cur.execute("""
+                SELECT 
+                    ce.id as id_conc_extrato,
+                    ce.data,
+                    ce.credito,
+                    ce.debito,
+                    ce.discriminacao,
+                    ce.cat_transacao,
+                    ce.competencia,
+                    ce.origem_destino
+                FROM analises_pc.conc_extrato ce
+                INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                WHERE ce.numero_termo = %s
+                  AND ca.avaliacao_guia = 'Não apresentada'
+            """, (numero_termo,))
+            
+            transacoes_para_ratificar = cur.fetchall()
+        
+        elif id_inconsistencia == 10:  # Pago em espécie
+            cur.execute("""
+                SELECT 
+                    ce.id as id_conc_extrato,
+                    ce.data,
+                    ce.credito,
+                    ce.debito,
+                    ce.discriminacao,
+                    ce.cat_transacao,
+                    ce.competencia,
+                    ce.origem_destino
+                FROM analises_pc.conc_extrato ce
+                INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                WHERE ce.numero_termo = %s
+                  AND ca.avaliacao_comprovante = 'Pago em Espécie'
+            """, (numero_termo,))
+            
+            transacoes_para_ratificar = cur.fetchall()
+        
+        elif id_inconsistencia == 11:  # Pago em cartão de crédito
+            cur.execute("""
+                SELECT 
+                    ce.id as id_conc_extrato,
+                    ce.data,
+                    ce.credito,
+                    ce.debito,
+                    ce.discriminacao,
+                    ce.cat_transacao,
+                    ce.competencia,
+                    ce.origem_destino
+                FROM analises_pc.conc_extrato ce
+                INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                WHERE ce.numero_termo = %s
+                  AND ca.avaliacao_comprovante = 'Cartão de Crédito'
+            """, (numero_termo,))
+            
+            transacoes_para_ratificar = cur.fetchall()
+        
+        elif id_inconsistencia == 12:  # Pago em cheque
+            cur.execute("""
+                SELECT 
+                    ce.id as id_conc_extrato,
+                    ce.data,
+                    ce.credito,
+                    ce.debito,
+                    ce.discriminacao,
+                    ce.cat_transacao,
+                    ce.competencia,
+                    ce.origem_destino
+                FROM analises_pc.conc_extrato ce
+                INNER JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+                WHERE ce.numero_termo = %s
+                  AND ca.avaliacao_comprovante = 'Pago em Cheque'
+            """, (numero_termo,))
+            
+            transacoes_para_ratificar = cur.fetchall()
+        
+        print(f"[DEBUG] Total de transações para ratificar: {len(transacoes_para_ratificar)}")
+        
+        # Inserir na tabela lista_inconsistencias
+        registros_inseridos = 0
+        
+        for transacao in transacoes_para_ratificar:
+            cur.execute("""
+                INSERT INTO analises_pc.lista_inconsistencias (
+                    nome_item,
+                    id_conc_extrato,
+                    data,
+                    credito,
+                    debito,
+                    discriminacao,
+                    cat_transacao,
+                    competencia,
+                    origem_destino,
+                    status,
+                    numero_termo,
+                    usuario_registro
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                nome_item,
+                transacao['id_conc_extrato'],
+                transacao['data'],
+                transacao['credito'],
+                transacao['debito'],
+                transacao['discriminacao'],
+                transacao['cat_transacao'],
+                transacao['competencia'],
+                transacao['origem_destino'],
+                'Não atendida',
+                numero_termo,
+                session.get('usuario', 'Sistema')
+            ))
+            registros_inseridos += 1
+        
+        conn.commit()
+        cur.close()
+        
+        print(f"[DEBUG] Ratificação concluída - {registros_inseridos} registro(s) com nome_item: {nome_item}")
+        
+        return jsonify({
+            'sucesso': True,
+            'registros_inseridos': registros_inseridos,
+            'mensagem': f'{registros_inseridos} registro(s) adicionado(s) à lista de inconsistências'
+        })
+    
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        print(f"[ERRO] ratificar_inconsistencia: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500

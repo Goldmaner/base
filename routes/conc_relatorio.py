@@ -300,20 +300,22 @@ def dados_relatorio():
             rendimento_usado = total_liquido if considerar_liquido else total_bruto
             valor_total_projeto = float(parceria['total_pago']) + rendimento_usado + total_contrapartida
             
-            # 8. Saldos não Utilizados Remanescentes = Valor Total - Executado - Glosas
+            # 8. Saldos não Utilizados Remanescentes = Valor Total - Executado - Glosas - Taxas não Devolvidas
             saldos_remanescentes = (
                 valor_total_projeto - 
                 valor_executado_aprovado - 
-                despesas_glosa
+                despesas_glosa - 
+                taxas_nao_devolvidas_dp
             )
             print(f"[DEBUG RELATORIO DP] Saldos Remanescentes: {saldos_remanescentes}")
             
-            # 9. Total de Descontos = Saldos Remanescentes + Descontos já Realizados + Descontos Contrapartida + Despesas Glosa
+            # 9. Total de Descontos = Saldos Remanescentes + Descontos já Realizados + Descontos Contrapartida + Despesas Glosa + Taxas não Devolvidas
             total_descontos = (
                 saldos_remanescentes + 
                 descontos_realizados + 
                 desconto_contrapartida + 
-                despesas_glosa
+                despesas_glosa + 
+                taxas_nao_devolvidas_dp
             )
             print(f"[DEBUG RELATORIO DP] Total de Descontos: {total_descontos}")
             

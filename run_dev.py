@@ -11,7 +11,7 @@ from app import app
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("🔧 SERVIDOR DE DESENVOLVIMENTO")
+    print("SERVIDOR DE DESENVOLVIMENTO")
     print("=" * 60)
     print("Porta: 8080")
     print("URL: http://127.0.0.1:8080")
