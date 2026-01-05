@@ -177,11 +177,13 @@
           <div class="col-md-3">
             <label for="inicio" class="form-label">Data de Início</label>
             <input type="date" class="form-control" id="inicio" name="inicio" 
+                   max="9999-12-31"
                    value="{{ parceria.get('inicio', '') if parceria else '' }}">
           </div>
           <div class="col-md-3">
             <label for="final" class="form-label">Data de Término</label>
             <input type="date" class="form-control" id="final" name="final" 
+                   max="9999-12-31"
                    value="{{ parceria.get('final', '') if parceria else '' }}">
           </div>
           {% if termo_rescindido %}
@@ -799,6 +801,27 @@
       // Validar datas antes de submeter
       const inicioInput = document.getElementById('inicio');
       const finalInput = document.getElementById('final');
+      
+      // Validar ano máximo (9999)
+      if (inicioInput.value) {
+        const anoInicio = parseInt(inicioInput.value.split('-')[0]);
+        if (anoInicio > 9999) {
+          e.preventDefault();
+          alert('❌ Erro: Data de início inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.');
+          inicioInput.focus();
+          return false;
+        }
+      }
+      
+      if (finalInput.value) {
+        const anoFinal = parseInt(finalInput.value.split('-')[0]);
+        if (anoFinal > 9999) {
+          e.preventDefault();
+          alert('❌ Erro: Data de término inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.');
+          finalInput.focus();
+          return false;
+        }
+      }
       
       if (inicioInput.value && finalInput.value) {
         const dataInicio = new Date(inicioInput.value + 'T00:00:00');

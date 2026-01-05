@@ -56,7 +56,7 @@ def processar_ocr():
         # Cabeçalho
         campos = [
             "Data", "Credito", "Debito", "Composição de valor", 
-            "Categoria da transação", "Competência", "Origem ou Destino"
+            "Categoria da transação", "Competência", "Origem ou Destino", "Saldo"
         ]
         writer.writerow(campos)
         writer.writerows(linhas_processadas)
@@ -127,7 +127,7 @@ def processar_pdf():
         # Cabeçalho
         campos = [
             "Data", "Credito", "Debito", "Composição de valor", 
-            "Categoria da transação", "Competência", "Origem ou Destino"
+            "Categoria da transação", "Competência", "Origem ou Destino", "Saldo"
         ]
         writer.writerow(campos)
         writer.writerows(linhas_processadas)
@@ -184,8 +184,9 @@ def processar_extrato(texto):
     linhas = [l.strip() for l in texto.split('\n')]
     
     # Expressão regular para detectar linha de movimentação
+    # Captura: data, valor da transação, tipo (C/D), opcionalmente saldo e tipo do saldo
     regex_mov = re.compile(
-        r'^(\d{2}/\d{2}/\d{4}).*?(\d{1,3}(?:\.\d{3})*,\d{2})\s([CD])(\s+\d{1,3}(?:\.\d{3})*,\d{2}\sC)?$'
+        r'^(\d{2}/\d{2}/\d{4}).*?(\d{1,3}(?:\.\d{3})*,\d{2})\s*([CD])(?:\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*([CD]))?$'
     )
     
     saida = []
@@ -196,18 +197,23 @@ def processar_extrato(texto):
         m = regex_mov.match(linha)
         
         if m:
-            data, valor, tipo, extra = m.groups()
+            data, valor_transacao, tipo_transacao, saldo_valor, saldo_tipo = m.groups()
             
             # Categoria
             categoria = categoriza(linha)
             
-            # Crédito/Débito
-            if tipo == 'C':
-                credito, debito = valor.replace('.', ''), ''
+            # Crédito/Débito da transação
+            if tipo_transacao == 'C':
+                credito, debito = valor_transacao.replace('.', ''), ''
             else:
-                credito, debito = '', valor.replace('.', '')
+                credito, debito = '', valor_transacao.replace('.', '')
             
-            comp_valor = valor.replace('.', '')
+            comp_valor = valor_transacao.replace('.', '')
+            
+            # Formatar saldo (se existir)
+            saldo_formatado = ""
+            if saldo_valor and saldo_tipo:
+                saldo_formatado = f"{saldo_valor.replace('.', '')} {saldo_tipo}"
             
             # Origem/destino: linha seguinte, exceto resgate/taxa ("Banco do Brasil")
             nome_origem_destino = ""
@@ -231,7 +237,7 @@ def processar_extrato(texto):
             
             # Primeira linha do arquivo pode ser saldo anterior, não movimentação
             if "Saldo Anterior" in linha:
-                saida.append([data, "", "", "", "", "", ""])
+                saida.append([data, "", "", "", "", "", "", saldo_formatado])
             else:
                 saida.append([
                     data,
@@ -240,7 +246,8 @@ def processar_extrato(texto):
                     comp_valor if comp_valor != "0,00" else "",
                     categoria,
                     "",
-                    nome_origem_destino
+                    nome_origem_destino,
+                    saldo_formatado
                 ])
         
         i += 1
@@ -296,7 +303,10 @@ def categoriza(linha):
     """Categoriza a transação baseada no conteúdo da linha"""
     s = linha.upper()
     
-    if "TED DEVOLVIDA" in s or "PIX - REJEITADO" in s or "PIX - DEVOLVIDO" in s:
+    # BB Renda Fixa LP é sempre Resgate (quando for crédito)
+    if "BB RENDA FIXA LP" in s:
+        return "Resgate"
+    elif "TED DEVOLVIDA" in s or "PIX - REJEITADO" in s or "PIX - DEVOLVIDO" in s:
         return "Pix / TED Devolvido"
     elif ("RESGATE" in s and "FUNDO" in s) or re.search(r'\bRESGATE\b', s):
         return "Resgate"

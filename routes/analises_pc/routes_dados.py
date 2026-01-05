@@ -9,6 +9,7 @@ from db import get_db
 import psycopg2
 import psycopg2.extras
 import traceback
+import re
 from io import BytesIO
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
@@ -759,8 +760,13 @@ def listar_relatorios_inconsistencias():
     Lista todos os Relatórios de Inconsistências disponíveis.
     Filtra por tipo_doc = 'Relatório de Inconsistências' em public.parcerias_notificacoes
     """
+    print("[DEBUG] ========================================")
+    print("[DEBUG] API: /api/listar-relatorios-inconsistencias")
+    print("[DEBUG] ========================================")
+    
     cur = None
     try:
+        print("[DEBUG] Obtendo cursor do banco...")
         cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Query com variações do nome do tipo de documento
@@ -778,11 +784,14 @@ def listar_relatorios_inconsistencias():
             ORDER BY pn.ano_doc DESC, pn.numero_doc DESC
         """
         
+        print("[DEBUG] Executando query...")
         # Usar ILIKE para ignorar case e acentos potenciais
         cur.execute(query, ('%Relatório%Inconsistências%',))
+        
+        print("[DEBUG] Fazendo fetchall()...")
         resultados = cur.fetchall()
         
-        print(f"[DEBUG] Encontrados {len(resultados)} relatórios de inconsistências")
+        print(f"[DEBUG] ✅ Encontrados {len(resultados)} relatórios de inconsistências")
         
         relatorios = []
         for row in resultados:
@@ -986,13 +995,357 @@ def gerar_texto_relatorio_inconsistencias():
         
         texto = texto.replace('numero_artigo_1_usuario', numero_artigo_1)
         
-        # Substituições concluídas - não há mais processamento de condicionais
-        # Os modelos já vêm com o texto correto baseado na portaria
+        # ============================================================
+        # BUSCAR E FORMATAR INCONSISTÊNCIAS EM HTML
+        # ============================================================
+        print(f"[DEBUG] Buscando inconsistências ratificadas para termo: {numero_termo}")
         
-        print(f"[DEBUG] Relatório de Inconsistências gerado para termo {numero_termo}")
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # 1. Buscar da tabela padrão (com transações)
+        cur.execute("""
+            SELECT 
+                li.nome_item,
+                ce.data,
+                ce.credito,
+                ce.debito,
+                ce.discriminacao,
+                ce.cat_transacao,
+                ce.competencia,
+                ce.origem_destino,
+                ce.indice
+            FROM analises_pc.lista_inconsistencias li
+            INNER JOIN analises_pc.conc_extrato ce ON li.id_conc_extrato = ce.id
+            WHERE li.numero_termo = %s
+            ORDER BY li.nome_item, ce.data, ce.indice
+        """, (numero_termo,))
+        transacoes_padrao = cur.fetchall()
+        
+        # 2. Buscar da tabela global (sem transações) e textos processados
+        cur.execute("""
+            SELECT DISTINCT nome_item, texto
+            FROM analises_pc.lista_inconsistencias_globais
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        dados_globais = cur.fetchall()
+        inconsistencias_globais = [row['nome_item'] for row in dados_globais]
+        
+        # Criar dicionário de textos processados
+        texto_processado_globais = {row['nome_item']: row['texto'] for row in dados_globais if row['texto']}
+        
+        # 3. Buscar da tabela agregada (dados especiais)
+        cur.execute("""
+            SELECT 
+                nome_item,
+                campo1,
+                campo2,
+                valor_previsto,
+                valor_executado,
+                diferenca
+            FROM analises_pc.lista_inconsistencias_agregadas
+            WHERE numero_termo = %s
+            ORDER BY nome_item, campo1, campo2
+        """, (numero_termo,))
+        transacoes_agregadas = cur.fetchall()
+        
+        # Organizar transações por nome_item
+        transacoes_por_item = {}
+        for t in transacoes_padrao:
+            nome = t['nome_item']
+            if nome not in transacoes_por_item:
+                transacoes_por_item[nome] = []
+            transacoes_por_item[nome].append(t)
+        
+        # Organizar agregadas por nome_item
+        agregadas_por_item = {}
+        for t in transacoes_agregadas:
+            nome = t['nome_item']
+            if nome not in agregadas_por_item:
+                agregadas_por_item[nome] = []
+            agregadas_por_item[nome].append(t)
+        
+        # Buscar modelos de texto para todas as inconsistências encontradas
+        todos_nomes = list(set(
+            list(transacoes_por_item.keys()) + 
+            inconsistencias_globais + 
+            list(agregadas_por_item.keys())
+        ))
+        
+        if todos_nomes:
+            cur.execute("""
+                SELECT id, nome_item, modelo_texto, ordem
+                FROM categoricas.c_modelo_textos_inconsistencias
+                WHERE nome_item = ANY(%s)
+                ORDER BY ordem
+            """, (todos_nomes,))
+            modelos_inconsistencias = cur.fetchall()
+        else:
+            modelos_inconsistencias = []
+        
+        cur.close()
+        
+        print(f"[DEBUG] Encontradas {len(modelos_inconsistencias)} inconsistências ratificadas")
+        
+        # ============================================================
+        # FORMATAR LISTA DE INCONSISTÊNCIAS EM HTML RICO
+        # ============================================================
+        lista_formatada_html = '<ol>'
+        
+        if modelos_inconsistencias:
+            for idx, modelo in enumerate(modelos_inconsistencias, start=1):
+                nome = modelo['nome_item']
+                
+                # Usar texto processado do banco se disponível, senão usar modelo padrão
+                if nome in texto_processado_globais:
+                    texto_inc = texto_processado_globais[nome]
+                else:
+                    texto_inc = modelo['modelo_texto']
+                
+                # Limpar HTML do texto (remover tags, manter apenas conteúdo)
+                texto_inc_limpo = re.sub(r'<[^>]+>', '', texto_inc)
+                
+                # Abrir item da lista
+                lista_formatada_html += f'<li class="Texto_Justificado" style="margin-bottom: 11px;">'
+                lista_formatada_html += f'<p class="Texto_Justificado"><b>{nome}:&nbsp;</b>{texto_inc_limpo}<br></p>'
+                
+                # ========== ADICIONAR TABELA SE HOUVER TRANSAÇÕES PADRÃO ==========
+                if nome in transacoes_por_item and transacoes_por_item[nome]:
+                    transacoes = transacoes_por_item[nome]
+                    
+                    lista_formatada_html += '<p class="Texto_Justificado">&nbsp;Transações Identificadas</p>'
+                    lista_formatada_html += '<div><table style="border-color: rgb(222, 226, 230); margin-bottom: 16px; margin-left: auto; margin-right: auto; vertical-align: top; width: 100%;" class="table table-bordered">'
+                    
+                    # Cabeçalho da tabela
+                    lista_formatada_html += '<thead style="border-color: rgb(55, 59, 62); background-color: #212529; color: rgb(255, 255, 255); vertical-align: bottom;"><tr>'
+                    lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Índice</th>'
+                    lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Data</th>'
+                    lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Crédito (R$)</th>'
+                    lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Débito (R$)</th>'
+                    lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Discriminação (R$)</th>'
+                    lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Categoria</th>'
+                    lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Competência</th>'
+                    lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255);">Origem/Destino</th>'
+                    lista_formatada_html += '</tr></thead>'
+                    
+                    # Corpo da tabela
+                    lista_formatada_html += '<tbody style="vertical-align: inherit;">'
+                    for t in transacoes:
+                        credito = f"R$ {float(t['credito'] or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if t['credito'] else 'R$ 0,00'
+                        debito = f"R$ {float(t['debito'] or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if t['debito'] else 'R$ 0,00'
+                        discriminacao = f"R$ {float(t['discriminacao'] or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if t['discriminacao'] else 'R$ 0,00'
+                        data_fmt = t['data'].strftime('%d/%m/%Y') if t['data'] else '-'
+                        indice = t['indice'] if t['indice'] else '-'
+                        categoria = t['cat_transacao'] if t['cat_transacao'] else '-'
+                        competencia = t['competencia'] if t['competencia'] else '-'
+                        origem_destino = t['origem_destino'] if t['origem_destino'] else '-'
+                        
+                        lista_formatada_html += '<tr>'
+                        lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{indice}</td>'
+                        lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{data_fmt}</td>'
+                        lista_formatada_html += f'<td style="padding: 0.25rem; text-align: right !important;">{credito}</td>'
+                        lista_formatada_html += f'<td style="padding: 0.25rem; text-align: right !important;">{debito}</td>'
+                        lista_formatada_html += f'<td style="padding: 0.25rem; text-align: right !important;">{discriminacao}</td>'
+                        lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{categoria}</td>'
+                        lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{competencia}</td>'
+                        lista_formatada_html += f'<td style="padding: 0.25rem;">{origem_destino}</td>'
+                        lista_formatada_html += '</tr>'
+                    
+                    lista_formatada_html += '</tbody></table></div>'
+                
+                # ========== ADICIONAR TABELA AGREGADA (Cards 17, 18, 21, 22) ==========
+                elif nome in agregadas_por_item and agregadas_por_item[nome]:
+                    dados = agregadas_por_item[nome]
+                    
+                    # Card 17: Divergências trimestrais (campo1=rubrica, campo2=trimestre)
+                    if dados[0].get('campo2') and str(dados[0]['campo2']).isdigit() and int(dados[0]['campo2']) <= 4:
+                        lista_formatada_html += '<p class="Texto_Justificado">&nbsp;Divergências Identificadas</p>'
+                        lista_formatada_html += '<div><table style="border-color: rgb(222, 226, 230); margin-bottom: 16px; margin-left: auto; margin-right: auto; vertical-align: top; width: 100%;" class="table table-bordered">'
+                        
+                        # Cabeçalho
+                        lista_formatada_html += '<thead style="border-color: rgb(55, 59, 62); background-color: #212529; color: rgb(255, 255, 255); vertical-align: bottom;"><tr>'
+                        lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Rubrica</th>'
+                        lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Trimestre</th>'
+                        lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Previsto</th>'
+                        lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Executado</th>'
+                        lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Diferença</th>'
+                        lista_formatada_html += '</tr></thead>'
+                        
+                        # Corpo
+                        lista_formatada_html += '<tbody style="vertical-align: inherit;">'
+                        for d in dados:
+                            previsto = f"R$ {float(d['valor_previsto'] or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            executado = f"R$ {float(d['valor_executado'] or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            diferenca = f"R$ {float(d['diferenca'] or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                            
+                            lista_formatada_html += '<tr>'
+                            lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{d["campo1"]}</td>'
+                            lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{d["campo2"]}º Trimestre</td>'
+                            lista_formatada_html += f'<td style="padding: 0.25rem; text-align: right !important;">{previsto}</td>'
+                            lista_formatada_html += f'<td style="padding: 0.25rem; text-align: right !important;">{executado}</td>'
+                            lista_formatada_html += f'<td style="padding: 0.25rem; text-align: right !important;">{diferenca}</td>'
+                            lista_formatada_html += '</tr>'
+                        
+                        lista_formatada_html += '</tbody></table></div>'
+                    
+                    # Distinguir entre Card 18 (Despesas sem previsão) e Cards 21/22 (Aplicações)
+                    elif dados[0].get('valor_executado') or dados[0].get('campo1'):
+                        # Verificar se é Card 18 (tem campo2 como mês numérico E valor_executado)
+                        # Cards 21/22 têm campo1 como data (formato YYYY-MM-DD ou DD/MM/YYYY)
+                        primeiro_campo1 = str(dados[0].get('campo1', ''))
+                        eh_card_18 = dados[0].get('valor_executado') and dados[0].get('campo2') and not ('-' in primeiro_campo1 or '/' in primeiro_campo1)
+                        
+                        if eh_card_18:
+                            # Card 18: Despesas sem previsão
+                            lista_formatada_html += '<p class="Texto_Justificado">&nbsp;Despesas sem previsão identificadas</p>'
+                            lista_formatada_html += '<div><table style="border-color: rgb(222, 226, 230); margin-bottom: 16px; margin-left: auto; margin-right: auto; vertical-align: top; width: 100%;" class="table table-bordered">'
+                            
+                            # Cabeçalho
+                            lista_formatada_html += '<thead style="border-color: rgb(55, 59, 62); background-color: #212529; color: rgb(255, 255, 255); vertical-align: bottom;"><tr>'
+                            lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Categoria</th>'
+                            lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Mês</th>'
+                            lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Valor Executado</th>'
+                            lista_formatada_html += '</tr></thead>'
+                            
+                            # Corpo
+                            lista_formatada_html += '<tbody style="vertical-align: inherit;">'
+                            for d in dados:
+                                executado = f"R$ {float(d['valor_executado'] or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                
+                                lista_formatada_html += '<tr>'
+                                lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{d["campo1"]}</td>'
+                                lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{d["campo2"]}º mês</td>'
+                                lista_formatada_html += f'<td style="padding: 0.25rem; text-align: right !important;">{executado}</td>'
+                                lista_formatada_html += '</tr>'
+                            
+                            lista_formatada_html += '</tbody></table></div>'
+                        else:
+                            # Cards 21/22: Aplicação 48h / Aplicação Divergente (apenas Data e Valor)
+                            lista_formatada_html += '<p class="Texto_Justificado">&nbsp;Aplicações Identificadas</p>'
+                            lista_formatada_html += '<div><table style="border-color: rgb(222, 226, 230); margin-bottom: 16px; margin-left: auto; margin-right: auto; vertical-align: top; width: 100%;" class="table table-bordered">'
+                            
+                            # Cabeçalho
+                            lista_formatada_html += '<thead style="border-color: rgb(55, 59, 62); background-color: #212529; color: rgb(255, 255, 255); vertical-align: bottom;"><tr>'
+                            lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Data</th>'
+                            lista_formatada_html += '<th style="padding: 0.25rem; background-color: rgb(33, 37, 41); color: rgb(255, 255, 255); text-align: center !important;">Valor (R$)</th>'
+                            lista_formatada_html += '</tr></thead>'
+                            
+                            # Corpo
+                            lista_formatada_html += '<tbody style="vertical-align: inherit;">'
+                            for d in dados:
+                                # campo1 contém a data
+                                data_str = d['campo1'] if d['campo1'] else '-'
+                                
+                                # Converter data para formato brasileiro (dd/mm/yyyy)
+                                if data_str != '-':
+                                    try:
+                                        # Se está no formato YYYY-MM-DD
+                                        if '-' in data_str and len(data_str) == 10:
+                                            partes = data_str.split('-')
+                                            data_aplicacao = f"{partes[2]}/{partes[1]}/{partes[0]}"
+                                        else:
+                                            data_aplicacao = data_str
+                                    except:
+                                        data_aplicacao = data_str
+                                else:
+                                    data_aplicacao = '-'
+                                
+                                # Valor pode estar em valor_executado ou campo2
+                                if d.get('valor_executado'):
+                                    valor_aplicacao = d['valor_executado']
+                                elif d.get('valor_previsto'):
+                                    valor_aplicacao = d['valor_previsto']
+                                else:
+                                    valor_aplicacao = d.get('campo2', '0')
+                                
+                                # Formatar valor
+                                try:
+                                    valor_fmt = f"R$ {float(valor_aplicacao):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                except:
+                                    valor_fmt = f"R$ {valor_aplicacao}"
+                                
+                                lista_formatada_html += '<tr>'
+                                lista_formatada_html += f'<td style="padding: 0.25rem; text-align: center !important;">{data_aplicacao}</td>'
+                                lista_formatada_html += f'<td style="padding: 0.25rem; text-align: right !important;">{valor_fmt}</td>'
+                                lista_formatada_html += '</tr>'
+                            
+                            lista_formatada_html += '</tbody></table></div>'
+                
+                # Fechar item da lista
+                lista_formatada_html += '</li>'
+        
+        else:
+            lista_formatada_html += '<li><i>Nenhuma inconsistência foi ratificada para este termo.</i></li>'
+        
+        lista_formatada_html += '</ol>'
+        
+        # Substituir placeholder no texto
+        texto = texto.replace('lista_inconsistencias', lista_formatada_html)
+        print(f"[DEBUG] Lista de inconsistências formatada em HTML e inserida no texto")
         
         return jsonify({'texto_gerado': texto})
     
     except Exception as e:
         print(f"[ERRO] gerar_texto_relatorio_inconsistencias: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# API: Gerar PDF do Relatório de Inconsistências - REMOVIDA
+# PDF agora é gerado apenas através do editor de texto rico
+# ============================================================
+
+
+# ============================================================
+# API: Resetar Inconsistências de um Termo
+# ============================================================
+@analises_pc_bp.route('/api/resetar-inconsistencias/<path:numero_termo>', methods=['DELETE'])
+def resetar_inconsistencias(numero_termo):
+    """
+    Remove todas as inconsistências ratificadas de um termo específico.
+    DELETE nas 3 tabelas: lista_inconsistencias, lista_inconsistencias_agregadas, lista_inconsistencias_globais
+    """
+    try:
+        print(f"[DEBUG] Resetando inconsistências do termo: {numero_termo}")
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        # Deletar das 3 tabelas
+        cur.execute("""
+            DELETE FROM analises_pc.lista_inconsistencias
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        deletados_lista = cur.rowcount
+        
+        cur.execute("""
+            DELETE FROM analises_pc.lista_inconsistencias_agregadas
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        deletados_agregadas = cur.rowcount
+        
+        cur.execute("""
+            DELETE FROM analises_pc.lista_inconsistencias_globais
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        deletados_globais = cur.rowcount
+        
+        conn.commit()
+        cur.close()
+        
+        total_deletados = deletados_lista + deletados_agregadas + deletados_globais
+        
+        print(f"[DEBUG] Inconsistências resetadas: {deletados_lista} padrão, {deletados_agregadas} agregadas, {deletados_globais} globais")
+        
+        return jsonify({
+            'sucesso': True,
+            'total_deletados': total_deletados,
+            'detalhes': {
+                'lista_inconsistencias': deletados_lista,
+                'lista_inconsistencias_agregadas': deletados_agregadas,
+                'lista_inconsistencias_globais': deletados_globais
+            }
+        })
+    
+    except Exception as e:
+        print(f"[ERRO] resetar_inconsistencias: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'erro': str(e)}), 500

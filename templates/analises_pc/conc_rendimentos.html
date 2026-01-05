@@ -103,6 +103,19 @@
 </head>
 <body>
 
+<!-- Toast Container -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    <div id="toastSucesso" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span id="toastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="bi bi-piggy-bank me-2"></i>Rendimentos de Ativos Financeiros</h2>
@@ -235,7 +248,46 @@
         'observacoes': 'Campo livre para anotações e observações do analista sobre os rendimentos do mês. Útil para registrar informações adicionais, justificativas ou pendências.'
     };
     
+    // ============================================================
+    // ATALHO DE TECLADO: CTRL+B PARA SALVAR
+    // ============================================================
+    document.addEventListener('keydown', function(event) {
+        // Ctrl+B ou Cmd+B (Mac)
+        if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
+            event.preventDefault(); // Evitar comportamento padrão do navegador
+            event.stopPropagation(); // Evitar propagação
+            
+            const numeroTermo = document.getElementById('numeroTermo').value;
+            if (!numeroTermo) {
+                mostrarToast('⚠️ Termo não carregado');
+                return;
+            }
+            
+            // Verificar se há dados para salvar
+            const btnSalvar = document.getElementById('btnSalvar');
+            const hasDadosParaSalvar = btnSalvar && btnSalvar.style.display !== 'none';
+            
+            if (!hasDadosParaSalvar) {
+                mostrarToast('ℹ️ Não há alterações para salvar');
+                return;
+            }
+            
+            // Feedback visual imediato
+            mostrarToast('💾 Salvando rendimentos... (Ctrl+B)');
+            
+            // Executar salvamento
+            salvarRendimentos();
+            
+            console.log('[HOTKEY] Salvamento de rendimentos disparado via Ctrl+B');
+        }
+    });
+    
     document.addEventListener('DOMContentLoaded', function() {
+        // Mostrar instruções de atalhos no console
+        console.log('%c⌨️  ATALHOS DE TECLADO:', 'color: #9b59b6; font-size: 13px; font-weight: bold;');
+        console.log('%c  Ctrl+B         %c- Salvar rendimentos rapidamente', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
+        console.log('');
+        
         carregarDados();
         
         // Adicionar navegação por teclado
@@ -527,6 +579,12 @@
         const valorNumerico = parseMoeda(valor);
         rendimentos[index][campo] = valorNumerico;
         
+        console.log(`[DEBUG] Atualizado ${campo} do index ${index}: ${valorNumerico}`);
+        console.log('[DEBUG] Rendimentos:', rendimentos);
+        
+        // Recalcular totais imediatamente
+        calcularTotais();
+        
         // Re-renderizar para atualizar valor líquido calculado
         renderizarTabela();
         document.getElementById('btnSalvar').style.display = 'block';
@@ -535,6 +593,18 @@
     function atualizarCampo(index, campo, valor) {
         rendimentos[index][campo] = valor;
         document.getElementById('btnSalvar').style.display = 'block';
+    }
+    
+    function mostrarToast(mensagem) {
+        const toastElement = document.getElementById('toastSucesso');
+        const toastMessage = document.getElementById('toastMessage');
+        toastMessage.textContent = mensagem;
+        
+        const toast = new bootstrap.Toast(toastElement, {
+            autohide: true,
+            delay: 3000
+        });
+        toast.show();
     }
     
     function adicionarNovaLinha() {
@@ -606,11 +676,32 @@
         let totalIOF = 0;
         let totalLiquido = 0;
         
-        rendimentos.forEach(rend => {
-            totalBruto += rend.rendimento_bruto || 0;
-            totalIR += rend.rendimento_ir || 0;
-            totalIOF += rend.rendimento_iof || 0;
-            totalLiquido += ((rend.rendimento_bruto || 0) - (rend.rendimento_ir || 0) - (rend.rendimento_iof || 0));
+        rendimentos.forEach((rend, index) => {
+            // Garantir conversão para número usando parseFloat
+            const bruto = parseFloat(rend.rendimento_bruto) || 0;
+            const ir = parseFloat(rend.rendimento_ir) || 0;
+            const iof = parseFloat(rend.rendimento_iof) || 0;
+            
+            console.log(`[DEBUG] calcularTotais index ${index}:`, {
+                bruto_original: rend.rendimento_bruto,
+                bruto_convertido: bruto,
+                ir_original: rend.rendimento_ir,
+                ir_convertido: ir,
+                iof_original: rend.rendimento_iof,
+                iof_convertido: iof
+            });
+            
+            totalBruto += bruto;
+            totalIR += ir;
+            totalIOF += iof;
+            totalLiquido += (bruto - ir - iof);
+        });
+        
+        console.log('[DEBUG] Totais calculados:', {
+            totalBruto,
+            totalIR,
+            totalIOF,
+            totalLiquido
         });
         
         document.getElementById('totalBruto').textContent = formatarMoeda(totalBruto);
@@ -645,7 +736,9 @@
             }
             
             const resultado = await response.json();
-            alert('✓ Rendimentos salvos com sucesso!');
+            
+            // Mostrar toast de sucesso
+            mostrarToast('Rendimentos salvos com sucesso!');
             document.getElementById('btnSalvar').style.display = 'none';
             
             // Recarregar dados
@@ -679,6 +772,9 @@
         
         let valorStr = String(valor).trim();
         
+        // Se já for um número, retornar direto
+        if (typeof valor === 'number') return valor;
+        
         // Remover R$ e espaços
         valorStr = valorStr.replace(/R\$/g, '').trim();
         
@@ -693,11 +789,14 @@
             // Apenas vírgula = decimal brasileiro
             valorStr = valorStr.replace(',', '.');
         }
+        // Se apenas tem ponto, já está no formato correto
         
         // Remover tudo exceto números, ponto e sinal negativo
         valorStr = valorStr.replace(/[^\d.-]/g, '');
         
-        return parseFloat(valorStr) || 0;
+        const resultado = parseFloat(valorStr) || 0;
+        console.log(`[DEBUG] parseMoeda('${valor}') = ${resultado}`);
+        return resultado;
     }
     
     function mostrarInfo(campo) {

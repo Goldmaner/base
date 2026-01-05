@@ -65,15 +65,15 @@ def listar():
         print(f"[ALERTA] DUPLICAÇÃO DETECTADA em c_tipo_contrato!")
         print(f"[DEBUG] Tipos com duplicação: {[t for t in tipos_contrato if tipos_contrato.count(t) > 1]}")
     
-    # Construir query dinamicamente com filtros
+    # Query principal - buscar parcerias com datas como texto para evitar erro de conversão
     query = """
-        SELECT 
+        SELECT
             p.numero_termo,
             p.osc,
             p.projeto,
             p.tipo_termo,
-            p.inicio,
-            p.final,
+            p.inicio::text as inicio_str,
+            p.final::text as final_str,
             p.meses,
             p.total_previsto,
             p.total_pago,
@@ -183,8 +183,59 @@ def listar():
     if limite_sql is not None:
         query += f" LIMIT {limite_sql}"
     
+    print(f"[DEBUG] Executando query com filtro_termo: {filtro_termo}")
     cur.execute(query, params)
-    parcerias = cur.fetchall()
+    
+    try:
+        parcerias = cur.fetchall()
+        print(f"[DEBUG] {len(parcerias)} parcerias retornadas com sucesso")
+        
+        # Converter datas de string para date object
+        from datetime import datetime
+        for parceria in parcerias:
+            try:
+                if parceria['inicio_str']:
+                    parceria['inicio'] = datetime.strptime(parceria['inicio_str'], '%Y-%m-%d').date()
+                else:
+                    parceria['inicio'] = None
+            except (ValueError, TypeError) as e:
+                print(f"[ERRO] Data inicio inválida para termo {parceria['numero_termo']}: {parceria['inicio_str']} - {e}")
+                parceria['inicio'] = None
+            
+            try:
+                if parceria['final_str']:
+                    parceria['final'] = datetime.strptime(parceria['final_str'], '%Y-%m-%d').date()
+                else:
+                    parceria['final'] = None
+            except (ValueError, TypeError) as e:
+                print(f"[ERRO] Data final inválida para termo {parceria['numero_termo']}: {parceria['final_str']} - {e}")
+                parceria['final'] = None
+        
+    except ValueError as e:
+        print(f"[ERRO] Erro ao processar datas das parcerias: {e}")
+        print(f"[DEBUG] Tentando identificar registro problemático...")
+        
+        # Re-executar query para buscar dados como texto
+        query_debug = query.replace("p.inicio", "p.inicio::text as inicio_str, p.inicio")
+        query_debug = query_debug.replace("p.final", "p.final::text as final_str, p.final")
+        
+        cur.execute(query_debug, params)
+        try:
+            for row in cur:
+                print(f"[DEBUG] Termo: {row.get('numero_termo')} - Inicio: {row.get('inicio_str')} - Final: {row.get('final_str')}")
+        except:
+            pass
+        
+        # Retornar erro ao usuário
+        cur.close()
+        return render_template("parcerias.html", 
+                             parcerias=[],
+                             tipos_contrato=tipos_contrato,
+                             pessoas_gestoras_filtro=pessoas_gestoras_filtro,
+                             contagem_status={},
+                             total_geral=0,
+                             limite_atual=limite,
+                             erro=f"Erro ao carregar parcerias: {str(e)}. Há uma data inválida no banco de dados.")
     
     # Calcular status para cada parceria
     from datetime import date
@@ -193,13 +244,28 @@ def listar():
     
     for parceria in parcerias:
         status = '-'
-        if parceria['inicio'] and parceria['final']:
-            if parceria['inicio'] <= hoje <= parceria['final']:
-                status = 'Vigente'
-            elif parceria['final'] < hoje:
-                status = 'Encerrado'
-            elif parceria['inicio'] > hoje:
-                status = 'Não iniciado'
+        try:
+            if parceria['inicio'] and parceria['final']:
+                # Validar se as datas são objetos date válidos
+                inicio = parceria['inicio']
+                final = parceria['final']
+                
+                # Se forem strings, tentar converter
+                if isinstance(inicio, str):
+                    print(f"[AVISO] inicio como string: {inicio} para termo {parceria.get('numero_termo', 'N/A')}")
+                if isinstance(final, str):
+                    print(f"[AVISO] final como string: {final} para termo {parceria.get('numero_termo', 'N/A')}")
+                
+                if inicio <= hoje <= final:
+                    status = 'Vigente'
+                elif final < hoje:
+                    status = 'Encerrado'
+                elif inicio > hoje:
+                    status = 'Não iniciado'
+        except (TypeError, ValueError) as e:
+            print(f"[ERRO] Erro ao calcular status para termo {parceria.get('numero_termo', 'N/A')}: {e}")
+            print(f"[DEBUG] inicio={parceria.get('inicio')}, final={parceria.get('final')}")
+            status = 'Erro'
         
         parceria['status_calculado'] = status
         
@@ -251,6 +317,32 @@ def nova():
     if request.method == "POST":
         print("[DEBUG NOVA] Recebendo POST para criar nova parceria")
         print(f"[DEBUG NOVA] Número do termo: {request.form.get('numero_termo')}")
+        
+        # Validar datas antes de processar
+        data_inicio = request.form.get('inicio', '').strip()
+        data_final = request.form.get('final', '').strip()
+        
+        if data_inicio:
+            try:
+                from datetime import datetime
+                dt_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+                if dt_inicio.year > 9999:
+                    flash('❌ Data de início inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
+                    return redirect(url_for('parcerias.nova'))
+            except ValueError:
+                flash('❌ Data de início em formato inválido! Use o formato AAAA-MM-DD.', 'danger')
+                return redirect(url_for('parcerias.nova'))
+        
+        if data_final:
+            try:
+                from datetime import datetime
+                dt_final = datetime.strptime(data_final, '%Y-%m-%d')
+                if dt_final.year > 9999:
+                    flash('❌ Data de término inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
+                    return redirect(url_for('parcerias.nova'))
+            except ValueError:
+                flash('❌ Data de término em formato inválido! Use o formato AAAA-MM-DD.', 'danger')
+                return redirect(url_for('parcerias.nova'))
         
         try:
             query = """
@@ -409,6 +501,32 @@ def editar(numero_termo):
     Formulário completo de edição de parceria
     """
     if request.method == "POST":
+        # Validar datas antes de processar
+        data_inicio = request.form.get('inicio', '').strip()
+        data_final = request.form.get('final', '').strip()
+        
+        if data_inicio:
+            try:
+                from datetime import datetime
+                dt_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+                if dt_inicio.year > 9999:
+                    flash('❌ Data de início inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
+                    return redirect(url_for('parcerias.editar', numero_termo=numero_termo))
+            except ValueError:
+                flash('❌ Data de início em formato inválido! Use o formato AAAA-MM-DD.', 'danger')
+                return redirect(url_for('parcerias.editar', numero_termo=numero_termo))
+        
+        if data_final:
+            try:
+                from datetime import datetime
+                dt_final = datetime.strptime(data_final, '%Y-%m-%d')
+                if dt_final.year > 9999:
+                    flash('❌ Data de término inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
+                    return redirect(url_for('parcerias.editar', numero_termo=numero_termo))
+            except ValueError:
+                flash('❌ Data de término em formato inválido! Use o formato AAAA-MM-DD.', 'danger')
+                return redirect(url_for('parcerias.editar', numero_termo=numero_termo))
+        
         # Buscar valor anterior da pessoa_gestora para auditoria
         cur = get_cursor()
         cur.execute("""
