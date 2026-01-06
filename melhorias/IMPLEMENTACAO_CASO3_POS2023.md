@@ -81,7 +81,7 @@ ORDER BY p.numero_termo
 **Query**:
 ```sql
 SELECT setor_sei
-FROM categoricas.c_coordenadores
+FROM categoricas.c_geral_coordenadores
 WHERE coordenacao = %s
 LIMIT 1
 ```
@@ -344,9 +344,9 @@ print(verificar_osc_tem_pos2023('Nome da OSC'))  # Deve retornar True
 ```
 
 ### **Problema**: Coordenação não encontrada
-**Solução**: Verificar se coordenação existe em `c_coordenadores`:
+**Solução**: Verificar se coordenação existe em `c_geral_coordenadores`:
 ```sql
-SELECT * FROM categoricas.c_coordenadores WHERE coordenacao = 'CPJ';
+SELECT * FROM categoricas.c_geral_coordenadores WHERE coordenacao = 'CPJ';
 ```
 
 ### **Problema**: Tabela vazia

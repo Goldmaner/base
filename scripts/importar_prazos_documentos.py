@@ -1,6 +1,6 @@
 """
 Script para importar prazos de documentos do CSV para o banco de dados
-Tabela: categoricas.c_documentos_dp_prazos
+Tabela: categoricas.c_dp_documentos_prazos
 """
 
 import sys
@@ -19,7 +19,7 @@ from config import DB_CONFIG
 
 def importar_prazos_documentos():
     """
-    Importa dados do CSV parcerias_documentos_prazos.csv para a tabela categoricas.c_documentos_dp_prazos
+    Importa dados do CSV parcerias_documentos_prazos.csv para a tabela categoricas.c_dp_documentos_prazos
     """
     conn = None
     try:
@@ -38,8 +38,8 @@ def importar_prazos_documentos():
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         # Limpar tabela antes de importar (opcional)
-        print("[INFO] Limpando tabela categoricas.c_documentos_dp_prazos...")
-        cur.execute("TRUNCATE TABLE categoricas.c_documentos_dp_prazos RESTART IDENTITY CASCADE")
+        print("[INFO] Limpando tabela categoricas.c_dp_documentos_prazos...")
+        cur.execute("TRUNCATE TABLE categoricas.c_dp_documentos_prazos RESTART IDENTITY CASCADE")
         conn.commit()
         
         # Ler CSV
@@ -75,7 +75,7 @@ def importar_prazos_documentos():
                 
                 # Inserir registro
                 cur.execute("""
-                    INSERT INTO categoricas.c_documentos_dp_prazos 
+                    INSERT INTO categoricas.c_dp_documentos_prazos 
                     (tipo_documento, lei, prazo_dias, prazo_descricao, created_at)
                     VALUES (%s, %s, %s, %s, %s)
                 """, (
@@ -94,7 +94,7 @@ def importar_prazos_documentos():
         print(f"\n[SUCESSO] {registros_inseridos} registros importados com sucesso!")
         
         # Verificar quantidade de registros
-        cur.execute("SELECT COUNT(*) as total FROM categoricas.c_documentos_dp_prazos")
+        cur.execute("SELECT COUNT(*) as total FROM categoricas.c_dp_documentos_prazos")
         total = cur.fetchone()['total']
         print(f"[INFO] Total de registros na tabela: {total}")
         

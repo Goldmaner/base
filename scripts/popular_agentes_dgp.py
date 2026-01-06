@@ -1,5 +1,5 @@
 """
-Script para popular a tabela c_analistas_dgp com dados de exemplo
+Script para popular a tabela c_dgp_analistas com dados de exemplo
 """
 
 import sys
@@ -22,7 +22,7 @@ def popular_agentes():
     
     try:
         # Verificar se já existem registros
-        cur.execute("SELECT COUNT(*) as total FROM categoricas.c_analistas_dgp")
+        cur.execute("SELECT COUNT(*) as total FROM categoricas.c_dac_dgp_analistas")
         total_atual = cur.fetchone()['total']
         
         print(f"\n📊 Registros existentes: {total_atual}")
@@ -72,7 +72,7 @@ def popular_agentes():
         
         for i, agente in enumerate(agentes, 1):
             cur.execute("""
-                INSERT INTO categoricas.c_analistas_dgp 
+                INSERT INTO categoricas.c_dac_dgp_analistas 
                 (nome_analista, rf, email, status)
                 VALUES (%s, %s, %s, %s)
                 RETURNING id
@@ -94,7 +94,7 @@ def popular_agentes():
         print("=" * 60)
         
         # Verificar total após inserção
-        cur.execute("SELECT COUNT(*) as total FROM categoricas.c_analistas_dgp")
+        cur.execute("SELECT COUNT(*) as total FROM categoricas.c_dac_dgp_analistas")
         total_final = cur.fetchone()['total']
         print(f"\n📊 Total de registros na tabela: {total_final}")
         
@@ -103,7 +103,7 @@ def popular_agentes():
             SELECT 
                 COUNT(*) FILTER (WHERE status = true) as ativos,
                 COUNT(*) FILTER (WHERE status = false) as inativos
-            FROM categoricas.c_analistas_dgp
+            FROM categoricas.c_dac_dgp_analistas
         """)
         stats = cur.fetchone()
         print(f"   • Ativos: {stats['ativos']}")

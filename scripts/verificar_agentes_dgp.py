@@ -6,7 +6,7 @@ from config import DB_CONFIG
 
 conn = psycopg2.connect(**DB_CONFIG)
 cur = conn.cursor(cursor_factory=RealDictCursor)
-cur.execute('SELECT * FROM categoricas.c_analistas_dgp ORDER BY nome_analista')
+cur.execute('SELECT * FROM categoricas.c_dac_dgp_analistas ORDER BY nome_analista')
 rows = cur.fetchall()
 
 print(f'\n✅ Total: {len(rows)} agentes\n')

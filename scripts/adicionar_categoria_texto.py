@@ -1,5 +1,5 @@
 """
-Script para adicionar coluna categoria_texto em categoricas.c_modelo_textos
+Script para adicionar coluna categoria_texto em categoricas.c_geral_legislacao
 """
 
 import sys
@@ -15,18 +15,18 @@ def adicionar_coluna_categoria_texto():
         cur = get_cursor()
         db = get_db()
         
-        print("🔧 Adicionando coluna categoria_texto em categoricas.c_modelo_textos...")
+        print("🔧 Adicionando coluna categoria_texto em categoricas.c_geral_legislacao...")
         
         # Adicionar coluna categoria_texto
         cur.execute("""
-            ALTER TABLE categoricas.c_modelo_textos 
+            ALTER TABLE categoricas.c_geral_legislacao 
             ADD COLUMN IF NOT EXISTS categoria_texto VARCHAR(255)
         """)
         
         # Criar índice para melhorar performance
         cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_c_modelo_textos_categoria 
-            ON categoricas.c_modelo_textos(categoria_texto)
+            CREATE INDEX IF NOT EXISTS idx_c_geral_legislacao_categoria 
+            ON categoricas.c_geral_legislacao(categoria_texto)
         """)
         
         db.commit()
@@ -39,7 +39,7 @@ def adicionar_coluna_categoria_texto():
             SELECT column_name, data_type, character_maximum_length
             FROM information_schema.columns 
             WHERE table_schema = 'categoricas' 
-              AND table_name = 'c_modelo_textos' 
+              AND table_name = 'c_geral_legislacao' 
             ORDER BY ordinal_position
         """)
         

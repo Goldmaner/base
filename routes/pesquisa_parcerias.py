@@ -219,11 +219,11 @@ def buscar_cnpj(nome_osc):
 @pesquisa_parcerias_bp.route('/api/analistas-ativos')
 @agente_dac_required
 def listar_analistas_ativos():
-    """Retorna lista de analistas ativos da tabela categoricas.c_analistas"""
+    """Retorna lista de analistas ativos da tabela categoricas.c_dac_analistas"""
     try:
         query = """
             SELECT nome_analista
-            FROM categoricas.c_analistas
+            FROM categoricas.c_dac_analistas
             WHERE status NOT IN ('Inativo', 'false') OR status IS NULL
             ORDER BY nome_analista
         """

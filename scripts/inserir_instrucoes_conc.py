@@ -436,14 +436,14 @@ def inserir_modelos():
             
             # Verificar se já existem
             cur.execute("""
-                SELECT id FROM categoricas.c_modelo_textos 
+                SELECT id FROM categoricas.c_geral_modelo_textos
                 WHERE titulo_texto = %s
             """, ("Instrução: Preenchimento da Conciliação Bancária",))
             
             if cur.fetchone():
                 # Atualizar modelo 1
                 cur.execute("""
-                    UPDATE categoricas.c_modelo_textos 
+                    UPDATE categoricas.c_geral_modelo_textos
                     SET modelo_texto = %s, oculto = %s
                     WHERE titulo_texto = %s
                 """, (
@@ -455,7 +455,7 @@ def inserir_modelos():
             else:
                 # Inserir modelo 1
                 cur.execute("""
-                    INSERT INTO categoricas.c_modelo_textos (titulo_texto, modelo_texto, oculto)
+                    INSERT INTO categoricas.c_geral_modelo_textos (titulo_texto, modelo_texto, oculto)
                     VALUES (%s, %s, %s)
                 """, (
                     "Instrução: Preenchimento da Conciliação Bancária",
@@ -466,14 +466,14 @@ def inserir_modelos():
             
             # Verificar modelo 2
             cur.execute("""
-                SELECT id FROM categoricas.c_modelo_textos 
+                SELECT id FROM categoricas.c_geral_modelo_textos
                 WHERE titulo_texto = %s
             """, ("Instrução: Avaliação dos Dados Bancários",))
             
             if cur.fetchone():
                 # Atualizar modelo 2
                 cur.execute("""
-                    UPDATE categoricas.c_modelo_textos 
+                    UPDATE categoricas.c_geral_modelo_textos
                     SET modelo_texto = %s, oculto = %s
                     WHERE titulo_texto = %s
                 """, (
@@ -485,7 +485,7 @@ def inserir_modelos():
             else:
                 # Inserir modelo 2
                 cur.execute("""
-                    INSERT INTO categoricas.c_modelo_textos (titulo_texto, modelo_texto, oculto)
+                    INSERT INTO categoricas.c_geral_modelo_textos (titulo_texto, modelo_texto, oculto)
                     VALUES (%s, %s, %s)
                 """, (
                     "Instrução: Avaliação dos Dados Bancários",

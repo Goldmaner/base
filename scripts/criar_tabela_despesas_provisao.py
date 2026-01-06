@@ -11,16 +11,16 @@ from app import app
 from db import get_db, get_cursor
 
 def criar_tabela_provisoes():
-    """Cria tabela c_despesas_provisao e insere dados iniciais"""
+    """Cria tabela c_dac_despesas_provisao e insere dados iniciais"""
     with app.app_context():
         db = get_db()
         cur = get_cursor()
         
-        print("🔄 Criando tabela categoricas.c_despesas_provisao...")
+        print("🔄 Criando tabela categoricas.c_dac_despesas_provisao...")
         
         # Criar tabela
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS categoricas.c_despesas_provisao (
+            CREATE TABLE IF NOT EXISTS categoricas.c_dac_despesas_provisao (
                 id SERIAL PRIMARY KEY,
                 despesa_provisao VARCHAR(200) NOT NULL UNIQUE,
                 descricao TEXT NOT NULL,
@@ -47,7 +47,7 @@ def criar_tabela_provisoes():
         
         for despesa, descricao in provisoes:
             cur.execute("""
-                INSERT INTO categoricas.c_despesas_provisao (despesa_provisao, descricao)
+                INSERT INTO categoricas.c_dac_despesas_provisao (despesa_provisao, descricao)
                 VALUES (%s, %s)
                 ON CONFLICT (despesa_provisao) DO NOTHING
             """, (despesa, descricao))
@@ -55,7 +55,7 @@ def criar_tabela_provisoes():
         db.commit()
         
         # Verificar registros inseridos
-        cur.execute("SELECT COUNT(*) as total FROM categoricas.c_despesas_provisao")
+        cur.execute("SELECT COUNT(*) as total FROM categoricas.c_dac_despesas_provisao")
         total = cur.fetchone()['total']
         
         print(f"✅ {total} despesas de provisão cadastradas!")

@@ -109,7 +109,7 @@ def obter_lookups(conn):
     responsabilidade_map = {row[1].strip().lower(): row[0] for row in cursor.fetchall()}
     
     # Lookup de analistas
-    cursor.execute("SELECT id, nome_analista FROM categoricas.c_analistas")
+    cursor.execute("SELECT id, nome_analista FROM categoricas.c_dac_analistas")
     analistas_map = {row[1].strip().lower(): row[0] for row in cursor.fetchall()}
     
     cursor.close()
@@ -188,7 +188,7 @@ def criar_tabela_se_nao_existir(conn):
             data_parecer_dp DATE,
             valor_devolucao NUMERIC(15,2),
             valor_devolvido NUMERIC(15,2),
-            responsavel_dp INTEGER REFERENCES categoricas.c_analistas(id),
+            responsavel_dp INTEGER REFERENCES categoricas.c_dac_analistas(id),
             data_parecer_pg DATE,
             responsavel_pg VARCHAR(100),
             observacoes TEXT

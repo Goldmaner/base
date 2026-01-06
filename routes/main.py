@@ -21,7 +21,33 @@ def index():
     cur.execute("SELECT id, email, tipo_usuario, data_criacao, acessos FROM usuarios WHERE id = %s", (session["user_id"],))
     user = cur.fetchone()
     cur.close()
-    return render_template("tela_inicial.html", user=user)
+    
+    # Preparar variáveis de controle de acesso
+    is_admin = user['tipo_usuario'] == 'Agente Público'
+    user_acessos = (user['acessos'] or '').split(';') if user['acessos'] else []
+    
+    # DEBUG DETALHADO
+    print("\n" + "="*80)
+    print("🔍 DEBUG - TELA INICIAL - CONTROLE DE ACESSO")
+    print("="*80)
+    print(f"👤 Usuário ID: {user['id']}")
+    print(f"📧 Email: {user['email']}")
+    print(f"🏷️  Tipo: {user['tipo_usuario']}")
+    print(f"🔐 String de acessos (raw): '{user['acessos']}'")
+    print(f"📋 Lista de acessos: {user_acessos}")
+    print(f"👑 É Admin (Agente Público)?: {is_admin}")
+    print("-"*80)
+    print("🔍 VERIFICAÇÕES DE EXIBIÇÃO DE BOTÕES:")
+    print(f"   ✓ 'listas' in user_acessos: {'listas' in user_acessos}")
+    print(f"   ✓ is_admin: {is_admin}")
+    print(f"   ✓ Condição final (is_admin OR 'listas' in user_acessos): {is_admin or 'listas' in user_acessos}")
+    print("-"*80)
+    print("📊 Todos os acessos individuais:")
+    for i, acesso in enumerate(user_acessos, 1):
+        print(f"   {i}. '{acesso}' (length: {len(acesso)})")
+    print("="*80 + "\n")
+    
+    return render_template("tela_inicial.html", user=user, is_admin=is_admin, user_acessos=user_acessos)
 
 
 @main_bp.route("/admin/portarias", methods=["GET", "POST"])
@@ -41,13 +67,13 @@ def gerenciar_portarias():
             termino = request.form.get('termino') or None
             
             # Verificar se já existe
-            cur.execute("SELECT lei FROM categoricas.c_legislacao WHERE lei = %s", (lei,))
+            cur.execute("SELECT lei FROM categoricas.c_geral_legislacao WHERE lei = %s", (lei,))
             existe = cur.fetchone()
             
             if existe:
                 # Atualizar
                 cur.execute("""
-                    UPDATE categoricas.c_legislacao 
+                    UPDATE categoricas.c_geral_legislacao 
                     SET inicio = %s, termino = %s
                     WHERE lei = %s
                 """, (inicio, termino, lei))
@@ -55,7 +81,7 @@ def gerenciar_portarias():
             else:
                 # Inserir
                 cur.execute("""
-                    INSERT INTO categoricas.c_legislacao (lei, inicio, termino)
+                    INSERT INTO categoricas.c_geral_legislacao (lei, inicio, termino)
                     VALUES (%s, %s, %s)
                 """, (lei, inicio, termino))
                 flash(f"Legislação '{lei}' criada com sucesso!", "success")
@@ -70,7 +96,7 @@ def gerenciar_portarias():
     # GET - Buscar todas as legislações
     cur.execute("""
         SELECT lei, inicio, termino
-        FROM categoricas.c_legislacao 
+        FROM categoricas.c_geral_legislacao 
         ORDER BY inicio DESC NULLS LAST, lei
     """)
     legislacoes = cur.fetchall()
@@ -236,7 +262,7 @@ def modelos_textos_list():
         # Garantir que a coluna 'oculto' exista (adiciona se necessário)
         cur = get_cursor()
         try:
-            cur.execute("ALTER TABLE categoricas.c_modelo_textos ADD COLUMN IF NOT EXISTS oculto boolean DEFAULT FALSE")
+            cur.execute("ALTER TABLE categoricas.c_geral_legislacao ADD COLUMN IF NOT EXISTS oculto boolean DEFAULT FALSE")
             get_db().commit()
         except Exception:
             try:
@@ -246,11 +272,11 @@ def modelos_textos_list():
 
         # Montar query
         if mostrar_ocultos and session.get('tipo_usuario') == 'Agente Público':
-            query = "SELECT id, titulo_texto, modelo_texto, categoria_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_modelo_textos ORDER BY titulo_texto"
+            query = "SELECT id, titulo_texto, modelo_texto, categoria_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_geral_modelo_textos ORDER BY titulo_texto"
             print(f"DEBUG: Usando query TODOS (admin)")
             cur.execute(query)
         else:
-            query = "SELECT id, titulo_texto, modelo_texto, categoria_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_modelo_textos WHERE COALESCE(oculto, false) = false ORDER BY titulo_texto"
+            query = "SELECT id, titulo_texto, modelo_texto, categoria_texto, COALESCE(oculto, false) as oculto FROM categoricas.c_geral_modelo_textos WHERE COALESCE(oculto, false) = false ORDER BY titulo_texto"
             print(f"DEBUG: Usando query NÃO OCULTOS")
             cur.execute(query)
 
@@ -290,7 +316,7 @@ def modelos_textos_create():
             return jsonify({'erro': 'titulo_texto é obrigatório'}), 400
 
         cur = get_cursor()
-        cur.execute("INSERT INTO categoricas.c_modelo_textos (titulo_texto, modelo_texto, categoria_texto, oculto) VALUES (%s, %s, %s, false) RETURNING id",
+        cur.execute("INSERT INTO categoricas.c_geral_modelo_textos (titulo_texto, modelo_texto, categoria_texto, oculto) VALUES (%s, %s, %s, false) RETURNING id",
                     (titulo, modelo, categoria))
         novo = cur.fetchone()
         get_db().commit()
@@ -334,7 +360,7 @@ def modelos_textos_update(id):
             params.append(categoria)
         params.append(id)
 
-        query = f"UPDATE categoricas.c_modelo_textos SET {', '.join(sets)} WHERE id = %s"
+        query = f"UPDATE categoricas.c_geral_modelo_textos SET {', '.join(sets)} WHERE id = %s"
         cur.execute(query, tuple(params))
         get_db().commit()
         cur.close()
@@ -361,7 +387,7 @@ def modelos_textos_toggle_oculto(id):
             return jsonify({'erro': 'Campo oculto obrigatório (true/false)'}), 400
 
         cur = get_cursor()
-        cur.execute("UPDATE categoricas.c_modelo_textos SET oculto = %s WHERE id = %s", (bool(novo), id))
+        cur.execute("UPDATE categoricas.c_geral_modelo_textos SET oculto = %s WHERE id = %s", (bool(novo), id))
         get_db().commit()
         cur.close()
         return jsonify({'sucesso': True})
@@ -386,7 +412,7 @@ def modelos_textos_delete(id):
             return jsonify({'erro': 'Acesso negado. Apenas Agente Público pode apagar modelos.'}), 403
 
         cur = get_cursor()
-        cur.execute("DELETE FROM categoricas.c_modelo_textos WHERE id = %s", (id,))
+        cur.execute("DELETE FROM categoricas.c_geral_modelo_textos WHERE id = %s", (id,))
         get_db().commit()
         cur.close()
         return jsonify({'sucesso': True})

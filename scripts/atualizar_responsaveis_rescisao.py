@@ -41,7 +41,7 @@ def listar_analistas_dgp():
     
     cur.execute("""
         SELECT nome_analista, status
-        FROM categoricas.c_analistas_dgp
+        FROM categoricas.c_dac_dgp_analistas
         ORDER BY nome_analista
     """)
     

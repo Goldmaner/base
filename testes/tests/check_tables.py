@@ -25,9 +25,9 @@ try:
 except Exception as e:
     print(f"Error: {e}")
 
-print("\n=== c_legislacao structure ===")
+print("\n=== c_geral_modelo_textos structure ===")
 try:
-    cur.execute("SELECT * FROM categoricas.c_legislacao LIMIT 5")
+    cur.execute("SELECT * FROM categoricas.c_geral_modelo_textos LIMIT 5")
     rows = cur.fetchall()
     if rows:
         print("Columns:", rows[0].keys())

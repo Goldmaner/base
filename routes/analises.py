@@ -256,7 +256,7 @@ def obter_modelo_ausencia_extratos():
         # Buscar modelo de texto
         query_modelo = """
             SELECT titulo_texto, modelo_texto 
-            FROM categoricas.c_modelo_textos 
+            FROM categoricas.c_geral_modelo_textos
             WHERE titulo_texto = %s
         """
         cur.execute(query_modelo, (titulo_modelo,))
@@ -345,7 +345,7 @@ def obter_dados():
                 a.nome_analista
             FROM parcerias_analises pa
             LEFT JOIN Parcerias p ON pa.numero_termo = p.numero_termo
-            LEFT JOIN categoricas.c_analistas a ON pa.responsavel_dp = a.id
+            LEFT JOIN categoricas.c_dac_analistas a ON pa.responsavel_dp = a.id
             WHERE 1=1
         """
         
@@ -639,7 +639,7 @@ def editar_por_termo():
         cur.execute("""
             SELECT pa.*, a.nome_analista
             FROM parcerias_analises pa
-            LEFT JOIN categoricas.c_analistas a ON pa.responsavel_dp = a.id
+            LEFT JOIN categoricas.c_dac_analistas a ON pa.responsavel_dp = a.id
             WHERE pa.numero_termo = %s
             ORDER BY pa.id ASC
         """, (numero_termo,))
@@ -648,7 +648,7 @@ def editar_por_termo():
         # Buscar lista de analistas para dropdown
         cur.execute("""
             SELECT id, nome_analista
-            FROM categoricas.c_analistas
+            FROM categoricas.c_dac_analistas
             ORDER BY nome_analista
         """)
         analistas = cur.fetchall()
@@ -830,7 +830,7 @@ def adicionar_analises():
     termos_pendentes = cur.fetchall()
     
     # Buscar analistas para dropdown
-    cur.execute("SELECT id, nome_analista FROM categoricas.c_analistas ORDER BY nome_analista")
+    cur.execute("SELECT id, nome_analista FROM categoricas.c_dac_analistas ORDER BY nome_analista")
     analistas = cur.fetchall()
     cur.close()
     

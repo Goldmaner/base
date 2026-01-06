@@ -26,7 +26,7 @@ def main():
     # Buscar modelo atual
     cur.execute("""
         SELECT id, titulo_texto, modelo_texto 
-        FROM categoricas.c_modelo_textos 
+        FROM categoricas.c_geral_legislacao 
         WHERE titulo_texto LIKE '%pós-2023%'
     """)
     
@@ -69,7 +69,7 @@ def main():
     # Atualizar no banco
     print("\n🔄 Atualizando modelo...")
     cur.execute("""
-        UPDATE categoricas.c_modelo_textos
+        UPDATE categoricas.c_geral_legislacao
         SET modelo_texto = %s
         WHERE id = %s
     """, (texto_novo, modelo['id']))

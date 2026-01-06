@@ -138,7 +138,7 @@ def verificar_dependencias():
     
     dependencias = [
         ('public', 'parcerias', 'numero_termo'),
-        ('categoricas', 'c_analistas', 'nome_analista')
+        ('categoricas', 'c_dac_analistas', 'nome_analista')
     ]
     
     todas_ok = True

@@ -51,7 +51,7 @@ def index():
     termos = cur.fetchall()
     
     # Buscar lista de analistas
-    cur.execute("SELECT DISTINCT nome_analista FROM categoricas.c_analistas ORDER BY nome_analista")
+    cur.execute("SELECT DISTINCT nome_analista FROM categoricas.c_dac_analistas ORDER BY nome_analista")
     analistas = cur.fetchall()
     
     cur.close()
@@ -84,7 +84,7 @@ def meus_processos():
         # Buscar todos os analistas para o filtro (se for admin)
         cur.execute("""
             SELECT DISTINCT nome_analista 
-            FROM categoricas.c_analistas 
+            FROM categoricas.c_dac_analistas 
             WHERE status NOT IN ('Inativo', 'false') OR status IS NULL
             ORDER BY nome_analista
         """)
@@ -115,7 +115,7 @@ def meus_processos():
                     pa.tipo_prestacao
                 FROM public.parcerias_analises pa
                 LEFT JOIN public.parcerias p ON pa.numero_termo = p.numero_termo
-                LEFT JOIN categoricas.c_analistas ca ON pa.responsavel_dp = ca.id
+                LEFT JOIN categoricas.c_dac_analistas ca ON pa.responsavel_dp = ca.id
                 WHERE pa.tipo_prestacao = 'Final'
                   AND NOT EXISTS (
                     SELECT 1 FROM analises_pc.checklist_analista ch
@@ -187,7 +187,7 @@ def meus_processos():
                 # OTIMIZADO: Filtro movido para SQL (evita N+1 Query)
                 cur.execute("""
                     SELECT nome_analista, d_usuario
-                    FROM categoricas.c_analistas
+                    FROM categoricas.c_dac_analistas
                     WHERE REGEXP_REPLACE(LOWER(d_usuario), '[^0-9]', '', 'g') LIKE %s || '%%'
                     LIMIT 10
                 """, (rf_usuario,))
@@ -576,10 +576,10 @@ def buscar_info_adicional():
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
-        # Buscar instrução de celebração da tabela categoricas.c_modelo_textos
+        # Buscar instrução de celebração da tabela categoricas.c_geral_modelo_textos
         cur.execute("""
             SELECT titulo_texto, modelo_texto 
-            FROM categoricas.c_modelo_textos 
+            FROM categoricas.c_geral_modelo_textos
             WHERE titulo_texto = 'Instrução: Avaliação do processo de celebração'
             LIMIT 1
         """)
@@ -590,7 +590,7 @@ def buscar_info_adicional():
         # Buscar instrução de prestação de contas
         cur.execute("""
             SELECT titulo_texto, modelo_texto 
-            FROM categoricas.c_modelo_textos 
+            FROM categoricas.c_geral_modelo_textos
             WHERE titulo_texto = 'Instrução: Avaliação do processo de prestação de contas'
             LIMIT 1
         """)
@@ -1114,7 +1114,7 @@ def buscar_modelo_texto():
         # Buscar modelo de texto
         cur.execute("""
             SELECT id, titulo_texto, modelo_texto, oculto
-            FROM categoricas.c_modelo_textos
+            FROM categoricas.c_geral_modelo_textos
             WHERE titulo_texto = %s AND (oculto IS NULL OR oculto = FALSE)
         """, (titulo,))
         
@@ -1326,7 +1326,7 @@ def conc_inconsistencias():
         # Buscar modelo de texto
         cur.execute("""
             SELECT titulo_texto, modelo_texto
-            FROM categoricas.c_modelo_textos
+            FROM categoricas.c_geral_modelo_textos
             WHERE titulo_texto = 'Análise de Contas: Relatório de Inconsistências'
             LIMIT 1
         """)

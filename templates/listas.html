@@ -6,6 +6,10 @@
   <title>Listas Suspensas - FAF</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body>
   <div class="container-fluid mt-4">
@@ -67,7 +71,7 @@
 
   <!-- Modal para Criar/Editar -->
   <div class="modal fade" id="modalFormulario" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-xl">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="tituloModal">Novo Registro</h5>
@@ -75,7 +79,7 @@
         </div>
         <div class="modal-body">
           <form id="formularioRegistro">
-            <div id="camposFormulario"></div>
+            <div id="camposFormulario" class="form-grid"></div>
           </form>
         </div>
         <div class="modal-footer">
@@ -212,7 +216,7 @@
 
         // Se for coordenadores, criar mapa de setores com coordenadores ativos
         let setoresComAtivos = new Set();
-        if (tabelaAtual === 'c_coordenadores') {
+        if (tabelaAtual === 'c_geral_coordenadores') {
           for (const registro of dados) {
             if (registro.status_c === 'Ativo' && registro.setor_sei) {
               setoresComAtivos.add(registro.setor_sei);
@@ -286,7 +290,7 @@
             }
             
             // Se for coordenadores e coluna setor_sei, verificar se há coordenador ativo
-            if (tabelaAtual === 'c_coordenadores' && col === 'setor_sei' && registro[col]) {
+            if (tabelaAtual === 'c_geral_coordenadores' && col === 'setor_sei' && registro[col]) {
               if (!setoresComAtivos.has(registro[col])) {
                 td.style.backgroundColor = '#ffc107'; // Laranja (Bootstrap warning color)
                 td.style.fontWeight = 'bold';
@@ -623,6 +627,69 @@
           checkDiv.appendChild(input);
           checkDiv.appendChild(checkLabel);
           div.appendChild(checkDiv);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox_multiple') {
+          // Checkbox múltiplo
+          // Criar container para label + botão "Marcar todos"
+          const labelContainer = document.createElement('div');
+          labelContainer.className = 'd-flex justify-content-between align-items-center mb-2';
+          
+          const labelSpan = document.createElement('span');
+          labelSpan.textContent = configAtual.labels[col];
+          labelSpan.className = 'form-label mb-0';
+          
+          const marcarTodosBtn = document.createElement('button');
+          marcarTodosBtn.type = 'button';
+          marcarTodosBtn.className = 'btn btn-sm btn-outline-primary';
+          marcarTodosBtn.textContent = 'Marcar todos';
+          marcarTodosBtn.dataset.campo = col;
+          marcarTodosBtn.onclick = function() {
+            const checkboxes = document.querySelectorAll(`input[data-campo="${col}"]`);
+            const todosMarkados = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(cb => cb.checked = !todosMarkados);
+            this.textContent = todosMarkados ? 'Marcar todos' : 'Desmarcar todos';
+          };
+          
+          labelContainer.appendChild(labelSpan);
+          labelContainer.appendChild(marcarTodosBtn);
+          div.appendChild(labelContainer);
+          
+          const checkboxGroup = document.createElement('div');
+          checkboxGroup.className = 'border rounded p-2';
+          checkboxGroup.style.maxHeight = '200px';
+          checkboxGroup.style.overflowY = 'auto';
+          
+          const opcoes = configAtual.tipos_campo[`opcoes_${col}`] || [];
+          const valorAtual = registro[col] || '';
+          const selecionados = valorAtual ? valorAtual.split(';') : [];
+          
+          opcoes.forEach(opcao => {
+            const checkDiv = document.createElement('div');
+            checkDiv.className = 'form-check';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'form-check-input';
+            checkbox.value = opcao.value || opcao;
+            checkbox.checked = selecionados.includes(checkbox.value);
+            checkbox.dataset.campo = col;
+            
+            const checkLabel = document.createElement('label');
+            checkLabel.className = 'form-check-label';
+            checkLabel.textContent = opcao.label || opcao;
+            
+            checkDiv.appendChild(checkbox);
+            checkDiv.appendChild(checkLabel);
+            checkboxGroup.appendChild(checkDiv);
+          });
+          
+          div.appendChild(checkboxGroup);
+          
+          // Criar campo hidden para armazenar os valores
+          input = document.createElement('input');
+          input.type = 'hidden';
+          input.id = `campo_${col}`;
+          div.appendChild(input);
         } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'textarea') {
           // Textarea genérico com suporte a rows configurável
           input = document.createElement('textarea');
@@ -670,9 +737,14 @@
       for (const col of configAtual.colunas_editaveis) {
         const input = document.getElementById(`campo_${col}`);
         
-        // Verificar se é checkbox
+        // Verificar se é checkbox simples
         if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox') {
           dados[col] = input.checked;
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox_multiple') {
+          // Coletar todos os checkboxes marcados
+          const checkboxes = document.querySelectorAll(`input[data-campo="${col}"]:checked`);
+          const valores = Array.from(checkboxes).map(cb => cb.value);
+          dados[col] = valores.join(';');
         } else {
           // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, aplicacao, categoria_texto e oculto
           const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'aplicacao', 'categoria_texto', 'oculto'];

@@ -13,11 +13,11 @@ cur.execute("""
     SELECT column_name, data_type, character_maximum_length
     FROM information_schema.columns 
     WHERE table_schema = 'categoricas' 
-      AND table_name = 'c_modelo_textos' 
+      AND table_name = 'c_geral_legislacao' 
     ORDER BY ordinal_position
 """)
 
-print("Estrutura da tabela categoricas.c_modelo_textos:")
+print("Estrutura da tabela categoricas.c_geral_legislacao:")
 print("=" * 60)
 for row in cur.fetchall():
     col_name, data_type, max_length = row

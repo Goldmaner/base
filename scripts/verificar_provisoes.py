@@ -1,5 +1,5 @@
 """
-Script para verificar registros da tabela c_despesas_provisao
+Script para verificar registros da tabela c_dac_despesas_provisao
 """
 
 import sys
@@ -13,13 +13,13 @@ with app.app_context():
     cursor = get_cursor()
     
     # Contar total
-    cursor.execute('SELECT COUNT(*) FROM categoricas.c_despesas_provisao')
+    cursor.execute('SELECT COUNT(*) FROM categoricas.c_dac_despesas_provisao')
     result = cursor.fetchone()
     total = result['count'] if isinstance(result, dict) else result[0]
     print(f'✅ Total de provisões cadastradas: {total}')
     
     # Listar todas
-    cursor.execute('SELECT id, despesa_provisao, descricao FROM categoricas.c_despesas_provisao ORDER BY despesa_provisao')
+    cursor.execute('SELECT id, despesa_provisao, descricao FROM categoricas.c_dac_despesas_provisao ORDER BY despesa_provisao')
     provisoes = cursor.fetchall()
     
     print('\n📋 Lista de Provisões:')

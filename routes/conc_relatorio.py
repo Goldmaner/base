@@ -343,10 +343,10 @@ def dados_relatorio():
             print(f"[DEBUG MISTO] Portaria: {portaria}")
             print(f"[DEBUG MISTO] Data início: {data_inicio}")
             
-            # Buscar data de término da portaria na tabela c_legislacao
+            # Buscar data de término da portaria na tabela c_geral_legislacao
             cursor.execute("""
                 SELECT termino
-                FROM categoricas.c_legislacao
+                FROM categoricas.c_geral_legislacao
                 WHERE lei = %s
             """, (portaria,))
             legislacao = cursor.fetchone()
@@ -364,7 +364,7 @@ def dados_relatorio():
             # Buscar lista oficial de categorias de provisão
             cursor.execute("""
                 SELECT DISTINCT despesa_provisao
-                FROM categoricas.c_despesas_provisao
+                FROM categoricas.c_dac_despesas_provisao
                 WHERE despesa_provisao IS NOT NULL
             """)
             categorias_provisao_db = [row['despesa_provisao'] for row in cursor.fetchall()]

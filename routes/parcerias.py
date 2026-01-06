@@ -434,7 +434,7 @@ def nova():
     cur = get_cursor()
     cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
     tipos_contrato = [row['informacao'] for row in cur.fetchall()]
-    cur.execute("SELECT lei FROM categoricas.c_legislacao ORDER BY lei")
+    cur.execute("SELECT lei FROM categoricas.c_geral_legislacao ORDER BY lei")
     legislacoes = [row['lei'] for row in cur.fetchall()]
     
     # Buscar pessoas gestoras (todas, incluindo inativas)
@@ -703,7 +703,7 @@ def editar(numero_termo):
     # Buscar dados dos dropdowns
     cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
     tipos_contrato = [row['informacao'] for row in cur.fetchall()]
-    cur.execute("SELECT lei FROM categoricas.c_legislacao ORDER BY lei")
+    cur.execute("SELECT lei FROM categoricas.c_geral_legislacao ORDER BY lei")
     legislacoes = [row['lei'] for row in cur.fetchall()]
     
     # Buscar pessoas gestoras (todas, incluindo inativas)
@@ -1536,7 +1536,7 @@ def termos_rescindidos():
     # Buscar lista de analistas DGP (ativos e inativos)
     cur.execute("""
         SELECT nome_analista
-        FROM categoricas.c_analistas_dgp
+        FROM categoricas.c_dac_dgp_analistas
         ORDER BY nome_analista
     """)
     analistas_dgp = [row['nome_analista'] for row in cur.fetchall()]
@@ -1728,7 +1728,7 @@ def editar_rescisao(id):
     # Buscar lista de analistas DGP (ativos e inativos)
     cur.execute("""
         SELECT nome_analista
-        FROM categoricas.c_analistas_dgp
+        FROM categoricas.c_dac_dgp_analistas
         ORDER BY nome_analista
     """)
     analistas_dgp = [row['nome_analista'] for row in cur.fetchall()]

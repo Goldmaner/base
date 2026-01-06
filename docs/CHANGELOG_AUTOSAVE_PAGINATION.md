@@ -53,7 +53,7 @@ Este documento descreve as alterações implementadas para adicionar funcionalid
 - `c_tipo_contrato` - Coluna: `informacao`
   - Valores: Acordo de Cooperação, Colaboração, Convênio, Convênio de Cooperação, Fomento, etc.
   
-- `c_legislacao` - Coluna: `lei`
+- `c_geral_legislacao` - Coluna: `lei`
   - Valores: Decreto nº 6.170, Portaria nº 006/2008/SF-SEMPLA, Portaria nº 072/SMPP/2012, etc.
 
 ### Implementação
@@ -191,7 +191,7 @@ FAF/
 ## Dependências
 
 ### Banco de Dados
-- Tabelas `c_tipo_contrato` e `c_legislacao` devem existir e estar populadas
+- Tabelas `c_tipo_contrato` e `c_geral_legislacao` devem existir e estar populadas
 - Queries SELECT para buscar opções dos dropdowns
 
 ### Frontend

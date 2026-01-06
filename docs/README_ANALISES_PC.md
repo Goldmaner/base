@@ -230,7 +230,7 @@ python scripts/inicializar_analises_pc.py
 - Verificar coluna `numero_termo`
 
 ### Dropdown vazio (analistas)
-- Verificar se tabela `categoricas.c_analistas` tem dados
+- Verificar se tabela `categoricas.c_dac_analistas` tem dados
 - Verificar coluna `nome_analista`
 
 ---

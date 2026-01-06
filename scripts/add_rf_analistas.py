@@ -1,5 +1,5 @@
 """
-Script para adicionar a coluna d_usuario (R.F.) na tabela categoricas.c_analistas
+Script para adicionar a coluna d_usuario (R.F.) na tabela categoricas.c_dac_analistas
 Executa de forma segura, verificando se a coluna já existe
 """
 
@@ -16,7 +16,7 @@ def adicionar_coluna_rf_analistas():
     """Adiciona a coluna d_usuario (R.F.) na tabela c_analistas"""
     
     print("=" * 70)
-    print("📊 Adicionando coluna d_usuario (R.F.) em categoricas.c_analistas")
+    print("📊 Adicionando coluna d_usuario (R.F.) em categoricas.c_dac_analistas")
     print("=" * 70)
     
     conn = psycopg2.connect(**DB_CONFIG)
@@ -42,13 +42,13 @@ def adicionar_coluna_rf_analistas():
         # Adicionar a coluna
         print("\n⚙️  Adicionando coluna d_usuario (R.F.)...")
         cur.execute("""
-            ALTER TABLE categoricas.c_analistas 
+            ALTER TABLE categoricas.c_dac_analistas 
             ADD COLUMN d_usuario VARCHAR(20);
         """)
         
         # Adicionar comentário
         cur.execute("""
-            COMMENT ON COLUMN categoricas.c_analistas.d_usuario 
+            COMMENT ON COLUMN categoricas.c_dac_analistas.d_usuario 
             IS 'Registro Funcional (R.F.) do analista';
         """)
         

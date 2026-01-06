@@ -13,11 +13,11 @@ with app.app_context():
         SELECT column_name, data_type, is_nullable 
         FROM information_schema.columns 
         WHERE table_schema = 'categoricas' 
-        AND table_name = 'c_modelo_textos' 
+        AND table_name = 'c_geral_modelo_textos' 
         ORDER BY ordinal_position
     """)
     
-    print("📋 Estrutura da tabela categoricas.c_modelo_textos:")
+    print("📋 Estrutura da tabela categoricas.c_geral_modelo_textos:")
     print("-" * 60)
     cols = cur.fetchall()
     for col in cols:
@@ -28,7 +28,7 @@ with app.app_context():
         SELECT constraint_name, constraint_type 
         FROM information_schema.table_constraints 
         WHERE table_schema = 'categoricas' 
-        AND table_name = 'c_modelo_textos'
+        AND table_name = 'c_geral_modelo_textos'
     """)
     
     print("\n🔒 Constraints:")

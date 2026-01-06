@@ -2,7 +2,7 @@
 -- Este modelo é usado quando a OSC possui termos com responsabilidade de Pessoa Gestora (2) ou Compartilhado (3)
 -- Gera múltiplos encaminhamentos, um para cada coordenação identificada
 
-INSERT INTO categoricas.c_modelo_textos (titulo_texto, modelo_texto, criado_em)
+INSERT INTO categoricas.c_geral_modelo_textos (titulo_texto, modelo_texto, criado_em)
 VALUES (
     'Pesquisa de Parcerias: Parcerias pós-2023',
     'coordenacao_informado_usuario

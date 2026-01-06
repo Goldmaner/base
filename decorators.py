@@ -31,32 +31,44 @@ def requires_access(modulo):
             # Verificar se o usuário tem acesso ao módulo
             acessos = session.get('acessos', '')
             
-            # FALLBACK: Se sessão não tem acessos, buscar do banco
+            # FALLBACK: Se sessão não tem acessos, buscar do banco e atualizar sessão
             if not acessos and 'user_id' in session:
                 from db import get_cursor
                 try:
                     cursor = get_cursor()
                     cursor.execute("""
-                        SELECT acessos FROM usuarios WHERE id = %s
+                        SELECT acessos, tipo_usuario FROM usuarios WHERE id = %s
                     """, (session['user_id'],))
                     result = cursor.fetchone()
+                    cursor.close()
+                    
                     if result:
                         acessos = result['acessos'] or ''
                         session['acessos'] = acessos  # Atualizar sessão
+                        session['tipo_usuario'] = result['tipo_usuario']  # Garantir tipo atualizado
+                        
+                        # Se virou Agente Público, permitir acesso
+                        if result['tipo_usuario'] == 'Agente Público':
+                            print(f"[INFO FALLBACK] Usuário {session['user_id']} é Agente Público - acesso total")
+                            return f(*args, **kwargs)
                 except Exception as e:
                     print(f"[ERRO FALLBACK ACESSOS] {e}")
                     acessos = ''
             
             if not acessos:
                 # Se não tem acessos definidos, negar acesso
-                flash(f'Você não tem permissão para acessar o módulo: {modulo}. Faça login novamente.', 'danger')
+                print(f"[ACESSO NEGADO] Usuário {session.get('user_id')} - Email: {session.get('email')} - Tipo: {session.get('tipo_usuario')} - Módulo: {modulo} - Acessos: (vazio)")
+                flash(f'Você não tem permissão para acessar o módulo: {modulo}. Entre em contato com o administrador.', 'danger')
                 return redirect(url_for('main.index'))
             
             # Verificar se o módulo está na lista de acessos
             lista_acessos = [a.strip() for a in acessos.split(';') if a.strip()]
             
+            print(f"[DEBUG ACESSO] Usuário {session.get('user_id')} - Email: {session.get('email')} - Tipo: {session.get('tipo_usuario')} - Módulo: {modulo} - Acessos: {lista_acessos}")
+            
             if modulo not in lista_acessos:
-                flash(f'Você não tem permissão para acessar o módulo: {modulo}', 'danger')
+                print(f"[ACESSO NEGADO] Módulo '{modulo}' não encontrado na lista de acessos do usuário")
+                flash(f'Você não tem permissão para acessar o módulo: {modulo}. Entre em contato com o administrador.', 'danger')
                 return redirect(url_for('main.index'))
             
             # Usuário tem acesso, continuar

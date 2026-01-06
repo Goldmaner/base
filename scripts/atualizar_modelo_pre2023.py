@@ -24,7 +24,7 @@ def atualizar_modelo_pre2023():
             # Query para buscar o modelo atual
             query_buscar = """
                 SELECT id, titulo_texto, modelo_texto
-                FROM categoricas.c_modelo_textos
+                FROM categoricas.c_geral_legislacao
                 WHERE titulo_texto = 'Pesquisa de Parcerias: Parcerias pré-2023'
             """
             
@@ -60,7 +60,7 @@ def atualizar_modelo_pre2023():
             
             # Atualizar no banco
             query_update = """
-                UPDATE categoricas.c_modelo_textos
+                UPDATE categoricas.c_geral_legislacao
                 SET modelo_texto = %s
                 WHERE id = %s
             """

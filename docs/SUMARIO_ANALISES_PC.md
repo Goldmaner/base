@@ -29,7 +29,7 @@
 ### ✅ Seleção de Termo e Configuração Inicial
 - Select2 para seleção de termo (integrado com `public.parcerias`)
 - Campo de meses analisados
-- Multi-select para analistas (integrado com `categoricas.c_analistas`)
+- Multi-select para analistas (integrado com `categoricas.c_dac_analistas`)
 
 ### ✅ Checklist Principal (12 etapas)
 1. Avaliação do processo de celebração

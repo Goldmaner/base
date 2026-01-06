@@ -42,7 +42,7 @@ def converter_valor_para_frontend(valor, campo):
 
 # Configuração das tabelas gerenciáveis
 TABELAS_CONFIG = {
-    'c_analistas': {
+    'c_dac_analistas': {
         'nome': 'Analistas',
         'schema': 'categoricas',
         'colunas_editaveis': ['nome_analista', 'd_usuario', 'status'],
@@ -84,7 +84,7 @@ TABELAS_CONFIG = {
         'labels': {'nome_setor': 'Nome do Setor'},
         'ordem': 'nome_setor'
     },
-    'c_coordenadores': {
+    'c_geral_coordenadores': {
         'nome': 'Coordenadores',
         'schema': 'categoricas',
         'colunas_editaveis': ['secretaria', 'coordenacao', 'nome_c', 'pronome', 'rf_c', 'status_c', 'e_mail_c', 'setor_sei'],
@@ -103,9 +103,9 @@ TABELAS_CONFIG = {
         'ordem': 'nome_c',
         'tipos_campo': {
             'secretaria': 'select_dinamico',
-            'query_secretaria': 'SELECT DISTINCT secretaria FROM categoricas.c_coordenadores WHERE secretaria IS NOT NULL ORDER BY secretaria',
+            'query_secretaria': 'SELECT DISTINCT secretaria FROM categoricas.c_geral_coordenadores WHERE secretaria IS NOT NULL ORDER BY secretaria',
             'coordenacao': 'text_com_datalist',
-            'query_coordenacao': 'SELECT DISTINCT coordenacao FROM categoricas.c_coordenadores WHERE coordenacao IS NOT NULL ORDER BY coordenacao',
+            'query_coordenacao': 'SELECT DISTINCT coordenacao FROM categoricas.c_geral_coordenadores WHERE coordenacao IS NOT NULL ORDER BY coordenacao',
             'status_c': 'select',
             'opcoes_status_c': ['Ativo', 'Afastado', 'Inativo'],
             'pronome': 'select',
@@ -119,7 +119,7 @@ TABELAS_CONFIG = {
         'labels': {'orgao': 'Órgão', 'unidade': 'Unidade', 'descricao': 'Descrição'},
         'ordem': 'orgao, unidade'
     },
-    'c_analistas_dgp': {
+    'c_dgp_analistas': {
         'nome': 'Agentes DGP',
         'schema': 'categoricas',
         'colunas_editaveis': ['nome_analista', 'rf', 'email', 'status'],
@@ -138,7 +138,7 @@ TABELAS_CONFIG = {
         'inline_edit': True,
         'inline_columns': ['status']
     },
-    'c_documentos_dp': {
+    'c_dp_documentos': {
         'nome': 'Tipos de Documento',
         'schema': 'categoricas',
         'colunas_editaveis': ['tipo_documento', 'descricao', 'orgao_emissor'],
@@ -153,7 +153,7 @@ TABELAS_CONFIG = {
             'descricao': 'textarea'
         }
     },
-    'c_documentos_dp_prazos': {
+    'c_dp_documentos_prazos': {
         'nome': 'Prazos de Documentos',
         'schema': 'categoricas',
         'colunas_editaveis': ['tipo_documento', 'lei', 'prazo_dias', 'prazo_descricao'],
@@ -167,14 +167,14 @@ TABELAS_CONFIG = {
         'ordem': 'tipo_documento, lei',
         'tipos_campo': {
             'tipo_documento': 'select_dinamico',
-            'query_tipo_documento': 'SELECT DISTINCT tipo_documento FROM categoricas.c_documentos_dp WHERE tipo_documento IS NOT NULL ORDER BY tipo_documento',
+            'query_tipo_documento': 'SELECT DISTINCT tipo_documento FROM categoricas.c_dp_documentos WHERE tipo_documento IS NOT NULL ORDER BY tipo_documento',
             'lei': 'select_dinamico',
-            'query_lei': 'SELECT DISTINCT lei FROM categoricas.c_legislacao WHERE lei IS NOT NULL ORDER BY lei',
+            'query_lei': 'SELECT DISTINCT lei FROM categoricas.c_geral_legislacao WHERE lei IS NOT NULL ORDER BY lei',
             'prazo_descricao': 'textarea',
             'prazo_dias': 'number'
         }
     },
-    'c_despesas_analise': {
+    'c_dac_despesas_analise': {
         'nome': 'Despesas de Análise',
         'schema': 'categoricas',
         'colunas_editaveis': ['categoria_extra', 'tipo_transacao', 'descricao', 'correspondente', 'aplicacao'],
@@ -196,7 +196,7 @@ TABELAS_CONFIG = {
             'correspondente': 'text'
         }
     },
-    'c_despesas_provisao': {
+    'c_dac_despesas_provisao': {
         'nome': 'Despesas de Provisão',
         'schema': 'categoricas',
         'colunas_editaveis': ['despesa_provisao', 'descricao'],
@@ -267,6 +267,117 @@ TABELAS_CONFIG = {
             'referencia_normativa': 'text',
             'ordem': 'number'
         }
+    },
+    'c_alt_instrumento': {
+        'nome': 'Instrumentos Jurídicos para Alterações de Contrato',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['instrumento_alteracao', 'descricao', 'status'],
+        'colunas_obrigatorias': ['instrumento_alteracao'],
+        'labels': {
+            'instrumento_alteracao': 'Nome do Instrumento',
+            'descricao': 'Descrição',
+            'status': 'Status'
+        },
+        'colunas_filtro': ['instrumento_alteracao', 'status'],
+        'ordem': 'instrumento_alteracao',
+        'tipos_campo': {
+            'instrumento_alteracao': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'status': 'select',
+            'opcoes_status': ['ativo', 'inativo']
+        },
+        'inline_edit': True,
+        'inline_columns': ['status']
+    },
+    'c_alt_principios': {
+        'nome': 'Tipos de Alteração de Parceria',
+        'schema': 'categoricas',
+        'colunas_editaveis': [
+            'alt_tipo',
+            'alt_modalidade',
+            'alt_escopo',
+            'alt_campo',
+            'alt_fonte_recursos',
+            'alt_instrumento',
+            'alt_principios',
+            'status'
+        ],
+        'colunas_obrigatorias': ['alt_tipo'],
+        'labels': {
+            'alt_tipo': 'Tipo de Alteração',
+            'alt_modalidade': 'Modalidades Aplicáveis',
+            'alt_escopo': 'Escopo da Alteração',
+            'alt_campo': 'Campos/Cláusulas Afetados',
+            'alt_fonte_recursos': 'Fontes de Recursos',
+            'alt_instrumento': 'Instrumentos Jurídicos',
+            'alt_principios': 'Princípios Aplicáveis',
+            'status': 'Status'
+        },
+        'colunas_filtro': ['alt_tipo', 'alt_escopo', 'status'],
+        'ordem': 'alt_tipo',
+        'tipos_campo': {
+            'alt_tipo': 'text',
+            'alt_modalidade': 'checkbox_multiple',
+            'query_alt_modalidade': 'SELECT DISTINCT informacao FROM categoricas.c_tipo_contrato WHERE informacao IS NOT NULL ORDER BY informacao',
+            'alt_escopo': 'select',
+            'opcoes_alt_escopo': [
+                'Termo',
+                'Plano',
+                'Flutuante (Plano e Termo)',
+                'Não aplicável'
+            ],
+            'alt_campo': 'checkbox_multiple',
+            'opcoes_alt_campo': [
+                'Preâmbulo do Termo',
+                'Cláusulas do Termo',
+                'Cronograma de Desembolso',
+                'Campos do Plano de Trabalho',
+                'Quadro de Metas',
+                'Cronograma de Execução',
+                'Proposta Orçamentária'
+            ],
+            'alt_fonte_recursos': 'checkbox_multiple',
+            'query_alt_fonte_recursos': 'SELECT DISTINCT descricao FROM categoricas.c_origem_recurso WHERE descricao IS NOT NULL ORDER BY descricao',
+            'alt_instrumento': 'checkbox_multiple',
+            'query_alt_instrumento': 'SELECT DISTINCT instrumento_alteracao FROM categoricas.c_alt_instrumento WHERE instrumento_alteracao IS NOT NULL ORDER BY instrumento_alteracao',
+            'alt_principios': 'checkbox_multiple',
+            'query_alt_principios': 'SELECT nome_principio FROM categoricas.c_alt_principios WHERE status = \'ativo\' ORDER BY nome_principio',
+            'status': 'select',
+            'opcoes_status': ['ativo', 'inativo']
+        },
+        'inline_edit': True,
+        'inline_columns': ['status']
+    },
+    'c_alt_principios': {
+        'nome': 'Princípios para Alteração de Parceria',
+        'schema': 'categoricas',
+        'colunas_editaveis': [
+            'nome_principio',
+            'descricao_principio',
+            'exemplo_principio',
+            'status'
+        ],
+        'colunas_obrigatorias': ['nome_principio'],
+        'labels': {
+            'nome_principio': 'Nome do Princípio',
+            'descricao_principio': 'Descrição do Princípio',
+            'exemplo_principio': 'Exemplo de Aplicação',
+            'status': 'Status'
+        },
+        'colunas_filtro': ['nome_principio', 'status'],
+        'ordem': 'nome_principio',
+        'tipos_campo': {
+            'nome_principio': 'text',
+            'descricao_principio': 'textarea',
+            'rows_descricao_principio': 5,
+            'exemplo_principio': 'textarea',
+            'rows_exemplo_principio': 5,
+            'status': 'select',
+            'opcoes_status': ['ativo', 'inativo']
+        },
+        'inline_edit': True,
+        'inline_columns': ['status']
     }
 }
 
@@ -361,13 +472,14 @@ def obter_dados(tabela):
                 item['total_parcerias'] = contagem_parcerias['total'] if contagem_parcerias else 0
             cur.close()
         
-        # Buscar opções dinâmicas para selects
+        # Buscar opções dinâmicas para selects e checkboxes múltiplas
         import copy
         config_com_opcoes = copy.deepcopy(config)
         if 'tipos_campo' in config_com_opcoes:
             # Criar lista de itens antes de iterar para evitar modificação durante iteração
             items_list = list(config_com_opcoes['tipos_campo'].items())
             for campo, tipo in items_list:
+                # Processar select_dinamico
                 if tipo == 'select_dinamico':
                     query_key = f'query_{campo}'
                     if query_key in config_com_opcoes['tipos_campo']:
@@ -379,6 +491,25 @@ def obter_dados(tabela):
                         # Extrair valores da primeira coluna
                         opcoes = [list(row.values())[0] for row in opcoes_raw if list(row.values())[0]]
                         config_com_opcoes['tipos_campo'][f'opcoes_{campo}'] = opcoes
+                
+                # Processar checkbox_multiple com query dinâmica
+                elif tipo == 'checkbox_multiple':
+                    query_key = f'query_{campo}'
+                    opcoes_key = f'opcoes_{campo}'
+                    
+                    # Se tem query dinâmica, buscar do banco
+                    if query_key in config_com_opcoes['tipos_campo']:
+                        cur = get_cursor()
+                        cur.execute(config_com_opcoes['tipos_campo'][query_key])
+                        opcoes_raw = cur.fetchall()
+                        cur.close()
+                        
+                        # Extrair valores da primeira coluna
+                        opcoes = [list(row.values())[0] for row in opcoes_raw if list(row.values())[0]]
+                        config_com_opcoes['tipos_campo'][f'opcoes_{campo}'] = opcoes
+                    
+                    # Se já tem opcoes_campo definidas (opções fixas), manter
+                    # (não precisa fazer nada, já está na config)
         
         return jsonify({
             'dados': resultado,

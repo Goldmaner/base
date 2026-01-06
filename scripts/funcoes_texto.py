@@ -1171,7 +1171,7 @@ def processar_texto_automatico(texto_modelo, variaveis):
 
 def obter_modelo_texto(titulo_texto):
     """
-    Busca um modelo de texto na tabela categoricas.c_modelo_textos
+    Busca um modelo de texto na tabela categoricas.c_geral_modelo_textos
     
     Parâmetros:
     - titulo_texto: título do modelo a buscar
@@ -1182,7 +1182,7 @@ def obter_modelo_texto(titulo_texto):
     try:
         query = """
             SELECT titulo_texto, modelo_texto
-            FROM categoricas.c_modelo_textos
+            FROM categoricas.c_geral_modelo_textos
             WHERE titulo_texto = %s
             LIMIT 1
         """

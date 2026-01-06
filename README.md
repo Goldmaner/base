@@ -466,7 +466,7 @@ O sistema suporta **dois ambientes** de banco de dados:
 | `c_tipo_contrato` | Catálogo de tipos de contrato |
 | `c_portarias` | Portarias e legislações |
 | `c_pessoas_gestoras` | Pessoas gestoras |
-| `c_modelo_textos` | Modelos de texto parametrizados |
+| `c_geral_legislacao` | Modelos de texto parametrizados |
 | `termos_rescindidos` | Termos rescindidos |
 
 #### **Schema `analises_pc`**

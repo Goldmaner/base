@@ -12,7 +12,7 @@ Use este checklist para validar a implementação do módulo.
 - [x] Constraint UNIQUE configurada
 - [x] Dependências externas existem
   - [x] `public.parcerias.numero_termo`
-  - [x] `categoricas.c_analistas.nome_analista`
+  - [x] `categoricas.c_dac_analistas.nome_analista`
 
 ## 📁 Arquivos
 

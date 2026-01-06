@@ -467,7 +467,7 @@ def api_categorias_analise():
         
         query = """
             SELECT categoria_extra, tipo_transacao, descricao, correspondente
-            FROM categoricas.c_despesas_analise
+            FROM categoricas.c_dac_despesas_analise
         """
         params = []
         
@@ -821,7 +821,7 @@ def api_categorias_aplicabilidade():
         
         query = """
             SELECT categoria_extra, COALESCE(aplicacao, false) as aplicacao
-            FROM categoricas.c_despesas_analise
+            FROM categoricas.c_dac_despesas_analise
             WHERE categoria_extra IS NOT NULL
         """
         
@@ -966,7 +966,7 @@ def api_salvar_documentos_analise():
                     e.competencia, e.origem_destino, e.cat_avaliacao,
                     ca.aplicacao
                 FROM analises_pc.conc_extrato e
-                LEFT JOIN categoricas.c_despesas_analise ca ON e.cat_transacao = ca.categoria_extra
+                LEFT JOIN categoricas.c_dac_despesas_analise ca ON e.cat_transacao = ca.categoria_extra
                 WHERE e.id = %s
             """, (conc_extrato_id,))
             

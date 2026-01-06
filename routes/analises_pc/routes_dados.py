@@ -111,7 +111,7 @@ def listar_portarias():
     try:
         cur.execute("""
             SELECT DISTINCT lei
-            FROM categoricas.c_legislacao
+            FROM categoricas.c_geral_legislacao
             WHERE lei IS NOT NULL AND lei != ''
             ORDER BY lei
         """)
@@ -667,7 +667,7 @@ def gerar_texto_ausencia_extratos():
         # Buscar modelo de texto
         cur.execute("""
             SELECT modelo_texto
-            FROM categoricas.c_modelo_textos
+            FROM categoricas.c_geral_modelo_textos
             WHERE titulo_texto = 'Análise de Contas: Ausência de extratos bancários pós-2023'
             LIMIT 1
         """)
@@ -937,7 +937,7 @@ def gerar_texto_relatorio_inconsistencias():
         # Buscar template do modelo de texto
         query_modelo = """
             SELECT titulo_texto, modelo_texto 
-            FROM categoricas.c_modelo_textos 
+            FROM categoricas.c_geral_modelo_textos 
             WHERE titulo_texto = %s
         """
         
@@ -1073,7 +1073,7 @@ def gerar_texto_relatorio_inconsistencias():
         
         if todos_nomes:
             cur.execute("""
-                SELECT id, nome_item, modelo_texto, ordem
+                SELECT id, nome_item, modelo_texto, ordem, solucao
                 FROM categoricas.c_modelo_textos_inconsistencias
                 WHERE nome_item = ANY(%s)
                 ORDER BY ordem
@@ -1101,12 +1101,17 @@ def gerar_texto_relatorio_inconsistencias():
                 else:
                     texto_inc = modelo['modelo_texto']
                 
-                # Limpar HTML do texto (remover tags, manter apenas conteúdo)
-                texto_inc_limpo = re.sub(r'<[^>]+>', '', texto_inc)
+                # LIMPAR TODO HTML - remover TODAS as tags de formatação
+                # Limpeza agressiva: remove tags HTML E entidades
+                nome_limpo = re.sub(r'<[^>]+>', '', str(nome))  # Limpar nome_item
+                nome_limpo = nome_limpo.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>')
+                
+                texto_inc_limpo = re.sub(r'<[^>]+>', '', str(texto_inc))  # Limpar descrição
+                texto_inc_limpo = texto_inc_limpo.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>')
                 
                 # Abrir item da lista
                 lista_formatada_html += f'<li class="Texto_Justificado" style="margin-bottom: 11px;">'
-                lista_formatada_html += f'<p class="Texto_Justificado"><b>{nome}:&nbsp;</b>{texto_inc_limpo}<br></p>'
+                lista_formatada_html += f'<p class="Texto_Justificado"><b>{nome_limpo}:</b>&nbsp;{texto_inc_limpo}</p>'
                 
                 # ========== ADICIONAR TABELA SE HOUVER TRANSAÇÕES PADRÃO ==========
                 if nome in transacoes_por_item and transacoes_por_item[nome]:
@@ -1151,6 +1156,13 @@ def gerar_texto_relatorio_inconsistencias():
                         lista_formatada_html += '</tr>'
                     
                     lista_formatada_html += '</tbody></table></div>'
+                    
+                    # Adicionar texto de solução se disponível (LIMPAR HTML)
+                    if modelo.get('solucao') and str(modelo['solucao']).strip():
+                        solucao_texto = str(modelo['solucao'])
+                        solucao_limpa = re.sub(r'<[^>]+>', '', solucao_texto)
+                        solucao_limpa = solucao_limpa.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>')
+                        lista_formatada_html += f'<p class="Texto_Justificado"><br><b>Solução/Regularização:</b> {solucao_limpa}</p>'
                 
                 # ========== ADICIONAR TABELA AGREGADA (Cards 17, 18, 21, 22) ==========
                 elif nome in agregadas_por_item and agregadas_por_item[nome]:
@@ -1186,6 +1198,13 @@ def gerar_texto_relatorio_inconsistencias():
                             lista_formatada_html += '</tr>'
                         
                         lista_formatada_html += '</tbody></table></div>'
+                        
+                        # Adicionar texto de solução se disponível (LIMPAR HTML)
+                        if modelo.get('solucao') and str(modelo['solucao']).strip():
+                            solucao_texto = str(modelo['solucao'])
+                            solucao_limpa = re.sub(r'<[^>]+>', '', solucao_texto)
+                            solucao_limpa = solucao_limpa.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>')
+                            lista_formatada_html += f'<p class="Texto_Justificado"><br><b>Solução/Regularização:</b> {solucao_limpa}</p>'
                     
                     # Distinguir entre Card 18 (Despesas sem previsão) e Cards 21/22 (Aplicações)
                     elif dados[0].get('valor_executado') or dados[0].get('campo1'):
@@ -1218,6 +1237,13 @@ def gerar_texto_relatorio_inconsistencias():
                                 lista_formatada_html += '</tr>'
                             
                             lista_formatada_html += '</tbody></table></div>'
+                            
+                            # Adicionar texto de solução se disponível (LIMPAR HTML)
+                            if modelo.get('solucao') and str(modelo['solucao']).strip():
+                                solucao_texto = str(modelo['solucao'])
+                                solucao_limpa = re.sub(r'<[^>]+>', '', solucao_texto)
+                                solucao_limpa = solucao_limpa.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>')
+                                lista_formatada_html += f'<p class="Texto_Justificado"><br><b>Solução/Regularização:</b> {solucao_limpa}</p>'
                         else:
                             # Cards 21/22: Aplicação 48h / Aplicação Divergente (apenas Data e Valor)
                             lista_formatada_html += '<p class="Texto_Justificado">&nbsp;Aplicações Identificadas</p>'
@@ -1269,6 +1295,21 @@ def gerar_texto_relatorio_inconsistencias():
                                 lista_formatada_html += '</tr>'
                             
                             lista_formatada_html += '</tbody></table></div>'
+                            
+                            # Adicionar texto de solução se disponível (LIMPAR HTML)
+                            if modelo.get('solucao') and str(modelo['solucao']).strip():
+                                solucao_texto = str(modelo['solucao'])
+                                solucao_limpa = re.sub(r'<[^>]+>', '', solucao_texto)
+                                solucao_limpa = solucao_limpa.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>')
+                                lista_formatada_html += f'<p class="Texto_Justificado"><br><b>Solução/Regularização:</b> {solucao_limpa}</p>'
+                
+                # Adicionar solução para cards sem tabelas (caso existam)
+                else:
+                    if modelo.get('solucao') and str(modelo['solucao']).strip():
+                        solucao_texto = str(modelo['solucao'])
+                        solucao_limpa = re.sub(r'<[^>]+>', '', solucao_texto)
+                        solucao_limpa = solucao_limpa.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>')
+                        lista_formatada_html += f'<p class="Texto_Justificado"><br><b>Solução/Regularização:</b> {solucao_limpa}</p>'
                 
                 # Fechar item da lista
                 lista_formatada_html += '</li>'

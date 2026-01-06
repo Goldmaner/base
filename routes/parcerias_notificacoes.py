@@ -79,7 +79,7 @@ def api_listar_notificacoes():
                 cdp.prazo_dias
             FROM parcerias_notificacoes pn
             LEFT JOIN parcerias p ON pn.numero_termo = p.numero_termo
-            LEFT JOIN categoricas.c_documentos_dp_prazos cdp 
+            LEFT JOIN categoricas.c_dp_documentos_prazos cdp 
                 ON pn.tipo_doc = cdp.tipo_documento 
                 AND p.portaria = cdp.lei
             WHERE 1=1
@@ -395,7 +395,7 @@ def api_listar_tipos_documento():
             # Mostrar todos os tipos
             cur.execute("""
                 SELECT DISTINCT tipo_documento, orgao_emissor
-                FROM categoricas.c_documentos_dp
+                FROM categoricas.c_dp_documentos
                 WHERE tipo_documento IS NOT NULL
                 ORDER BY tipo_documento
             """)
@@ -403,7 +403,7 @@ def api_listar_tipos_documento():
             # Apenas documentos da Divisão de Análise de Contas
             cur.execute("""
                 SELECT DISTINCT tipo_documento, orgao_emissor
-                FROM categoricas.c_documentos_dp
+                FROM categoricas.c_dp_documentos
                 WHERE orgao_emissor = 'Divisão de Análise de Contas'
                   AND tipo_documento IS NOT NULL
                 ORDER BY tipo_documento
@@ -412,7 +412,7 @@ def api_listar_tipos_documento():
             # Apenas documentos da Divisão de Gestão de Parcerias
             cur.execute("""
                 SELECT DISTINCT tipo_documento, orgao_emissor
-                FROM categoricas.c_documentos_dp
+                FROM categoricas.c_dp_documentos
                 WHERE orgao_emissor = 'Divisão de Gestão de Parcerias'
                   AND tipo_documento IS NOT NULL
                 ORDER BY tipo_documento
@@ -453,11 +453,11 @@ def api_listar_analistas():
             # Buscar de ambas as tabelas
             cur.execute("""
                 SELECT DISTINCT nome_analista
-                FROM categoricas.c_analistas
+                FROM categoricas.c_dac_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
                 UNION
                 SELECT DISTINCT nome_analista
-                FROM categoricas.c_analistas_dgp
+                FROM categoricas.c_dac_dgp_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
                 ORDER BY nome_analista
             """)
@@ -467,7 +467,7 @@ def api_listar_analistas():
             # Apenas analistas DAC
             cur.execute("""
                 SELECT DISTINCT nome_analista
-                FROM categoricas.c_analistas
+                FROM categoricas.c_dac_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
                 ORDER BY nome_analista
             """)
@@ -477,7 +477,7 @@ def api_listar_analistas():
             # Apenas analistas DGP
             cur.execute("""
                 SELECT DISTINCT nome_analista
-                FROM categoricas.c_analistas_dgp
+                FROM categoricas.c_dac_dgp_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
                 ORDER BY nome_analista
             """)
@@ -614,7 +614,7 @@ def api_calcular_prazo():
         # Buscar prazo_dias baseado em tipo_doc e portaria do termo
         cur.execute("""
             SELECT cdp.prazo_dias
-            FROM categoricas.c_documentos_dp_prazos cdp
+            FROM categoricas.c_dp_documentos_prazos cdp
             INNER JOIN parcerias p ON cdp.lei = p.portaria
             WHERE cdp.tipo_documento = %s 
             AND p.numero_termo = %s

@@ -263,6 +263,20 @@ def atualizar_usuario(user_id):
         get_db().commit()
         cur.close()
         
+        # IMPORTANTE: Atualizar sessão do usuário se ele estiver logado
+        # Isso permite que as permissões sejam aplicadas imediatamente
+        if 'user_id' in session and session['user_id'] == user_id:
+            # Recarregar dados do usuário na sessão atual
+            cur = get_cursor()
+            cur.execute("SELECT tipo_usuario, acessos FROM usuarios WHERE id = %s", (user_id,))
+            updated_user = cur.fetchone()
+            cur.close()
+            
+            if updated_user:
+                session['tipo_usuario'] = updated_user['tipo_usuario']
+                session['acessos'] = updated_user['acessos'] or ""
+                print(f"[INFO] Sessão atualizada para usuário ID {user_id}")
+        
         return jsonify({"mensagem": "Usuário atualizado com sucesso"}), 200
     except Exception as e:
         get_db().rollback()

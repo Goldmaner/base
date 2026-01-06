@@ -66,7 +66,7 @@ def api_tipos_documentos():
             # Buscar tipos que contenham a string (case-insensitive)
             cur.execute("""
                 SELECT DISTINCT tipo_documento
-                FROM categoricas.c_documentos_dp_prazos
+                FROM categoricas.c_dp_documentos_prazos
                 WHERE LOWER(tipo_documento) LIKE LOWER(%s)
                 ORDER BY tipo_documento
                 LIMIT 20
@@ -75,7 +75,7 @@ def api_tipos_documentos():
             # Retornar todos os tipos
             cur.execute("""
                 SELECT DISTINCT tipo_documento
-                FROM categoricas.c_documentos_dp_prazos
+                FROM categoricas.c_dp_documentos_prazos
                 ORDER BY tipo_documento
             """)
         
@@ -175,24 +175,24 @@ document.getElementById('tipoDoc').addEventListener('input', function() {
 
 #### 1. Índice para Busca Case-Insensitive
 ```sql
-CREATE INDEX IF NOT EXISTS idx_c_documentos_dp_prazos_tipo_documento_lower 
-ON categoricas.c_documentos_dp_prazos (LOWER(tipo_documento));
+CREATE INDEX IF NOT EXISTS idx_c_dp_documentos_prazos_tipo_documento_lower 
+ON categoricas.c_dp_documentos_prazos (LOWER(tipo_documento));
 ```
 - **Uso**: Autocomplete com ILIKE/LIKE
 - **Benefício**: Acelera buscas case-insensitive em até 100x
 
 #### 2. Índice para Busca Exata
 ```sql
-CREATE INDEX IF NOT EXISTS idx_c_documentos_dp_prazos_tipo_documento 
-ON categoricas.c_documentos_dp_prazos (tipo_documento);
+CREATE INDEX IF NOT EXISTS idx_c_dp_documentos_prazos_tipo_documento 
+ON categoricas.c_dp_documentos_prazos (tipo_documento);
 ```
 - **Uso**: JOINs e comparações exatas
 - **Benefício**: Otimiza joins entre tabelas
 
 #### 3. Índice Composto para Cálculo de Prazos
 ```sql
-CREATE INDEX IF NOT EXISTS idx_c_documentos_dp_prazos_tipo_lei 
-ON categoricas.c_documentos_dp_prazos (tipo_documento, lei);
+CREATE INDEX IF NOT EXISTS idx_c_dp_documentos_prazos_tipo_lei 
+ON categoricas.c_dp_documentos_prazos (tipo_documento, lei);
 ```
 - **Uso**: Buscar prazo_dias por tipo_documento + lei
 - **Benefício**: Reduz tempo de cálculo de prazos
@@ -210,7 +210,7 @@ Ou execute manualmente no pgAdmin/DBeaver.
 SELECT indexname, indexdef 
 FROM pg_indexes 
 WHERE schemaname = 'categoricas' 
-AND tablename = 'c_documentos_dp_prazos';
+AND tablename = 'c_dp_documentos_prazos';
 ```
 
 ### Testar Performance
@@ -218,23 +218,23 @@ AND tablename = 'c_documentos_dp_prazos';
 -- Teste de autocomplete (deve usar índice LOWER)
 EXPLAIN ANALYZE 
 SELECT DISTINCT tipo_documento
-FROM categoricas.c_documentos_dp_prazos
+FROM categoricas.c_dp_documentos_prazos
 WHERE LOWER(tipo_documento) LIKE LOWER('%ofício%')
 ORDER BY tipo_documento
 LIMIT 20;
 
--- Resultado esperado: "Index Scan using idx_c_documentos_dp_prazos_tipo_documento_lower"
+-- Resultado esperado: "Index Scan using idx_c_dp_documentos_prazos_tipo_documento_lower"
 ```
 
 ### Manutenção Recomendada
 - **Reindexação periódica** (mensal ou após muitas inserções):
   ```sql
-  REINDEX TABLE categoricas.c_documentos_dp_prazos;
+  REINDEX TABLE categoricas.c_dp_documentos_prazos;
   ```
 
 - **Atualizar estatísticas** (já incluído no script):
   ```sql
-  ANALYZE categoricas.c_documentos_dp_prazos;
+  ANALYZE categoricas.c_dp_documentos_prazos;
   ```
 
 ---
@@ -299,7 +299,7 @@ LIMIT 20;
 **Causa**: Estatísticas desatualizadas
 **Solução**: 
 ```sql
-ANALYZE categoricas.c_documentos_dp_prazos;
+ANALYZE categoricas.c_dp_documentos_prazos;
 ```
 
 ---
