@@ -1,5 +1,5 @@
 """
-Script para verificar as colunas da tabela c_pessoa_gestora
+Script para verificar as colunas da tabela c_geral_pessoa_gestora
 """
 
 import sys
@@ -9,7 +9,7 @@ import psycopg2
 import psycopg2.extras
 from config import DB_CONFIG
 
-print("=== Verificando estrutura da tabela c_pessoa_gestora ===\n")
+print("=== Verificando estrutura da tabela c_geral_pessoa_gestora ===\n")
 
 conn = psycopg2.connect(**DB_CONFIG)
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -19,7 +19,7 @@ cur.execute("""
     SELECT column_name, data_type, is_nullable
     FROM information_schema.columns
     WHERE table_schema = 'categoricas'
-    AND table_name = 'c_pessoa_gestora'
+    AND table_name = 'c_geral_pessoa_gestora'
     ORDER BY ordinal_position
 """)
 
@@ -48,7 +48,7 @@ print("\n" + "=" * 60)
 # Mostrar alguns registros de exemplo
 print("\nRegistros de exemplo (primeiros 5):")
 cur.execute("""
-    SELECT * FROM categoricas.c_pessoa_gestora
+    SELECT * FROM categoricas.c_geral_pessoa_gestora
     ORDER BY id
     LIMIT 5
 """)

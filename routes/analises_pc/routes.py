@@ -1378,7 +1378,7 @@ def identificar_inconsistencias(numero_termo):
         print("[DEBUG] Buscando modelos de texto (otimizado)...")
         cur.execute("""
             SELECT id, nome_item, modelo_texto, solucao, ordem
-            FROM categoricas.c_modelo_textos_inconsistencias
+            FROM categoricas.c_dac_modelo_textos_inconsistencias
             WHERE id IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26)
             ORDER BY ordem
         """)
@@ -2674,7 +2674,7 @@ def ratificar_inconsistencia():
         # Buscar ID e modelo_texto da inconsistência
         cur.execute("""
             SELECT id, modelo_texto
-            FROM categoricas.c_modelo_textos_inconsistencias
+            FROM categoricas.c_dac_modelo_textos_inconsistencias
             WHERE nome_item = %s
             LIMIT 1
         """, (nome_item,))
@@ -3508,7 +3508,7 @@ def atualizar_status_inconsistencia():
         # Determinar qual tabela usar baseado no nome_item
         # Buscar id_inconsistencia para determinar tipo de card
         cur.execute("""
-            SELECT id FROM categoricas.c_modelo_textos_inconsistencias
+            SELECT id FROM categoricas.c_dac_modelo_textos_inconsistencias
             WHERE nome_item = %s
         """, (nome_item,))
         result = cur.fetchone()

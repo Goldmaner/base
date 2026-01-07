@@ -50,7 +50,7 @@ Este documento descreve as alterações implementadas para adicionar funcionalid
 ## 2. Dropdowns Categóricos
 
 ### Tabelas do Banco de Dados Utilizadas
-- `c_tipo_contrato` - Coluna: `informacao`
+- `c_geral_tipo_contrato` - Coluna: `informacao`
   - Valores: Acordo de Cooperação, Colaboração, Convênio, Convênio de Cooperação, Fomento, etc.
   
 - `c_geral_legislacao` - Coluna: `lei`
@@ -61,7 +61,7 @@ Este documento descreve as alterações implementadas para adicionar funcionalid
 #### Filtro de Parcerias
 **Arquivo:** `templates/parcerias.html`
 - Campo "Tipo de Termo" convertido de input text para dropdown
-- Opções carregadas dinamicamente da tabela `c_tipo_contrato`
+- Opções carregadas dinamicamente da tabela `c_geral_tipo_contrato`
 - Opção "-- Todos --" para limpar o filtro
 
 #### Formulário de Parcerias
@@ -74,7 +74,7 @@ Este documento descreve as alterações implementadas para adicionar funcionalid
 #### Backend
 **Arquivo:** `routes/parcerias.py`
 - Função `listar()`:
-  - Query para buscar `tipos_contrato` de `c_tipo_contrato`
+  - Query para buscar `tipos_contrato` de `c_geral_tipo_contrato`
   - Passa lista para o template
 
 - Função `nova()`:
@@ -191,7 +191,7 @@ FAF/
 ## Dependências
 
 ### Banco de Dados
-- Tabelas `c_tipo_contrato` e `c_geral_legislacao` devem existir e estar populadas
+- Tabelas `c_geral_tipo_contrato` e `c_geral_legislacao` devem existir e estar populadas
 - Queries SELECT para buscar opções dos dropdowns
 
 ### Frontend
@@ -251,7 +251,7 @@ LIMIT {limite_sql}  -- None = sem limite
 2. Adicionar nova `<option value="X">X linhas</option>`
 
 ### Adicionar Novo Dropdown
-1. Criar tabela categórica no banco com estrutura similar a `c_tipo_contrato`
+1. Criar tabela categórica no banco com estrutura similar a `c_geral_tipo_contrato`
 2. Adicionar query no route correspondente
 3. Passar lista para template
 4. Criar `<select>` no template HTML

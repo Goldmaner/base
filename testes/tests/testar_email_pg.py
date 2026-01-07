@@ -16,7 +16,7 @@ print("=== Pessoas Gestoras (primeiros 5 registros) ===\n")
 
 cur.execute("""
     SELECT id, nome_pg, setor, numero_rf, status_pg, email_pg
-    FROM categoricas.c_pessoa_gestora
+    FROM categoricas.c_geral_pessoa_gestora
     ORDER BY id
     LIMIT 5
 """)

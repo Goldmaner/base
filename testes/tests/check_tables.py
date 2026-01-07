@@ -14,9 +14,9 @@ tables = cur.fetchall()
 for table in tables:
     print(table['table_name'])
 
-print("\n=== c_tipo_contrato structure ===")
+print("\n=== c_geral_tipo_contrato structure ===")
 try:
-    cur.execute("SELECT * FROM categoricas.c_tipo_contrato LIMIT 5")
+    cur.execute("SELECT * FROM categoricas.c_geral_tipo_contrato LIMIT 5")
     rows = cur.fetchall()
     if rows:
         print("Columns:", rows[0].keys())

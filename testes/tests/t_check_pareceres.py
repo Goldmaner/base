@@ -22,7 +22,7 @@ cur.execute("""
         pg.setor,
         pg.status_pg,
         COUNT(pa.id) as total_pareceres
-    FROM categoricas.c_pessoa_gestora pg
+    FROM categoricas.c_geral_pessoa_gestora pg
     LEFT JOIN parcerias_analises pa ON pa.responsavel_pg = pg.nome_pg
     GROUP BY pg.id, pg.nome_pg, pg.setor, pg.status_pg
     ORDER BY total_pareceres DESC, pg.nome_pg

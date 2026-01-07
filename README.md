@@ -463,7 +463,7 @@ O sistema suporta **dois ambientes** de banco de dados:
 | `Parcerias` | Termos de parceria/fomento |
 | `Parcerias_Despesas` | Despesas mensais por rubrica |
 | `Usuarios` | Controle de acesso |
-| `c_tipo_contrato` | Catálogo de tipos de contrato |
+| `c_geral_tipo_contrato` | Catálogo de tipos de contrato |
 | `c_portarias` | Portarias e legislações |
 | `c_pessoas_gestoras` | Pessoas gestoras |
 | `c_geral_legislacao` | Modelos de texto parametrizados |

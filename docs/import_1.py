@@ -105,7 +105,7 @@ def obter_lookups(conn):
     cursor = conn.cursor()
     
     # Lookup de responsabilidade_analise
-    cursor.execute("SELECT id, nome_setor FROM categoricas.c_responsabilidade_analise")
+    cursor.execute("SELECT id, nome_setor FROM categoricas.c_dac_responsabilidade_analise")
     responsabilidade_map = {row[1].strip().lower(): row[0] for row in cursor.fetchall()}
     
     # Lookup de analistas
@@ -178,7 +178,7 @@ def criar_tabela_se_nao_existir(conn):
             vigencia_inicial DATE NOT NULL,
             vigencia_final DATE NOT NULL,
             numero_termo VARCHAR(100),
-            responsabilidade_analise INTEGER REFERENCES categoricas.c_responsabilidade_analise(id),
+            responsabilidade_analise INTEGER REFERENCES categoricas.c_dac_responsabilidade_analise(id),
             entregue BOOLEAN NOT NULL,
             cobrado BOOLEAN NOT NULL,
             e_notificacao BOOLEAN NOT NULL,

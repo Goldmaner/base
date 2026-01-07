@@ -12,7 +12,7 @@ import copy
 
 # Simular a configuração
 TABELAS_CONFIG = {
-    'c_pessoa_gestora': {
+    'c_geral_pessoa_gestora': {
         'nome': 'Pessoas Gestoras',
         'schema': 'categoricas',
         'colunas_editaveis': ['nome_pg', 'setor', 'numero_rf', 'status_pg', 'email_pg'],
@@ -20,7 +20,7 @@ TABELAS_CONFIG = {
         'ordem': 'nome_pg',
         'tipos_campo': {
             'setor': 'select_dinamico',
-            'query_setor': 'SELECT DISTINCT setor FROM categoricas.c_pessoa_gestora WHERE setor IS NOT NULL ORDER BY setor',
+            'query_setor': 'SELECT DISTINCT setor FROM categoricas.c_geral_pessoa_gestora WHERE setor IS NOT NULL ORDER BY setor',
             'status_pg': 'select',
             'opcoes_status_pg': ['Ativo', 'Inativo', 'Desconhecido']
         }
@@ -30,9 +30,9 @@ TABELAS_CONFIG = {
 print("=== Teste da função obter_dados ===\n")
 
 try:
-    config = TABELAS_CONFIG['c_pessoa_gestora']
+    config = TABELAS_CONFIG['c_geral_pessoa_gestora']
     schema = config['schema']
-    tabela = 'c_pessoa_gestora'
+    tabela = 'c_geral_pessoa_gestora'
     colunas = ['id'] + config['colunas_editaveis']
     ordem = config['ordem']
     

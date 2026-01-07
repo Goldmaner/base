@@ -12,11 +12,11 @@ from config import DB_CONFIG
 conn = psycopg2.connect(**DB_CONFIG)
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-print("=== Setores cadastrados em c_pessoa_gestora ===\n")
+print("=== Setores cadastrados em c_geral_pessoa_gestora ===\n")
 
 cur.execute("""
     SELECT DISTINCT setor 
-    FROM categoricas.c_pessoa_gestora 
+    FROM categoricas.c_geral_pessoa_gestora 
     WHERE setor IS NOT NULL 
     ORDER BY setor
 """)
@@ -35,7 +35,7 @@ print("\nDistribuição de pessoas por setor:\n")
 
 cur.execute("""
     SELECT setor, COUNT(*) as total
-    FROM categoricas.c_pessoa_gestora
+    FROM categoricas.c_geral_pessoa_gestora
     WHERE setor IS NOT NULL
     GROUP BY setor
     ORDER BY setor

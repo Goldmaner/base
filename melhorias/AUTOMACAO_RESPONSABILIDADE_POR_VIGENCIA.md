@@ -219,7 +219,7 @@ analises.push({
 - `parcerias.portaria` (VARCHAR) - Portaria do termo
 - `parcerias_analises.vigencia_inicial` (DATE) - Início da prestação
 - `parcerias_analises.vigencia_final` (DATE) - **Término da prestação** (usado para determinar responsabilidade)
-- `parcerias_analises.responsabilidade_analise` (INTEGER) - FK para c_responsabilidade_analise (1=DP, 2=Compartilhada, 3=PG)
+- `parcerias_analises.responsabilidade_analise` (INTEGER) - FK para c_dac_responsabilidade_analise (1=DP, 2=Compartilhada, 3=PG)
 
 ---
 

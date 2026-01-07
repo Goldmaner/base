@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Alterações DGP - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <!-- Select2 para dropdown com busca -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      padding: 20px; 
+    }
+    .header-section { 
+      background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+      color: white;
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .form-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table th { 
+      background-color: #0d6efd; 
+      color: white; 
+      white-space: nowrap; 
+    }
+    .btn-action { 
+      padding: 5px 15px; 
+      font-size: 0.85rem;
+    }
+    .select2-container { 
+      width: 100% !important; 
+    }
+    .alert-info-custom {
+      background-color: #e7f3ff;
+      border-left: 4px solid #0d6efd;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .tipo-alteracao-secao {
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 15px;
+      background-color: #f8f9fa;
+    }
+    .tipo-alteracao-secao.active {
+      border-color: #0d6efd;
+      background-color: #e7f3ff;
+    }
+    .btn-remover-tipo {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="bi bi-arrow-repeat"></i> Alterações DGP</h2>
+          <p class="mb-0">Cadastro e gerenciamento de alterações em termos de parceria</p>
+        </div>
+        <div>
+          <a href="{{ url_for('parcerias.listar') }}" class="btn btn-light">
+            <i class="bi bi-arrow-left"></i> Voltar para Parcerias
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensagens Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Botão para Abrir Modal de Cadastro -->
+    <div class="mb-4 text-end">
+      <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#modalCadastroAlteracao">
+        <i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração
+      </button>
+    </div>
+
+    <!-- Modal de Cadastro de Alteração -->
+    <div class="modal fade" id="modalCadastroAlteracao" tabindex="-1" aria-labelledby="modalCadastroLabel" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="modalCadastroLabel">
+              <i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert-info-custom">
+              <i class="bi bi-info-circle-fill"></i> 
+              <strong>Importante:</strong> Você pode cadastrar múltiplos tipos de alteração para um mesmo termo. 
+              Cada tipo será salvo como um registro separado.
+            </div>
+
+            <form method="POST" action="{{ url_for('parcerias.salvar_alteracao') }}" id="formAlteracao">
+        
+        <!-- SEÇÃO 1: Dados Gerais -->
+        <div class="mb-4">
+          <h5 class="border-bottom pb-2 mb-3">
+            <i class="bi bi-file-text"></i> Dados Gerais da Alteração
+          </h5>
+
+          <div class="row g-3">
+            <!-- Número do Termo -->
+            <div class="col-md-6">
+              <label for="numero_termo" class="form-label">
+                <i class="bi bi-file-earmark-text"></i> Número do Termo *
+              </label>
+              <select class="form-select" id="numero_termo" name="numero_termo" required>
+                <option value="">Digite para buscar...</option>
+              </select>
+              <small class="text-muted">Selecione o termo que receberá a alteração</small>
+            </div>
+
+            <!-- Instrumento Jurídico (preenchido automaticamente) -->
+            <div class="col-md-6">
+              <label for="instrumento_alteracao" class="form-label">
+                <i class="bi bi-file-earmark-medical"></i> Instrumento Jurídico *
+              </label>
+              <select class="form-select" id="instrumento_alteracao" name="instrumento_alteracao" required>
+                <option value="">-- Selecione --</option>
+                <option value="Termo de Aditamento">Termo de Aditamento</option>
+                <option value="Termo de Apostilamento">Termo de Apostilamento</option>
+                <option value="Termo de Apostilamento do Aditamento">Termo de Apostilamento do Aditamento</option>
+                <option value="Informação DGP">Informação DGP</option>
+                <option value="Despacho Autorizatório">Despacho Autorizatório</option>
+                <option value="Informação da Pessoa Gestora">Informação da Pessoa Gestora</option>
+              </select>
+              <small class="text-muted">Preenchido automaticamente, mas pode ser alterado manualmente</small>
+            </div>
+          </div>
+
+          <!-- Numeração da Alteração -->
+          <div class="row g-3 mt-2" id="numeracao-container" style="display: none;">
+            <div class="col-md-12">
+              <label class="form-label">
+                <i class="bi bi-hash"></i> Numeração da Alteração *
+              </label>
+            </div>
+
+            <!-- Campo para Aditamento/Apostilamento simples -->
+            <div class="col-md-6" id="numero-simples-container" style="display: none;">
+              <input type="number" class="form-control" id="alt_numero_simples" 
+                     min="1" max="99" placeholder="Digite um número de 1 a 99">
+              <small class="text-muted">Número do Termo de Aditamento ou Apostilamento (1 a 99)</small>
+            </div>
+
+            <!-- Campos para Apostilamento do Aditamento -->
+            <div class="col-md-3" id="numero-apostilamento-container" style="display: none;">
+              <label for="alt_numero_apostilamento" class="form-label">Nº Apostilamento</label>
+              <input type="number" class="form-control" id="alt_numero_apostilamento" 
+                     min="1" max="9" placeholder="1-9">
+              <small class="text-muted">Número do Apostilamento</small>
+            </div>
+
+            <div class="col-md-3" id="numero-aditamento-container" style="display: none;">
+              <label for="alt_numero_aditamento" class="form-label">Nº Aditamento</label>
+              <input type="number" class="form-control" id="alt_numero_aditamento" 
+                     min="1" max="99" placeholder="1-99">
+              <small class="text-muted">Número do Aditamento</small>
+            </div>
+
+            <!-- Campo hidden para enviar o número final -->
+            <input type="hidden" id="alt_numero" name="alt_numero" value="0">
+          </div>
+        </div>
+
+        <!-- SEÇÃO 2: Tipos de Alteração (Dinâmica) -->
+        <div class="mb-4">
+          <h5 class="border-bottom pb-2 mb-3">
+            <i class="bi bi-list-check"></i> Tipos de Alteração
+          </h5>
+
+          <div id="tipos-alteracao-container">
+            <!-- Primeira seção de tipo (gerada via JavaScript) -->
+          </div>
+
+              <button type="button" class="btn btn-outline-primary" id="btn-adicionar-tipo">
+                <i class="bi bi-plus-circle"></i> Adicionar Mais um Tipo de Alteração
+              </button>
+            </div>
+
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <button type="submit" form="formAlteracao" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Salvar Alteração(ões)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Modal de Confirmação de Exclusão -->
+    <div class="modal fade" id="modalExcluir" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title">
+              <i class="bi bi-exclamation-triangle-fill"></i> Confirmar Exclusão
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Tem certeza que deseja excluir TODAS as alterações cadastradas para:</p>
+            <div class="alert alert-warning">
+              <strong>Termo:</strong> <span id="termoExcluir"></span><br>
+              <strong>Instrumento:</strong> <span id="instrumentoExcluir"></span><br>
+              <strong>Numeração:</strong> <span id="numeroExcluir"></span>
+            </div>
+            <p class="text-muted small">Esta ação não pode ser desfeita e excluirá todos os tipos de alteração vinculados.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="bi bi-x-circle"></i> Cancelar
+            </button>
+            <form id="formExcluir" method="POST" style="display: inline;">
+              <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash"></i> Confirmar Exclusão
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela de Alterações Cadastradas -->
+    <div class="table-section">
+      <h4 class="mb-4">
+        <i class="bi bi-table"></i> Alterações Cadastradas
+        <span class="badge bg-primary">{{ alteracoes|length if alteracoes else 0 }}</span>
+      </h4>
+
+      {% if alteracoes %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped">
+            <thead>
+              <tr>
+                <th style="width: 20%;">Número do Termo</th>
+                <th style="width: 20%;">Instrumento</th>
+                <th style="width: 10%;">Numeração</th>
+                <th style="width: 30%;">Tipos de Alteração</th>
+                <th style="width: 10%;" class="text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for alteracao in alteracoes %}
+                <tr>
+                  <td><strong>{{ alteracao.numero_termo }}</strong></td>
+                  <td>{{ alteracao.instrumento_alteracao }}</td>
+                  <td class="text-center">
+                    {% if alteracao.alt_numero == 0 %}
+                      <span class="badge bg-secondary">N/A</span>
+                    {% elif alteracao.alt_numero >= 100 %}
+                      <span class="badge bg-info">
+                        {{ (alteracao.alt_numero // 100) }}/{{ (alteracao.alt_numero % 100) }}
+                      </span>
+                    {% else %}
+                      <span class="badge bg-primary">{{ alteracao.alt_numero }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if alteracao.tipos_alteracao %}
+                      {% set tipos = alteracao.tipos_alteracao.split(', ') %}
+                      {% for tipo in tipos %}
+                        <span class="badge bg-success me-1">{{ tipo }}</span>
+                      {% endfor %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <button class="btn btn-sm btn-warning btn-action" 
+                            onclick="editarAlteracao('{{ alteracao.numero_termo }}', '{{ alteracao.instrumento_alteracao }}', {{ alteracao.alt_numero }})"
+                            title="Editar alteração">
+                      <i class="bi bi-pencil"></i> Editar
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-action" 
+                            onclick="confirmarExclusao('{{ alteracao.numero_termo }}', '{{ alteracao.instrumento_alteracao }}', {{ alteracao.alt_numero }})"
+                            title="Excluir alteração">
+                      <i class="bi bi-trash"></i> Excluir
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Nenhuma alteração cadastrada ainda.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script>
+    // Dados dos tipos de alteração vindos do backend
+    const tiposAlteracao = {{ tipos_alteracao|tojson if tipos_alteracao else '[]'|safe }};
+    const instrumentos = {{ instrumentos|tojson if instrumentos else '[]'|safe }};
+    
+    let contadorTipos = 0;
+    let tiposSelecionados = new Set();
+
+    $(document).ready(function() {
+      // Adicionar primeira seção de tipo de alteração
+      adicionarSecaoTipo();
+    });
+
+    // Inicializar Select2 quando o modal for aberto
+    $('#modalCadastroAlteracao').on('shown.bs.modal', function() {
+      // Inicializar Select2 para número do termo dentro do modal
+      $('#numero_termo').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Digite para buscar o termo...',
+        allowClear: true,
+        minimumInputLength: 2,
+        dropdownParent: $('#modalCadastroAlteracao'), // IMPORTANTE: Para funcionar dentro do modal
+        ajax: {
+          url: '{{ url_for("parcerias.api_termos_parcerias") }}',
+          dataType: 'json',
+          delay: 250,
+          data: function(params) {
+            return { q: params.term };
+          },
+          processResults: function(data) {
+            return {
+              results: data.map(function(termo) {
+                return { id: termo, text: termo };
+              })
+            };
+          },
+          cache: true
+        },
+        language: {
+          inputTooShort: function() {
+            return "Digite pelo menos 2 caracteres para buscar";
+          },
+          noResults: function() {
+            return "Nenhum termo encontrado";
+          },
+          searching: function() {
+            return "Buscando...";
+          }
+        }
+      });
+    });
+
+    // Limpar Select2 quando o modal for fechado
+    $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
+      $('#numero_termo').select2('destroy');
+      $('#formAlteracao')[0].reset();
+      // Resetar tipos de alteração
+      $('#tipos-alteracao-container').empty();
+      contadorTipos = 0;
+      adicionarSecaoTipo();
+    });
+
+    // Função para adicionar uma nova seção de tipo de alteração
+    function adicionarSecaoTipo() {
+      contadorTipos++;
+      const id = `tipo_${contadorTipos}`;
+
+      const html = `
+        <div class="tipo-alteracao-secao position-relative" id="${id}" data-index="${contadorTipos}">
+          ${contadorTipos > 1 ? `
+            <button type="button" class="btn btn-sm btn-danger btn-remover-tipo" onclick="removerSecaoTipo('${id}')">
+              <i class="bi bi-x"></i>
+            </button>
+          ` : ''}
+          
+          <h6 class="mb-3">
+            <i class="bi bi-tag"></i> Tipo de Alteração #${contadorTipos}
+          </h6>
+
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label for="alt_tipo_${contadorTipos}" class="form-label">
+                Selecione o Tipo de Alteração *
+              </label>
+              <select class="form-select tipo-select" id="alt_tipo_${contadorTipos}" 
+                      name="alt_tipo[]" required onchange="atualizarInstrumento()">
+                <option value="">-- Selecione --</option>
+                ${tiposAlteracao.map(tipo => `
+                  <option value="${tipo.alt_tipo}" data-instrumento="${tipo.alt_instrumento}">
+                    ${tipo.alt_tipo}
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+        </div>
+      `;
+
+      $('#tipos-alteracao-container').append(html);
+    }
+
+    // Botão adicionar mais tipo
+    $('#btn-adicionar-tipo').click(function() {
+      adicionarSecaoTipo();
+    });
+
+    // Função para remover seção de tipo
+    function removerSecaoTipo(id) {
+      const select = $(`#${id} select`);
+      const valor = select.val();
+      if (valor) {
+        tiposSelecionados.delete(valor);
+      }
+      $(`#${id}`).remove();
+      atualizarInstrumento();
+    }
+
+    // Atualizar instrumento baseado no primeiro tipo selecionado
+    function atualizarInstrumento() {
+      const primeiroTipo = $('.tipo-select').first();
+      const selectedOption = primeiroTipo.find('option:selected');
+      const instrumento = selectedOption.data('instrumento') || '';
+      
+      if (instrumento) {
+        $('#instrumento_alteracao').val(instrumento);
+        mostrarCamposNumeracao(instrumento);
+      }
+    }
+
+    // Listener para mudanças manuais no instrumento
+    $(document).on('change', '#instrumento_alteracao', function() {
+      mostrarCamposNumeracao($(this).val());
+    });
+
+    // Mostrar campos de numeração apropriados
+    function mostrarCamposNumeracao(instrumento) {
+      const container = $('#numeracao-container');
+      const simplesContainer = $('#numero-simples-container');
+      const apostilamentoContainer = $('#numero-apostilamento-container');
+      const aditamentoContainer = $('#numero-aditamento-container');
+
+      // Resetar
+      simplesContainer.hide();
+      apostilamentoContainer.hide();
+      aditamentoContainer.hide();
+      $('#alt_numero_simples').val('').prop('required', false);
+      $('#alt_numero_apostilamento').val('').prop('required', false);
+      $('#alt_numero_aditamento').val('').prop('required', false);
+      
+      if (!instrumento || 
+          instrumento === 'Informação DGP' || 
+          instrumento === 'Despacho Autorizatório' || 
+          instrumento === 'Informação da Pessoa Gestora') {
+        // Não numerável - campo some e valor fica 0
+        container.hide();
+        $('#alt_numero').val('0');
+      } else if (instrumento === 'Termo de Aditamento' || instrumento === 'Termo de Apostilamento') {
+        // Numeração simples (1 a 99)
+        container.show();
+        simplesContainer.show();
+        $('#alt_numero_simples').prop('required', true);
+      } else if (instrumento === 'Termo de Apostilamento do Aditamento') {
+        // Numeração composta (apostilamento + aditamento)
+        container.show();
+        apostilamentoContainer.show();
+        aditamentoContainer.show();
+        $('#alt_numero_apostilamento').prop('required', true);
+        $('#alt_numero_aditamento').prop('required', true);
+      } else {
+        container.hide();
+        $('#alt_numero').val('0');
+      }
+    }
+
+    // Calcular número final antes de submeter
+    $('#formAlteracao').submit(function(e) {
+      const instrumento = $('#instrumento_alteracao').val();
+      let numeroFinal = 0;
+
+      if (instrumento === 'Termo de Aditamento' || instrumento === 'Termo de Apostilamento') {
+        numeroFinal = parseInt($('#alt_numero_simples').val()) || 0;
+      } else if (instrumento === 'Termo de Apostilamento do Aditamento') {
+        const apostilamento = parseInt($('#alt_numero_apostilamento').val()) || 0;
+        const aditamento = parseInt($('#alt_numero_aditamento').val()) || 0;
+        // Formato: apostilamento * 100 + aditamento (ex: 1 e 1 = 101, 2 e 2 = 202)
+        numeroFinal = (apostilamento * 100) + aditamento;
+      }
+
+      $('#alt_numero').val(numeroFinal);
+    });
+
+    // Função para editar alteração
+    function editarAlteracao(numeroTermo, instrumento, altNumero) {
+      // Carregar dados via AJAX
+      $.ajax({
+        url: '/parcerias/alteracao/editar',
+        method: 'GET',
+        data: {
+          numero_termo: numeroTermo,
+          instrumento: instrumento,
+          alt_numero: altNumero
+        },
+        success: function(data) {
+          // Preencher o formulário com os dados
+          // Primeiro destruir o Select2 se existir
+          if ($('#numero_termo').hasClass('select2-hidden-accessible')) {
+            $('#numero_termo').select2('destroy');
+          }
+          
+          // Preencher campo de termo (adicionar opção se não existir)
+          $('#numero_termo').empty().append($('<option>', {
+            value: numeroTermo,
+            text: numeroTermo,
+            selected: true
+          }));
+          
+          // Preencher instrumento
+          $('#instrumento_alteracao').val(instrumento);
+          
+          // Preencher numeração
+          if (altNumero >= 100) {
+            // Apostilamento do Aditamento
+            const apostilamento = Math.floor(altNumero / 100);
+            const aditamento = altNumero % 100;
+            $('#alt_numero_apostilamento').val(apostilamento);
+            $('#alt_numero_aditamento').val(aditamento);
+          } else if (altNumero > 0) {
+            $('#alt_numero_simples').val(altNumero);
+          }
+          $('#alt_numero').val(altNumero);
+          
+          mostrarCamposNumeracao(instrumento);
+          
+          // Limpar tipos anteriores e adicionar os tipos do banco
+          $('#tipos-alteracao-container').empty();
+          contadorTipos = 0;
+          
+          // Adicionar tipos de alteração
+          data.tipos.forEach(function(tipo) {
+            contadorTipos++;
+            const id = `tipo_${contadorTipos}`;
+            const html = `
+              <div class="tipo-alteracao-secao position-relative" id="${id}" data-index="${contadorTipos}">
+                ${contadorTipos > 1 ? `
+                  <button type="button" class="btn btn-sm btn-danger btn-remover-tipo" onclick="removerSecaoTipo('${id}')">
+                    <i class="bi bi-x"></i>
+                  </button>
+                ` : ''}
+                <h6 class="mb-3">
+                  <i class="bi bi-tag"></i> Tipo de Alteração #${contadorTipos}
+                </h6>
+                <div class="row g-3">
+                  <div class="col-md-12">
+                    <label for="alt_tipo_${contadorTipos}" class="form-label">
+                      Selecione o Tipo de Alteração *
+                    </label>
+                    <select class="form-select tipo-select" id="alt_tipo_${contadorTipos}" 
+                            name="alt_tipo[]" required onchange="atualizarInstrumento()">
+                      <option value="">-- Selecione --</option>
+                      ${tiposAlteracao.map(t => `
+                        <option value="${t.alt_tipo}" data-instrumento="${t.alt_instrumento}" ${t.alt_tipo === tipo ? 'selected' : ''}>
+                          ${t.alt_tipo}
+                        </option>
+                      `).join('')}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            `;
+            $('#tipos-alteracao-container').append(html);
+          });
+          
+          // Alterar ação do formulário para update
+          $('#formAlteracao').attr('action', `/parcerias/alteracao/atualizar?numero_termo=${numeroTermo}&instrumento=${instrumento}&alt_numero=${altNumero}`);
+          $('#modalCadastroLabel').html('<i class="bi bi-pencil"></i> Editar Alteração');
+          
+          // Abrir modal
+          $('#modalCadastroAlteracao').modal('show');
+        },
+        error: function() {
+          alert('Erro ao carregar dados da alteração!');
+        }
+      });
+    }
+
+    // Função para confirmar exclusão
+    function confirmarExclusao(numeroTermo, instrumento, altNumero) {
+      $('#termoExcluir').text(numeroTermo);
+      $('#instrumentoExcluir').text(instrumento);
+      
+      let numeroTexto = 'N/A';
+      if (altNumero >= 100) {
+        const apostilamento = Math.floor(altNumero / 100);
+        const aditamento = altNumero % 100;
+        numeroTexto = `${apostilamento}/${aditamento}`;
+      } else if (altNumero > 0) {
+        numeroTexto = altNumero;
+      }
+      $('#numeroExcluir').text(numeroTexto);
+      
+      $('#formExcluir').attr('action', `/parcerias/alteracao/deletar?numero_termo=${encodeURIComponent(numeroTermo)}&instrumento=${encodeURIComponent(instrumento)}&alt_numero=${altNumero}`);
+      
+      var modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+      modal.show();
+    }
+
+    // Resetar formulário para modo "cadastro" quando fechar o modal
+    $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
+      $('#formAlteracao').attr('action', '{{ url_for("parcerias.salvar_alteracao") }}');
+      $('#modalCadastroLabel').html('<i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração');
+    });
+  </script>
+</body>
+</html>

@@ -42,16 +42,25 @@ df_planilha = df_excel.loc[inicio:ultima_linha, list(colunas_interesse.keys())].
 # Renomeia as colunas
 df_planilha.columns = list(colunas_interesse.values())
 
+# Debugging: contagem inicial
+total_inicial = len(df_planilha)
+print(f"[DEBUG] Total de linhas antes de filtros: {total_inicial}")
+
 # Remove linhas onde numero_termo está vazio
 df_planilha = df_planilha[df_planilha['numero_termo'].notna()]
+print(f"[DEBUG] Após remover vazios: {len(df_planilha)} (removidos: {total_inicial - len(df_planilha)})")
 
 # Remove linhas onde numero_termo é "0", 0 (número) ou string vazia
+antes_zero = len(df_planilha)
 df_planilha = df_planilha[df_planilha['numero_termo'] != '0']
 df_planilha = df_planilha[df_planilha['numero_termo'] != 0]
 df_planilha = df_planilha[df_planilha['numero_termo'].astype(str).str.strip() != '']
+print(f"[DEBUG] Após remover zeros/vazios: {len(df_planilha)} (removidos: {antes_zero - len(df_planilha)})")
 
 # Remove duplicados baseado no numero_termo
+antes_dup = len(df_planilha)
 df_planilha = df_planilha.drop_duplicates(subset=['numero_termo'])
+print(f"[DEBUG] Após remover duplicados: {len(df_planilha)} (removidos: {antes_dup - len(df_planilha)})")
 
 # Reseta o índice
 df_planilha = df_planilha.reset_index(drop=True)

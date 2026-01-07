@@ -1,6 +1,6 @@
 """
 Script para sincronizar nomes de pessoas gestoras entre 
-categoricas.c_pessoa_gestora e parcerias_analises
+categoricas.c_geral_pessoa_gestora e parcerias_analises
 """
 
 import sys
@@ -19,7 +19,7 @@ cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 print("1. Buscando pessoas gestoras cadastradas...")
 cur.execute("""
     SELECT id, nome_pg, setor
-    FROM categoricas.c_pessoa_gestora
+    FROM categoricas.c_geral_pessoa_gestora
     ORDER BY nome_pg
 """)
 pessoas_gestoras = cur.fetchall()
@@ -47,7 +47,7 @@ inconsistencias = []
 
 for nome_analise in pessoas_em_analises:
     if nome_analise not in nomes_cadastrados:
-        print(f"⚠️  '{nome_analise}' existe em parcerias_analises mas não em c_pessoa_gestora")
+        print(f"⚠️  '{nome_analise}' existe em parcerias_analises mas não em c_geral_pessoa_gestora")
         
         # Tentar encontrar correspondência aproximada
         possibilidades = []

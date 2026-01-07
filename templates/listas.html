@@ -757,7 +757,7 @@
       }
       
       // Validação especial: RF não pode ser duplicado (exceto se vazio)
-      if (tabelaAtual === 'c_pessoa_gestora' && dados.numero_rf && dados.numero_rf !== '') {
+      if (tabelaAtual === 'c_geral_pessoa_gestora' && dados.numero_rf && dados.numero_rf !== '') {
         // Buscar todos os dados atuais
         const response = await fetch(`/listas/api/dados/${tabelaAtual}`);
         const data = await response.json();
@@ -1086,7 +1086,7 @@
       rodape.innerHTML = '';
       
       // Só mostrar rodapé se for pessoa_gestora e tiver coluna de pareceres
-      if (tabelaAtual !== 'c_pessoa_gestora' || !configAtual.colunas_calculadas || !configAtual.colunas_calculadas.includes('total_pareceres')) {
+      if (tabelaAtual !== 'c_geral_pessoa_gestora' || !configAtual.colunas_calculadas || !configAtual.colunas_calculadas.includes('total_pareceres')) {
         return;
       }
       

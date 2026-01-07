@@ -2,7 +2,7 @@
 Blueprint de parcerias (listagem e formulário)
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, jsonify, session
 from db import get_cursor, get_db, execute_query
 from utils import login_required
 from decorators import requires_access
@@ -50,19 +50,19 @@ def listar():
     cur = get_cursor()
     
     # Buscar tipos de contrato para o dropdown de filtro
-    cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
+    cur.execute("SELECT informacao FROM categoricas.c_geral_tipo_contrato ORDER BY informacao")
     tipos_contrato_raw = cur.fetchall()
     tipos_contrato = [row['informacao'] for row in tipos_contrato_raw]
     
     # Buscar pessoas gestoras para o dropdown de filtro (todas, incluindo inativas)
-    cur.execute("SELECT DISTINCT nome_pg FROM categoricas.c_pessoa_gestora ORDER BY nome_pg")
+    cur.execute("SELECT DISTINCT nome_pg FROM categoricas.c_geral_pessoa_gestora ORDER BY nome_pg")
     pessoas_gestoras_filtro = [row['nome_pg'] for row in cur.fetchall()]
     
     # DEBUG: Verificar duplicação
     print(f"[DEBUG] Total de tipos_contrato retornados: {len(tipos_contrato)}")
     print(f"[DEBUG] Tipos únicos: {len(set(tipos_contrato))}")
     if len(tipos_contrato) != len(set(tipos_contrato)):
-        print(f"[ALERTA] DUPLICAÇÃO DETECTADA em c_tipo_contrato!")
+        print(f"[ALERTA] DUPLICAÇÃO DETECTADA em c_geral_tipo_contrato!")
         print(f"[DEBUG] Tipos com duplicação: {[t for t in tipos_contrato if tipos_contrato.count(t) > 1]}")
     
     # Query principal - buscar parcerias com datas como texto para evitar erro de conversão
@@ -86,7 +86,7 @@ def listar():
              LIMIT 1) as pessoa_gestora,
             (SELECT cpg.status_pg 
              FROM parcerias_pg pg 
-             LEFT JOIN categoricas.c_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
+             LEFT JOIN categoricas.c_geral_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
              WHERE pg.numero_termo = p.numero_termo 
              ORDER BY pg.data_de_criacao DESC 
              LIMIT 1) as status_pg,
@@ -129,7 +129,7 @@ def listar():
             # Filtrar parcerias com pessoas gestoras inativas
             query += """ AND EXISTS (
                 SELECT 1 FROM parcerias_pg pg 
-                LEFT JOIN categoricas.c_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
+                LEFT JOIN categoricas.c_geral_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
                 WHERE pg.numero_termo = p.numero_termo 
                 AND cpg.status_pg != 'Ativo'
                 AND pg.data_de_criacao = (
@@ -432,57 +432,27 @@ def nova():
     # GET - retornar formulário vazio (ou com dados pré-preenchidos da conferência)
     # Buscar dados dos dropdowns
     cur = get_cursor()
-    cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
+    cur.execute("SELECT informacao FROM categoricas.c_geral_tipo_contrato ORDER BY informacao")
     tipos_contrato = [row['informacao'] for row in cur.fetchall()]
     cur.execute("SELECT lei FROM categoricas.c_geral_legislacao ORDER BY lei")
     legislacoes = [row['lei'] for row in cur.fetchall()]
     
     # Buscar pessoas gestoras (todas, incluindo inativas)
-    cur.execute("SELECT nome_pg, numero_rf, status_pg FROM categoricas.c_pessoa_gestora ORDER BY nome_pg")
+    cur.execute("SELECT nome_pg, numero_rf, status_pg FROM categoricas.c_geral_pessoa_gestora ORDER BY nome_pg")
     pessoas_gestoras = cur.fetchall()
     
     cur.close()
     
-    # Verificar se há um número de termo na query string (vindo da conferência)
+    # Verificar se há parâmetros na query string (vindo da conferência)
     numero_termo_param = request.args.get('numero_termo', '')
+    osc_param = request.args.get('osc', '')
     
-    # Criar objeto parceria com dados pré-preenchidos se existir
-    parceria_preenchida = None
-    if numero_termo_param:
-        # Buscar dados do CSV para este termo
-        import pandas as pd
-        import os
-        
-        csv_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'saida.csv')
-        
-        if os.path.exists(csv_path):
-            try:
-                df = pd.read_csv(csv_path, sep=';', encoding='utf-8-sig')
-                # Buscar a linha correspondente ao termo
-                termo_data = df[df['numero_termo'] == numero_termo_param]
-                
-                if not termo_data.empty:
-                    # Converter para dicionário
-                    parceria_preenchida = termo_data.iloc[0].to_dict()
-                    
-                    # Converter valores NaN para None/vazios
-                    for key, value in parceria_preenchida.items():
-                        if pd.isna(value):
-                            parceria_preenchida[key] = None
-                    
-                    # Tratar datas do pandas (Timestamp) para string no formato YYYY-MM-DD
-                    if parceria_preenchida.get('inicio') and isinstance(parceria_preenchida['inicio'], pd.Timestamp):
-                        parceria_preenchida['inicio'] = parceria_preenchida['inicio'].strftime('%Y-%m-%d')
-                    if parceria_preenchida.get('final') and isinstance(parceria_preenchida['final'], pd.Timestamp):
-                        parceria_preenchida['final'] = parceria_preenchida['final'].strftime('%Y-%m-%d')
-                else:
-                    # Se não encontrou no CSV, criar apenas com numero_termo
-                    parceria_preenchida = {'numero_termo': numero_termo_param}
-            except Exception as e:
-                print(f"[ERRO] Ao ler CSV: {e}")
-                parceria_preenchida = {'numero_termo': numero_termo_param}
-        else:
-            parceria_preenchida = {'numero_termo': numero_termo_param}
+    # Criar objeto parceria com dados pré-preenchidos
+    parceria_preenchida = {
+        'numero_termo': numero_termo_param,
+        'osc': osc_param,
+        'cnpj': ''  # Será preenchido via JavaScript no frontend
+    }
     
     return render_template("parcerias_form.html", 
                          parceria=parceria_preenchida,
@@ -490,7 +460,7 @@ def nova():
                          legislacoes=legislacoes,
                          pessoas_gestoras=pessoas_gestoras,
                          rf_pessoa_gestora=None,
-                         modo_importacao=True if parceria_preenchida else False)
+                         modo_importacao=True if numero_termo_param else False)
 
 
 @parcerias_bp.route("/editar/<path:numero_termo>", methods=["GET", "POST"])
@@ -701,19 +671,19 @@ def editar(numero_termo):
         parceria['solicitacao'] = pg_result['solicitacao']
     
     # Buscar dados dos dropdowns
-    cur.execute("SELECT informacao FROM categoricas.c_tipo_contrato ORDER BY informacao")
+    cur.execute("SELECT informacao FROM categoricas.c_geral_tipo_contrato ORDER BY informacao")
     tipos_contrato = [row['informacao'] for row in cur.fetchall()]
     cur.execute("SELECT lei FROM categoricas.c_geral_legislacao ORDER BY lei")
     legislacoes = [row['lei'] for row in cur.fetchall()]
     
     # Buscar pessoas gestoras (todas, incluindo inativas)
-    cur.execute("SELECT nome_pg, numero_rf, status_pg FROM categoricas.c_pessoa_gestora ORDER BY nome_pg")
+    cur.execute("SELECT nome_pg, numero_rf, status_pg FROM categoricas.c_geral_pessoa_gestora ORDER BY nome_pg")
     pessoas_gestoras = cur.fetchall()
     
     # Buscar RF da pessoa gestora atual se existir
     rf_pessoa_gestora = None
     if pg_result:
-        cur.execute("SELECT numero_rf FROM categoricas.c_pessoa_gestora WHERE nome_pg = %s", (pg_result['nome_pg'],))
+        cur.execute("SELECT numero_rf FROM categoricas.c_geral_pessoa_gestora WHERE nome_pg = %s", (pg_result['nome_pg'],))
         rf_result = cur.fetchone()
         if rf_result:
             rf_pessoa_gestora = rf_result['numero_rf']
@@ -782,7 +752,7 @@ def api_sigla_tipo_termo():
     from flask import jsonify
     
     cur = get_cursor()
-    cur.execute("SELECT id, informacao, sigla FROM categoricas.c_tipo_contrato ORDER BY sigla")
+    cur.execute("SELECT id, informacao, sigla FROM categoricas.c_geral_tipo_contrato ORDER BY sigla")
     tipos = cur.fetchall()
     cur.close()
     
@@ -875,7 +845,7 @@ def exportar_csv():
             elif filtro_pessoa_gestora.lower() == 'inativos':
                 query += """ AND EXISTS (
                     SELECT 1 FROM parcerias_pg pg 
-                    LEFT JOIN categoricas.c_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
+                    LEFT JOIN categoricas.c_geral_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
                     WHERE pg.numero_termo = p.numero_termo 
                     AND cpg.status_pg != 'Ativo'
                     AND pg.data_de_criacao = (
@@ -1164,59 +1134,92 @@ def exportar_pdf():
 @requires_access('parcerias')
 def conferencia():
     """
-    Compara as parcerias do CSV com as do banco
-    e mostra as parcerias não inseridas no sistema com todos os dados
+    Rota de conferência de parcerias - agora com input manual de CSV
     """
-    print("[DEBUG CONFERENCIA] Função conferencia() foi chamada!")
-    
-    import pandas as pd
-    import os
-    
+    return render_template('temp_conferencia.html')
+
+
+@parcerias_bp.route("/conferencia/processar", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def conferencia_processar():
+    """
+    Processa o CSV colado pelo usuário e compara com o banco de dados
+    Extrai: Número do Termo (col 1) e Nome da OSC (col 2)
+    """
     try:
-        # Caminho do CSV gerado pelo script import_conferencia.py
-        csv_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'saida.csv')
-        csv_path_abs = os.path.abspath(csv_path)
+        data = request.get_json()
+        csv_data = data.get('csv_data', '').strip()
         
-        print(f"[DEBUG CONFERENCIA] Procurando CSV em: {csv_path_abs}")
-        print(f"[DEBUG CONFERENCIA] Arquivo existe: {os.path.exists(csv_path_abs)}")
+        if not csv_data:
+            return jsonify({'erro': 'Nenhum dado CSV fornecido'}), 400
         
-        # Verifica se o arquivo existe
-        if not os.path.exists(csv_path):
-            flash("Arquivo de conferência não encontrado. Clique em 'Atualizar' para gerar.", "warning")
-            print(f"[DEBUG CONFERENCIA] Redirecionando para listar - arquivo não existe")
-            return redirect(url_for('parcerias.listar'))
+        # Processa o CSV (pega número do termo E nome da OSC)
+        linhas = csv_data.split('\n')
+        termos_csv = {}  # {numero_termo: nome_osc}
         
-        # Lê o CSV com todos os campos
-        df = pd.read_csv(csv_path, sep=';', encoding='utf-8-sig')
+        for i, linha in enumerate(linhas):
+            linha = linha.strip()
+            if not linha:
+                continue
+            
+            # Pula o cabeçalho (primeira linha)
+            if i == 0:
+                continue
+            
+            # Pega os campos
+            partes = linha.split(';')
+            if len(partes) >= 1:
+                numero_termo = partes[0].strip()
+                nome_osc = partes[1].strip() if len(partes) >= 2 else ''
+                
+                if numero_termo and numero_termo != '0' and numero_termo.lower() != 'null':
+                    termos_csv[numero_termo] = nome_osc
         
-        print(f"[DEBUG CONFERENCIA] CSV lido com sucesso - {len(df)} linhas")
-        print(f"[DEBUG CONFERENCIA] Colunas: {list(df.columns)}")
+        print(f"[DEBUG CSV] Total de termos extraídos do CSV: {len(termos_csv)}")
         
-        # O CSV já contém apenas os termos não inseridos
-        termos_nao_inseridos = df['numero_termo'].tolist()
-        
-        # Busca total de termos no banco para estatísticas
+        # Busca termos no banco
         cur = get_cursor()
-        cur.execute("SELECT COUNT(DISTINCT numero_termo) as total FROM Parcerias")
-        total_database = cur.fetchone()['total']
+        cur.execute("SELECT numero_termo FROM Parcerias ORDER BY numero_termo")
+        termos_db = [row['numero_termo'] for row in cur.fetchall()]
         cur.close()
         
-        print(f"[DEBUG CONFERENCIA] Total no banco: {total_database}")
-        print(f"[DEBUG CONFERENCIA] Termos não inseridos: {len(termos_nao_inseridos)}")
+        termos_db_unicos = set(termos_db)
         
-        # Estatísticas
-        total_nao_inseridos = len(termos_nao_inseridos)
-        total_planilha = total_database + total_nao_inseridos
-        total_inseridos = total_database
+        print(f"[DEBUG CSV] Total de termos no banco: {len(termos_db_unicos)}")
         
-        return render_template(
-            'temp_conferencia.html',
-            termos_nao_inseridos=termos_nao_inseridos,
-            total_planilha=total_planilha,
-            total_database=total_database,
-            total_nao_inseridos=total_nao_inseridos,
-            total_inseridos=total_inseridos
-        )
+        # Compara
+        set_csv = set(termos_csv.keys())
+        
+        # Termos faltantes com suas OSCs
+        faltantes = []
+        for termo in sorted(set_csv - termos_db_unicos):
+            faltantes.append({
+                'numero_termo': termo,
+                'osc': termos_csv[termo]
+            })
+        
+        # Termos existentes (só os números)
+        existentes = sorted(list(set_csv & termos_db_unicos))
+        
+        print(f"[DEBUG CSV] Faltantes: {len(faltantes)}, Existentes: {len(existentes)}")
+        
+        return jsonify({
+            'faltantes': faltantes,
+            'existentes': existentes,
+            'stats': {
+                'total_csv': len(termos_csv),
+                'total_banco': len(termos_db_unicos),
+                'total_faltantes': len(faltantes),
+                'total_existentes': len(existentes)
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"[ERRO CSV] {str(e)}")
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
         
     except Exception as e:
         import traceback
@@ -1536,7 +1539,7 @@ def termos_rescindidos():
     # Buscar lista de analistas DGP (ativos e inativos)
     cur.execute("""
         SELECT nome_analista
-        FROM categoricas.c_dac_dgp_analistas
+        FROM categoricas.c_dgp_analistas
         ORDER BY nome_analista
     """)
     analistas_dgp = [row['nome_analista'] for row in cur.fetchall()]
@@ -1728,7 +1731,7 @@ def editar_rescisao(id):
     # Buscar lista de analistas DGP (ativos e inativos)
     cur.execute("""
         SELECT nome_analista
-        FROM categoricas.c_dac_dgp_analistas
+        FROM categoricas.c_dgp_analistas
         ORDER BY nome_analista
     """)
     analistas_dgp = [row['nome_analista'] for row in cur.fetchall()]
@@ -1778,3 +1781,311 @@ def deletar_rescisao(id):
         get_db().rollback()
         flash(f'Erro ao deletar rescisão: {str(e)}', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
+
+
+# ============================================================================
+# ROTAS DE ALTERAÇÕES DGP
+# ============================================================================
+
+@parcerias_bp.route("/dgp_alteracoes", methods=["GET"])
+@login_required
+@requires_access('parcerias')
+def dgp_alteracoes():
+    """
+    Página de gerenciamento de alterações em termos de parceria
+    """
+    cur = get_cursor()
+    
+    try:
+        # Buscar tipos de alteração com seus instrumentos
+        cur.execute("""
+            SELECT alt_tipo, alt_instrumento 
+            FROM categoricas.c_alt_tipo 
+            ORDER BY alt_tipo
+        """)
+        tipos_alteracao = cur.fetchall()
+        
+        # Buscar instrumentos disponíveis
+        cur.execute("""
+            SELECT DISTINCT instrumento_alteracao 
+            FROM categoricas.c_alt_instrumento 
+            ORDER BY instrumento_alteracao
+        """)
+        instrumentos = [row['instrumento_alteracao'] for row in cur.fetchall()]
+        
+        # Buscar alterações cadastradas (agrupadas por número do termo)
+        cur.execute("""
+            SELECT 
+                numero_termo,
+                instrumento_alteracao,
+                alt_numero,
+                string_agg(DISTINCT alt_tipo, ', ' ORDER BY alt_tipo) as tipos_alteracao
+            FROM public.termos_alteracoes
+            GROUP BY numero_termo, instrumento_alteracao, alt_numero
+            ORDER BY numero_termo
+        """)
+        alteracoes = cur.fetchall()
+        
+        cur.close()
+        
+        return render_template(
+            'dgp_alteracoes.html',
+            tipos_alteracao=tipos_alteracao,
+            instrumentos=instrumentos,
+            alteracoes=alteracoes
+        )
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao carregar página de alterações: {str(e)}")
+        flash(f'Erro ao carregar dados: {str(e)}', 'danger')
+        return redirect(url_for('parcerias.listar'))
+
+
+@parcerias_bp.route("/api/termos_parcerias", methods=["GET"])
+@login_required
+def api_termos_parcerias():
+    """
+    API para buscar termos de parcerias (para Select2)
+    Retorna todos os termos que não estão rescindidos
+    """
+    termo_busca = request.args.get('q', '').strip()
+    
+    cur = get_cursor()
+    
+    try:
+        # Buscar termos que NÃO estão na tabela de rescisão
+        query = """
+            SELECT DISTINCT p.numero_termo 
+            FROM public.parcerias p
+            WHERE p.numero_termo NOT IN (
+                SELECT numero_termo FROM public.termos_rescisao
+            )
+        """
+        
+        params = []
+        
+        if termo_busca:
+            query += " AND p.numero_termo ILIKE %s"
+            params.append(f'%{termo_busca}%')
+        
+        query += " ORDER BY p.numero_termo LIMIT 100"
+        
+        cur.execute(query, params)
+        termos = [row['numero_termo'] for row in cur.fetchall()]
+        cur.close()
+        
+        return jsonify(termos)
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar termos: {str(e)}")
+        return jsonify([]), 500
+
+
+@parcerias_bp.route("/alteracao/salvar", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def salvar_alteracao():
+    """
+    Salvar alteração(ões) de termo
+    Cada tipo de alteração selecionado será salvo como um registro separado
+    """
+    cur = get_cursor()
+    
+    try:
+        # Dados gerais
+        numero_termo = request.form.get('numero_termo', '').strip()
+        instrumento_alteracao = request.form.get('instrumento_alteracao', '').strip()
+        alt_numero = int(request.form.get('alt_numero', 0))
+        
+        # Validar campos obrigatórios
+        if not numero_termo or not instrumento_alteracao:
+            flash('Número do termo e instrumento são obrigatórios!', 'danger')
+            return redirect(url_for('parcerias.dgp_alteracoes'))
+        
+        # Tipos de alteração (array)
+        tipos_alteracao = request.form.getlist('alt_tipo[]')
+        
+        if not tipos_alteracao or not any(tipos_alteracao):
+            flash('Selecione pelo menos um tipo de alteração!', 'danger')
+            return redirect(url_for('parcerias.dgp_alteracoes'))
+        
+        # Inserir um registro para cada tipo de alteração
+        registros_inseridos = 0
+        
+        for alt_tipo in tipos_alteracao:
+            if not alt_tipo.strip():
+                continue
+            
+            cur.execute("""
+                INSERT INTO public.termos_alteracoes 
+                (numero_termo, instrumento_alteracao, alt_numero, alt_tipo, 
+                 alt_data_cadastro_inicio, criado_por)
+                VALUES (%s, %s, %s, %s, NOW(), %s)
+            """, (
+                numero_termo,
+                instrumento_alteracao,
+                alt_numero,
+                alt_tipo.strip(),
+                session.get('username', 'Sistema')
+            ))
+            
+            registros_inseridos += 1
+        
+        get_db().commit()
+        cur.close()
+        
+        flash(f'{registros_inseridos} alteração(ões) cadastrada(s) com sucesso para o termo {numero_termo}!', 'success')
+        return redirect(url_for('parcerias.dgp_alteracoes'))
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao salvar alteração: {str(e)}")
+        get_db().rollback()
+        flash(f'Erro ao salvar alteração: {str(e)}', 'danger')
+        return redirect(url_for('parcerias.dgp_alteracoes'))
+
+
+@parcerias_bp.route("/alteracao/editar", methods=["GET"])
+@login_required
+@requires_access('parcerias')
+def editar_alteracao():
+    """
+    Buscar dados de uma alteração para edição
+    """
+    numero_termo = request.args.get('numero_termo', '').strip()
+    instrumento = request.args.get('instrumento', '').strip()
+    alt_numero = int(request.args.get('alt_numero', 0))
+    
+    cur = get_cursor()
+    
+    try:
+        # Buscar todos os tipos de alteração para esse termo/instrumento/número
+        cur.execute("""
+            SELECT alt_tipo
+            FROM public.termos_alteracoes
+            WHERE numero_termo = %s 
+              AND instrumento_alteracao = %s 
+              AND alt_numero = %s
+            ORDER BY id
+        """, (numero_termo, instrumento, alt_numero))
+        
+        tipos = [row['alt_tipo'] for row in cur.fetchall()]
+        cur.close()
+        
+        return jsonify({'tipos': tipos})
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar alteração: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@parcerias_bp.route("/alteracao/atualizar", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def atualizar_alteracao():
+    """
+    Atualizar alteração existente
+    Deleta os registros antigos e cria novos com os dados atualizados
+    """
+    cur = get_cursor()
+    
+    try:
+        # Parâmetros originais (para identificar registros a deletar)
+        numero_termo_original = request.args.get('numero_termo', '').strip()
+        instrumento_original = request.args.get('instrumento', '').strip()
+        alt_numero_original = int(request.args.get('alt_numero', 0))
+        
+        # Novos dados
+        numero_termo = request.form.get('numero_termo', '').strip()
+        instrumento_alteracao = request.form.get('instrumento_alteracao', '').strip()
+        alt_numero = int(request.form.get('alt_numero', 0))
+        tipos_alteracao = request.form.getlist('alt_tipo[]')
+        
+        # Validar campos obrigatórios
+        if not numero_termo or not instrumento_alteracao:
+            flash('Número do termo e instrumento são obrigatórios!', 'danger')
+            return redirect(url_for('parcerias.dgp_alteracoes'))
+        
+        if not tipos_alteracao or not any(tipos_alteracao):
+            flash('Selecione pelo menos um tipo de alteração!', 'danger')
+            return redirect(url_for('parcerias.dgp_alteracoes'))
+        
+        # Deletar registros antigos
+        cur.execute("""
+            DELETE FROM public.termos_alteracoes
+            WHERE numero_termo = %s 
+              AND instrumento_alteracao = %s 
+              AND alt_numero = %s
+        """, (numero_termo_original, instrumento_original, alt_numero_original))
+        
+        # Inserir novos registros
+        registros_inseridos = 0
+        
+        for alt_tipo in tipos_alteracao:
+            if not alt_tipo.strip():
+                continue
+            
+            cur.execute("""
+                INSERT INTO public.termos_alteracoes 
+                (numero_termo, instrumento_alteracao, alt_numero, alt_tipo, 
+                 alt_data_cadastro_inicio, criado_por, atualizado_por, atualizado_em)
+                VALUES (%s, %s, %s, %s, NOW(), %s, %s, NOW())
+            """, (
+                numero_termo,
+                instrumento_alteracao,
+                alt_numero,
+                alt_tipo.strip(),
+                session.get('username', 'Sistema'),
+                session.get('username', 'Sistema')
+            ))
+            
+            registros_inseridos += 1
+        
+        get_db().commit()
+        cur.close()
+        
+        flash(f'Alteração atualizada com sucesso! {registros_inseridos} tipo(s) de alteração.', 'success')
+        return redirect(url_for('parcerias.dgp_alteracoes'))
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao atualizar alteração: {str(e)}")
+        get_db().rollback()
+        flash(f'Erro ao atualizar alteração: {str(e)}', 'danger')
+        return redirect(url_for('parcerias.dgp_alteracoes'))
+
+
+@parcerias_bp.route("/alteracao/deletar", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def deletar_alteracao():
+    """
+    Deletar alteração(ões) de termo
+    Deleta todos os registros com a mesma combinação de termo/instrumento/número
+    """
+    numero_termo = request.args.get('numero_termo', '').strip()
+    instrumento = request.args.get('instrumento', '').strip()
+    alt_numero = int(request.args.get('alt_numero', 0))
+    
+    cur = get_cursor()
+    
+    try:
+        # Deletar todos os registros com essa combinação
+        cur.execute("""
+            DELETE FROM public.termos_alteracoes
+            WHERE numero_termo = %s 
+              AND instrumento_alteracao = %s 
+              AND alt_numero = %s
+        """, (numero_termo, instrumento, alt_numero))
+        
+        registros_deletados = cur.rowcount
+        
+        get_db().commit()
+        cur.close()
+        
+        flash(f'Alteração(ões) do termo "{numero_termo}" excluída(s) com sucesso! ({registros_deletados} registro(s))', 'success')
+        return redirect(url_for('parcerias.dgp_alteracoes'))
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao deletar alteração: {str(e)}")
+        get_db().rollback()
+        flash(f'Erro ao deletar alteração: {str(e)}', 'danger')
+        return redirect(url_for('parcerias.dgp_alteracoes'))

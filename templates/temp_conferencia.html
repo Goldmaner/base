@@ -10,6 +10,7 @@
   <style>
     body { background-color: #f8f9fa; padding: 20px; }
     .header-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .input-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
     .stats-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
     .table-container { background: #fff; padding: 20px; border-radius: 8px; overflow-x: auto; }
     .stat-card { padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 10px; }
@@ -20,7 +21,11 @@
     .stat-info { background-color: #cfe2ff; border: 1px solid #b6d4fe; }
     .stat-danger { background-color: #f8d7da; border: 1px solid #f5c2c7; }
     
-    /* Spinner de carregamento */
+    #csvInput { 
+      font-family: 'Courier New', monospace; 
+      font-size: 12px;
+      min-height: 300px;
+    }
     .spinner-border-sm { width: 1rem; height: 1rem; border-width: 0.15em; }
   </style>
 </head>
@@ -31,14 +36,9 @@
       <div class="d-flex justify-content-between align-items-center">
         <div>
           <h2><i class="bi bi-clipboard-check"></i> Conferência de Parcerias</h2>
-          <p class="text-muted mb-0">Comparação entre banco externo e sistema interno</p>
+          <p class="text-muted mb-0">Cole os dados CSV para comparar com o sistema interno</p>
         </div>
         <div>
-          <form method="POST" action="{{ url_for('parcerias.atualizar_conferencia') }}" style="display: inline;" onsubmit="return confirmarAtualizacao()" id="formAtualizar">
-            <button type="submit" class="btn btn-primary me-2" id="btnAtualizar">
-              <i class="bi bi-arrow-clockwise"></i> Atualizar
-            </button>
-          </form>
           <a href="{{ url_for('parcerias.listar') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Voltar
           </a>
@@ -46,8 +46,26 @@
       </div>
     </div>
 
-    <!-- Estatísticas -->
-    <div class="stats-section">
+    <!-- Área de Input CSV -->
+    <div class="input-section">
+      <h5><i class="bi bi-file-earmark-spreadsheet"></i> Dados CSV</h5>
+      <p class="text-muted small mb-3">
+        Cole aqui os dados CSV do banco externo (com cabeçalho). Formato esperado: campos separados por <code>;</code>
+      </p>
+      <textarea 
+        id="csvInput" 
+        class="form-control mb-3" 
+        placeholder="Número do Termo;Nome da Organização;Nome do Projeto;Tipo de Termo;...&#10;TCV/002/2006/SEPP/CPLGBTI;Associação da Parada do Orgulho;Comemoração;Convênio;..."></textarea>
+      <button class="btn btn-primary" id="btnProcessar">
+        <i class="bi bi-play-circle"></i> Processar e Comparar
+      </button>
+      <button class="btn btn-outline-secondary" id="btnLimpar">
+        <i class="bi bi-x-circle"></i> Limpar
+      </button>
+    </div>
+
+    <!-- Estatísticas (oculto inicialmente) -->
+    <div class="stats-section" id="statsSection" style="display: none;">
       <div class="row">
         <div class="col-md-3">
           <div class="stat-card stat-info">
@@ -76,90 +94,225 @@
       </div>
     </div>
 
-    <!-- Tabela de Parcerias Não Inseridas -->
-    <div class="table-container">
+    <!-- Tabela de Resultados (oculto inicialmente) -->
+    <div class="table-container" id="resultsSection" style="display: none;">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5><i class="bi bi-exclamation-triangle text-danger"></i> Parcerias NÃO Inseridas no Sistema</h5>
-        <button class="btn btn-sm btn-outline-success" onclick="copiarLista()">
-          <i class="bi bi-clipboard"></i> Copiar Lista
+        <h5><i class="bi bi-exclamation-triangle text-danger"></i> Resultado da Comparação</h5>
+        <button class="btn btn-sm btn-outline-success" id="btnCopiar">
+          <i class="bi bi-clipboard"></i> Copiar Faltantes
         </button>
       </div>
 
-      {% if termos_nao_inseridos %}
-      <div class="alert alert-warning">
-        <i class="bi bi-info-circle"></i> <strong>{{ total_nao_inseridos }}</strong> parceria(s) encontrada(s) no banco externo que não estão no sistema.
-      </div>
+      <div id="alertContainer"></div>
 
-      <table class="table table-striped table-hover" id="tabelaConferencia">
+      <table class="table table-striped table-hover" id="tabelaResultados">
         <thead>
           <tr>
-            <th style="width: 80px;">#</th>
+            <th style="width: 50px;">#</th>
             <th>Número do Termo</th>
-            <th style="width: 220px;">Ação</th>
+            <th>Status</th>
+            <th style="width: 180px;">Ação</th>
           </tr>
         </thead>
-        <tbody>
-          {% for termo in termos_nao_inseridos %}
-          <tr>
-            <td>{{ loop.index }}</td>
-            <td><strong>{{ termo }}</strong></td>
-            <td>
-              <button class="btn btn-sm btn-outline-primary me-1" onclick="copiarTermo('{{ termo }}')">
-                <i class="bi bi-clipboard"></i> Copiar
-              </button>
-              <a href="{{ url_for('parcerias.nova', numero_termo=termo, origem='conferencia') }}" class="btn btn-sm btn-success">
-                <i class="bi bi-plus-circle"></i> Importar
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
+        <tbody id="resultadosBody">
         </tbody>
       </table>
-      {% else %}
-      <div class="alert alert-success">
-        <i class="bi bi-check-circle"></i> <strong>Parabéns!</strong> Todas as parcerias do banco externo estão inseridas no sistema.
-      </div>
-      {% endif %}
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // @ts-nocheck - Template Jinja2, não JavaScript puro
-    
-    // Função para confirmar atualização
-    function confirmarAtualizacao() {
-      const confirmacao = confirm('Deseja atualizar os dados de conferência? Isso pode levar alguns segundos.');
+    let resultadosGlobais = { faltantes: [], existentes: [] };
+
+    async function processarCSV() {
+      const csvText = document.getElementById('csvInput').value.trim();
       
-      if (confirmacao) {
-        // Mostra indicador de carregamento no botão
-        const btnAtualizar = document.getElementById('btnAtualizar');
-        btnAtualizar.disabled = true;
-        btnAtualizar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Atualizando...';
+      if (!csvText) {
+        alert('Por favor, cole os dados CSV antes de processar.');
+        return;
       }
-      
-      return confirmacao;
+
+      // Mostra indicador de carregamento
+      const btnProcessar = document.getElementById('btnProcessar');
+      btnProcessar.disabled = true;
+      btnProcessar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando...';
+
+      try {
+        const response = await fetch('{{ url_for("parcerias.conferencia_processar") }}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ csv_data: csvText })
+        });
+
+        const data = await response.json();
+
+        if (data.erro) {
+          alert('Erro: ' + data.erro);
+          return;
+        }
+
+        // Atualiza estatísticas
+        mostrarEstatisticas(data.stats);
+
+        // Mostra resultados
+        mostrarResultados(data.faltantes, data.existentes);
+
+        resultadosGlobais = { faltantes: data.faltantes, existentes: data.existentes };
+
+      } catch (error) {
+        alert('Erro ao processar CSV: ' + error.message);
+      } finally {
+        btnProcessar.disabled = false;
+        btnProcessar.innerHTML = '<i class="bi bi-play-circle"></i> Processar e Comparar';
+      }
     }
 
-    // Função para copiar um termo específico
+    function mostrarEstatisticas(stats) {
+      const statsSection = document.getElementById('statsSection');
+      statsSection.style.display = 'block';
+      
+      statsSection.innerHTML = `
+        <div class="row">
+          <div class="col-md-3">
+            <div class="stat-card stat-info">
+              <h3>${stats.total_csv}</h3>
+              <p>Termos no CSV</p>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card stat-info">
+              <h3>${stats.total_banco}</h3>
+              <p>Termos no Sistema</p>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card stat-success">
+              <h3>${stats.total_existentes}</h3>
+              <p>Já Cadastrados ✓</p>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card stat-danger">
+              <h3>${stats.total_faltantes}</h3>
+              <p>Faltam Cadastrar ✗</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function mostrarResultados(faltantes, existentes) {
+      const resultsSection = document.getElementById('resultsSection');
+      const alertContainer = document.getElementById('alertContainer');
+      const tbody = document.getElementById('resultadosBody');
+      
+      resultsSection.style.display = 'block';
+      tbody.innerHTML = '';
+
+      // Alert informativo
+      if (faltantes.length > 0) {
+        alertContainer.innerHTML = `
+          <div class="alert alert-warning">
+            <i class="bi bi-info-circle"></i> <strong>${faltantes.length}</strong> termo(s) do CSV não estão cadastrados no sistema.
+          </div>
+        `;
+      } else {
+        alertContainer.innerHTML = `
+          <div class="alert alert-success">
+            <i class="bi bi-check-circle"></i> <strong>Perfeito!</strong> Todos os termos do CSV já estão cadastrados no sistema.
+          </div>
+        `;
+      }
+
+      // Adiciona termos faltantes
+      faltantes.forEach((item, index) => {
+        const termo = item.numero_termo;
+        const osc = item.osc || '';
+        const urlParams = new URLSearchParams({
+          numero_termo: termo,
+          osc: osc
+        });
+        
+        tbody.innerHTML += `
+          <tr class="table-danger">
+            <td>${index + 1}</td>
+            <td>
+              <strong>${termo}</strong>
+              ${osc ? '<br><small class="text-muted">' + osc + '</small>' : ''}
+            </td>
+            <td><span class="badge bg-danger">Faltando</span></td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary me-1" onclick="copiarTermo('${termo}')">
+                <i class="bi bi-clipboard"></i>
+              </button>
+              <a href="{{ url_for('parcerias.nova') }}?${urlParams}" target="_blank" class="btn btn-sm btn-success">
+                <i class="bi bi-box-arrow-up-right"></i> Cadastrar
+              </a>
+            </td>
+          </tr>
+        `;
+      });
+
+      // Mostra alguns existentes (limitado)
+      const maxExistentes = 50;
+      existentes.slice(0, maxExistentes).forEach((termo, index) => {
+        tbody.innerHTML += `
+          <tr class="table-success">
+            <td>${faltantes.length + index + 1}</td>
+            <td>${termo}</td>
+            <td><span class="badge bg-success">Cadastrado</span></td>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary disabled">
+                <i class="bi bi-check-circle"></i> OK
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      if (existentes.length > maxExistentes) {
+        tbody.innerHTML += `
+          <tr>
+            <td colspan="4" class="text-center text-muted">
+              <em>... e mais ${existentes.length - maxExistentes} termos já cadastrados</em>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
     function copiarTermo(termo) {
       navigator.clipboard.writeText(termo).then(() => {
         alert('Termo copiado: ' + termo);
       });
     }
 
-    // Função para copiar toda a lista
-    function copiarLista() {
-      const termos = [
-        {% for termo in termos_nao_inseridos %}
-        '{{ termo }}'{% if not loop.last %},{% endif %}
-        {% endfor %}
-      ];
-      const texto = termos.join('\n');
-      navigator.clipboard.writeText(texto).then(() => {
-        alert('Lista completa copiada! (' + termos.length + ' termos)');
-      });
+    function copiarResultados() {
+      const texto = resultadosGlobais.faltantes.map(item => item.numero_termo).join('\n');
+      if (texto) {
+        navigator.clipboard.writeText(texto).then(() => {
+          alert('Lista de termos faltantes copiada! (' + resultadosGlobais.faltantes.length + ' termos)');
+        });
+      } else {
+        alert('Nenhum termo faltante para copiar.');
+      }
     }
+
+    function limparTudo() {
+      document.getElementById('csvInput').value = '';
+      document.getElementById('statsSection').style.display = 'none';
+      document.getElementById('resultsSection').style.display = 'none';
+      resultadosGlobais = { faltantes: [], existentes: [] };
+    }
+
+    // Adiciona event listeners quando o DOM estiver pronto
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('btnProcessar').addEventListener('click', processarCSV);
+      document.getElementById('btnLimpar').addEventListener('click', limparTudo);
+      document.getElementById('btnCopiar').addEventListener('click', copiarResultados);
+    });
   </script>
 </body>
 </html>

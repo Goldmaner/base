@@ -22,7 +22,7 @@ Ao digitar o **número do termo**, o sistema reconhece automaticamente os **3 pr
 - **TCP**/003/2025 → Seleciona automaticamente "**Termo de Cooperação**"
 
 ### Mapeamento de Siglas
-Tabela `c_tipo_contrato` atualizada com coluna `sigla`:
+Tabela `c_geral_tipo_contrato` atualizada com coluna `sigla`:
 
 | Sigla | Tipo de Termo |
 |-------|---------------|
@@ -36,7 +36,7 @@ Tabela `c_tipo_contrato` atualizada com coluna `sigla`:
 ### Implementação Técnica
 - **Frontend:** Listener no campo `numero_termo` que detecta input
 - **Backend:** Nova rota API `/parcerias/api/sigla-tipo-termo`
-- **Database:** Coluna `sigla` adicionada à tabela `c_tipo_contrato`
+- **Database:** Coluna `sigla` adicionada à tabela `c_geral_tipo_contrato`
 - **Feedback Visual:** Borda verde ao detectar e preencher automaticamente
 
 ---
@@ -182,7 +182,7 @@ templates/parcerias_form.html
 
 ### Database
 ```
-c_tipo_contrato
+c_geral_tipo_contrato
 └── Coluna adicionada: sigla (VARCHAR(10))
     └── Populada com: ACP, TCL, TCV, TCC, TFM, TCP
 ```
@@ -275,7 +275,7 @@ testes/t_update_siglas.py
 ### Requisitos Backend
 - ✅ Flask com jsonify
 - ✅ PostgreSQL 17.0
-- ✅ Tabela `c_tipo_contrato` com coluna `sigla`
+- ✅ Tabela `c_geral_tipo_contrato` com coluna `sigla`
 - ✅ Tabela `Parcerias` com colunas `osc` e `cnpj`
 
 ### Requisitos Frontend
@@ -294,9 +294,9 @@ python testes/t_update_siglas.py
 ## Manutenção Futura
 
 ### Adicionar Nova Sigla
-1. Inserir na tabela `c_tipo_contrato`:
+1. Inserir na tabela `c_geral_tipo_contrato`:
    ```sql
-   INSERT INTO c_tipo_contrato (informacao, sigla) 
+   INSERT INTO c_geral_tipo_contrato (informacao, sigla) 
    VALUES ('Novo Tipo', 'NVT');
    ```
 2. Sistema reconhecerá automaticamente

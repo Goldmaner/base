@@ -40,13 +40,13 @@ else:
 
 print("\n" + "=" * 80)
 
-# Verificar o nome atual na tabela c_pessoa_gestora
-print("\nNome cadastrado em c_pessoa_gestora:")
+# Verificar o nome atual na tabela c_geral_pessoa_gestora
+print("\nNome cadastrado em c_geral_pessoa_gestora:")
 print("=" * 80)
 
 cur.execute("""
     SELECT id, nome_pg, setor, numero_rf, status_pg
-    FROM categoricas.c_pessoa_gestora
+    FROM categoricas.c_geral_pessoa_gestora
     WHERE nome_pg LIKE '%Adriana%'
 """)
 
@@ -71,7 +71,7 @@ cur.execute("""
     SELECT DISTINCT responsavel_pg
     FROM parcerias_analises
     WHERE responsavel_pg NOT IN (
-        SELECT nome_pg FROM categoricas.c_pessoa_gestora
+        SELECT nome_pg FROM categoricas.c_geral_pessoa_gestora
     )
     AND responsavel_pg IS NOT NULL
     ORDER BY responsavel_pg

@@ -16,7 +16,7 @@ cur.execute("""
     SELECT column_name, data_type, is_nullable
     FROM information_schema.columns
     WHERE table_schema = 'categoricas'
-    AND table_name = 'c_pessoa_gestora'
+    AND table_name = 'c_geral_pessoa_gestora'
     AND column_name = 'email_pg'
 """)
 
@@ -29,7 +29,7 @@ if result:
 else:
     print("❌ Coluna email_pg NÃO EXISTE no banco de dados")
     print("\nVocê precisa criar a coluna executando:")
-    print("ALTER TABLE categoricas.c_pessoa_gestora ADD COLUMN email_pg TEXT;")
+    print("ALTER TABLE categoricas.c_geral_pessoa_gestora ADD COLUMN email_pg TEXT;")
 
 cur.close()
 conn.close()

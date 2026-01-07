@@ -136,7 +136,7 @@ def listar_pessoas_gestoras():
     try:
         cur.execute("""
             SELECT nome_pg, setor, numero_rf, status_pg
-            FROM categoricas.c_pessoa_gestora
+            FROM categoricas.c_geral_pessoa_gestora
             ORDER BY nome_pg
         """)
         pessoas_gestoras = cur.fetchall()
@@ -1074,7 +1074,7 @@ def gerar_texto_relatorio_inconsistencias():
         if todos_nomes:
             cur.execute("""
                 SELECT id, nome_item, modelo_texto, ordem, solucao
-                FROM categoricas.c_modelo_textos_inconsistencias
+                FROM categoricas.c_dac_modelo_textos_inconsistencias
                 WHERE nome_item = ANY(%s)
                 ORDER BY ordem
             """, (todos_nomes,))

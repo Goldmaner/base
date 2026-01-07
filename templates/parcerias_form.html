@@ -535,6 +535,14 @@
       if (status !== 'Ativo' && selectPG.value !== '') {
         solicitacaoContainer.style.display = 'block';
       }
+
+      // Se OSC veio pré-preenchida da conferência, buscar CNPJ automaticamente
+      const oscField = document.getElementById('osc');
+      const cnpjField = document.getElementById('cnpj');
+      if (oscField.value && !cnpjField.value) {
+        console.log('[DEBUG] OSC pré-preenchida, buscando CNPJ...');
+        preencherCNPJ();
+      }
     });
 
     // ========== 4. CÁLCULO AUTOMÁTICO DE MESES ==========

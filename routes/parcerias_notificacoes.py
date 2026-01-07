@@ -79,7 +79,7 @@ def api_listar_notificacoes():
                 cdp.prazo_dias
             FROM parcerias_notificacoes pn
             LEFT JOIN parcerias p ON pn.numero_termo = p.numero_termo
-            LEFT JOIN categoricas.c_dp_documentos_prazos cdp 
+            LEFT JOIN categoricas.c_documentos_dp_prazos cdp 
                 ON pn.tipo_doc = cdp.tipo_documento 
                 AND p.portaria = cdp.lei
             WHERE 1=1
@@ -457,7 +457,7 @@ def api_listar_analistas():
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
                 UNION
                 SELECT DISTINCT nome_analista
-                FROM categoricas.c_dac_dgp_analistas
+                FROM categoricas.c_dgp_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
                 ORDER BY nome_analista
             """)
@@ -477,7 +477,7 @@ def api_listar_analistas():
             # Apenas analistas DGP
             cur.execute("""
                 SELECT DISTINCT nome_analista
-                FROM categoricas.c_dac_dgp_analistas
+                FROM categoricas.c_dgp_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
                 ORDER BY nome_analista
             """)
@@ -614,7 +614,7 @@ def api_calcular_prazo():
         # Buscar prazo_dias baseado em tipo_doc e portaria do termo
         cur.execute("""
             SELECT cdp.prazo_dias
-            FROM categoricas.c_dp_documentos_prazos cdp
+            FROM categoricas.c_documentos_dp_prazos cdp
             INNER JOIN parcerias p ON cdp.lei = p.portaria
             WHERE cdp.tipo_documento = %s 
             AND p.numero_termo = %s
