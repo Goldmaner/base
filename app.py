@@ -28,6 +28,7 @@ from routes.conc_exportacao import bp as conc_exportacao_bp
 from routes.conc_relatorio import bp as conc_relatorio_bp
 from routes.conc_demonstrativo import bp as conc_demonstrativo_bp
 from routes.ocr_testes import bp as ocr_testes_bp
+from routes.gestao_financeira import gestao_financeira_bp
 
 
 def create_app():
@@ -82,6 +83,7 @@ def create_app():
     app.register_blueprint(conc_relatorio_bp)
     app.register_blueprint(conc_demonstrativo_bp)
     app.register_blueprint(ocr_testes_bp)
+    app.register_blueprint(gestao_financeira_bp)
     
     return app
 

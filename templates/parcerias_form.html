@@ -278,6 +278,22 @@
 
         <div class="row mb-3">
           <div class="col-md-6">
+            <label for="termo_sei_doc" class="form-label">
+              SEI do Documento
+              <small class="text-muted">(Termo Original)</small>
+            </label>
+            <input type="text" class="form-control" id="termo_sei_doc" name="termo_sei_doc" 
+                   value="{{ termo_sei_doc or '' }}" 
+                   placeholder="Ex: 123456789">
+            <div class="form-text">
+              <i class="bi bi-info-circle"></i> 
+              Número SEI do documento do termo original (não aditivo/apostilamento).
+            </div>
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
             <label for="sei_plano" class="form-label">SEI do Plano de Trabalho</label>
             <input type="text" class="form-control" id="sei_plano" name="sei_plano" 
                    value="{{ parceria.sei_plano or '' }}">

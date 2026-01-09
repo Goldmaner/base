@@ -810,6 +810,16 @@
 
                         <div class="row mb-3">
                             <div class="col-md-6">
+                                <label for="db_termo_sei_doc" class="form-label fw-bold">
+                                    SEI do Documento <small class="text-muted">(Termo Original)</small>
+                                </label>
+                                <input type="text" class="form-control" id="db_termo_sei_doc" name="termo_sei_doc" placeholder="Ex: 123456789">
+                                <small class="text-muted">Número SEI do documento do termo original</small>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
                                 <label for="db_sei_plano" class="form-label fw-bold">Documento SEI do Plano de Trabalho</label>
                                 <input type="text" class="form-control" id="db_sei_plano" name="sei_plano">
                             </div>
@@ -1486,6 +1496,14 @@
                 // Preencher formulário
                 preencherFormularioDadosBase(data.parceria);
                 
+                // Preencher termo_sei_doc se disponível
+                if (data.termo_sei_doc) {
+                    const termoSeiDocInput = document.getElementById('db_termo_sei_doc');
+                    if (termoSeiDocInput) {
+                        termoSeiDocInput.value = data.termo_sei_doc;
+                    }
+                }
+                
                 console.log('[DEBUG] Carregando portarias...');
                 // Carregar lista de portarias
                 await carregarListaPortarias(data.parceria.portaria);
@@ -1519,7 +1537,7 @@
             const campos = [
                 'numero_termo', 'tipo_termo', 'osc', 'projeto', 
                 'cnpj', 'inicio', 'final', 'meses', 'total_previsto', 'total_pago',
-                'conta', 'sei_celeb', 'sei_pc', 'sei_plano', 'sei_orcamento'
+                'conta', 'sei_celeb', 'sei_pc', 'sei_plano', 'sei_orcamento', 'termo_sei_doc'
             ];
             
             campos.forEach(campo => {

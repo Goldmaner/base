@@ -176,10 +176,50 @@ def extrair_texto_pdf(arquivo_pdf):
     return '\n'.join(texto_completo)
 
 
+def detectar_formato(texto):
+    """
+    Detecta qual formato de extrato está sendo processado
+    Retorna 1 (formato antigo) ou 2 (formato novo)
+    """
+    linhas = [l.strip() for l in texto.split('\n') if l.strip()]
+    
+    # Contador de padrões de cada formato
+    formato1_count = 0
+    formato2_count = 0
+    
+    for linha in linhas[:20]:  # Analisa primeiras 20 linhas
+        # Formato 1: Data no início + C/D no final
+        if re.match(r'^\d{2}/\d{2}/\d{4}.*[CD]$', linha):
+            formato1_count += 1
+        
+        # Formato 2: Valor no início + (+) ou (-) + Data
+        if re.match(r'^\d{1,3}(?:\.\d{3})*,\d{2}\s+\([+-]\)\s+\d{2}/\d{2}/\d{4}', linha):
+            formato2_count += 1
+    
+    print(f"[OCR] Detecção de formato - F1: {formato1_count}, F2: {formato2_count}")
+    
+    return 2 if formato2_count > formato1_count else 1
+
+
 def processar_extrato(texto):
     """
     Processa o texto do extrato e retorna lista de linhas processadas
-    Baseado no código original fornecido
+    Detecta automaticamente o formato e usa o processador adequado
+    """
+    formato = detectar_formato(texto)
+    
+    print(f"[OCR] Usando processador para Formato {formato}")
+    
+    if formato == 2:
+        return processar_extrato_formato2(texto)
+    else:
+        return processar_extrato_formato1(texto)
+
+
+def processar_extrato_formato1(texto):
+    """
+    Processa extrato no FORMATO 1 (antigo)
+    Formato: DD/MM/YYYY ... VALOR C/D [SALDO C/D]
     """
     linhas = [l.strip() for l in texto.split('\n')]
     
@@ -253,6 +293,149 @@ def processar_extrato(texto):
         i += 1
     
     return saida
+
+
+def processar_extrato_formato2(texto):
+    """
+    Processa extrato no FORMATO 2 (novo)
+    Formato: VALOR (+/-) DD/MM/YYYY LOTE DOC HISTORICO
+    Nome/origem na linha seguinte
+    """
+    linhas = [l.strip() for l in texto.split('\n')]
+    
+    # Regex para formato 2: VALOR (SINAL) DATA
+    regex_mov = re.compile(
+        r'^(\d{1,3}(?:\.\d{3})*,\d{2})\s+\(([+-])\)\s+(\d{2}/\d{2}/\d{4})'
+    )
+    
+    saida = []
+    i = 0
+    
+    while i < len(linhas):
+        linha = linhas[i].strip()
+        m = regex_mov.match(linha)
+        
+        if m:
+            valor_transacao, sinal, data = m.groups()
+            
+            # Extrair histórico da mesma linha (após a data e códigos)
+            # Remove o padrão inicial capturado
+            resto_linha = linha[m.end():].strip()
+            # Remove números de lote/documento no início
+            historico = re.sub(r'^\d+\s+\d+\s*', '', resto_linha).strip()
+            
+            # Categoria baseada no histórico
+            categoria = categoriza_formato2(historico)
+            
+            # Crédito/Débito
+            if sinal == '+':
+                credito, debito = valor_transacao.replace('.', ''), ''
+            else:
+                credito, debito = '', valor_transacao.replace('.', '')
+            
+            comp_valor = valor_transacao.replace('.', '')
+            
+            # Origem/destino: linha seguinte
+            nome_origem_destino = ""
+            
+            # Se for "Saldo Anterior", deixa em branco
+            if "Saldo Anterior" in historico:
+                saida.append([data, "", "", "", "", "", "", comp_valor])
+                i += 1
+                continue
+            
+            # Se for categoria específica do BB, usa "Banco do Brasil"
+            if categoria in ["Resgate", "Taxas Bancárias"]:
+                nome_origem_destino = "Banco do Brasil"
+            else:
+                # Busca próxima linha não vazia que não seja uma movimentação
+                j = i + 1
+                while j < len(linhas):
+                    prox = linhas[j].strip()
+                    # Ignora linhas vazias ou que são novas movimentações
+                    if prox and not regex_mov.match(prox):
+                        # Extrai nome (remove códigos e horários)
+                        nome_origem_destino = extrair_nome_formato2(prox)
+                        if nome_origem_destino:
+                            break
+                    if prox == "":
+                        break
+                    j += 1
+            
+            saida.append([
+                data,
+                credito if credito else "",
+                debito if debito else "",
+                comp_valor,
+                categoria,
+                "",  # Competência vazia
+                nome_origem_destino,
+                ""   # Saldo vazio (formato 2 não tem saldo em cada linha)
+            ])
+        
+        i += 1
+    
+    return saida
+
+
+def extrair_nome_formato2(linha):
+    """
+    Extrai nome do formato 2
+    Remove horários (HH:MM) e datas (DD/MM) do início
+    """
+    if not linha:
+        return ""
+    
+    nome = linha.strip()
+    
+    # Remove horário no formato HH:MM
+    nome = re.sub(r'^\d{2}:\d{2}\s+', '', nome)
+    
+    # Remove data DD/MM no início
+    nome = re.sub(r'^\d{2}/\d{2}\s+', '', nome)
+    
+    # Remove texto de tarifa agrupada (caso especial)
+    if "Tar. agrupadas" in nome or "ocorrencia" in nome:
+        return "Banco do Brasil"
+    
+    # Remove "SECRETARIA MUNICIPAL" duplicado
+    nome = re.sub(r'^SECRETARIA MUNICIPAL\s+SECRETARIA MUNICIPAL', 'SECRETARIA MUNICIPAL', nome, flags=re.IGNORECASE)
+    
+    nome = nome.strip()
+    
+    # Title case
+    nome = nome.title()
+    
+    return nome if nome else ""
+
+
+def categoriza_formato2(historico):
+    """
+    Categoriza transação do formato 2 baseada no histórico
+    """
+    s = historico.upper()
+    
+    # Resgate
+    if "BB RENDA FIXA" in s or "RESGATE" in s:
+        return "Resgate"
+    
+    # Taxas
+    if "TARIFA" in s or "TAR." in s or "TAR " in s:
+        return "Taxas Bancárias"
+    
+    # PIX devolvido/rejeitado
+    if "PIX - REJEITADO" in s or "PIX - DEVOLVIDO" in s or "DEVOLVID" in s:
+        return "Pix / TED Devolvido"
+    
+    # Parcela (pagamento de fornecedor da prefeitura)
+    if "SECRETARIA MUNICIPAL" in s and "FAZENDA" in s:
+        return "Parcela"
+    
+    if "RECEBIMENTO FORNECEDOR" in s:
+        return "Parcela"
+    
+    # Outros vazios
+    return ""
 
 
 def extrair_nome(linha):

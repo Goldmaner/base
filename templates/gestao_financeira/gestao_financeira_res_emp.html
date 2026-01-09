@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservas e Empenhos - Gestão Financeira</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        .header-section {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .table-section {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .table {
+            font-size: 0.85rem;
+        }
+        .table th {
+            background-color: #28a745;
+            color: white;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .table td {
+            vertical-align: middle;
+        }
+        .valor-cell {
+            text-align: right;
+            font-family: monospace;
+        }
+        .table-responsive {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Cabeçalho -->
+        <div class="header-section">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-journal-check"></i> Gestão Financeira: Acompanhamento de Reservas e Empenhos</h2>
+                    <p class="mb-0">Controle detalhado de reservas orçamentárias e notas de empenho por parcela</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('gestao_financeira.index') }}" class="btn btn-light">
+                        <i class="bi bi-arrow-left"></i> Voltar ao Menu
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensagens Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Tabela de Reservas e Empenhos -->
+        <div class="table-section">
+            <h4 class="mb-4">
+                <i class="bi bi-table"></i> Registros de Reservas e Empenhos
+                <span class="badge bg-success">{{ registros|length if registros else 0 }}</span>
+            </h4>
+
+            {% if registros %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped table-bordered">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 120px;">Termo</th>
+                                <th style="min-width: 150px;">Origem do Recurso</th>
+                                <th style="min-width: 120px;">CNPJ</th>
+                                <th style="min-width: 120px;">SEI de Celebração</th>
+                                <th style="min-width: 200px;">OSC</th>
+                                <th style="min-width: 100px;">Parcela</th>
+                                <th style="min-width: 120px;" class="text-end">53.23 (Outras Despesas)</th>
+                                <th style="min-width: 150px;" class="text-end">53.24 (Pessoal / RH)</th>
+                                <th style="min-width: 120px;" class="text-end">Valor Total da Parcela</th>
+                                <th style="min-width: 150px;">Atribuição</th>
+                                <th style="min-width: 100px;">Situação</th>
+                                <th style="min-width: 120px;">Nota de Empenho .23</th>
+                                <th style="min-width: 120px;">Nota de Empenho .24</th>
+                                <th style="min-width: 120px;" class="text-end">Valor Empenhado .23</th>
+                                <th style="min-width: 120px;" class="text-end">Valor Empenhado .24</th>
+                                <th style="min-width: 120px;" class="text-end">Valor Total Empenho</th>
+                                <th style="min-width: 200px;">Observações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for registro in registros %}
+                                <tr>
+                                    <td><strong>{{ registro.termo }}</strong></td>
+                                    <td>{{ registro.origem_recurso }}</td>
+                                    <td>{{ registro.cnpj }}</td>
+                                    <td>{{ registro.sei_celebracao }}</td>
+                                    <td>{{ registro.osc }}</td>
+                                    <td class="text-center">{{ registro.parcela }}</td>
+                                    <td class="valor-cell">{{ registro.valor_5323 }}</td>
+                                    <td class="valor-cell">{{ registro.valor_5324 }}</td>
+                                    <td class="valor-cell"><strong>{{ registro.valor_total_parcela }}</strong></td>
+                                    <td>{{ registro.atribuicao }}</td>
+                                    <td>
+                                        {% if registro.situacao %}
+                                            <span class="badge bg-info">{{ registro.situacao }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ registro.nota_empenho_23 }}</td>
+                                    <td>{{ registro.nota_empenho_24 }}</td>
+                                    <td class="valor-cell">{{ registro.valor_empenhado_23 }}</td>
+                                    <td class="valor-cell">{{ registro.valor_empenhado_24 }}</td>
+                                    <td class="valor-cell"><strong>{{ registro.valor_total_empenho }}</strong></td>
+                                    <td><small>{{ registro.observacoes }}</small></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Nenhum registro de reserva ou empenho cadastrado ainda.
+                    <br><small>Aguardando integração com base de dados.</small>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -84,6 +84,14 @@
           </a>
         </div>
         {% endif %}
+        
+        {% if is_admin or 'gestao_financeira' in user_acessos %}
+        <div class="col-md-6">
+          <a href="{{ url_for('gestao_financeira.index') }}" class="btn btn-main" style="background-color: #28a745;">
+            <i class="bi bi-cash-coin me-2"></i>Gestão Financeira
+          </a>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -525,6 +533,7 @@
         { id: 'parcerias', nome: 'Parcerias', grupo: 'Principal' },
         { id: 'pesquisa_parcerias', nome: 'Pesquisa de Parcerias', grupo: 'Principal' },
         { id: 'parcerias_notificacoes', nome: 'Ofícios, Documentos e Notificações', grupo: 'Principal' },
+        { id: 'gestao_financeira', nome: 'Gestão Financeira', grupo: 'Principal' },
         { id: 'listas', nome: 'Listas suspensas', grupo: 'Gestão' },
         { id: 'conc_bancaria', nome: 'Conciliação Bancária', grupo: 'Análise PC' },
         { id: 'conc_rendimentos', nome: 'Rendimentos', grupo: 'Análise PC' },

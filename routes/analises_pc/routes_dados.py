@@ -71,6 +71,16 @@ def buscar_dados_base():
         is_rescindido = rescisao_row is not None
         data_rescisao = rescisao_row['data_rescisao'] if rescisao_row else None
         
+        # Buscar termo_sei_doc de parcerias_sei (apenas termo original, não aditivos/apostilamentos)
+        cur.execute("""
+            SELECT termo_sei_doc
+            FROM public.parcerias_sei
+            WHERE TRIM(numero_termo) = TRIM(%s) AND aditamento = '-' AND apostilamento = '-'
+            LIMIT 1
+        """, (numero_termo,))
+        sei_row = cur.fetchone()
+        termo_sei_doc = sei_row['termo_sei_doc'] if sei_row else None
+        
         cur.close()
         
         # Converter data para string se necessário
@@ -84,10 +94,11 @@ def buscar_dados_base():
             'parceria': parceria_dict,
             'nome_pg': nome_pg,
             'is_rescindido': is_rescindido,
-            'data_rescisao': str(data_rescisao) if data_rescisao else None
+            'data_rescisao': str(data_rescisao) if data_rescisao else None,
+            'termo_sei_doc': termo_sei_doc
         }
         
-        print(f"[DEBUG] Dados retornados - rescindido: {is_rescindido}, data_rescisao: {data_rescisao}, nome_pg: {nome_pg}")
+        print(f"[DEBUG] Dados retornados - rescindido: {is_rescindido}, data_rescisao: {data_rescisao}, nome_pg: {nome_pg}, termo_sei_doc: {termo_sei_doc}")
         
         return jsonify(result)
     
@@ -237,6 +248,33 @@ def salvar_dados_base():
                     INSERT INTO public.parcerias_pg (numero_termo, nome_pg)
                     VALUES (%s, %s)
                 """, (numero_termo, dados['nome_pg']))
+        
+        # Atualizar termo_sei_doc em parcerias_sei se fornecido
+        if 'termo_sei_doc' in dados and dados['termo_sei_doc']:
+            termo_sei_doc = dados['termo_sei_doc'].strip()
+            
+            # Verificar se já existe registro para este termo
+            cur.execute("""
+                SELECT id FROM public.parcerias_sei 
+                WHERE TRIM(numero_termo) = TRIM(%s) AND aditamento = '-' AND apostilamento = '-'
+            """, (numero_termo,))
+            exists = cur.fetchone()
+            
+            if exists:
+                # Atualizar termo_sei_doc existente
+                cur.execute("""
+                    UPDATE public.parcerias_sei 
+                    SET termo_sei_doc = %s
+                    WHERE TRIM(numero_termo) = TRIM(%s) AND aditamento = '-' AND apostilamento = '-'
+                """, (termo_sei_doc, numero_termo))
+                print(f"[DEBUG] termo_sei_doc atualizado em parcerias_sei: {termo_sei_doc}")
+            else:
+                # Inserir novo registro
+                cur.execute("""
+                    INSERT INTO public.parcerias_sei (numero_termo, termo_sei_doc, aditamento, apostilamento)
+                    VALUES (%s, %s, '-', '-')
+                """, (numero_termo, termo_sei_doc))
+                print(f"[DEBUG] Novo registro criado em parcerias_sei com termo_sei_doc: {termo_sei_doc}")
         
         conn.commit()
         cur.close()

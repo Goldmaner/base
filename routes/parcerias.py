@@ -386,8 +386,43 @@ def nova():
             if resultado_insert:
                 print("[DEBUG NOVA] INSERT bem-sucedido! Processando auditoria...")
                 
-                # Registrar na tabela de auditoria parcerias_pg
+                # Salvar/atualizar termo_sei_doc em parcerias_sei se fornecido
                 numero_termo = request.form.get('numero_termo')
+                termo_sei_doc = request.form.get('termo_sei_doc', '').strip()
+                
+                if termo_sei_doc:
+                    try:
+                        # Verificar se já existe registro para este termo
+                        check_query = """
+                            SELECT id FROM public.parcerias_sei 
+                            WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
+                        """
+                        cur_check = get_cursor()
+                        cur_check.execute(check_query, (numero_termo,))
+                        exists = cur_check.fetchone()
+                        cur_check.close()
+                        
+                        if exists:
+                            # Atualizar termo_sei_doc existente
+                            update_sei_query = """
+                                UPDATE public.parcerias_sei 
+                                SET termo_sei_doc = %s
+                                WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
+                            """
+                            execute_query(update_sei_query, (termo_sei_doc, numero_termo))
+                            print(f"[DEBUG NOVA] termo_sei_doc atualizado em parcerias_sei: {termo_sei_doc}")
+                        else:
+                            # Inserir novo registro
+                            insert_sei_query = """
+                                INSERT INTO public.parcerias_sei (numero_termo, termo_sei_doc, aditamento, apostilamento)
+                                VALUES (%s, %s, '-', '-')
+                            """
+                            execute_query(insert_sei_query, (numero_termo, termo_sei_doc))
+                            print(f"[DEBUG NOVA] Novo registro criado em parcerias_sei com termo_sei_doc: {termo_sei_doc}")
+                    except Exception as e:
+                        print(f"[ERRO] Falha ao salvar termo_sei_doc: {e}")
+                
+                # Registrar na tabela de auditoria parcerias_pg
                 pessoa_gestora = request.form.get('pessoa_gestora')
                 solicitacao_checkbox = request.form.get('solicitacao_alteracao')
                 solicitacao = True if solicitacao_checkbox == 'on' else False
@@ -447,6 +482,23 @@ def nova():
     numero_termo_param = request.args.get('numero_termo', '')
     osc_param = request.args.get('osc', '')
     
+    # Buscar termo_sei_doc se houver numero_termo
+    termo_sei_doc = None
+    if numero_termo_param:
+        try:
+            cur_sei = get_cursor()
+            cur_sei.execute("""
+                SELECT termo_sei_doc 
+                FROM public.parcerias_sei 
+                WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
+            """, (numero_termo_param,))
+            result_sei = cur_sei.fetchone()
+            cur_sei.close()
+            if result_sei:
+                termo_sei_doc = result_sei['termo_sei_doc']
+        except Exception as e:
+            print(f"[ERRO] Falha ao buscar termo_sei_doc: {e}")
+    
     # Criar objeto parceria com dados pré-preenchidos
     parceria_preenchida = {
         'numero_termo': numero_termo_param,
@@ -460,6 +512,7 @@ def nova():
                          legislacoes=legislacoes,
                          pessoas_gestoras=pessoas_gestoras,
                          rf_pessoa_gestora=None,
+                         termo_sei_doc=termo_sei_doc,
                          modo_importacao=True if numero_termo_param else False)
 
 
@@ -559,6 +612,40 @@ def editar(numero_termo):
             )
             
             if execute_query(query, params):
+                # Salvar/atualizar termo_sei_doc em parcerias_sei se fornecido
+                termo_sei_doc = request.form.get('termo_sei_doc', '').strip()
+                
+                if termo_sei_doc:
+                    try:
+                        # Verificar se já existe registro para este termo
+                        cur_check = get_cursor()
+                        cur_check.execute("""
+                            SELECT id FROM public.parcerias_sei 
+                            WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
+                        """, (numero_termo,))
+                        exists = cur_check.fetchone()
+                        cur_check.close()
+                        
+                        if exists:
+                            # Atualizar termo_sei_doc existente
+                            update_sei_query = """
+                                UPDATE public.parcerias_sei 
+                                SET termo_sei_doc = %s
+                                WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
+                            """
+                            execute_query(update_sei_query, (termo_sei_doc, numero_termo))
+                            print(f"[DEBUG EDITAR] termo_sei_doc atualizado em parcerias_sei: {termo_sei_doc}")
+                        else:
+                            # Inserir novo registro
+                            insert_sei_query = """
+                                INSERT INTO public.parcerias_sei (numero_termo, termo_sei_doc, aditamento, apostilamento)
+                                VALUES (%s, %s, '-', '-')
+                            """
+                            execute_query(insert_sei_query, (numero_termo, termo_sei_doc))
+                            print(f"[DEBUG EDITAR] Novo registro criado em parcerias_sei com termo_sei_doc: {termo_sei_doc}")
+                    except Exception as e:
+                        print(f"[ERRO] Falha ao salvar termo_sei_doc em editar: {e}")
+                
                 # Registrar na tabela de auditoria parcerias_pg se houve mudança
                 solicitacao_checkbox = request.form.get('solicitacao_alteracao')
                 solicitacao = True if solicitacao_checkbox == 'on' else False
@@ -702,6 +789,22 @@ def editar(numero_termo):
         termo_rescindido = True
         data_rescisao = rescisao_result['data_rescisao']
     
+    # Buscar termo_sei_doc de parcerias_sei
+    termo_sei_doc = None
+    try:
+        cur_sei = get_cursor()
+        cur_sei.execute("""
+            SELECT termo_sei_doc 
+            FROM public.parcerias_sei 
+            WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
+        """, (numero_termo,))
+        result_sei = cur_sei.fetchone()
+        cur_sei.close()
+        if result_sei:
+            termo_sei_doc = result_sei['termo_sei_doc']
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar termo_sei_doc em editar: {e}")
+    
     cur.close()
     
     return render_template("parcerias_form.html", 
@@ -710,6 +813,7 @@ def editar(numero_termo):
                          legislacoes=legislacoes,
                          pessoas_gestoras=pessoas_gestoras,
                          rf_pessoa_gestora=rf_pessoa_gestora,
+                         termo_sei_doc=termo_sei_doc,
                          termo_rescindido=termo_rescindido,
                          data_rescisao=data_rescisao)
 
@@ -1813,6 +1917,21 @@ def dgp_alteracoes():
         """)
         instrumentos = [row['instrumento_alteracao'] for row in cur.fetchall()]
         
+        # Buscar analistas DGP da tabela categoricas.c_dgp_analistas
+        analistas_dgp = []
+        try:
+            cur.execute("""
+                SELECT nome_analista
+                FROM categoricas.c_dgp_analistas
+                WHERE nome_analista IS NOT NULL
+                ORDER BY nome_analista
+            """)
+            analistas_dgp = [row['nome_analista'] for row in cur.fetchall()]
+        except Exception as e:
+            print(f"[WARN] Erro ao buscar analistas DGP: {str(e)}")
+            # Fallback para lista estática se tabela não existir
+            analistas_dgp = ['Administrador', 'Sistema']
+        
         # Buscar alterações cadastradas (agrupadas por número do termo)
         cur.execute("""
             SELECT 
@@ -1832,7 +1951,8 @@ def dgp_alteracoes():
             'dgp_alteracoes.html',
             tipos_alteracao=tipos_alteracao,
             instrumentos=instrumentos,
-            alteracoes=alteracoes
+            alteracoes=alteracoes,
+            analistas_dgp=analistas_dgp
         )
         
     except Exception as e:
@@ -1871,13 +1991,64 @@ def api_termos_parcerias():
         query += " ORDER BY p.numero_termo LIMIT 100"
         
         cur.execute(query, params)
-        termos = [row['numero_termo'] for row in cur.fetchall()]
+        # Retornar no formato esperado pelo Select2: lista de objetos {id, text}
+        termos = [{'id': row['numero_termo'], 'text': row['numero_termo']} for row in cur.fetchall()]
         cur.close()
         
         return jsonify(termos)
         
     except Exception as e:
         print(f"[ERRO] Erro ao buscar termos: {str(e)}")
+        return jsonify([]), 500
+
+
+@parcerias_bp.route("/api/lista_oscs", methods=["GET"])
+@login_required
+def api_lista_oscs():
+    """
+    API para listar todas as OSCs únicas
+    """
+    cur = get_cursor()
+    
+    try:
+        cur.execute("""
+            SELECT DISTINCT osc 
+            FROM public.parcerias 
+            WHERE osc IS NOT NULL AND osc != ''
+            ORDER BY osc
+        """)
+        oscs = [row['osc'] for row in cur.fetchall()]
+        cur.close()
+        
+        return jsonify(oscs)
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar OSCs: {str(e)}")
+        return jsonify([]), 500
+
+
+@parcerias_bp.route("/api/lista_pgs", methods=["GET"])
+@login_required
+def api_lista_pgs():
+    """
+    API para listar todas as pessoas gestoras únicas
+    """
+    cur = get_cursor()
+    
+    try:
+        cur.execute("""
+            SELECT DISTINCT nome_pg 
+            FROM public.parcerias_pg 
+            WHERE nome_pg IS NOT NULL AND nome_pg != ''
+            ORDER BY nome_pg
+        """)
+        pgs = [row['nome_pg'] for row in cur.fetchall()]
+        cur.close()
+        
+        return jsonify(pgs)
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar PGs: {str(e)}")
         return jsonify([]), 500
 
 
@@ -1888,6 +2059,7 @@ def salvar_alteracao():
     """
     Salvar alteração(ões) de termo
     Cada tipo de alteração selecionado será salvo como um registro separado
+    Se status = "Concluído", atualiza as tabelas originais
     """
     cur = get_cursor()
     
@@ -1896,38 +2068,77 @@ def salvar_alteracao():
         numero_termo = request.form.get('numero_termo', '').strip()
         instrumento_alteracao = request.form.get('instrumento_alteracao', '').strip()
         alt_numero = int(request.form.get('alt_numero', 0))
+        alt_status = request.form.get('alt_status', '').strip()
+        alt_responsavel = request.form.get('alt_responsavel', '').strip()
+        alt_observacao = request.form.get('alt_observacao', '').strip()
         
         # Validar campos obrigatórios
-        if not numero_termo or not instrumento_alteracao:
-            flash('Número do termo e instrumento são obrigatórios!', 'danger')
+        if not numero_termo or not instrumento_alteracao or not alt_status or not alt_responsavel:
+            flash('Todos os campos obrigatórios devem ser preenchidos!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
-        # Tipos de alteração (array)
+        # Tipos de alteração e informações (arrays)
         tipos_alteracao = request.form.getlist('alt_tipo[]')
+        alt_infos = request.form.getlist('alt_info[]')
+        alt_info_inicios = request.form.getlist('alt_info_inicio[]')
+        alt_info_fins = request.form.getlist('alt_info_fim[]')
         
         if not tipos_alteracao or not any(tipos_alteracao):
             flash('Selecione pelo menos um tipo de alteração!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
-        # Inserir um registro para cada tipo de alteração
+        # Processar cada tipo de alteração
         registros_inseridos = 0
+        idx_info = 0
+        idx_date_range = 0
         
-        for alt_tipo in tipos_alteracao:
+        for i, alt_tipo in enumerate(tipos_alteracao):
             if not alt_tipo.strip():
                 continue
             
-            cur.execute("""
+            # Determinar o valor de alt_info baseado no tipo
+            alt_info = None
+            if alt_tipo == 'Adequação de vigência':
+                # Usar date range
+                if idx_date_range < len(alt_info_inicios) and idx_date_range < len(alt_info_fins):
+                    alt_info = f"{alt_info_inicios[idx_date_range]}|{alt_info_fins[idx_date_range]}"
+                    idx_date_range += 1
+            else:
+                # Usar info normal
+                if idx_info < len(alt_infos):
+                    alt_info = alt_infos[idx_info]
+                    idx_info += 1
+            
+            # Capturar valor antigo se status = "Concluído"
+            alt_old_info = None
+            if alt_status == 'Concluído' and alt_info:
+                alt_old_info = _capturar_valor_antigo(cur, numero_termo, alt_tipo)
+            
+            # Inserir registro
+            data_fim = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+            
+            cur.execute(f"""
                 INSERT INTO public.termos_alteracoes 
-                (numero_termo, instrumento_alteracao, alt_numero, alt_tipo, 
-                 alt_data_cadastro_inicio, criado_por)
-                VALUES (%s, %s, %s, %s, NOW(), %s)
+                (numero_termo, instrumento_alteracao, alt_numero, alt_tipo, alt_status,
+                 alt_info, alt_old_info, alt_responsavel, alt_observacao,
+                 alt_data_cadastro_inicio, alt_data_cadastro_fim, criado_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), {data_fim}, %s)
             """, (
                 numero_termo,
                 instrumento_alteracao,
                 alt_numero,
                 alt_tipo.strip(),
+                alt_status,
+                alt_info,
+                alt_old_info,
+                alt_responsavel,
+                alt_observacao if alt_observacao else None,
                 session.get('username', 'Sistema')
             ))
+            
+            # Se concluído, atualizar tabelas originais
+            if alt_status == 'Concluído' and alt_info:
+                _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info)
             
             registros_inseridos += 1
         
@@ -1939,9 +2150,210 @@ def salvar_alteracao():
         
     except Exception as e:
         print(f"[ERRO] Erro ao salvar alteração: {str(e)}")
+        import traceback
+        traceback.print_exc()
         get_db().rollback()
         flash(f'Erro ao salvar alteração: {str(e)}', 'danger')
         return redirect(url_for('parcerias.dgp_alteracoes'))
+
+
+def _capturar_valor_antigo(cur, numero_termo, alt_tipo):
+    """
+    Captura o valor antigo da tabela original antes de atualizar
+    """
+    try:
+        mapa = {
+            'Nome do projeto': ('public.parcerias', 'projeto'),
+            'Nome da organização': ('public.parcerias', 'osc'),
+            'CNPJ da organização': ('public.parcerias', 'cnpj'),
+            'Nome do responsável legal': ('public.parcerias_infos_adicionais', 'parceria_responsavel_legal'),
+            'Pessoa gestora indicada pela administração pública': ('public.parcerias_pg', 'nome_pg'),
+            'Objeto da parceria': ('public.parcerias_infos_adicionais', 'parceria_objeto'),
+            'Quantidade de beneficiários diretos': ('public.parcerias_infos_adicionais', 'parceria_beneficiarios_diretos'),
+            'Aumento de valor total da parceria': ('public.parcerias', 'total_previsto'),
+            'Redução de valor de valor total da parceria': ('public.parcerias', 'total_previsto'),
+            'Remanejamentos sem alteração de valor mensal': ('public.parcerias', 'sei_orcamento'),
+            'FACC': ('public.parcerias', 'conta'),
+            'Prorrogação de vigência': ('public.parcerias', 'final'),
+            'Adequação de vigência': ('public.parcerias', 'inicio|final'),
+            'Redução de vigência da parceria': ('public.parcerias', 'final'),
+            'Suspensão de vigência da parceria': ('public.parcerias_infos_adicionais', 'parceria_data_suspensao'),
+            'Retomada de vigência da parceria': ('public.parcerias_infos_adicionais', 'parceria_data_retomada'),
+            'Justificativa do Projeto': ('public.parcerias_infos_adicionais', 'parceria_justificativa_projeto'),
+            'Abragência geográfica': ('public.parcerias_infos_adicionais', 'parceria_abrangencia_projeto'),
+            'Quantidade de beneficiários indiretos': ('public.parcerias_infos_adicionais', 'parceria_beneficiarios_indiretos'),
+        }
+        
+        if alt_tipo not in mapa:
+            return None
+        
+        tabela, coluna = mapa[alt_tipo]
+        
+        # Adequação de vigência tem duas colunas
+        if '|' in coluna:
+            col1, col2 = coluna.split('|')
+            cur.execute(f"SELECT {col1}, {col2} FROM {tabela} WHERE numero_termo = %s", (numero_termo,))
+            row = cur.fetchone()
+            if row:
+                return f"{row[col1]}|{row[col2]}" if row[col1] and row[col2] else None
+        else:
+            # Caso especial para pessoa gestora
+            if tabela == 'public.parcerias_pg':
+                cur.execute(f"SELECT {coluna} FROM {tabela} WHERE numero_termo = %s AND vigente = TRUE LIMIT 1", (numero_termo,))
+            else:
+                cur.execute(f"SELECT {coluna} FROM {tabela} WHERE numero_termo = %s", (numero_termo,))
+            
+            row = cur.fetchone()
+            if row and row[coluna] is not None:
+                return str(row[coluna])
+        
+        return None
+        
+    except Exception as e:
+        print(f"[WARN] Erro ao capturar valor antigo: {str(e)}")
+        return None
+
+
+def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info):
+    """
+    Atualiza a tabela original com o novo valor quando status = "Concluído"
+    """
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    
+    try:
+        # Mapear tipo de alteração para tabela e coluna
+        if alt_tipo == 'Nome do projeto':
+            cur.execute("UPDATE public.parcerias SET projeto = %s WHERE numero_termo = %s", (alt_info, numero_termo))
+        
+        elif alt_tipo == 'Nome da organização':
+            cur.execute("UPDATE public.parcerias SET osc = %s WHERE numero_termo = %s", (alt_info, numero_termo))
+        
+        elif alt_tipo == 'CNPJ da organização':
+            cur.execute("UPDATE public.parcerias SET cnpj = %s WHERE numero_termo = %s", (alt_info, numero_termo))
+        
+        elif alt_tipo == 'Nome do responsável legal':
+            cur.execute("""
+                UPDATE public.parcerias_infos_adicionais 
+                SET parceria_responsavel_legal = %s 
+                WHERE numero_termo = %s
+            """, (alt_info, numero_termo))
+        
+        elif alt_tipo == 'Pessoa gestora indicada pela administração pública':
+            # Desativar a atual e criar nova
+            cur.execute("UPDATE public.parcerias_pg SET vigente = FALSE WHERE numero_termo = %s", (numero_termo,))
+            cur.execute("""
+                INSERT INTO public.parcerias_pg (numero_termo, nome_pg, vigente)
+                VALUES (%s, %s, TRUE)
+            """, (numero_termo, alt_info))
+        
+        elif alt_tipo == 'Objeto da parceria':
+            cur.execute("""
+                UPDATE public.parcerias_infos_adicionais 
+                SET parceria_objeto = %s 
+                WHERE numero_termo = %s
+            """, (alt_info, numero_termo))
+        
+        elif alt_tipo == 'Quantidade de beneficiários diretos':
+            cur.execute("""
+                UPDATE public.parcerias_infos_adicionais 
+                SET parceria_beneficiarios_diretos = %s 
+                WHERE numero_termo = %s
+            """, (int(alt_info), numero_termo))
+        
+        elif alt_tipo in ['Aumento de valor total da parceria', 'Redução de valor de valor total da parceria']:
+            # Limpar formatação de moeda
+            valor = alt_info.replace('R$', '').replace('.', '').replace(',', '.').strip()
+            cur.execute("UPDATE public.parcerias SET total_previsto = %s WHERE numero_termo = %s", (float(valor), numero_termo))
+        
+        elif alt_tipo == 'Remanejamentos sem alteração de valor mensal':
+            cur.execute("UPDATE public.parcerias SET sei_orcamento = %s WHERE numero_termo = %s", (alt_info, numero_termo))
+        
+        elif alt_tipo == 'FACC':
+            cur.execute("UPDATE public.parcerias SET conta = %s WHERE numero_termo = %s", (alt_info, numero_termo))
+        
+        elif alt_tipo in ['Prorrogação de vigência', 'Redução de vigência da parceria']:
+            # Atualizar data final e recalcular meses
+            cur.execute("UPDATE public.parcerias SET final = %s WHERE numero_termo = %s", (alt_info, numero_termo))
+            _recalcular_meses(cur, numero_termo)
+        
+        elif alt_tipo == 'Adequação de vigência':
+            # Atualizar data de início e fim
+            datas = alt_info.split('|')
+            if len(datas) == 2:
+                cur.execute("""
+                    UPDATE public.parcerias 
+                    SET inicio = %s, final = %s 
+                    WHERE numero_termo = %s
+                """, (datas[0], datas[1], numero_termo))
+                _recalcular_meses(cur, numero_termo)
+        
+        elif alt_tipo == 'Suspensão de vigência da parceria':
+            cur.execute("""
+                UPDATE public.parcerias_infos_adicionais 
+                SET parceria_data_suspensao = %s 
+                WHERE numero_termo = %s
+            """, (alt_info, numero_termo))
+        
+        elif alt_tipo == 'Retomada de vigência da parceria':
+            cur.execute("""
+                UPDATE public.parcerias_infos_adicionais 
+                SET parceria_data_retomada = %s 
+                WHERE numero_termo = %s
+            """, (alt_info, numero_termo))
+        
+        elif alt_tipo == 'Justificativa do Projeto':
+            cur.execute("""
+                UPDATE public.parcerias_infos_adicionais 
+                SET parceria_justificativa_projeto = %s 
+                WHERE numero_termo = %s
+            """, (alt_info, numero_termo))
+        
+        elif alt_tipo == 'Abragência geográfica':
+            cur.execute("""
+                UPDATE public.parcerias_infos_adicionais 
+                SET parceria_abrangencia_projeto = %s 
+                WHERE numero_termo = %s
+            """, (alt_info, numero_termo))
+        
+        elif alt_tipo == 'Quantidade de beneficiários indiretos':
+            cur.execute("""
+                UPDATE public.parcerias_infos_adicionais 
+                SET parceria_beneficiarios_indiretos = %s 
+                WHERE numero_termo = %s
+            """, (int(alt_info), numero_termo))
+        
+        print(f"[INFO] Tabela original atualizada para {alt_tipo}: {alt_info}")
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao atualizar tabela original: {str(e)}")
+        raise
+
+
+def _recalcular_meses(cur, numero_termo):
+    """
+    Recalcula o número de meses entre data de início e fim
+    """
+    from dateutil.relativedelta import relativedelta
+    
+    try:
+        cur.execute("SELECT inicio, final FROM public.parcerias WHERE numero_termo = %s", (numero_termo,))
+        row = cur.fetchone()
+        
+        if row and row['inicio'] and row['final']:
+            inicio = row['inicio']
+            final = row['final']
+            
+            # Calcular diferença em meses
+            diff = relativedelta(final, inicio)
+            meses = diff.years * 12 + diff.months
+            
+            # Atualizar
+            cur.execute("UPDATE public.parcerias SET meses = %s WHERE numero_termo = %s", (meses, numero_termo))
+            print(f"[INFO] Meses recalculados para {numero_termo}: {meses}")
+    
+    except Exception as e:
+        print(f"[ERRO] Erro ao recalcular meses: {str(e)}")
 
 
 @parcerias_bp.route("/alteracao/editar", methods=["GET"])
@@ -1958,9 +2370,10 @@ def editar_alteracao():
     cur = get_cursor()
     
     try:
-        # Buscar todos os tipos de alteração para esse termo/instrumento/número
+        # Buscar todos os registros para esse termo/instrumento/número
         cur.execute("""
-            SELECT alt_tipo
+            SELECT alt_tipo, alt_status, alt_info, alt_old_info, 
+                   alt_responsavel, alt_observacao
             FROM public.termos_alteracoes
             WHERE numero_termo = %s 
               AND instrumento_alteracao = %s 
@@ -1968,10 +2381,30 @@ def editar_alteracao():
             ORDER BY id
         """, (numero_termo, instrumento, alt_numero))
         
-        tipos = [row['alt_tipo'] for row in cur.fetchall()]
+        rows = cur.fetchall()
         cur.close()
         
-        return jsonify({'tipos': tipos})
+        if not rows:
+            return jsonify({'error': 'Alteração não encontrada'}), 404
+        
+        # Preparar dados para retornar
+        tipos = []
+        infos = []
+        status = rows[0]['alt_status']  # Todos têm o mesmo status
+        responsavel = rows[0]['alt_responsavel']  # Todos têm o mesmo responsável
+        observacao = rows[0]['alt_observacao']  # Todos têm a mesma observação
+        
+        for row in rows:
+            tipos.append(row['alt_tipo'])
+            infos.append(row['alt_info'] or '')
+        
+        return jsonify({
+            'tipos': tipos,
+            'infos': infos,
+            'status': status,
+            'responsavel': responsavel,
+            'observacao': observacao or ''
+        })
         
     except Exception as e:
         print(f"[ERRO] Erro ao buscar alteração: {str(e)}")
@@ -1994,16 +2427,24 @@ def atualizar_alteracao():
         instrumento_original = request.args.get('instrumento', '').strip()
         alt_numero_original = int(request.args.get('alt_numero', 0))
         
-        # Novos dados
+        # Novos dados gerais
         numero_termo = request.form.get('numero_termo', '').strip()
         instrumento_alteracao = request.form.get('instrumento_alteracao', '').strip()
         alt_numero = int(request.form.get('alt_numero', 0))
-        tipos_alteracao = request.form.getlist('alt_tipo[]')
+        alt_status = request.form.get('alt_status', '').strip()
+        alt_responsavel = request.form.get('alt_responsavel', '').strip()
+        alt_observacao = request.form.get('alt_observacao', '').strip()
         
         # Validar campos obrigatórios
-        if not numero_termo or not instrumento_alteracao:
-            flash('Número do termo e instrumento são obrigatórios!', 'danger')
+        if not numero_termo or not instrumento_alteracao or not alt_status or not alt_responsavel:
+            flash('Todos os campos obrigatórios devem ser preenchidos!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
+        
+        # Tipos de alteração e informações (arrays)
+        tipos_alteracao = request.form.getlist('alt_tipo[]')
+        alt_infos = request.form.getlist('alt_info[]')
+        alt_info_inicios = request.form.getlist('alt_info_inicio[]')
+        alt_info_fins = request.form.getlist('alt_info_fim[]')
         
         if not tipos_alteracao or not any(tipos_alteracao):
             flash('Selecione pelo menos um tipo de alteração!', 'danger')
@@ -2019,24 +2460,58 @@ def atualizar_alteracao():
         
         # Inserir novos registros
         registros_inseridos = 0
+        idx_info = 0
+        idx_date_range = 0
         
-        for alt_tipo in tipos_alteracao:
+        for i, alt_tipo in enumerate(tipos_alteracao):
             if not alt_tipo.strip():
                 continue
             
-            cur.execute("""
+            # Determinar o valor de alt_info baseado no tipo
+            alt_info = None
+            if alt_tipo == 'Adequação de vigência':
+                # Usar date range
+                if idx_date_range < len(alt_info_inicios) and idx_date_range < len(alt_info_fins):
+                    alt_info = f"{alt_info_inicios[idx_date_range]}|{alt_info_fins[idx_date_range]}"
+                    idx_date_range += 1
+            else:
+                # Usar info normal
+                if idx_info < len(alt_infos):
+                    alt_info = alt_infos[idx_info]
+                    idx_info += 1
+            
+            # Capturar valor antigo se status = "Concluído"
+            alt_old_info = None
+            if alt_status == 'Concluído' and alt_info:
+                alt_old_info = _capturar_valor_antigo(cur, numero_termo, alt_tipo)
+            
+            # Inserir registro
+            data_fim = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+            
+            cur.execute(f"""
                 INSERT INTO public.termos_alteracoes 
-                (numero_termo, instrumento_alteracao, alt_numero, alt_tipo, 
-                 alt_data_cadastro_inicio, criado_por, atualizado_por, atualizado_em)
-                VALUES (%s, %s, %s, %s, NOW(), %s, %s, NOW())
+                (numero_termo, instrumento_alteracao, alt_numero, alt_tipo, alt_status,
+                 alt_info, alt_old_info, alt_responsavel, alt_observacao,
+                 alt_data_cadastro_inicio, alt_data_cadastro_fim,
+                 criado_por, atualizado_por, atualizado_em)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), {data_fim}, %s, %s, NOW())
             """, (
                 numero_termo,
                 instrumento_alteracao,
                 alt_numero,
                 alt_tipo.strip(),
+                alt_status,
+                alt_info,
+                alt_old_info,
+                alt_responsavel,
+                alt_observacao if alt_observacao else None,
                 session.get('username', 'Sistema'),
                 session.get('username', 'Sistema')
             ))
+            
+            # Se concluído, atualizar tabelas originais
+            if alt_status == 'Concluído' and alt_info:
+                _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info)
             
             registros_inseridos += 1
         

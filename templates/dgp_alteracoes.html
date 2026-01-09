@@ -134,7 +134,7 @@
 
           <div class="row g-3">
             <!-- Número do Termo -->
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label for="numero_termo" class="form-label">
                 <i class="bi bi-file-earmark-text"></i> Número do Termo *
               </label>
@@ -145,7 +145,7 @@
             </div>
 
             <!-- Instrumento Jurídico (preenchido automaticamente) -->
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label for="instrumento_alteracao" class="form-label">
                 <i class="bi bi-file-earmark-medical"></i> Instrumento Jurídico *
               </label>
@@ -159,6 +159,36 @@
                 <option value="Informação da Pessoa Gestora">Informação da Pessoa Gestora</option>
               </select>
               <small class="text-muted">Preenchido automaticamente, mas pode ser alterado manualmente</small>
+            </div>
+
+            <!-- Status da Alteração -->
+            <div class="col-md-4">
+              <label for="alt_status" class="form-label">
+                <i class="bi bi-flag"></i> Status *
+              </label>
+              <select class="form-select" id="alt_status" name="alt_status" required>
+                <option value="">-- Selecione --</option>
+                <option value="Iniciado">Iniciado</option>
+                <option value="Em andamento">Em andamento</option>
+                <option value="Concluído">Concluído</option>
+              </select>
+              <small class="text-muted">Status atual da alteração</small>
+            </div>
+          </div>
+
+          <div class="row g-3 mt-2">
+            <!-- Responsável pela Alteração -->
+            <div class="col-md-12">
+              <label for="alt_responsavel" class="form-label">
+                <i class="bi bi-person-badge"></i> Responsável pela Alteração *
+              </label>
+              <select class="form-select" id="alt_responsavel" name="alt_responsavel" required>
+                <option value="">-- Selecione --</option>
+                {% for analista in analistas_dgp %}
+                  <option value="{{ analista }}">{{ analista }}</option>
+                {% endfor %}
+              </select>
+              <small class="text-muted">Pessoa responsável por processar esta alteração</small>
             </div>
           </div>
 
@@ -211,6 +241,24 @@
                 <i class="bi bi-plus-circle"></i> Adicionar Mais um Tipo de Alteração
               </button>
             </div>
+
+        <!-- SEÇÃO 3: Observações -->
+        <div class="mb-4">
+          <h5 class="border-bottom pb-2 mb-3">
+            <i class="bi bi-chat-left-text"></i> Observações
+          </h5>
+
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label for="alt_observacao" class="form-label">
+                <i class="bi bi-journal-text"></i> Observações Adicionais
+              </label>
+              <textarea class="form-control" id="alt_observacao" name="alt_observacao" 
+                        rows="3" placeholder="Digite observações sobre esta alteração..."></textarea>
+              <small class="text-muted">Campo opcional para informações complementares</small>
+            </div>
+          </div>
+        </div>
 
           </form>
         </div>
@@ -337,16 +385,44 @@
     const tiposAlteracao = {{ tipos_alteracao|tojson if tipos_alteracao else '[]'|safe }};
     const instrumentos = {{ instrumentos|tojson if instrumentos else '[]'|safe }};
     
+    // Mapeamento de tipos para campos dinâmicos
+    const tiposCampos = {
+      'Nome do projeto': { tipo: 'text', placeholder: 'Digite o novo nome do projeto' },
+      'Nome da organização': { tipo: 'select_osc', placeholder: 'Selecione a OSC' },
+      'CNPJ da organização': { tipo: 'text', placeholder: 'XX.XXX.XXX/XXXX-XX', maxlength: 18 },
+      'Nome do responsável legal': { tipo: 'text', placeholder: 'Digite o nome do responsável legal', maxlength: 300 },
+      'Pessoa gestora indicada pela administração pública': { tipo: 'select_pg', placeholder: 'Selecione a pessoa gestora' },
+      'Objeto da parceria': { tipo: 'textarea', placeholder: 'Descreva o objeto da parceria' },
+      'Quantidade de beneficiários diretos': { tipo: 'number', placeholder: 'Quantidade', min: 0 },
+      'Cláusulas gerais': { tipo: 'textarea', placeholder: 'Descreva as cláusulas gerais' },
+      'Alteração de norma geral aplicável': { tipo: 'textarea', placeholder: 'Descreva a alteração da norma' },
+      'Aumento de valor total da parceria': { tipo: 'money', placeholder: 'R$ 0,00' },
+      'Redução de valor de valor total da parceria': { tipo: 'money', placeholder: 'R$ 0,00' },
+      'Remanejamentos sem alteração de valor mensal': { tipo: 'text', placeholder: 'SEI do orçamento', maxlength: 12 },
+      'FACC': { tipo: 'text', placeholder: '1511-x / 15138-9' },
+      'Prorrogação de vigência': { tipo: 'date', placeholder: 'Nova data final' },
+      'Adequação de vigência': { tipo: 'date_range', placeholder: 'Novas datas de início e fim' },
+      'Redução de vigência da parceria': { tipo: 'date', placeholder: 'Nova data final' },
+      'Suspensão de vigência da parceria': { tipo: 'date', placeholder: 'Data da suspensão' },
+      'Retomada de vigência da parceria': { tipo: 'date', placeholder: 'Data da retomada' },
+      'Justificativa do Projeto': { tipo: 'textarea', placeholder: 'Justificativa do projeto' },
+      'Abragência geográfica': { tipo: 'text', placeholder: 'Abrangência geográfica do projeto' },
+      'Quantidade de beneficiários indiretos': { tipo: 'number', placeholder: 'Quantidade', min: 0 }
+    };
+    
     let contadorTipos = 0;
     let tiposSelecionados = new Set();
 
     $(document).ready(function() {
-      // Adicionar primeira seção de tipo de alteração
-      adicionarSecaoTipo();
+      // Nada aqui - seção será adicionada quando modal abrir
     });
 
     // Inicializar Select2 quando o modal for aberto
     $('#modalCadastroAlteracao').on('shown.bs.modal', function() {
+      // Adicionar primeira seção se container estiver vazio
+      if ($('#tipos-alteracao-container').children().length === 0) {
+        adicionarSecaoTipo();
+      }
       // Inicializar Select2 para número do termo dentro do modal
       $('#numero_termo').select2({
         theme: 'bootstrap-5',
@@ -362,11 +438,7 @@
             return { q: params.term };
           },
           processResults: function(data) {
-            return {
-              results: data.map(function(termo) {
-                return { id: termo, text: termo };
-              })
-            };
+            return { results: data };
           },
           cache: true
         },
@@ -386,12 +458,18 @@
 
     // Limpar Select2 quando o modal for fechado
     $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
-      $('#numero_termo').select2('destroy');
+      if ($('#numero_termo').hasClass('select2-hidden-accessible')) {
+        $('#numero_termo').select2('destroy');
+      }
       $('#formAlteracao')[0].reset();
+      $('#formAlteracao').attr('action', '{{ url_for("parcerias.salvar_alteracao") }}');
+      $('#modalCadastroLabel').html('<i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração');
       // Resetar tipos de alteração
       $('#tipos-alteracao-container').empty();
       contadorTipos = 0;
-      adicionarSecaoTipo();
+      tiposSelecionados.clear();
+      // Ocultar campos de numeração
+      $('#numeracao-container').hide();
     });
 
     // Função para adicionar uma nova seção de tipo de alteração
@@ -417,7 +495,7 @@
                 Selecione o Tipo de Alteração *
               </label>
               <select class="form-select tipo-select" id="alt_tipo_${contadorTipos}" 
-                      name="alt_tipo[]" required onchange="atualizarInstrumento()">
+                      name="alt_tipo[]" required onchange="atualizarInstrumento(); atualizarCampoDinamico(${contadorTipos})">
                 <option value="">-- Selecione --</option>
                 ${tiposAlteracao.map(tipo => `
                   <option value="${tipo.alt_tipo}" data-instrumento="${tipo.alt_instrumento}">
@@ -425,6 +503,11 @@
                   </option>
                 `).join('')}
               </select>
+            </div>
+
+            <!-- Campo dinâmico para alt_info -->
+            <div class="col-md-12" id="campo_info_${contadorTipos}" style="display: none;">
+              <!-- Será preenchido dinamicamente -->
             </div>
           </div>
         </div>
@@ -523,6 +606,109 @@
       $('#alt_numero').val(numeroFinal);
     });
 
+    // Função para atualizar campo dinâmico baseado no tipo de alteração
+    function atualizarCampoDinamico(index) {
+      const tipoSelect = $(`#alt_tipo_${index}`);
+      const tipoSelecionado = tipoSelect.val();
+      const campoContainer = $(`#campo_info_${index}`);
+      
+      if (!tipoSelecionado || !tiposCampos[tipoSelecionado]) {
+        campoContainer.hide();
+        return;
+      }
+      
+      const config = tiposCampos[tipoSelecionado];
+      let campoHTML = '';
+      
+      campoHTML += `<label class="form-label"><i class="bi bi-pencil-square"></i> Nova Informação *</label>`;
+      
+      switch(config.tipo) {
+        case 'text':
+          campoHTML += `<input type="text" class="form-control" name="alt_info[]" 
+                        placeholder="${config.placeholder}" 
+                        ${config.maxlength ? `maxlength="${config.maxlength}"` : ''} required>`;
+          break;
+          
+        case 'textarea':
+          campoHTML += `<textarea class="form-control" name="alt_info[]" rows="3" 
+                        placeholder="${config.placeholder}" required></textarea>`;
+          break;
+          
+        case 'number':
+          campoHTML += `<input type="number" class="form-control" name="alt_info[]" 
+                        placeholder="${config.placeholder}" min="${config.min || 0}" required>`;
+          break;
+          
+        case 'money':
+          campoHTML += `<input type="text" class="form-control money-input" name="alt_info[]" 
+                        placeholder="${config.placeholder}" required>`;
+          break;
+          
+        case 'date':
+          campoHTML += `<input type="date" class="form-control" name="alt_info[]" required>`;
+          break;
+          
+        case 'date_range':
+          campoHTML += `
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label small">Data de Início</label>
+                <input type="date" class="form-control" name="alt_info_inicio[]" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small">Data de Término</label>
+                <input type="date" class="form-control" name="alt_info_fim[]" required>
+              </div>
+            </div>`;
+          break;
+          
+        case 'select_osc':
+          campoHTML += `<select class="form-select" name="alt_info[]" required>
+                          <option value="">-- Selecione a OSC --</option>
+                          <!-- Será populado via AJAX -->
+                        </select>`;
+          // Carregar OSCs via AJAX
+          setTimeout(() => {
+            $.get('/parcerias/api/lista_oscs', function(data) {
+              const select = $(`#campo_info_${index} select[name="alt_info[]"]`);
+              data.forEach(osc => {
+                select.append(`<option value="${osc}">${osc}</option>`);
+              });
+            });
+          }, 100);
+          break;
+          
+        case 'select_pg':
+          campoHTML += `<select class="form-select" name="alt_info[]" required>
+                          <option value="">-- Selecione a Pessoa Gestora --</option>
+                          <!-- Será populado via AJAX -->
+                        </select>`;
+          // Carregar PGs via AJAX
+          setTimeout(() => {
+            $.get('/parcerias/api/lista_pgs', function(data) {
+              const select = $(`#campo_info_${index} select[name="alt_info[]"]`);
+              data.forEach(pg => {
+                select.append(`<option value="${pg}">${pg}</option>`);
+              });
+            });
+          }, 100);
+          break;
+      }
+      
+      campoHTML += `<small class="text-muted">Preencha a nova informação para este tipo de alteração</small>`;
+      
+      campoContainer.html(campoHTML).show();
+      
+      // Aplicar máscara de dinheiro se necessário
+      if (config.tipo === 'money') {
+        $(`#campo_info_${index} .money-input`).on('input', function() {
+          let value = this.value.replace(/\D/g, '');
+          value = (parseInt(value) / 100).toFixed(2);
+          this.value = 'R$ ' + value.replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+        });
+      }
+    }
+
     // Função para editar alteração
     function editarAlteracao(numeroTermo, instrumento, altNumero) {
       // Carregar dados via AJAX
@@ -548,6 +734,38 @@
             selected: true
           }));
           
+          // Re-inicializar Select2 após preencher
+          $('#numero_termo').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Digite para buscar o termo...',
+            allowClear: true,
+            minimumInputLength: 2,
+            dropdownParent: $('#modalCadastroAlteracao'),
+            ajax: {
+              url: '{{ url_for("parcerias.api_termos_parcerias") }}',
+              dataType: 'json',
+              delay: 250,
+              data: function(params) {
+                return { q: params.term };
+              },
+              processResults: function(data) {
+                return { results: data };
+              },
+              cache: true
+            },
+            language: {
+              inputTooShort: function() {
+                return "Digite pelo menos 2 caracteres para buscar";
+              },
+              noResults: function() {
+                return "Nenhum termo encontrado";
+              },
+              searching: function() {
+                return "Buscando...";
+              }
+            }
+          });
+          
           // Preencher instrumento
           $('#instrumento_alteracao').val(instrumento);
           
@@ -565,54 +783,64 @@
           
           mostrarCamposNumeracao(instrumento);
           
+          // Preencher status, responsavel e observacao
+          $('#alt_status').val(data.status || 'Iniciado');
+          $('#alt_responsavel').val(data.responsavel || '');
+          $('#alt_observacao').val(data.observacao || '');
+          
           // Limpar tipos anteriores e adicionar os tipos do banco
           $('#tipos-alteracao-container').empty();
           contadorTipos = 0;
+          tiposSelecionados.clear();
           
-          // Adicionar tipos de alteração
-          data.tipos.forEach(function(tipo) {
-            contadorTipos++;
-            const id = `tipo_${contadorTipos}`;
-            const html = `
-              <div class="tipo-alteracao-secao position-relative" id="${id}" data-index="${contadorTipos}">
-                ${contadorTipos > 1 ? `
-                  <button type="button" class="btn btn-sm btn-danger btn-remover-tipo" onclick="removerSecaoTipo('${id}')">
-                    <i class="bi bi-x"></i>
-                  </button>
-                ` : ''}
-                <h6 class="mb-3">
-                  <i class="bi bi-tag"></i> Tipo de Alteração #${contadorTipos}
-                </h6>
-                <div class="row g-3">
-                  <div class="col-md-12">
-                    <label for="alt_tipo_${contadorTipos}" class="form-label">
-                      Selecione o Tipo de Alteração *
-                    </label>
-                    <select class="form-select tipo-select" id="alt_tipo_${contadorTipos}" 
-                            name="alt_tipo[]" required onchange="atualizarInstrumento()">
-                      <option value="">-- Selecione --</option>
-                      ${tiposAlteracao.map(t => `
-                        <option value="${t.alt_tipo}" data-instrumento="${t.alt_instrumento}" ${t.alt_tipo === tipo ? 'selected' : ''}>
-                          ${t.alt_tipo}
-                        </option>
-                      `).join('')}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            `;
-            $('#tipos-alteracao-container').append(html);
+          // Adicionar seções para cada tipo
+          data.tipos.forEach((tipo, idx) => {
+            adicionarSecaoTipo();
+            const currentIndex = contadorTipos;
+            
+            // Preencher select do tipo
+            $(`#alt_tipo_${currentIndex}`).val(tipo);
+            tiposSelecionados.add(tipo);
+            
+            // Atualizar campo dinâmico
+            atualizarCampoDinamico(currentIndex);
+            
+            // Esperar um pouco e preencher o valor de alt_info
+            setTimeout(() => {
+              const info = data.infos[idx] || '';
+              
+              // Se for date_range, separar os valores
+              if (tipo === 'Adequação de vigência' && info.includes('|')) {
+                const datas = info.split('|');
+                $(`#campo_info_${currentIndex} input[name="alt_info_inicio[]"]`).val(datas[0]);
+                $(`#campo_info_${currentIndex} input[name="alt_info_fim[]"]`).val(datas[1]);
+              } else {
+                // Para outros tipos
+                $(`#campo_info_${currentIndex} input[name="alt_info[]"]`).val(info);
+                $(`#campo_info_${currentIndex} textarea[name="alt_info[]"]`).val(info);
+                $(`#campo_info_${currentIndex} select[name="alt_info[]"]`).val(info);
+              }
+            }, 300);
           });
           
-          // Alterar ação do formulário para update
-          $('#formAlteracao').attr('action', `/parcerias/alteracao/atualizar?numero_termo=${numeroTermo}&instrumento=${instrumento}&alt_numero=${altNumero}`);
-          $('#modalCadastroLabel').html('<i class="bi bi-pencil"></i> Editar Alteração');
+          if (data.tipos.length === 0) {
+            adicionarSecaoTipo();
+          }
+          
+          // Atualizar instrumento baseado no primeiro tipo
+          atualizarInstrumento();
+          
+          // Alterar título e ação do modal
+          $('#modalCadastroAlteracaoLabel').text('Editar Alteração');
+          $('#formAlteracao').attr('action', 
+            `/parcerias/alteracao/atualizar?numero_termo=${numeroTermo}&instrumento=${instrumento}&alt_numero=${altNumero}`
+          );
           
           // Abrir modal
           $('#modalCadastroAlteracao').modal('show');
         },
-        error: function() {
-          alert('Erro ao carregar dados da alteração!');
+        error: function(xhr) {
+          alert('Erro ao carregar alteração: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
         }
       });
     }
@@ -637,12 +865,6 @@
       var modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
       modal.show();
     }
-
-    // Resetar formulário para modo "cadastro" quando fechar o modal
-    $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
-      $('#formAlteracao').attr('action', '{{ url_for("parcerias.salvar_alteracao") }}');
-      $('#modalCadastroLabel').html('<i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração');
-    });
   </script>
 </body>
 </html>

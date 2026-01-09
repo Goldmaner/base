@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encaminhamento Gerado - Gestão Financeira</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body { 
+            background: linear-gradient(135deg, #20c997 0%, #198754 100%); 
+            min-height: 100vh; 
+            padding: 20px; 
+        }
+        .main-container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 15px; 
+            padding: 30px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+        }
+        .btn-voltar {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+        }
+        .btn-voltar:hover {
+            background-color: #5a6268;
+            color: white;
+        }
+        .btn-copiar {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+        }
+        .btn-copiar:hover {
+            background-color: #0b5ed7;
+            color: white;
+        }
+        .btn-imprimir {
+            background-color: #198754;
+            color: white;
+            border: none;
+        }
+        .btn-imprimir:hover {
+            background-color: #157347;
+            color: white;
+        }
+        .documento-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-top: 20px;
+            min-height: 500px;
+        }
+        
+        /* Classes CSS do SEI para formatação de documentos */
+        p.Centralizado_Timbre {font-size:18pt;font-family:Calibri;text-align:center;word-wrap:normal;margin:1pt;}
+        p.Centralizado_Timbre_Arial {font-size:16pt;font-family:Arial;text-align:center;word-wrap:normal;margin:1pt;}
+        p.Centralizado_Timbre_Arial_Pequeno {font-size:12pt;font-family:Arial;text-align:center;word-wrap:normal;margin:1pt;}
+        p.Centralizado_Timbre_Secretaria {font-size:13pt;font-family:Calibri;text-align:center;word-wrap:normal;margin:0pt;}
+        p.Centralizado_Timbre_Secretaria_Arial {font-size:13pt;font-family:Arial;text-align:center;word-wrap:normal;margin:0pt;}
+        p.Centralizado_Timbre_Times {font-size:18pt;font-family:Times;text-align:center;word-wrap:normal;margin:1pt;}
+        p.Citacao {font-size:10pt;font-family:Calibri;word-wrap:normal;margin:4pt 0 4pt 160px;text-align:justify;}
+        p.Tabela_Texto_8 {font-size:8pt;font-family:Calibri;text-align:left;word-wrap:normal;margin:0 3pt 0 3pt;}
+        p.Tabela_Texto_Alinhado_Direita {font-size:11pt;font-family:Calibri;text-align:right;word-wrap:normal;margin:0 3pt 0 3pt;}
+        p.Tabela_Texto_Alinhado_Esquerda {font-size:11pt;font-family:Calibri;text-align:left;word-wrap:normal;margin:0 3pt 0 3pt;}
+        p.Tabela_Texto_Centralizado {font-size:11pt;font-family:Calibri;text-align:center;word-wrap:normal;margin:0 3pt 0;}
+        p.Tachado {font-size:11pt;font-family:Calibri;text-indent:1.18in;text-align:justify;word-wrap:normal;text-decoration:line-through;}
+        p.Texto_Alinhado_Direita {font-size:12pt;font-family:Calibri;text-align:right;word-wrap:normal;margin:6pt;}
+        p.Texto_Alinhado_Esquerda {font-size:12pt;font-family:Calibri;text-align:left;word-wrap:normal;margin:6pt;}
+        p.Texto_Alinhado_Esquerda_Espacamento_Simples {font-size:12pt;font-family:Calibri;text-align:left;word-wrap:normal;margin:0;}
+        p.Texto_Alinhado_Esquerda_Espacamento_Simples_Maiusc {font-size:12pt;font-family:Calibri;text-align:left;text-transform:uppercase;word-wrap:normal;margin:0;}
+        p.Texto_Centralizado {font-size:12pt;font-family:Calibri;text-align:center;word-wrap:normal;margin:6pt;}
+        p.Texto_Centralizado_Maiusculas {font-size:13pt;font-family:Calibri;text-align:center;text-transform:uppercase;word-wrap:normal;}
+        p.Texto_Centralizado_Maiusculas_Negrito {font-weight:bold;font-size:13pt;font-family:Calibri;text-align:center;text-transform:uppercase;word-wrap:normal;}
+        p.Texto_Ementa {font-size:10pt;font-family:Times New Roman;text-align:right;word-wrap:normal;margin:4pt 0 4pt 3.14in;}
+        p.Texto_Espaco_Duplo_Recuo_Primeira_Linha {letter-spacing:0.2em;font-weight:bold;font-size:12pt;font-family:Calibri;text-indent:25mm;text-align:justify;word-wrap:normal;margin:6pt;}
+        p.Texto_Fundo_Cinza_Maiusculas_Negrito {text-transform:uppercase;font-weight:bold;background-color:#e6e6e6;font-size:12pt;font-family:Calibri;text-align:justify;word-wrap:normal;text-indent:0;margin:6pt;}
+        p.Texto_Fundo_Cinza_Negrito {font-weight:bold;background-color:#e6e6e6;font-size:12pt;font-family:Calibri;text-align:justify;word-wrap:normal;text-indent:0;margin:6pt;}
+        p.Texto_Justificado {font-size:12pt;font-family:Calibri;text-align:justify;word-wrap:normal;text-indent:0;margin:6pt;}
+        p.Texto_Justificado_Maiusculas {font-size:12pt;font-family:Calibri;text-align:justify;word-wrap:normal;text-indent:0;margin:6pt;text-transform:uppercase;}
+        p.Texto_Justificado_Recuo_Primeira_Linha {font-size:12pt;font-family:Calibri;text-indent:25mm;text-align:justify;word-wrap:normal;margin:6pt;}
+        p.Texto_Mono_Espacado {font-size:8pt;font-family:Calibri;text-align:left;white-space:pre;word-wrap:normal;margin:2pt;}
+        
+        @media print {
+            body {
+                background: white;
+            }
+            .main-container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+            .btn-container, .page-header {
+                display: none !important;
+            }
+            .documento-container {
+                border: none;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Cabeçalho -->
+        <div class="d-flex justify-content-between align-items-center mb-4 page-header">
+            <h2 class="mb-0">
+                <i class="bi bi-file-earmark-check me-2"></i>Encaminhamento Gerado
+            </h2>
+            <a href="{{ url_for('gestao_financeira.encaminhamento') }}" class="btn btn-voltar">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+
+        <!-- Informações do Termo -->
+        <div class="alert alert-success mb-3 page-header">
+            <strong><i class="bi bi-info-circle me-2"></i>Informações:</strong><br>
+            <strong>Termo:</strong> {{ numero_termo }}<br>
+            <strong>Parcelas selecionadas:</strong> 
+            {% for parcela in parcelas %}
+                {{ parcela.numero_parcela }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="btn-container mb-3 d-flex gap-2">
+            <button class="btn btn-copiar" onclick="copiarTexto()">
+                <i class="bi bi-clipboard me-2"></i>Copiar Texto
+            </button>
+            <button class="btn btn-imprimir" onclick="window.print()">
+                <i class="bi bi-printer me-2"></i>Imprimir
+            </button>
+        </div>
+
+        <!-- Documento Gerado (HTML compilado) -->
+        <div class="documento-container" id="documentoGerado">
+            {{ texto_html | safe }}
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        function copiarTexto() {
+            const documento = document.getElementById('documentoGerado');
+            
+            // Cria um range de seleção
+            const range = document.createRange();
+            range.selectNode(documento);
+            
+            // Seleciona o conteúdo
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            try {
+                // Tenta copiar o HTML formatado
+                const successful = document.execCommand('copy');
+                
+                if (successful) {
+                    // Feedback visual
+                    const btnCopiar = document.querySelector('.btn-copiar');
+                    const textoOriginal = btnCopiar.innerHTML;
+                    
+                    btnCopiar.innerHTML = '<i class="bi bi-check-circle me-2"></i>Copiado!';
+                    btnCopiar.classList.remove('btn-copiar');
+                    btnCopiar.classList.add('btn-success');
+                    
+                    setTimeout(function() {
+                        btnCopiar.innerHTML = textoOriginal;
+                        btnCopiar.classList.remove('btn-success');
+                        btnCopiar.classList.add('btn-copiar');
+                    }, 2000);
+                } else {
+                    alert('Não foi possível copiar automaticamente. Use Ctrl+C para copiar o conteúdo selecionado.');
+                }
+            } catch (err) {
+                console.error('Erro ao copiar:', err);
+                alert('Erro ao copiar. O conteúdo foi selecionado - use Ctrl+C para copiar.');
+            }
+            
+            // Remove a seleção após um breve delay
+            setTimeout(function() {
+                selection.removeAllRanges();
+            }, 100);
+        }
+        
+        // Alternativa: Copiar HTML puro para área de transferência usando API moderna
+        async function copiarHTMLPuro() {
+            const documento = document.getElementById('documentoGerado');
+            const htmlContent = documento.innerHTML;
+            
+            try {
+                // Tenta usar a API moderna de clipboard
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        'text/html': new Blob([htmlContent], { type: 'text/html' }),
+                        'text/plain': new Blob([documento.innerText], { type: 'text/plain' })
+                    })
+                ]);
+                
+                alert('HTML copiado com formatação preservada!');
+            } catch (err) {
+                console.error('Erro ao copiar HTML:', err);
+                // Fallback para método antigo
+                copiarTexto();
+            }
+        }
+    </script>
+</body>
+</html>
