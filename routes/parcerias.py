@@ -492,10 +492,11 @@ def nova():
                 except Exception as e:
                     print(f"[ERRO] Falha ao salvar endereços: {e}")
                 
-                # Salvar/atualizar termo_sei_doc em parcerias_sei se fornecido
+                # Salvar/atualizar termo_sei_doc e data_assinatura em parcerias_sei se fornecidos
                 termo_sei_doc = request.form.get('termo_sei_doc', '').strip()
+                data_assinatura = request.form.get('data_assinatura', '').strip()
                 
-                if termo_sei_doc:
+                if termo_sei_doc or data_assinatura:
                     try:
                         # Verificar se já existe registro para este termo
                         check_query = """
@@ -508,24 +509,25 @@ def nova():
                         cur_check.close()
                         
                         if exists:
-                            # Atualizar termo_sei_doc existente
+                            # Atualizar termo_sei_doc e data_assinatura existentes
                             update_sei_query = """
                                 UPDATE public.parcerias_sei 
-                                SET termo_sei_doc = %s
+                                SET termo_sei_doc = %s,
+                                    data_assinatura = %s
                                 WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
                             """
-                            execute_query(update_sei_query, (termo_sei_doc, numero_termo))
-                            print(f"[DEBUG NOVA] termo_sei_doc atualizado em parcerias_sei: {termo_sei_doc}")
+                            execute_query(update_sei_query, (termo_sei_doc or None, data_assinatura or None, numero_termo))
+                            print(f"[DEBUG NOVA] termo_sei_doc e data_assinatura atualizados em parcerias_sei")
                         else:
                             # Inserir novo registro
                             insert_sei_query = """
-                                INSERT INTO public.parcerias_sei (numero_termo, termo_sei_doc, aditamento, apostilamento)
-                                VALUES (%s, %s, '-', '-')
+                                INSERT INTO public.parcerias_sei (numero_termo, termo_sei_doc, data_assinatura, aditamento, apostilamento)
+                                VALUES (%s, %s, %s, '-', '-')
                             """
-                            execute_query(insert_sei_query, (numero_termo, termo_sei_doc))
-                            print(f"[DEBUG NOVA] Novo registro criado em parcerias_sei com termo_sei_doc: {termo_sei_doc}")
+                            execute_query(insert_sei_query, (numero_termo, termo_sei_doc or None, data_assinatura or None))
+                            print(f"[DEBUG NOVA] Novo registro criado em parcerias_sei com termo_sei_doc e data_assinatura")
                     except Exception as e:
-                        print(f"[ERRO] Falha ao salvar termo_sei_doc: {e}")
+                        print(f"[ERRO] Falha ao salvar termo_sei_doc e data_assinatura: {e}")
                 
                 # Registrar na tabela de auditoria parcerias_pg
                 pessoa_gestora = request.form.get('pessoa_gestora')
@@ -830,10 +832,11 @@ def editar(numero_termo):
                 except Exception as e:
                     print(f"[ERRO] Falha ao salvar endereços: {e}")
                 
-                # Salvar/atualizar termo_sei_doc em parcerias_sei se fornecido
+                # Salvar/atualizar termo_sei_doc e data_assinatura em parcerias_sei se fornecidos
                 termo_sei_doc = request.form.get('termo_sei_doc', '').strip()
+                data_assinatura = request.form.get('data_assinatura', '').strip()
                 
-                if termo_sei_doc:
+                if termo_sei_doc or data_assinatura:
                     try:
                         # Verificar se já existe registro para este termo
                         cur_check = get_cursor()
@@ -845,24 +848,25 @@ def editar(numero_termo):
                         cur_check.close()
                         
                         if exists:
-                            # Atualizar termo_sei_doc existente
+                            # Atualizar termo_sei_doc e data_assinatura existentes
                             update_sei_query = """
                                 UPDATE public.parcerias_sei 
-                                SET termo_sei_doc = %s
+                                SET termo_sei_doc = %s,
+                                    data_assinatura = %s
                                 WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
                             """
-                            execute_query(update_sei_query, (termo_sei_doc, numero_termo))
-                            print(f"[DEBUG EDITAR] termo_sei_doc atualizado em parcerias_sei: {termo_sei_doc}")
+                            execute_query(update_sei_query, (termo_sei_doc or None, data_assinatura or None, numero_termo))
+                            print(f"[DEBUG EDITAR] termo_sei_doc e data_assinatura atualizados em parcerias_sei")
                         else:
                             # Inserir novo registro
                             insert_sei_query = """
-                                INSERT INTO public.parcerias_sei (numero_termo, termo_sei_doc, aditamento, apostilamento)
-                                VALUES (%s, %s, '-', '-')
+                                INSERT INTO public.parcerias_sei (numero_termo, termo_sei_doc, data_assinatura, aditamento, apostilamento)
+                                VALUES (%s, %s, %s, '-', '-')
                             """
-                            execute_query(insert_sei_query, (numero_termo, termo_sei_doc))
-                            print(f"[DEBUG EDITAR] Novo registro criado em parcerias_sei com termo_sei_doc: {termo_sei_doc}")
+                            execute_query(insert_sei_query, (numero_termo, termo_sei_doc or None, data_assinatura or None))
+                            print(f"[DEBUG EDITAR] Novo registro criado em parcerias_sei com termo_sei_doc e data_assinatura")
                     except Exception as e:
-                        print(f"[ERRO] Falha ao salvar termo_sei_doc em editar: {e}")
+                        print(f"[ERRO] Falha ao salvar termo_sei_doc e data_assinatura em editar: {e}")
                 
                 # Registrar na tabela de auditoria parcerias_pg se houve mudança
                 solicitacao_checkbox = request.form.get('solicitacao_alteracao')
@@ -1007,12 +1011,13 @@ def editar(numero_termo):
         termo_rescindido = True
         data_rescisao = rescisao_result['data_rescisao']
     
-    # Buscar termo_sei_doc de parcerias_sei
+    # Buscar termo_sei_doc e data_assinatura de parcerias_sei
     termo_sei_doc = None
+    data_assinatura = None
     try:
         cur_sei = get_cursor()
         cur_sei.execute("""
-            SELECT termo_sei_doc 
+            SELECT termo_sei_doc, data_assinatura 
             FROM public.parcerias_sei 
             WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
         """, (numero_termo,))
@@ -1020,8 +1025,9 @@ def editar(numero_termo):
         cur_sei.close()
         if result_sei:
             termo_sei_doc = result_sei['termo_sei_doc']
+            data_assinatura = result_sei['data_assinatura']
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar termo_sei_doc em editar: {e}")
+        print(f"[ERRO] Falha ao buscar termo_sei_doc e data_assinatura em editar: {e}")
     
     # Buscar informações adicionais
     cur.execute("""
@@ -1060,6 +1066,7 @@ def editar(numero_termo):
                          pessoas_gestoras=pessoas_gestoras,
                          rf_pessoa_gestora=rf_pessoa_gestora,
                          termo_sei_doc=termo_sei_doc,
+                         data_assinatura=data_assinatura,
                          infos_adicionais=infos_adicionais,
                          enderecos=enderecos,
                          projeto_online=projeto_online,
@@ -2192,16 +2199,48 @@ def dgp_alteracoes():
         filtro_instrumento = request.args.get('filtro_instrumento', '').strip()
         filtro_tipos = request.args.getlist('filtro_tipos[]')
         filtro_responsavel = request.args.get('filtro_responsavel', '').strip()
+        filtro_status = request.args.get('filtro_status', '').strip()
         
-        # Construir query base
+        # Construir query base com subconsulta para pegar SEI documento e data de assinatura
         query_base = """
             SELECT 
-                numero_termo,
-                instrumento_alteracao,
-                alt_numero,
-                string_agg(DISTINCT alt_tipo, ', ' ORDER BY alt_tipo) as tipos_alteracao,
-                MAX(alt_responsavel) as responsavel
-            FROM public.termos_alteracoes
+                t.numero_termo,
+                t.instrumento_alteracao,
+                t.alt_numero,
+                string_agg(DISTINCT t.alt_tipo, ', ' ORDER BY t.alt_tipo) as tipos_alteracao,
+                MAX(t.alt_responsavel) as responsavel,
+                MAX(t.alt_status) as alt_status,
+                (
+                    SELECT s.termo_sei_doc 
+                    FROM public.parcerias_sei s
+                    WHERE s.numero_termo = t.numero_termo
+                    AND (
+                        (t.instrumento_alteracao = 'Termo de Aditamento' AND s.aditamento = CAST(t.alt_numero AS VARCHAR))
+                        OR (t.instrumento_alteracao = 'Termo de Apostilamento' AND s.apostilamento = CAST(t.alt_numero AS VARCHAR))
+                        OR (t.instrumento_alteracao = 'Termo de Apostilamento do Aditamento' 
+                            AND s.apostilamento = CAST(FLOOR(t.alt_numero / 100) AS VARCHAR)
+                            AND s.aditamento = CAST(MOD(t.alt_numero, 100) AS VARCHAR))
+                        OR (t.instrumento_alteracao NOT IN ('Termo de Aditamento', 'Termo de Apostilamento', 'Termo de Apostilamento do Aditamento')
+                            AND s.termo_tipo_sei = t.instrumento_alteracao)
+                    )
+                    LIMIT 1
+                ) as termo_sei_doc,
+                (
+                    SELECT s.data_assinatura 
+                    FROM public.parcerias_sei s
+                    WHERE s.numero_termo = t.numero_termo
+                    AND (
+                        (t.instrumento_alteracao = 'Termo de Aditamento' AND s.aditamento = CAST(t.alt_numero AS VARCHAR))
+                        OR (t.instrumento_alteracao = 'Termo de Apostilamento' AND s.apostilamento = CAST(t.alt_numero AS VARCHAR))
+                        OR (t.instrumento_alteracao = 'Termo de Apostilamento do Aditamento' 
+                            AND s.apostilamento = CAST(FLOOR(t.alt_numero / 100) AS VARCHAR)
+                            AND s.aditamento = CAST(MOD(t.alt_numero, 100) AS VARCHAR))
+                        OR (t.instrumento_alteracao NOT IN ('Termo de Aditamento', 'Termo de Apostilamento', 'Termo de Apostilamento do Aditamento')
+                            AND s.termo_tipo_sei = t.instrumento_alteracao)
+                    )
+                    LIMIT 1
+                ) as data_assinatura
+            FROM public.termos_alteracoes t
             WHERE 1=1
         """
         
@@ -2209,26 +2248,54 @@ def dgp_alteracoes():
         
         # Aplicar filtros
         if filtro_termo:
-            query_base += " AND numero_termo ILIKE %s"
+            query_base += " AND t.numero_termo ILIKE %s"
             params.append(f"%{filtro_termo}%")
         
         if filtro_instrumento:
-            query_base += " AND instrumento_alteracao = %s"
+            query_base += " AND t.instrumento_alteracao = %s"
             params.append(filtro_instrumento)
         
         if filtro_tipos:
             placeholders = ','.join(['%s'] * len(filtro_tipos))
-            query_base += f" AND alt_tipo IN ({placeholders})"
+            query_base += f" AND t.alt_tipo IN ({placeholders})"
             params.extend(filtro_tipos)
         
         if filtro_responsavel:
-            query_base += " AND alt_responsavel LIKE %s"
+            query_base += " AND t.alt_responsavel LIKE %s"
             params.append(f"%{filtro_responsavel}%")
         
+        if filtro_status:
+            query_base += " AND t.alt_status = %s"
+            params.append(filtro_status)
+        
         query_base += """
-            GROUP BY numero_termo, instrumento_alteracao, alt_numero
-            ORDER BY numero_termo
+            GROUP BY t.numero_termo, t.instrumento_alteracao, t.alt_numero
         """
+        
+        # Paginação
+        page = request.args.get('page', 1, type=int)
+        per_page = 100
+        offset = (page - 1) * per_page
+        
+        # Contar total de registros (query separada sem subconsultas complexas)
+        count_query = f"""
+            SELECT COUNT(*) as total
+            FROM ({query_base}) as subquery
+        """
+        cur.execute(count_query, params)
+        count_result = cur.fetchone()
+        total_count = count_result['total'] if count_result else 0
+        total_pages = (total_count + per_page - 1) // per_page
+        
+        # Adicionar ORDER BY e LIMIT/OFFSET para query principal
+        query_base += """
+            ORDER BY 
+                CASE WHEN MAX(alt_status) = 'Concluído' THEN 1 ELSE 0 END,
+                data_assinatura DESC NULLS LAST, 
+                numero_termo, 
+                alt_numero
+        """
+        query_base += f" LIMIT {per_page} OFFSET {offset}"
         
         cur.execute(query_base, params)
         alteracoes = cur.fetchall()
@@ -2240,12 +2307,18 @@ def dgp_alteracoes():
             tipos_alteracao=tipos_alteracao,
             instrumentos=instrumentos,
             alteracoes=alteracoes,
-            analistas_dgp=analistas_dgp
+            analistas_dgp=analistas_dgp,
+            page=page,
+            total_pages=total_pages,
+            total_count=total_count
         )
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"[ERRO] Erro ao carregar página de alterações: {str(e)}")
         flash(f'Erro ao carregar dados: {str(e)}', 'danger')
+        cur.close()
         return redirect(url_for('parcerias.listar'))
 
 
@@ -2431,6 +2504,83 @@ def salvar_alteracao():
                 _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info)
             
             registros_inseridos += 1
+        
+        # === SALVAR NÚMERO SEI DO DOCUMENTO E DATA DE ASSINATURA (se status = Concluído) ===
+        alt_sei_documento = request.form.get('alt_sei_documento', '').strip()
+        alt_data_assinatura = request.form.get('alt_data_assinatura', '').strip()
+        
+        if alt_status == 'Concluído' and (alt_sei_documento or alt_data_assinatura):
+            try:
+                # Determinar as colunas baseadas no instrumento
+                aditamento = None
+                apostilamento = None
+                termo_tipo_sei = None
+                
+                if instrumento_alteracao == 'Termo de Aditamento':
+                    aditamento = alt_numero
+                elif instrumento_alteracao == 'Termo de Apostilamento':
+                    apostilamento = alt_numero
+                elif instrumento_alteracao == 'Termo de Apostilamento do Aditamento':
+                    # Decompor o número (formato: apostilamento * 100 + aditamento)
+                    apostilamento = alt_numero // 100
+                    aditamento = alt_numero % 100
+                else:
+                    # Para outros instrumentos (Informação DGP, Despacho, etc)
+                    termo_tipo_sei = instrumento_alteracao
+                
+                # Verificar se já existe registro
+                if aditamento or apostilamento:
+                    # Buscar por aditamento/apostilamento (converter para string)
+                    cur.execute("""
+                        SELECT id FROM public.parcerias_sei
+                        WHERE numero_termo = %s 
+                        AND (aditamento = %s OR apostilamento = %s)
+                    """, (numero_termo, str(aditamento or 0), str(apostilamento or 0)))
+                else:
+                    # Buscar por termo_tipo_sei
+                    cur.execute("""
+                        SELECT id FROM public.parcerias_sei
+                        WHERE numero_termo = %s AND termo_tipo_sei = %s
+                    """, (numero_termo, termo_tipo_sei))
+                
+                existe = cur.fetchone()
+                
+                if existe:
+                    # Atualizar registro existente
+                    if aditamento or apostilamento:
+                        cur.execute("""
+                            UPDATE public.parcerias_sei
+                            SET termo_sei_doc = %s, 
+                                data_assinatura = %s,
+                                aditamento = %s,
+                                apostilamento = %s
+                            WHERE numero_termo = %s
+                        """, (alt_sei_documento or None, alt_data_assinatura or None, str(aditamento) if aditamento else None, str(apostilamento) if apostilamento else None, numero_termo))
+                    else:
+                        cur.execute("""
+                            UPDATE public.parcerias_sei
+                            SET termo_sei_doc = %s,
+                                data_assinatura = %s,
+                                aditamento = '-',
+                                apostilamento = '-',
+                                termo_tipo_sei = %s
+                            WHERE numero_termo = %s AND termo_tipo_sei = %s
+                        """, (alt_sei_documento or None, alt_data_assinatura or None, termo_tipo_sei, numero_termo, termo_tipo_sei))
+                    
+                    print(f"[DEBUG] SEI Documento e Data Assinatura ATUALIZADOS para {numero_termo}")
+                else:
+                    # Inserir novo registro
+                    cur.execute("""
+                        INSERT INTO public.parcerias_sei 
+                        (numero_termo, termo_sei_doc, data_assinatura, aditamento, apostilamento, termo_tipo_sei)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (numero_termo, alt_sei_documento or None, alt_data_assinatura or None, str(aditamento) if aditamento else '-', str(apostilamento) if apostilamento else '-', termo_tipo_sei))
+                    
+                    print(f"[DEBUG] SEI Documento e Data Assinatura INSERIDOS para {numero_termo}")
+                
+            except Exception as e:
+                print(f"[ERRO] Falha ao salvar SEI do documento: {e}")
+                # Não interromper o fluxo principal
         
         get_db().commit()
         cur.close()
@@ -2775,9 +2925,9 @@ def editar_alteracao():
         """, (numero_termo, instrumento, alt_numero))
         
         rows = cur.fetchall()
-        cur.close()
         
         if not rows:
+            cur.close()
             return jsonify({'error': 'Alteração não encontrada'}), 404
         
         # Preparar dados para retornar
@@ -2791,12 +2941,58 @@ def editar_alteracao():
             tipos.append(row['alt_tipo'])
             infos.append(row['alt_info'] or '')
         
+        # Buscar SEI do documento e data de assinatura se status = Concluído
+        sei_documento = None
+        data_assinatura = None
+        if status == 'Concluído':
+            try:
+                # Determinar como buscar baseado no instrumento
+                aditamento = None
+                apostilamento = None
+                termo_tipo_sei = None
+                
+                if instrumento == 'Termo de Aditamento':
+                    aditamento = alt_numero
+                elif instrumento == 'Termo de Apostilamento':
+                    apostilamento = alt_numero
+                elif instrumento == 'Termo de Apostilamento do Aditamento':
+                    apostilamento = alt_numero // 100
+                    aditamento = alt_numero % 100
+                else:
+                    termo_tipo_sei = instrumento
+                
+                if aditamento or apostilamento:
+                    cur.execute("""
+                        SELECT termo_sei_doc, data_assinatura FROM public.parcerias_sei
+                        WHERE numero_termo = %s 
+                        AND (aditamento = %s OR apostilamento = %s)
+                    """, (numero_termo, str(aditamento or 0), str(apostilamento or 0)))
+                else:
+                    cur.execute("""
+                        SELECT termo_sei_doc, data_assinatura FROM public.parcerias_sei
+                        WHERE numero_termo = %s AND termo_tipo_sei = %s
+                    """, (numero_termo, termo_tipo_sei))
+                
+                resultado = cur.fetchone()
+                if resultado:
+                    sei_documento = resultado['termo_sei_doc']
+                    data_assinatura_obj = resultado['data_assinatura']
+                    # Converter data para formato ISO (YYYY-MM-DD) para input type="date"
+                    if data_assinatura_obj:
+                        data_assinatura = data_assinatura_obj.strftime('%Y-%m-%d')
+            except Exception as e:
+                print(f"[WARN] Erro ao buscar SEI documento e data assinatura: {e}")
+        
+        cur.close()
+        
         return jsonify({
             'tipos': tipos,
             'infos': infos,
             'status': status,
             'responsavel': responsavel,
-            'observacao': observacao or ''
+            'observacao': observacao or '',
+            'sei_documento': sei_documento,
+            'data_assinatura': data_assinatura
         })
         
     except Exception as e:
@@ -2909,6 +3105,75 @@ def atualizar_alteracao():
                 _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info)
             
             registros_inseridos += 1
+        
+        # === SALVAR/ATUALIZAR NÚMERO SEI DO DOCUMENTO E DATA DE ASSINATURA (se status = Concluído) ===
+        alt_sei_documento = request.form.get('alt_sei_documento', '').strip()
+        alt_data_assinatura = request.form.get('alt_data_assinatura', '').strip()
+        
+        if alt_status == 'Concluído' and (alt_sei_documento or alt_data_assinatura):
+            try:
+                # Determinar as colunas baseadas no instrumento
+                aditamento = None
+                apostilamento = None
+                termo_tipo_sei = None
+                
+                if instrumento_alteracao == 'Termo de Aditamento':
+                    aditamento = alt_numero
+                elif instrumento_alteracao == 'Termo de Apostilamento':
+                    apostilamento = alt_numero
+                elif instrumento_alteracao == 'Termo de Apostilamento do Aditamento':
+                    apostilamento = alt_numero // 100
+                    aditamento = alt_numero % 100
+                else:
+                    termo_tipo_sei = instrumento_alteracao
+                
+                # Verificar se já existe registro
+                if aditamento or apostilamento:
+                    cur.execute("""
+                        SELECT id FROM public.parcerias_sei
+                        WHERE numero_termo = %s 
+                        AND (aditamento = %s OR apostilamento = %s)
+                    """, (numero_termo, str(aditamento or 0), str(apostilamento or 0)))
+                else:
+                    cur.execute("""
+                        SELECT id FROM public.parcerias_sei
+                        WHERE numero_termo = %s AND termo_tipo_sei = %s
+                    """, (numero_termo, termo_tipo_sei))
+                
+                existe = cur.fetchone()
+                
+                if existe:
+                    # Atualizar
+                    if aditamento or apostilamento:
+                        cur.execute("""
+                            UPDATE public.parcerias_sei
+                            SET termo_sei_doc = %s,
+                                data_assinatura = %s,
+                                aditamento = %s,
+                                apostilamento = %s
+                            WHERE numero_termo = %s
+                        """, (alt_sei_documento or None, alt_data_assinatura or None, str(aditamento) if aditamento else None, str(apostilamento) if apostilamento else None, numero_termo))
+                    else:
+                        cur.execute("""
+                            UPDATE public.parcerias_sei
+                            SET termo_sei_doc = %s,
+                                data_assinatura = %s,
+                                aditamento = '-',
+                                apostilamento = '-',
+                                termo_tipo_sei = %s
+                            WHERE numero_termo = %s AND termo_tipo_sei = %s
+                        """, (alt_sei_documento or None, alt_data_assinatura or None, termo_tipo_sei, numero_termo, termo_tipo_sei))
+                else:
+                    # Inserir
+                    cur.execute("""
+                        INSERT INTO public.parcerias_sei 
+                        (numero_termo, termo_sei_doc, data_assinatura, aditamento, apostilamento, termo_tipo_sei)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (numero_termo, alt_sei_documento or None, alt_data_assinatura or None, str(aditamento) if aditamento else '-', str(apostilamento) if apostilamento else '-', termo_tipo_sei))
+                
+                print(f"[DEBUG] SEI Documento e Data Assinatura SALVOS na atualização")
+            except Exception as e:
+                print(f"[ERRO] Falha ao salvar SEI na atualização: {e}")
         
         get_db().commit()
         cur.close()

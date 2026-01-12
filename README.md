@@ -3,9 +3,9 @@
 > **Sistema integrado de gestão de parcerias, orçamentos e prestações de contas**  
 > Divisão de Análise de Contas - Secretaria Municipal de Direitos Humanos e Cidadania de São Paulo
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-3.1.0-green.svg)](https://flask.palletsprojects.com)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-12+-blue.svg)](https://postgresql.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17+-blue.svg)](https://postgresql.org)
 [![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3.0-purple.svg)](https://getbootstrap.com)
 
 ---
@@ -15,190 +15,123 @@
 - [Sobre o Projeto](#-sobre-o-projeto)
 - [Funcionalidades Principais](#-funcionalidades-principais)
 - [Tecnologias Utilizadas](#-tecnologias-utilizadas)
-- [Arquitetura do Sistema](#-arquitetura-do-sistema)
 - [Requisitos](#-requisitos)
 - [Instalação e Configuração](#-instalação-e-configuração)
 - [Estrutura de Pastas](#-estrutura-de-pastas)
 - [Módulos do Sistema](#-módulos-do-sistema)
 - [Controle de Acesso](#-controle-de-acesso)
 - [Banco de Dados](#-banco-de-dados)
+- [Scripts Utilitários](#-scripts-utilitários)
 - [Troubleshooting](#-troubleshooting)
 - [Contribuindo](#-contribuindo)
-- [Licença](#-licença)
 
 ---
 
 ## 🎯 Sobre o Projeto
 
-O **FAF** é uma aplicação web desenvolvida para gerenciar termos de parceria e fomento, orçamentos anuais, conciliações bancárias e análises de prestações de contas. O sistema oferece:
+O **FAF** é uma aplicação web completa desenvolvida para gerenciar termos de parceria e fomento (TFM, TCC, TAP), orçamentos anuais, conciliações bancárias e análises de prestações de contas da SMDHC.
 
-- **Gestão completa de parcerias**: Cadastro, edição, consulta e exportação de termos
-- **Orçamento anual detalhado**: Planejamento por rubrica, mês e categoria de despesa
-- **Conciliação bancária**: Importação de extratos, categorização e avaliação de transações
-- **Análise de prestações de contas**: Checklist completo com instruções automatizadas
-- **Controle de acesso granular**: Permissões por módulo para diferentes usuários
-- **Duplo ambiente**: Banco local (desenvolvimento) e Railway (produção)
+**Principais diferenciais:**
+- ✅ Gestão completa de parcerias com informações adicionais e endereços
+- ✅ Sistema de **Alterações DGP** com 25+ tipos e histórico completo
+- ✅ Orçamento anual com dicionário inteligente de categorias
+- ✅ Conciliação bancária com categorização e avaliação
+- ✅ Análises de prestações de contas com checklist e geração automática de textos
+- ✅ Controle de acesso granular por módulo
+- ✅ Backup automático (mantém últimos 10)
 
 ---
 
 ## ⚡ Funcionalidades Principais
 
 ### 1. **Gestão de Parcerias**
-- ✅ Cadastro e edição de termos (TFM, TCC, TAP)
-- ✅ Visualização de dados consolidados por termo
-- ✅ Filtros avançados (OSC, tipo, responsabilidade, vigência)
-- ✅ Exportação para CSV/Excel
-- ✅ Sistema de busca global
-- ✅ Gerenciamento de termos rescindidos com validação de execução mínima
-- ✅ Cálculo automático de prestações de contas
+- Cadastro e edição completa de termos
+- Informações adicionais (responsável legal, objeto, beneficiários, datas)
+- Gerenciamento de múltiplos endereços (logradouro, CEP, distrito)
+- Dicionário de OSCs com CNPJs
+- Termos rescindidos com análise de execução
+- Filtros avançados e exportação CSV/Excel
 
-### 2. **Orçamento Anual**
-- ✅ Editor de orçamento por mês e rubrica
-- ✅ Importação de dados do Excel (cola inteligente)
-- ✅ **Dicionário de Categorias**: Padronização em massa com sincronização
-- ✅ Filtros por aditivo e situação
-- ✅ Totalizadores automáticos (linha, coluna, geral)
-- ✅ **Sistema de Undo**: Desfazer até 10 edições (Ctrl+Z)
-- ✅ **Validação de formato monetário**: Aceita BR, rejeita US
-- ✅ Barra de progresso no salvamento
-- ✅ Exportação para CSV
+### 2. **Alterações DGP** 🆕
+- **25+ tipos de alteração** (aditamentos, apostilamentos, informações DGP)
+- **Campos dinâmicos** baseados no tipo selecionado
+- **Interface especial** para "Localização do projeto" (edição de múltiplos endereços)
+- **Histórico completo**: Captura automática de valores antigos
+- **Atualização automática** das tabelas originais ao concluir
+- Suporte a múltiplos responsáveis
+- Filtros por termo, instrumento, status, tipo
 
-### 3. **Conciliação Bancária**
-- ✅ Importação de extratos bancários (Excel/CSV)
-- ✅ Categorização de transações (cat_transacao)
-- ✅ Avaliação de conformidade (cat_avaliacao)
-- ✅ Mesclagem de lançamentos
-- ✅ Filtros por tipo, período e avaliação
-- ✅ Relatório consolidado de conciliação
-- ✅ Sincronização automática com categorias de despesa
+### 3. **Orçamento Anual**
+- Editor visual (12 meses × rubricas)
+- Importação Excel com cola inteligente
+- **Dicionário de Categorias**: Padronização em massa
+- Sistema de **Undo** (Ctrl+Z, até 10 edições)
+- Validação de formato monetário (BR vs US)
+- Totalizadores automáticos
+- Barra de progresso no salvamento
 
-### 4. **Análise de Prestações de Contas**
-- ✅ Checklist completo com 15+ etapas
-- ✅ Instruções automatizadas com badges interativos
-- ✅ Gerenciamento de fases recursais
-- ✅ Preenchimento de dados base
-- ✅ Geração de textos automáticos (SEI)
-- ✅ Central de modelos de texto
-- ✅ Exportação de dados para PDF
+### 4. **Conciliação Bancária**
+- Importação de extratos (Excel/CSV)
+- Categorização e avaliação de transações
+- Mesclagem de lançamentos
+- Gestão de rendimentos e contrapartida
+- Relatório consolidado
+- Sincronização automática com despesas
 
-### 5. **Administração**
-- ✅ Gerenciamento de usuários com tipos (Agente Público/Pessoa Gestora)
-- ✅ **Sistema de Controle de Acesso**: Permissões granulares por módulo
-- ✅ Gerenciamento de portarias e legislações
-- ✅ Modelos de texto parametrizados
-- ✅ Auditoria de ações (audit_log)
+### 5. **Análise de Prestações de Contas**
+- Checklist com 15+ etapas
+- Instruções automatizadas com badges interativos
+- Geração de textos SEI (pré-2023 e pós-2023)
+- Fases recursais
+- Central de modelos de texto parametrizados
+- Dados base preenchimento automático
+
+### 6. **Administração**
+- Gerenciamento de usuários (Agente Público / Pessoa Gestora)
+- Controle de acesso granular por módulo
+- Gestão de portarias e legislações
+- Modelos de texto com variáveis
+- Auditoria de ações
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
 ### **Backend**
-- **Python 3.8+**: Linguagem principal
-- **Flask 3.1.0**: Framework web
-- **psycopg2**: Adapter PostgreSQL
-- **python-dotenv**: Gerenciamento de variáveis de ambiente
-- **Werkzeug**: Segurança de senhas (hashing)
+- Python 3.12+ com Flask 3.1.0
+- psycopg2 (PostgreSQL adapter)
+- python-dotenv (variáveis de ambiente)
+- Werkzeug (hash de senhas)
+- dateutil (manipulação de datas)
 
 ### **Frontend**
-- **HTML5/CSS3**: Estrutura e estilização
-- **Bootstrap 5.3.0**: Framework CSS responsivo
-- **JavaScript ES6+**: Lógica client-side
-- **Bootstrap Icons**: Ícones vetoriais
-- **Select2**: Dropdowns avançados
-- **SheetJS (xlsx)**: Importação/exportação Excel
+- HTML5/CSS3 + Bootstrap 5.3.0
+- JavaScript ES6+ com jQuery 3.6
+- Select2 4.1 (dropdowns com AJAX)
+- Bootstrap Icons
+- SheetJS (importação/exportação Excel)
 
 ### **Banco de Dados**
-- **PostgreSQL 12+**: Banco principal
-- **Schema duplo**: `public` (parcerias) + `analises_pc` (conciliações)
-- **Railway**: Hospedagem em nuvem
-
-### **Deploy e Infraestrutura**
-- **Railway**: Produção
-- **Git**: Controle de versão
-- **pg_dump**: Backups automáticos
-
----
-
-## 🏗️ Arquitetura do Sistema
-
-### **Padrão MVC com Blueprints**
-
-```
-┌─────────────────────────────────────────────────┐
-│                   FRONTEND                       │
-│  ┌─────────────────────────────────────────┐   │
-│  │  HTML Templates (Jinja2)                │   │
-│  │  - Bootstrap 5 (responsivo)             │   │
-│  │  - JavaScript (interatividade)          │   │
-│  │  - Modals, Toasts, Progress Bars        │   │
-│  └─────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────┘
-                       ↕
-┌─────────────────────────────────────────────────┐
-│                   BACKEND (Flask)                │
-│  ┌────────────────────────────────────────┐    │
-│  │  BLUEPRINTS (Modular Routes)           │    │
-│  │  - main.py       (Dashboard)           │    │
-│  │  - parcerias.py  (Parcerias CRUD)      │    │
-│  │  - orcamento.py  (Orçamentos)          │    │
-│  │  - analises.py   (Análises PC)         │    │
-│  │  - conc_*.py     (Conciliações)        │    │
-│  └────────────────────────────────────────┘    │
-│  ┌────────────────────────────────────────┐    │
-│  │  CORE MODULES                          │    │
-│  │  - decorators.py (Auth/Access Control) │    │
-│  │  - db.py         (Database Layer)      │    │
-│  │  - utils.py      (Helper Functions)    │    │
-│  │  - config.py     (Settings)            │    │
-│  └────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────┘
-                       ↕
-┌─────────────────────────────────────────────────┐
-│           DATABASE (PostgreSQL)                  │
-│  ┌────────────────────────────────────────┐    │
-│  │  Schema: public                        │    │
-│  │  - Parcerias                           │    │
-│  │  - Parcerias_Despesas                  │    │
-│  │  - Usuarios                            │    │
-│  │  - c_* (Tabelas catalogas)             │    │
-│  └────────────────────────────────────────┘    │
-│  ┌────────────────────────────────────────┐    │
-│  │  Schema: analises_pc                   │    │
-│  │  - conc_extrato                        │    │
-│  │  - dados_base                          │    │
-│  │  - termos_rescindidos                  │    │
-│  └────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────┘
-```
+- PostgreSQL 17
+- 3 schemas: `public`, `analises_pc`, `categoricas`
 
 ---
 
 ## 📦 Requisitos
 
-### **Software Necessário**
-- Python 3.8 ou superior
-- PostgreSQL 12 ou superior
-- Git (para controle de versão)
-- pip (gerenciador de pacotes Python)
-
-### **Navegadores Suportados**
-- Chrome 90+
-- Firefox 88+
-- Edge 90+
-- Safari 14+
+- Python 3.12 ou superior
+- PostgreSQL 17 ou superior
+- Git
+- Navegador moderno (Chrome 90+, Firefox 88+, Edge 90+)
 
 ---
 
 ## 🚀 Instalação e Configuração
 
-### **1. Clone o Repositório**
+### **1. Clone e Configure o Ambiente**
 ```bash
-git clone https://github.com/Goldmaner/base.git
-cd base
-```
-
-### **2. Crie o Ambiente Virtual**
-```bash
+git clone https://github.com/seu-usuario/faf.git
+cd faf
 python -m venv venv
 
 # Windows
@@ -206,57 +139,43 @@ venv\Scripts\activate
 
 # Linux/Mac
 source venv/bin/activate
-```
 
-### **3. Instale as Dependências**
-```bash
 pip install -r requirements.txt
 ```
 
-### **4. Configure as Variáveis de Ambiente**
-
-Crie um arquivo `.env` na raiz do projeto:
-
+### **2. Configure o `.env`**
 ```env
-# Banco LOCAL (desenvolvimento)
-DB_LOCAL_HOST=localhost
-DB_LOCAL_PORT=5432
-DB_LOCAL_NAME=faf_db
-DB_LOCAL_USER=postgres
-DB_LOCAL_PASSWORD=sua_senha_local
+# Banco de Dados
+DB_HOST=localhost
+DB_PORT=5432
+DB_DATABASE=projeto_parcerias
+DB_USER=postgres
+DB_PASSWORD=sua_senha_aqui
 
 # Flask
-SECRET_KEY=chave-secreta-super-complexa-aqui
+SECRET_KEY=chave-secreta-complexa
 FLASK_ENV=development
+PORT=5000
 ```
 
-### **5. Configure o Banco de Dados**
-
+### **3. Configure o Banco**
 ```sql
--- Criar banco de dados local
-CREATE DATABASE faf_db;
-
--- Conectar ao banco
-\c faf_db
-
--- Criar schema de análises
+CREATE DATABASE projeto_parcerias;
+\c projeto_parcerias
 CREATE SCHEMA IF NOT EXISTS analises_pc;
-
--- Executar scripts de criação de tabelas (se disponíveis)
--- Ver pasta scripts/ para SQL de inicialização
+CREATE SCHEMA IF NOT EXISTS categoricas;
 ```
 
-### **6. Execute a Aplicação**
-
+### **4. Execute**
 ```bash
-# Desenvolvimento (porta 5000)
+# Desenvolvimento (porta 8080, hot reload)
 python run_dev.py
 
-# Produção (porta 8080)
+# Produção (porta 5000)
 python run_prod.py
 ```
 
-Acesse: `http://localhost:5000`
+**Acesse**: http://localhost:8080 (dev) ou http://localhost:5000 (prod)
 
 ---
 
@@ -264,138 +183,79 @@ Acesse: `http://localhost:5000`
 
 ```
 FAF/
-├── app.py                      # Aplicação Flask principal
-├── config.py                   # Configurações centralizadas
-├── db.py                       # Camada de banco de dados
-├── decorators.py               # Decoradores (@requires_access)
-├── utils.py                    # Funções utilitárias
-├── audit_log.py                # Sistema de auditoria
-├── run_dev.py                  # Iniciar em desenvolvimento
-├── run_prod.py                 # Iniciar em produção
-├── requirements.txt            # Dependências Python
-├── .env                        # Variáveis de ambiente (NÃO commitar)
-├── .env.example                # Template de configuração
-├── .gitignore                  # Arquivos ignorados pelo Git
-├── Procfile                    # Deploy Railway
+├── app.py                      # Flask app principal
+├── config.py                   # Configurações
+├── db.py                       # Database layer
+├── decorators.py               # @login_required, @requires_access
+├── utils.py                    # Funções auxiliares
+├── audit_log.py                # Auditoria
+├── run_dev.py                  # Servidor dev (hot reload)
+├── run_prod.py                 # Servidor prod
+├── requirements.txt            # Dependências
 │
-├── routes/                     # Blueprints (Módulos de Rotas)
-│   ├── __init__.py
-│   ├── main.py                 # Dashboard e rotas principais
-│   ├── parcerias.py            # CRUD de parcerias (1300+ linhas)
-│   ├── orcamento.py            # Gestão de orçamentos
-│   ├── analises.py             # Menu de análises PC
-│   ├── instrucoes.py           # CRUD de instruções
-│   ├── listas.py               # Listas catalogas
-│   ├── pesquisa_parcerias.py   # Busca e relatórios
-│   ├── parcerias_notificacoes.py # Notificações
-│   ├── conc_bancaria.py        # Conciliação principal
-│   ├── conc_rendimentos.py     # Rendimentos bancários
-│   ├── conc_contrapartida.py   # Contrapartida
-│   ├── conc_relatorio.py       # Relatório de conciliação
-│   └── conc_exportacao.py      # Exportação de dados
+├── routes/                     # 17 blueprints modulares
+│   ├── main.py                # Dashboard
+│   ├── auth.py                # Login/logout
+│   ├── parcerias.py           # ⭐ CRUD parcerias (3100+ linhas)
+│   ├── orcamento.py           # Orçamentos
+│   ├── analises.py            # Menu análises PC
+│   ├── instrucoes.py          # Instruções
+│   ├── listas.py              # Listas catalogas
+│   ├── pesquisa_parcerias.py  # Busca e relatórios
+│   ├── conc_*.py              # Conciliações (5 módulos)
+│   ├── analises_pc/           # Submódulo de análises
+│   └── ...
 │
-├── templates/                  # Templates HTML (Jinja2)
-│   ├── tela_inicial.html       # Dashboard principal
-│   ├── login.html              # Tela de login
-│   ├── analises.html           # Menu de análises
-│   ├── orcamento_2.html        # Editor de orçamento
-│   ├── orcamento_3_dict.html   # Dicionário de categorias
-│   ├── parcerias_*.html        # 10+ templates de parcerias
-│   └── analises_pc/            # Templates de análise PC
-│       ├── index.html          # Checklist principal
-│       ├── conc_bancaria.html  # Conciliação bancária
-│       ├── conc_rendimentos.html
-│       ├── conc_contrapartida.html
-│       └── conc_relatorio.html
+├── templates/                  # 30+ templates Jinja2
+│   ├── tela_inicial.html      # Dashboard
+│   ├── parcerias*.html        # 10+ templates parcerias
+│   ├── dgp_alteracoes.html    # ⭐ Alterações DGP
+│   ├── orcamento_*.html       # Orçamentos
+│   ├── analises_pc/           # Templates análises
+│   └── ...
 │
-├── static/                     # Arquivos estáticos
-│   ├── css/                    # Estilos customizados
-│   ├── js/                     # Scripts JavaScript
-│   └── img/                    # Imagens e ícones
+├── static/                     # CSS, JS, imagens
+├── scripts/                    # ⭐ 2 scripts ativos
+│   ├── funcoes_texto.py       # Geração textos SEI
+│   ├── import_conferencia.py  # Atualização conferência
+│   └── archive/               # Scripts históricos
 │
-├── scripts/                    # Scripts SQL e utilitários
-│   ├── funcoes_texto.py        # Geração de textos automáticos
-│   └── *.sql                   # Scripts de banco de dados
-│
-├── backups/                    # Backups do banco (SQL dumps)
-│   ├── fazer_backup.bat        # Script Windows de backup
-│   └── backup_faf_*.sql        # Arquivos de backup
+├── backups/                    # ⭐ Backups automáticos
+│   └── fazer_backup.py        # Mantém últimos 10
 │
 ├── docs/                       # Documentação técnica
-│   ├── ESTRUTURA_MODULAR.md    # Arquitetura do projeto
-│   ├── README_ANALISES_PC.md   # Módulo de análises
-│   ├── MODULARIZACAO_PARCERIAS.md
-│   ├── IMPLEMENTACAO_*.md      # Implementações específicas
-│   └── MELHORIAS_*.md          # Histórico de melhorias
-│
-├── testes/                     # Scripts de teste e importação
-│   ├── tests/                  # Testes unitários
-│   └── *.py                    # Scripts diversos
-│
-└── modelos/                    # Templates de documentos
-    └── README.md
+└── testes/                     # Scripts de teste
 ```
 
 ---
 
 ## 🧩 Módulos do Sistema
 
-### **1. Dashboard (`main.py`)**
-- Tela inicial com visão geral do sistema
-- Atalhos para módulos principais
-- Informações do usuário logado
+### **Parcerias** (`parcerias.py` - 3100 linhas)
+- CRUD completo de termos
+- **Alterações DGP**: 25+ tipos com campos dinâmicos
+- Informações adicionais e endereços
+- Conferência de dados
+- Dicionário OSC
+- Termos rescindidos
+- 10+ APIs REST
 
-### **2. Parcerias (`parcerias.py`)**
-- Listar termos com filtros avançados
-- Cadastrar novo termo
-- Editar termo existente
-- Visualizar detalhes completos
-- Exportar dados para CSV/Excel
-- Conferência de dados (OSC, vigência, portaria)
-- Dicionário de OSCs com CNPJ
-- Gerenciamento de termos rescindidos
+### **Orçamento** (`orcamento.py`)
+- Editor visual 12 meses × rubricas
+- Dicionário de categorias
+- Sistema Undo (Ctrl+Z)
+- Importação Excel
 
-### **3. Orçamento (`orcamento.py`)**
-- Listar orçamentos por termo
-- Editor visual com 12 meses
-- Importação de Excel (cola de células)
-- Validação de formato monetário
-- Sistema de Undo (Ctrl+Z)
-- Dicionário de categorias com sincronização
-- Totalizadores automáticos
-- Filtros por aditivo
+### **Análises PC** (`analises.py` + `analises_pc/*`)
+- Checklist 15 etapas
+- Conciliação bancária
+- Geração textos automáticos
+- Instruções com badges
 
-### **4. Análises de PC (`analises.py` + `analises_pc/*`)**
-- Menu de prestações de contas
-- Checklist de 15 etapas
-- Instruções automatizadas
-- Preenchimento de dados base
-- Fases recursais
-- Exportação para PDF
-- Central de modelos de texto
-
-### **5. Conciliação Bancária (`conc_*.py`)**
-- **Bancária**: Importação de extratos, categorização, mesclagem
-- **Rendimentos**: Análise de rendimentos de aplicação
-- **Contrapartida**: Gestão de contrapartidas
-- **Relatório**: Consolidação e exportação
-
-### **6. Instruções (`instrucoes.py`)**
-- CRUD de instruções parametrizadas
-- Vínculo com portarias
-- Visualização formatada
-
-### **7. Listas Catalogas (`listas.py`)**
-- Gerenciamento de tipos de contrato
-- Portarias/legislações
-- Pessoas gestoras
-- Categorias de despesa
-
-### **8. Administração (`main.py`)**
-- Gerenciamento de usuários
-- Controle de acessos por módulo
-- Modelos de texto
-- Auditoria de ações
+### **Outros Módulos**
+- Instruções, Listas, Pesquisas, Notificações
+- Conciliações (bancária, rendimentos, contrapartida, relatório)
+- Administração (usuários, portarias, modelos)
 
 ---
 
@@ -403,41 +263,28 @@ FAF/
 
 ### **Sistema de Permissões Granulares**
 
-O FAF implementa um sistema de controle de acesso baseado em **módulos** através do decorador `@requires_access(modulo)`.
+Decorador `@requires_access(modulo)` controla acesso por módulo.
 
-#### **Tipos de Usuário**
-1. **Agente Público**: Acesso total irrestrito (bypass automático)
-2. **Pessoa Gestora**: Acesso controlado por campo `acessos`
+**Tipos de Usuário:**
+- **Agente Público**: Acesso total (bypass)
+- **Pessoa Gestora**: Acesso controlado (campo `acessos`)
 
-#### **Módulos Disponíveis**
+**Módulos Disponíveis:**
 ```python
-parcerias          # Gestão de parcerias
-orcamento          # Orçamentos anuais
-analises           # Análises de PC
-instrucoes         # Instruções parametrizadas
-listas             # Listas catalogas
-pesquisa           # Busca e relatórios
-notificacoes       # Notificações
-conc_bancaria      # Conciliação bancária
-conc_rendimentos   # Rendimentos
-conc_contrapartida # Contrapartida
-conc_relatorio     # Relatórios de conciliação
-portarias          # Admin: Portarias
-usuarios           # Admin: Usuários
-modelos_textos     # Admin: Modelos de texto
+parcerias, orcamento, analises, instrucoes, listas,
+pesquisa, notificacoes, conc_bancaria, conc_rendimentos,
+conc_contrapartida, conc_relatorio, portarias, usuarios,
+modelos_textos, despesas
 ```
 
-#### **Formato de Armazenamento**
-Campo `acessos` na tabela `usuarios`: `"parcerias;orcamento;analises"`
+**Formato**: `"parcerias;orcamento;analises"`
 
-#### **Exemplo de Uso**
+**Exemplo:**
 ```python
-@orcamento_bp.route('/editar/<numero_termo>')
+@parcerias_bp.route('/editar/<numero_termo>')
 @login_required
-@requires_access('orcamento')
-def editar_orcamento(numero_termo):
-    # Apenas usuários com permissão 'orcamento' ou Agente Público
-    # podem acessar esta rota
+@requires_access('parcerias')
+def editar_parceria(numero_termo):
     ...
 ```
 
@@ -445,180 +292,164 @@ def editar_orcamento(numero_termo):
 
 ## 🗄️ Banco de Dados
 
-### **Dual Database Architecture**
+### **3 Schemas PostgreSQL 17**
 
-O sistema suporta **dois ambientes** de banco de dados:
+**Schema `public`** (Parcerias):
+- `parcerias` - Termos principais
+- `parcerias_infos_adicionais` - Responsável, objeto, beneficiários
+- `parcerias_enderecos` - Múltiplos endereços por termo
+- `parcerias_despesas` - Despesas mensais por rubrica
+- `parcerias_pg` - Pessoas gestoras (histórico)
+- `termos_alteracoes` - ⭐ Alterações DGP com histórico
+- `termos_rescindidos` - Termos rescindidos
+- `usuarios` - Controle de acesso
 
-- **LOCAL**: PostgreSQL local para desenvolvimento (`DB_LOCAL_*`)
-- **RAILWAY**: PostgreSQL na nuvem para produção (`DB_RAILWAY_*`)
+**Schema `analises_pc`** (Análises):
+- `conc_extrato` - Movimentações bancárias
+- `conc_rendimentos`, `conc_contrapartida`
+- `dados_base` - Dados das análises
+- `analistas` - Analistas responsáveis
 
-**Detecção automática**: Se a variável `RAILWAY_ENVIRONMENT` existe, usa Railway; caso contrário, usa Local.
+**Schema `categoricas`** (Catálogos):
+- `c_alt_tipo` - ⭐ 25+ tipos de alteração DGP
+- `c_geral_tipo_contrato` - Tipos de contrato
+- `c_portarias` - Portarias/legislações
+- `c_pessoas_gestoras` - Pessoas gestoras
+- `c_geral_legislacao` - Modelos de texto
+- `c_geral_regionalizacao` - Distritos
 
-### **Principais Tabelas**
+### **Relacionamentos Principais**
+```
+parcerias (1) ←→ (N) parcerias_despesas
+parcerias (1) ←→ (N) parcerias_enderecos
+parcerias (1) ←→ (1) parcerias_infos_adicionais
+parcerias (1) ←→ (N) parcerias_pg
+parcerias (1) ←→ (N) termos_alteracoes
+```
 
-#### **Schema `public`**
+---
 
-| Tabela | Descrição |
-|--------|-----------|
-| `Parcerias` | Termos de parceria/fomento |
-| `Parcerias_Despesas` | Despesas mensais por rubrica |
-| `Usuarios` | Controle de acesso |
-| `c_geral_tipo_contrato` | Catálogo de tipos de contrato |
-| `c_portarias` | Portarias e legislações |
-| `c_pessoas_gestoras` | Pessoas gestoras |
-| `c_geral_legislacao` | Modelos de texto parametrizados |
-| `termos_rescindidos` | Termos rescindidos |
+## 🔧 Scripts Utilitários
 
-#### **Schema `analises_pc`**
+### **Scripts Ativos** (pasta `scripts/`)
 
-| Tabela | Descrição |
-|--------|-----------|
-| `conc_extrato` | Movimentações bancárias |
-| `dados_base` | Dados base das análises |
-| `analistas` | Analistas responsáveis |
+| Script | Usado Por | Descrição |
+|--------|-----------|-----------|
+| **funcoes_texto.py** | pesquisa_parcerias.py | Geração automática de textos SEI |
+| **import_conferencia.py** | parcerias.py | Atualização de conferência (subprocess) |
 
-### **Funcionalidades Avançadas**
+### **Backup Automático**
+```bash
+python backups/fazer_backup.py
+```
+- Cria dump SQL com pg_dump
+- Mantém **últimos 10 backups** automaticamente
+- Deleta backups antigos
 
-- **UPSERT Inteligente**: Compara dados existentes e salva apenas diferenças
-- **Batch Operations**: INSERT/UPDATE em lote para alta performance
-- **Sincronização Cross-Table**: Atualização automática de categorias entre `Parcerias_Despesas` e `conc_extrato`
+### **Arquivo** (pasta `scripts/archive/`)
+Scripts SQL e Python já executados para:
+- Migrações de schema
+- Criação de tabelas/índices
+- Populações iniciais
 
 ---
 
 ## 🐛 Troubleshooting
 
-### **Erro de Conexão com Banco de Dados**
-
-**Sintoma**: `FATAL: password authentication failed`
-
-**Solução**:
-1. Verifique credenciais no `.env`
-2. Confirme que PostgreSQL está rodando: `psql --version`
-3. Teste conexão manual: `psql -h localhost -U postgres -d faf_db`
-
-### **Módulos não Carregam**
-
-**Sintoma**: `ModuleNotFoundError: No module named 'decorators'`
-
-**Solução**:
+### **Erro de Conexão com Banco**
 ```bash
-# Verifique se está no diretório correto
-pwd
+# Verifique .env
+DB_HOST=localhost
+DB_DATABASE=projeto_parcerias
+DB_USER=postgres
+DB_PASSWORD=sua_senha
 
-# Reinstale dependências
-pip install -r requirements.txt
-
-# Verifique imports circulares
-python -c "import decorators; print('OK')"
+# Teste conexão
+psql -h localhost -U postgres -d projeto_parcerias
 ```
 
 ### **Erro 403 - Acesso Negado**
-
-**Sintoma**: Usuário não consegue acessar módulo
-
-**Solução**:
-1. Verifique campo `acessos` na tabela `usuarios`
-2. Confirme que o módulo está escrito corretamente (ex: `parcerias`, não `parceria`)
-3. Agente Público tem acesso total por padrão
-
-### **Dados Duplicados no Banco**
-
-**Sintoma**: Registros aparecem várias vezes
-
-**Solução**:
 ```sql
--- Verificar duplicatas em Parcerias
-SELECT numero_termo, COUNT(*) 
-FROM Parcerias 
-GROUP BY numero_termo 
-HAVING COUNT(*) > 1;
+-- Verifique permissões
+SELECT username, tipo_usuario, acessos 
+FROM usuarios 
+WHERE username = 'seu_usuario';
 
--- Sistema de UPSERT deve prevenir isso, mas caso ocorra:
-DELETE FROM Parcerias 
-WHERE id NOT IN (
-    SELECT MIN(id) FROM Parcerias GROUP BY numero_termo
-);
+-- Adicione permissão
+UPDATE usuarios 
+SET acessos = 'parcerias;orcamento;analises' 
+WHERE username = 'seu_usuario';
 ```
 
-### **Formatação Monetária Inválida**
+### **Alterações DGP não Salvam**
+- Campos HTML devem usar arrays: `parceria_logradouro[]`
+- Campos info adicionais: prefixo `parceria_`
+- Verifique nomes exatos no formulário
 
-**Sintoma**: Alerta de "formato americano detectado"
-
-**Solução**:
-- ✅ **Aceito**: `10000`, `10.000,00`, `10000,05`
-- ❌ **Rejeitado**: `10,000.00` (formato US)
-
-Use sempre **vírgula** como separador decimal e **ponto** como separador de milhares.
+### **Backup Falha**
+```bash
+# Adicione PostgreSQL ao PATH
+# Windows: C:\Program Files\PostgreSQL\17\bin
+pg_dump --version
+```
 
 ---
 
 ## 🤝 Contribuindo
 
-### **Como Contribuir**
-
-1. **Fork** o projeto
-2. Crie uma **branch** para sua feature:
-   ```bash
-   git checkout -b feature/nova-funcionalidade
-   ```
-3. **Commit** suas mudanças:
-   ```bash
-   git commit -m "feat: Adiciona nova funcionalidade X"
-   ```
-4. **Push** para a branch:
-   ```bash
-   git push origin feature/nova-funcionalidade
-   ```
-5. Abra um **Pull Request**
+### **Workflow**
+1. Fork o projeto
+2. `git checkout -b feature/nova-funcionalidade`
+3. `git commit -m "feat: Adiciona funcionalidade X"`
+4. `git push origin feature/nova-funcionalidade`
+5. Abra Pull Request
 
 ### **Padrões de Commit**
-
 - `feat:` Nova funcionalidade
 - `fix:` Correção de bug
-- `docs:` Atualização de documentação
-- `style:` Formatação de código
-- `refactor:` Refatoração sem mudança de comportamento
-- `test:` Adição ou correção de testes
-- `chore:` Manutenção geral
+- `docs:` Documentação
+- `refactor:` Refatoração
+- `chore:` Manutenção
+
+### **Boas Práticas**
+- Use `@login_required` e `@requires_access()` em novas rotas
+- Documente funções complexas
+- Mantenha consistência com Bootstrap 5
+- Teste localmente antes de commitar
 
 ---
 
-## 📄 Licença
-
-Este projeto é de uso interno da **Divisão de Análise de Contas - SMDHC**.
-
----
-
-## 📞 Suporte e Contato
-
-Para dúvidas, sugestões ou problemas:
+## 📞 Suporte
 
 - **Email**: jeffersonluiz@prefeitura.sp.gov.br
-- **Issues**: [GitHub Issues](https://github.com/Goldmaner/base/issues)
-- **Documentação**: Pasta `docs/` deste repositório
+- **Documentação**: Pasta `docs/`
 
 ---
 
-## 🎉 Agradecimentos
+## 📊 Estatísticas
 
-Desenvolvido com dedicação pela equipe de tecnologia da Divisão de Análise de Contas.
-
-**Versão**: 3.0  
-**Última Atualização**: Dezembro/2025  
-**Autor**: Sistema FAF - Gestão de Parcerias
-
----
-
-## 📊 Estatísticas do Projeto
-
-- **Linhas de código**: ~15.000+
-- **Módulos (Blueprints)**: 13
-- **Templates HTML**: 25+
-- **Rotas (endpoints)**: 80+
-- **Tabelas no banco**: 15+
-- **Tempo de desenvolvimento**: 2 anos
+- **Linhas de código**: ~18.000+
+- **Blueprints**: 17 módulos
+- **Templates**: 30+
+- **Rotas**: 100+
+- **Tabelas**: 25+ (3 schemas)
+- **Scripts ativos**: 2
+- **Tipos alteração DGP**: 25+
 - **Usuários ativos**: 20+
+- **Tempo de desenvolvimento**: 2 anos
 
 ---
 
-**🚀 Pronto para começar? Execute `python run_dev.py` e acesse `http://localhost:5000`!**
+**🚀 Pronto para começar?**
+
+```bash
+python run_dev.py
+```
+
+**Acesse**: http://localhost:8080
+
+---
+
+**Última Atualização**: Janeiro/2026  
+**Versão**: 3.1  
+**Desenvolvido por**: Equipe FAF - Divisão de Análise de Contas - SMDHC

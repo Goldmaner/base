@@ -151,12 +151,9 @@
               </label>
               <select class="form-select" id="instrumento_alteracao" name="instrumento_alteracao" required>
                 <option value="">-- Selecione --</option>
-                <option value="Termo de Aditamento">Termo de Aditamento</option>
-                <option value="Termo de Apostilamento">Termo de Apostilamento</option>
-                <option value="Termo de Apostilamento do Aditamento">Termo de Apostilamento do Aditamento</option>
-                <option value="Informação DGP">Informação DGP</option>
-                <option value="Despacho Autorizatório">Despacho Autorizatório</option>
-                <option value="Informação da Pessoa Gestora">Informação da Pessoa Gestora</option>
+                {% for instrumento in instrumentos %}
+                <option value="{{ instrumento }}">{{ instrumento }}</option>
+                {% endfor %}
               </select>
               <small class="text-muted">Preenchido automaticamente, mas pode ser alterado manualmente</small>
             </div>
@@ -174,6 +171,26 @@
                 <option value="Concluído">Concluído</option>
               </select>
               <small class="text-muted">Status atual da alteração</small>
+            </div>
+          </div>
+          
+          <!-- Número SEI do Documento (aparece somente quando Status = Concluído) -->
+          <div class="row g-3 mt-2" id="campo-sei-documento-container" style="display: none;">
+            <div class="col-md-6">
+              <label for="alt_sei_documento" class="form-label">
+                <i class="bi bi-file-earmark-check"></i> Número SEI do Documento *
+              </label>
+              <input type="text" class="form-control" id="alt_sei_documento" name="alt_sei_documento" 
+                     placeholder="Ex: 123456789">
+              <small class="text-muted">Número SEI do documento da alteração concluída</small>
+            </div>
+            <div class="col-md-6">
+              <label for="alt_data_assinatura" class="form-label">
+                <i class="bi bi-calendar-check"></i> Data de Assinatura *
+              </label>
+              <input type="date" class="form-control" id="alt_data_assinatura" name="alt_data_assinatura" 
+                     max="9999-12-31">
+              <small class="text-muted">Data de assinatura da alteração concluída</small>
             </div>
           </div>
 
@@ -310,9 +327,15 @@
     <!-- Seção de Filtros -->
     <div class="form-section mb-3">
       <h5 class="mb-3">
-        <i class="bi bi-funnel"></i> Filtros
+        <button class="btn btn-link text-decoration-none p-0 d-flex align-items-center" type="button" 
+                data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" 
+                aria-expanded="false" aria-controls="filtrosCollapse">
+          <i class="bi bi-funnel me-2"></i> Filtros
+          <i class="bi bi-chevron-down ms-2" id="filtrosChevron"></i>
+        </button>
       </h5>
-      <form method="GET" action="{{ url_for('parcerias.dgp_alteracoes') }}" id="formFiltros">
+      <div class="collapse" id="filtrosCollapse">
+        <form method="GET" action="{{ url_for('parcerias.dgp_alteracoes') }}" id="formFiltros">
         <div class="row g-3">
           <div class="col-md-3">
             <label for="filtro_termo" class="form-label">Número do Termo</label>
@@ -352,6 +375,16 @@
               {% endfor %}
             </select>
           </div>
+          <div class="col-md-3">
+            <label for="filtro_status" class="form-label">Status</label>
+            <select class="form-select" id="filtro_status" name="filtro_status">
+              <option value="">-- Todos --</option>
+              <option value="Em análise prévia" {{ 'selected' if request.args.get('filtro_status') == 'Em análise prévia' }}>Em análise prévia</option>
+              <option value="Iniciado" {{ 'selected' if request.args.get('filtro_status') == 'Iniciado' }}>Iniciado</option>
+              <option value="Em andamento" {{ 'selected' if request.args.get('filtro_status') == 'Em andamento' }}>Em andamento</option>
+              <option value="Concluído" {{ 'selected' if request.args.get('filtro_status') == 'Concluído' }}>Concluído</option>
+            </select>
+          </div>
         </div>
         <div class="row mt-3">
           <div class="col-md-12 text-end">
@@ -364,25 +397,35 @@
           </div>
         </div>
       </form>
+      </div>
     </div>
 
     <!-- Tabela de Alterações Cadastradas -->
     <div class="table-section">
-      <h4 class="mb-4">
-        <i class="bi bi-table"></i> Alterações Cadastradas
-        <span class="badge bg-primary">{{ alteracoes|length if alteracoes else 0 }}</span>
-      </h4>
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">
+          <i class="bi bi-table"></i> Alterações Cadastradas
+          <span class="badge bg-primary">{{ total_count if total_count else 0 }}</span>
+        </h4>
+        {% if total_pages > 1 %}
+        <div class="text-muted">
+          Página {{ page }} de {{ total_pages }}
+        </div>
+        {% endif %}
+      </div>
 
       {% if alteracoes %}
         <div class="table-responsive">
           <table class="table table-hover table-striped">
             <thead>
               <tr>
-                <th style="width: 15%;">Número do Termo</th>
+                <th style="width: 12%;">Número do Termo</th>
                 <th style="width: 15%;">Instrumento</th>
-                <th style="width: 8%;">Numeração</th>
-                <th style="width: 25%;">Tipos de Alteração</th>
-                <th style="width: 20%;">Responsáveis</th>
+                <th style="width: 6%;">Numeração</th>
+                <th style="width: 20%;">Tipos de Alteração</th>
+                <th style="width: 10%;">Status</th>
+                <th style="width: 10%;">Nº SEI Doc</th>
+                <th style="width: 15%;">Responsáveis</th>
                 <th style="width: 12%;" class="text-center">Ações</th>
               </tr>
             </thead>
@@ -408,6 +451,24 @@
                       {% for tipo in tipos %}
                         <span class="badge bg-success me-1">{{ tipo }}</span>
                       {% endfor %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if alteracao.alt_status == 'Concluído' %}
+                      <span class="badge bg-success">{{ alteracao.alt_status }}</span>
+                    {% elif alteracao.alt_status == 'Em andamento' %}
+                      <span class="badge bg-primary">{{ alteracao.alt_status }}</span>
+                    {% elif alteracao.alt_status == 'Iniciado' %}
+                      <span class="badge bg-info">{{ alteracao.alt_status }}</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ alteracao.alt_status or 'N/A' }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if alteracao.termo_sei_doc %}
+                      <span class="badge bg-dark">{{ alteracao.termo_sei_doc }}</span>
                     {% else %}
                       <span class="text-muted">-</span>
                     {% endif %}
@@ -439,6 +500,59 @@
             </tbody>
           </table>
         </div>
+        
+        <!-- Paginação -->
+        {% if total_pages > 1 %}
+        <nav aria-label="Navegação de páginas" class="mt-4">
+          <ul class="pagination justify-content-center">
+            <!-- Botão Primeira Página -->
+            <li class="page-item {{ 'disabled' if page == 1 else '' }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=1, **request.args) }}">
+                <i class="bi bi-chevron-double-left"></i>
+              </a>
+            </li>
+            
+            <!-- Botão Anterior -->
+            <li class="page-item {{ 'disabled' if page == 1 else '' }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=page-1, **request.args) }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+            
+            <!-- Números de Página -->
+            {% set start_page = [1, page - 2]|max %}
+            {% set end_page = [total_pages, page + 2]|min %}
+            
+            {% if start_page > 1 %}
+              <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+            
+            {% for p in range(start_page, end_page + 1) %}
+              <li class="page-item {{ 'active' if p == page else '' }}">
+                <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=p, **request.args) }}">{{ p }}</a>
+              </li>
+            {% endfor %}
+            
+            {% if end_page < total_pages %}
+              <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+            
+            <!-- Botão Próximo -->
+            <li class="page-item {{ 'disabled' if page == total_pages else '' }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=page+1, **request.args) }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+            
+            <!-- Botão Última Página -->
+            <li class="page-item {{ 'disabled' if page == total_pages else '' }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=total_pages, **request.args) }}">
+                <i class="bi bi-chevron-double-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+        {% endif %}
       {% else %}
         <div class="alert alert-info">
           <i class="bi bi-info-circle"></i> Nenhuma alteração cadastrada ainda.
@@ -451,6 +565,16 @@
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script>
+    // Animar ícone de colapso dos filtros
+    document.getElementById('filtrosCollapse').addEventListener('show.bs.collapse', function() {
+      document.getElementById('filtrosChevron').classList.remove('bi-chevron-down');
+      document.getElementById('filtrosChevron').classList.add('bi-chevron-up');
+    });
+    document.getElementById('filtrosCollapse').addEventListener('hide.bs.collapse', function() {
+      document.getElementById('filtrosChevron').classList.remove('bi-chevron-up');
+      document.getElementById('filtrosChevron').classList.add('bi-chevron-down');
+    });
+    
     // Dados dos tipos de alteração vindos do backend
     const tiposAlteracao = {{ tipos_alteracao|tojson if tipos_alteracao else '[]'|safe }};
     const instrumentos = {{ instrumentos|tojson if instrumentos else '[]'|safe }};
@@ -530,6 +654,24 @@
         }
       });
     });
+    
+    // Listener para mostrar/ocultar campos SEI e Data Assinatura quando status mudar
+    $(document).on('change', '#alt_status', function() {
+      const status = $(this).val();
+      const campoSeiContainer = $('#campo-sei-documento-container');
+      const campoSei = $('#alt_sei_documento');
+      const campoDataAssinatura = $('#alt_data_assinatura');
+      
+      if (status === 'Concluído') {
+        campoSeiContainer.show();
+        campoSei.prop('required', true);
+        campoDataAssinatura.prop('required', true);
+      } else {
+        campoSeiContainer.hide();
+        campoSei.prop('required', false).val('');
+        campoDataAssinatura.prop('required', false).val('');
+      }
+    });
 
     // Limpar Select2 quando o modal for fechado
     $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
@@ -550,18 +692,21 @@
     // Função para adicionar uma nova seção de tipo de alteração
     function adicionarSecaoTipo() {
       contadorTipos++;
+      
+      // Contar quantas seções visíveis existem para mostrar número correto
+      const secoesVisiveis = $('.tipo-alteracao-secao').length + 1;
       const id = `tipo_${contadorTipos}`;
 
       const html = `
         <div class="tipo-alteracao-secao position-relative" id="${id}" data-index="${contadorTipos}">
-          ${contadorTipos > 1 ? `
+          ${secoesVisiveis > 1 ? `
             <button type="button" class="btn btn-sm btn-danger btn-remover-tipo" onclick="removerSecaoTipo('${id}')">
               <i class="bi bi-x"></i>
             </button>
           ` : ''}
           
           <h6 class="mb-3">
-            <i class="bi bi-tag"></i> Tipo de Alteração #${contadorTipos}
+            <i class="bi bi-tag"></i> Tipo de Alteração #${secoesVisiveis}
           </h6>
 
           <div class="row g-3">
@@ -589,6 +734,9 @@
       `;
 
       $('#tipos-alteracao-container').append(html);
+      
+      // Renumerar todos os títulos após adicionar
+      renumerarTiposAlteracao();
     }
 
     // Botão adicionar mais tipo
@@ -605,6 +753,23 @@
       }
       $(`#${id}`).remove();
       atualizarInstrumento();
+      
+      // Renumerar todos os títulos após remover
+      renumerarTiposAlteracao();
+    }
+    
+    // Função para renumerar os títulos das seções
+    function renumerarTiposAlteracao() {
+      $('.tipo-alteracao-secao').each(function(index) {
+        $(this).find('h6').html(`<i class="bi bi-tag"></i> Tipo de Alteração #${index + 1}`);
+        
+        // Mostrar/ocultar botão de remover (primeira seção não pode ser removida)
+        if (index === 0) {
+          $(this).find('.btn-remover-tipo').hide();
+        } else {
+          $(this).find('.btn-remover-tipo').show();
+        }
+      });
     }
 
     // Atualizar instrumento baseado no primeiro tipo selecionado
@@ -631,13 +796,18 @@
       const apostilamentoContainer = $('#numero-apostilamento-container');
       const aditamentoContainer = $('#numero-aditamento-container');
 
-      // Resetar
+      // Salvar valores atuais antes de esconder
+      const valorSimples = $('#alt_numero_simples').val();
+      const valorApostilamento = $('#alt_numero_apostilamento').val();
+      const valorAditamento = $('#alt_numero_aditamento').val();
+
+      // Resetar visibilidade (mas NÃO os valores)
       simplesContainer.hide();
       apostilamentoContainer.hide();
       aditamentoContainer.hide();
-      $('#alt_numero_simples').val('').prop('required', false);
-      $('#alt_numero_apostilamento').val('').prop('required', false);
-      $('#alt_numero_aditamento').val('').prop('required', false);
+      $('#alt_numero_simples').prop('required', false);
+      $('#alt_numero_apostilamento').prop('required', false);
+      $('#alt_numero_aditamento').prop('required', false);
       
       if (!instrumento || 
           instrumento === 'Informação DGP' || 
@@ -647,15 +817,18 @@
         container.hide();
         $('#alt_numero').val('0');
       } else if (instrumento === 'Termo de Aditamento' || instrumento === 'Termo de Apostilamento') {
-        // Numeração simples (1 a 99)
+        // Numeração simples (1 a 99) - Restaurar valor se existir
         container.show();
         simplesContainer.show();
+        if (valorSimples) $('#alt_numero_simples').val(valorSimples);
         $('#alt_numero_simples').prop('required', true);
       } else if (instrumento === 'Termo de Apostilamento do Aditamento') {
-        // Numeração composta (apostilamento + aditamento)
+        // Numeração composta - Restaurar valores se existirem
         container.show();
         apostilamentoContainer.show();
         aditamentoContainer.show();
+        if (valorApostilamento) $('#alt_numero_apostilamento').val(valorApostilamento);
+        if (valorAditamento) $('#alt_numero_aditamento').val(valorAditamento);
         $('#alt_numero_apostilamento').prop('required', true);
         $('#alt_numero_aditamento').prop('required', true);
       } else {
@@ -1056,6 +1229,24 @@
           
           // Preencher status, responsavel e observacao
           $('#alt_status').val(data.status || 'Iniciado');
+          
+          // Mostrar/ocultar campos SEI documento e Data Assinatura baseado no status
+          if (data.status === 'Concluído') {
+            $('#campo-sei-documento-container').show();
+            $('#alt_sei_documento').prop('required', true);
+            $('#alt_data_assinatura').prop('required', true);
+            // Carregar SEI documento e data assinatura se existirem
+            if (data.sei_documento) {
+              $('#alt_sei_documento').val(data.sei_documento);
+            }
+            if (data.data_assinatura) {
+              $('#alt_data_assinatura').val(data.data_assinatura);
+            }
+          } else {
+            $('#campo-sei-documento-container').hide();
+            $('#alt_sei_documento').prop('required', false).val('');
+            $('#alt_data_assinatura').prop('required', false).val('');
+          }
           
           // Preencher múltiplos responsáveis (separados por ;)
           if (data.responsavel) {

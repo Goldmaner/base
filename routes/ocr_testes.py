@@ -43,11 +43,20 @@ def processar_ocr():
         data = request.get_json()
         texto = data.get('texto', '')
         
+        print(f"[OCR-DEBUG] Texto recebido: {len(texto)} caracteres")
+        print(f"[OCR-DEBUG] Primeiras 200 chars: {texto[:200] if texto else 'VAZIO'}")
+        
         if not texto.strip():
+            print("[OCR-ERRO] Texto vazio recebido")
             return jsonify({'erro': 'Texto vazio'}), 400
         
         # Processar o texto
         linhas_processadas = processar_extrato(texto)
+        print(f"[OCR-DEBUG] Linhas processadas: {len(linhas_processadas)}")
+        
+        if not linhas_processadas:
+            print("[OCR-AVISO] Nenhuma linha foi processada do texto fornecido")
+            return jsonify({'erro': 'Não foi possível processar nenhuma linha do extrato. Verifique o formato do texto.'}), 400
         
         # Gerar CSV em memória
         output = io.StringIO()
@@ -120,6 +129,10 @@ def processar_pdf():
         
         print(f"[OCR-PDF] Linhas processadas: {len(linhas_processadas)}")
         
+        if not linhas_processadas:
+            print("[OCR-PDF-AVISO] Nenhuma linha foi processada do PDF")
+            return jsonify({'erro': 'Não foi possível processar nenhuma linha do PDF. Verifique o formato do extrato.'}), 400
+        
         # Gerar CSV em memória
         output = io.StringIO()
         writer = csv.writer(output, delimiter=';')
@@ -183,22 +196,36 @@ def detectar_formato(texto):
     """
     linhas = [l.strip() for l in texto.split('\n') if l.strip()]
     
+    print(f"[OCR-DEBUG] Total de linhas não vazias: {len(linhas)}")
+    print(f"[OCR-DEBUG] Primeiras 5 linhas:")
+    for i, linha in enumerate(linhas[:5]):
+        print(f"  [{i}]: {linha[:100]}")
+    
     # Contador de padrões de cada formato
     formato1_count = 0
     formato2_count = 0
     
-    for linha in linhas[:20]:  # Analisa primeiras 20 linhas
+    for linha in linhas[:30]:  # Analisa primeiras 30 linhas (aumentado para pegar mais amostras)
         # Formato 1: Data no início + C/D no final
         if re.match(r'^\d{2}/\d{2}/\d{4}.*[CD]$', linha):
             formato1_count += 1
+            print(f"[OCR-DEBUG] Match F1: {linha[:80]}")
         
         # Formato 2: Valor no início + (+) ou (-) + Data
         if re.match(r'^\d{1,3}(?:\.\d{3})*,\d{2}\s+\([+-]\)\s+\d{2}/\d{2}/\d{4}', linha):
             formato2_count += 1
+            print(f"[OCR-DEBUG] Match F2: {linha[:80]}")
+        
+        # Formato 2 alternativo: apenas VALOR (SINAL) (sem data na mesma linha ainda)
+        # Indica que provavelmente é formato 2 que foi quebrado
+        if re.match(r'^\d{1,3}(?:\.\d{3})*,\d{2}\s+\([+-]\)\s*$', linha):
+            formato2_count += 0.5  # Conta meio ponto como indicativo
+            print(f"[OCR-DEBUG] Match F2 parcial: {linha[:80]}")
     
     print(f"[OCR] Detecção de formato - F1: {formato1_count}, F2: {formato2_count}")
     
-    return 2 if formato2_count > formato1_count else 1
+    # Se detectou qualquer indicativo de formato 2, usa formato 2
+    return 2 if formato2_count >= 1 else 1
 
 
 def processar_extrato(texto):
@@ -206,6 +233,9 @@ def processar_extrato(texto):
     Processa o texto do extrato e retorna lista de linhas processadas
     Detecta automaticamente o formato e usa o processador adequado
     """
+    # Pré-processar texto para juntar linhas quebradas (comum em PDFs/OCR)
+    texto = preprocessar_texto(texto)
+    
     formato = detectar_formato(texto)
     
     print(f"[OCR] Usando processador para Formato {formato}")
@@ -216,12 +246,48 @@ def processar_extrato(texto):
         return processar_extrato_formato1(texto)
 
 
+def preprocessar_texto(texto):
+    """
+    Pré-processa o texto para juntar linhas que foram quebradas indevidamente
+    Especialmente útil para formato 2 onde: VALOR (SINAL) DATA podem estar em linhas separadas
+    """
+    linhas = texto.split('\n')
+    linhas_reconstruidas = []
+    i = 0
+    
+    while i < len(linhas):
+        linha_atual = linhas[i].strip()
+        
+        # Padrão: VALOR (SINAL) em uma linha, seguido de DATA na próxima
+        # Ex: "0,00 (+)" seguido de "10/09/2024"
+        if re.match(r'^\d{1,3}(?:\.\d{3})*,\d{2}\s+\([+-]\)\s*$', linha_atual):
+            # Próxima linha deve conter data
+            if i + 1 < len(linhas):
+                proxima = linhas[i + 1].strip()
+                if re.match(r'^\d{2}/\d{2}/\d{4}', proxima):
+                    # Juntar as linhas
+                    linha_junta = f"{linha_atual} {proxima}"
+                    linhas_reconstruidas.append(linha_junta)
+                    print(f"[OCR-PREPROC] Juntou: '{linha_atual}' + '{proxima}' -> '{linha_junta}'")
+                    i += 2  # Pula as duas linhas
+                    continue
+        
+        linhas_reconstruidas.append(linha_atual)
+        i += 1
+    
+    texto_reconstruido = '\n'.join(linhas_reconstruidas)
+    print(f"[OCR-PREPROC] Linhas originais: {len(linhas)}, Linhas reconstruídas: {len(linhas_reconstruidas)}")
+    
+    return texto_reconstruido
+
+
 def processar_extrato_formato1(texto):
     """
     Processa extrato no FORMATO 1 (antigo)
     Formato: DD/MM/YYYY ... VALOR C/D [SALDO C/D]
     """
     linhas = [l.strip() for l in texto.split('\n')]
+    print(f"[OCR-F1] Processando {len(linhas)} linhas")
     
     # Expressão regular para detectar linha de movimentação
     # Captura: data, valor da transação, tipo (C/D), opcionalmente saldo e tipo do saldo
@@ -230,6 +296,7 @@ def processar_extrato_formato1(texto):
     )
     
     saida = []
+    matches_count = 0
     i = 0
     
     while i < len(linhas):
@@ -237,6 +304,7 @@ def processar_extrato_formato1(texto):
         m = regex_mov.match(linha)
         
         if m:
+            matches_count += 1
             data, valor_transacao, tipo_transacao, saldo_valor, saldo_tipo = m.groups()
             
             # Categoria
@@ -292,6 +360,8 @@ def processar_extrato_formato1(texto):
         
         i += 1
     
+    print(f"[OCR-F1] Matches encontrados: {matches_count}")
+    print(f"[OCR-F1] Linhas de saída: {len(saida)}")
     return saida
 
 
@@ -302,6 +372,7 @@ def processar_extrato_formato2(texto):
     Nome/origem na linha seguinte
     """
     linhas = [l.strip() for l in texto.split('\n')]
+    print(f"[OCR-F2] Processando {len(linhas)} linhas")
     
     # Regex para formato 2: VALOR (SINAL) DATA
     regex_mov = re.compile(
@@ -309,6 +380,7 @@ def processar_extrato_formato2(texto):
     )
     
     saida = []
+    matches_count = 0
     i = 0
     
     while i < len(linhas):
@@ -316,16 +388,39 @@ def processar_extrato_formato2(texto):
         m = regex_mov.match(linha)
         
         if m:
+            matches_count += 1
             valor_transacao, sinal, data = m.groups()
             
             # Extrair histórico da mesma linha (após a data e códigos)
             # Remove o padrão inicial capturado
             resto_linha = linha[m.end():].strip()
-            # Remove números de lote/documento no início
-            historico = re.sub(r'^\d+\s+\d+\s*', '', resto_linha).strip()
+            # Remove números de lote/documento no início (apenas 2 grupos de números)
+            historico = re.sub(r'^\d+\s+\d+\s+', '', resto_linha, count=1).strip()
+            # Se ainda começar com muitos dígitos seguidos (ex: doc longo), remove
+            historico = re.sub(r'^\d{10,}\s+', '', historico).strip()
+            
+            # Se o histórico é apenas números/códigos, buscar na próxima linha
+            if not historico or re.match(r'^[\d\s]+$', historico):
+                print(f"[OCR-F2-DEBUG] Histórico vazio ou só códigos, buscando próxima linha...")
+                # Busca próxima linha não vazia
+                j = i + 1
+                while j < len(linhas):
+                    proxima = linhas[j].strip()
+                    if proxima and not regex_mov.match(proxima):
+                        historico = proxima
+                        print(f"[OCR-F2-DEBUG] Histórico encontrado na linha seguinte: '{historico}'")
+                        break
+                    if proxima == "":
+                        break
+                    j += 1
+            
+            print(f"[OCR-F2-DEBUG] Linha completa: '{linha[:100]}'")
+            print(f"[OCR-F2-DEBUG] Histórico extraído: '{historico}'")
             
             # Categoria baseada no histórico
             categoria = categoriza_formato2(historico)
+            
+            print(f"[OCR-F2-DEBUG] Categoria atribuída: '{categoria}'")
             
             # Crédito/Débito
             if sinal == '+':
@@ -347,6 +442,24 @@ def processar_extrato_formato2(texto):
             # Se for categoria específica do BB, usa "Banco do Brasil"
             if categoria in ["Resgate", "Taxas Bancárias"]:
                 nome_origem_destino = "Banco do Brasil"
+            # ESPECIAL: Se o histórico contém "Pix - Enviado" ou "Pagamento de Boleto", busca o nome na próxima linha
+            elif ("PIX" in historico.upper() and "ENVIADO" in historico.upper()) or \
+                 ("PAGAMENTO" in historico.upper() and "BOLETO" in historico.upper()):
+                # Busca a linha seguinte que contém o nome do destinatário
+                j = i + 1
+                while j < len(linhas):
+                    prox = linhas[j].strip()
+                    # Ignora linhas vazias ou que são novas movimentações
+                    if prox and not regex_mov.match(prox):
+                        # Verifica se não é uma linha de tarifa/histórico
+                        if not prox.startswith("Tar.") and not prox.startswith("Tarifa"):
+                            nome_extraido = extrair_nome_formato2(prox)
+                            if nome_extraido and nome_extraido != "Banco do Brasil":
+                                nome_origem_destino = nome_extraido
+                                break
+                    if prox == "":
+                        break
+                    j += 1
             else:
                 # Busca próxima linha não vazia que não seja uma movimentação
                 j = i + 1
@@ -375,6 +488,8 @@ def processar_extrato_formato2(texto):
         
         i += 1
     
+    print(f"[OCR-F2] Matches encontrados: {matches_count}")
+    print(f"[OCR-F2] Linhas de saída: {len(saida)}")
     return saida
 
 
@@ -395,15 +510,26 @@ def extrair_nome_formato2(linha):
     nome = re.sub(r'^\d{2}/\d{2}\s+', '', nome)
     
     # Remove texto de tarifa agrupada (caso especial)
-    if "Tar. agrupadas" in nome or "ocorrencia" in nome:
+    if "Tar. agrupadas" in nome or "ocorrencia" in nome.lower() or "Tarifa" in nome:
         return "Banco do Brasil"
     
     # Remove "SECRETARIA MUNICIPAL" duplicado
     nome = re.sub(r'^SECRETARIA MUNICIPAL\s+SECRETARIA MUNICIPAL', 'SECRETARIA MUNICIPAL', nome, flags=re.IGNORECASE)
     
+    # Remove códigos de agência/documento se existirem no início
+    # Ex: "260 0001 053246086000101 COMPANHIA PLA" -> "COMPANHIA PLA"
+    nome = re.sub(r'^\d{3}\s+\d{4}\s+\d+\s+', '', nome)
+    
+    # Remove apenas números longos (CPF/CNPJ) seguidos de espaço no início
+    nome = re.sub(r'^\d{11,14}\s+', '', nome)
+    
     nome = nome.strip()
     
-    # Title case
+    # Se a linha é apenas "Pix - Enviado" ou similar, retorna vazio para buscar próxima
+    if nome.lower() in ["pix - enviado", "pagamento de boleto", "pix", "ted"]:
+        return ""
+    
+    # Title case para nomes próprios
     nome = nome.title()
     
     return nome if nome else ""
@@ -415,26 +541,34 @@ def categoriza_formato2(historico):
     """
     s = historico.upper()
     
+    print(f"[CATEGORIZA-F2] Analisando: '{s[:80]}'")
+    
     # Resgate
     if "BB RENDA FIXA" in s or "RESGATE" in s:
+        print(f"[CATEGORIZA-F2] -> Resgate")
         return "Resgate"
     
-    # Taxas
-    if "TARIFA" in s or "TAR." in s or "TAR " in s:
+    # Taxas (incluindo Tarifa Pix Enviado)
+    if "TARIFA" in s or "TAR." in s or "TAR " in s or "TARIFA PIX" in s:
+        print(f"[CATEGORIZA-F2] -> Taxas Bancárias")
         return "Taxas Bancárias"
     
     # PIX devolvido/rejeitado
     if "PIX - REJEITADO" in s or "PIX - DEVOLVIDO" in s or "DEVOLVID" in s:
+        print(f"[CATEGORIZA-F2] -> Pix / TED Devolvido")
         return "Pix / TED Devolvido"
     
     # Parcela (pagamento de fornecedor da prefeitura)
     if "SECRETARIA MUNICIPAL" in s and "FAZENDA" in s:
+        print(f"[CATEGORIZA-F2] -> Parcela")
         return "Parcela"
     
     if "RECEBIMENTO FORNECEDOR" in s:
+        print(f"[CATEGORIZA-F2] -> Parcela")
         return "Parcela"
     
     # Outros vazios
+    print(f"[CATEGORIZA-F2] -> (vazio)")
     return ""
 
 
@@ -493,7 +627,7 @@ def categoriza(linha):
         return "Pix / TED Devolvido"
     elif ("RESGATE" in s and "FUNDO" in s) or re.search(r'\bRESGATE\b', s):
         return "Resgate"
-    elif "TAR DOC/TED ELETRÔNICO" in s or "TARIFA PACOTE DE SERVIÇOS" in s or "TAR. AGRUPADAS" in s or "TARIFA" in s:
+    elif "TAR DOC/TED ELETRÔNICO" in s or "TARIFA PACOTE DE SERVIÇOS" in s or "TAR. AGRUPADAS" in s or "TARIFA" in s or "TARIFA PIX" in s:
         return "Taxas Bancárias"
     elif "SECRETARIA MUNICIPAL" in s and "FAZENDA" in s:
         return "Parcela"

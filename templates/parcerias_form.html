@@ -153,7 +153,7 @@
         </div>
 
         <div class="mb-3">
-          <label for="endereco" class="form-label">Endereço do Projeto</label>
+          <label for="endereco" class="form-label">Localização da Sede da OSC</label>
           <textarea class="form-control" id="endereco" name="endereco" rows="2">{{ parceria.endereco or '' }}</textarea>
         </div>
 
@@ -187,6 +187,13 @@
                    max="9999-12-31"
                    value="{{ parceria.get('final', '') if parceria else '' }}">
           </div>
+          <div class="col-md-3">
+            <label for="data_assinatura" class="form-label">Data de Assinatura</label>
+            <input type="date" class="form-control" id="data_assinatura" name="data_assinatura" 
+                   max="9999-12-31"
+                   value="{{ data_assinatura or '' }}">
+            <small class="text-muted">Data de assinatura do termo</small>
+          </div>
           {% if termo_rescindido %}
           <div class="col-md-3">
             <label for="data_rescisao" class="form-label">
@@ -196,15 +203,8 @@
                    value="{{ data_rescisao.strftime('%Y-%m-%d') if data_rescisao else '' }}"
                    readonly style="background-color: #f8d7da; font-weight: bold;">
           </div>
-          <div class="col-md-3">
-            <label for="meses" class="form-label">Meses do Projeto</label>
-            <input type="number" class="form-control" id="meses" name="meses" 
-                   value="{{ parceria.get('meses', '') if parceria else '' }}"
-                   readonly style="background-color: #e9ecef;">
-            <small class="text-muted">Calculado automaticamente</small>
-          </div>
           {% else %}
-          <div class="col-md-6">
+          <div class="col-md-3">
             <label for="meses" class="form-label">Meses do Projeto</label>
             <input type="number" class="form-control" id="meses" name="meses" 
                    value="{{ parceria.get('meses', '') if parceria else '' }}"
@@ -213,6 +213,18 @@
           </div>
           {% endif %}
         </div>
+        
+        {% if termo_rescindido %}
+        <div class="row mb-3">
+          <div class="col-md-12">
+            <label for="meses" class="form-label">Meses do Projeto</label>
+            <input type="number" class="form-control" id="meses" name="meses" 
+                   value="{{ parceria.get('meses', '') if parceria else '' }}"
+                   readonly style="background-color: #e9ecef;">
+            <small class="text-muted">Calculado automaticamente</small>
+          </div>
+        </div>
+        {% endif %}
 
         <div class="row mb-3">
           <div class="col-md-6">
@@ -389,9 +401,16 @@
         <div class="collapse" id="secaoInfosAdicionais">
           <div class="row mb-3">
             <div class="col-md-12">
-              <label for="parceria_responsavel_legal" class="form-label">Responsável Legal</label>
-              <input type="text" class="form-control" id="parceria_responsavel_legal" name="parceria_responsavel_legal" 
-                     value="{{ infos_adicionais.parceria_responsavel_legal or '' }}">
+              <label for="parceria_responsavel_legal" class="form-label">
+                Responsável Legal
+                <small class="text-muted">(separe múltiplos responsáveis por ponto-e-vírgula ";")</small>
+              </label>
+              <textarea class="form-control" id="parceria_responsavel_legal" name="parceria_responsavel_legal" rows="2" 
+                        placeholder="Exemplo: Fulano de Tal; Ciclano da Silva; Beltrano Santos">{{ infos_adicionais.parceria_responsavel_legal or '' }}</textarea>
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> 
+                Para informar múltiplos responsáveis legais, digite os nomes separados por ponto-e-vírgula.
+              </div>
             </div>
           </div>
 

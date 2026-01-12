@@ -100,7 +100,27 @@ try:
         
         # Listar todos os backups existentes
         backups = sorted(BACKUP_DIR.glob('backup_faf_*.sql'), reverse=True)
+        
+        # Manter apenas os 10 backups mais recentes
+        MAX_BACKUPS = 10
+        if len(backups) > MAX_BACKUPS:
+            backups_para_deletar = backups[MAX_BACKUPS:]
+            print(f"[INFO] Encontrados {len(backups)} backups. Mantendo os {MAX_BACKUPS} mais recentes.")
+            print()
+            print(f"[INFO] Deletando {len(backups_para_deletar)} backup(s) antigo(s):")
+            
+            for bkp in backups_para_deletar:
+                try:
+                    bkp_data = datetime.fromtimestamp(bkp.stat().st_mtime)
+                    bkp.unlink()
+                    print(f"  ✓ Deletado: {bkp.name} ({bkp_data.strftime('%d/%m/%Y %H:%M:%S')})")
+                except Exception as e:
+                    print(f"  ✗ Erro ao deletar {bkp.name}: {e}")
+            print()
+        
         if len(backups) > 1:
+            # Atualizar lista após deleção
+            backups = sorted(BACKUP_DIR.glob('backup_faf_*.sql'), reverse=True)
             print(f"[INFO] Total de backups na pasta: {len(backups)}")
             print()
             print("Últimos 5 backups:")
