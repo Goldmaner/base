@@ -850,6 +850,45 @@ def obter_dados(tabela):
         return jsonify({'erro': str(e)}), 500
 
 
+@listas_bp.route("/api/opcoes/<tabela>/<campo>", methods=["GET"])
+@login_required
+@requires_access('listas')
+def obter_opcoes_campo(tabela, campo):
+    """
+    Retorna as opções dinâmicas de um campo com query definida
+    """
+    if tabela not in TABELAS_CONFIG:
+        return jsonify({'erro': 'Tabela inválida'}), 400
+    
+    try:
+        config = TABELAS_CONFIG[tabela]
+        query_key = f'query_{campo}'
+        
+        # Verificar se há query definida para este campo
+        if config.get('tipos_campo') and query_key in config['tipos_campo']:
+            query = config['tipos_campo'][query_key]
+            
+            cur = get_cursor()
+            cur.execute(query)
+            resultados = cur.fetchall()
+            cur.close()
+            
+            # Retornar lista de valores (primeira coluna do resultado)
+            opcoes = [list(row.values())[0] for row in resultados if list(row.values())[0] is not None]
+            
+            return jsonify({'opcoes': opcoes})
+        else:
+            # Se não tem query, retornar opções fixas se existirem
+            opcoes_key = f'opcoes_{campo}'
+            if config.get('tipos_campo') and opcoes_key in config['tipos_campo']:
+                return jsonify({'opcoes': config['tipos_campo'][opcoes_key]})
+            else:
+                return jsonify({'opcoes': []})
+    
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
 @listas_bp.route("/api/dados/<tabela>", methods=["POST"])
 @login_required
 @requires_access('listas')

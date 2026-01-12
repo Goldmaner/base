@@ -168,6 +168,7 @@
               </label>
               <select class="form-select" id="alt_status" name="alt_status" required>
                 <option value="">-- Selecione --</option>
+                <option value="Em análise prévia">Em análise prévia</option>
                 <option value="Iniciado">Iniciado</option>
                 <option value="Em andamento">Em andamento</option>
                 <option value="Concluído">Concluído</option>
@@ -180,15 +181,14 @@
             <!-- Responsável pela Alteração -->
             <div class="col-md-12">
               <label for="alt_responsavel" class="form-label">
-                <i class="bi bi-person-badge"></i> Responsável pela Alteração *
+                <i class="bi bi-person-badge"></i> Responsáveis pela Alteração *
               </label>
-              <select class="form-select" id="alt_responsavel" name="alt_responsavel" required>
-                <option value="">-- Selecione --</option>
+              <select class="form-select" id="alt_responsavel" name="alt_responsavel[]" multiple required size="5">
                 {% for analista in analistas_dgp %}
                   <option value="{{ analista }}">{{ analista }}</option>
                 {% endfor %}
               </select>
-              <small class="text-muted">Pessoa responsável por processar esta alteração</small>
+              <small class="text-muted">Selecione uma ou mais pessoas responsáveis (Ctrl+Clique para múltipla seleção)</small>
             </div>
           </div>
 
@@ -307,6 +307,65 @@
       </div>
     </div>
 
+    <!-- Seção de Filtros -->
+    <div class="form-section mb-3">
+      <h5 class="mb-3">
+        <i class="bi bi-funnel"></i> Filtros
+      </h5>
+      <form method="GET" action="{{ url_for('parcerias.dgp_alteracoes') }}" id="formFiltros">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label for="filtro_termo" class="form-label">Número do Termo</label>
+            <input type="text" class="form-control" id="filtro_termo" name="filtro_termo" 
+                   value="{{ request.args.get('filtro_termo', '') }}" placeholder="Digite o termo...">
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_instrumento" class="form-label">Instrumento</label>
+            <select class="form-select" id="filtro_instrumento" name="filtro_instrumento">
+              <option value="">-- Todos --</option>
+              <option value="Termo de Aditamento" {{ 'selected' if request.args.get('filtro_instrumento') == 'Termo de Aditamento' }}>Termo de Aditamento</option>
+              <option value="Termo de Apostilamento" {{ 'selected' if request.args.get('filtro_instrumento') == 'Termo de Apostilamento' }}>Termo de Apostilamento</option>
+              <option value="Termo de Apostilamento do Aditamento" {{ 'selected' if request.args.get('filtro_instrumento') == 'Termo de Apostilamento do Aditamento' }}>Termo de Apostilamento do Aditamento</option>
+              <option value="Informação DGP" {{ 'selected' if request.args.get('filtro_instrumento') == 'Informação DGP' }}>Informação DGP</option>
+              <option value="Despacho Autorizatório" {{ 'selected' if request.args.get('filtro_instrumento') == 'Despacho Autorizatório' }}>Despacho Autorizatório</option>
+              <option value="Informação da Pessoa Gestora" {{ 'selected' if request.args.get('filtro_instrumento') == 'Informação da Pessoa Gestora' }}>Informação da Pessoa Gestora</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_tipos" class="form-label">Tipos de Alteração</label>
+            <select class="form-select" id="filtro_tipos" name="filtro_tipos[]" multiple size="3">
+              {% for tipo in tipos_alteracao %}
+                <option value="{{ tipo.alt_tipo }}" 
+                  {{ 'selected' if tipo.alt_tipo in request.args.getlist('filtro_tipos[]') }}>
+                  {{ tipo.alt_tipo }}
+                </option>
+              {% endfor %}
+            </select>
+            <small class="text-muted">Ctrl+Clique para múltipla seleção</small>
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_responsavel" class="form-label">Responsável</label>
+            <select class="form-select" id="filtro_responsavel" name="filtro_responsavel">
+              <option value="">-- Todos --</option>
+              {% for analista in analistas_dgp %}
+                <option value="{{ analista }}" {{ 'selected' if request.args.get('filtro_responsavel') == analista }}>{{ analista }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="row mt-3">
+          <div class="col-md-12 text-end">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-search"></i> Aplicar Filtros
+            </button>
+            <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="btn btn-secondary">
+              <i class="bi bi-x-circle"></i> Limpar Filtros
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+
     <!-- Tabela de Alterações Cadastradas -->
     <div class="table-section">
       <h4 class="mb-4">
@@ -319,11 +378,12 @@
           <table class="table table-hover table-striped">
             <thead>
               <tr>
-                <th style="width: 20%;">Número do Termo</th>
-                <th style="width: 20%;">Instrumento</th>
-                <th style="width: 10%;">Numeração</th>
-                <th style="width: 30%;">Tipos de Alteração</th>
-                <th style="width: 10%;" class="text-center">Ações</th>
+                <th style="width: 15%;">Número do Termo</th>
+                <th style="width: 15%;">Instrumento</th>
+                <th style="width: 8%;">Numeração</th>
+                <th style="width: 25%;">Tipos de Alteração</th>
+                <th style="width: 20%;">Responsáveis</th>
+                <th style="width: 12%;" class="text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -347,6 +407,16 @@
                       {% set tipos = alteracao.tipos_alteracao.split(', ') %}
                       {% for tipo in tipos %}
                         <span class="badge bg-success me-1">{{ tipo }}</span>
+                      {% endfor %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if alteracao.responsavel %}
+                      {% set responsaveis = alteracao.responsavel.split(';') %}
+                      {% for resp in responsaveis %}
+                        <span class="badge bg-info me-1">{{ resp.strip() }}</span>
                       {% endfor %}
                     {% else %}
                       <span class="text-muted">-</span>
@@ -385,36 +455,41 @@
     const tiposAlteracao = {{ tipos_alteracao|tojson if tipos_alteracao else '[]'|safe }};
     const instrumentos = {{ instrumentos|tojson if instrumentos else '[]'|safe }};
     
-    // Mapeamento de tipos para campos dinâmicos
-    const tiposCampos = {
-      'Nome do projeto': { tipo: 'text', placeholder: 'Digite o novo nome do projeto' },
-      'Nome da organização': { tipo: 'select_osc', placeholder: 'Selecione a OSC' },
-      'CNPJ da organização': { tipo: 'text', placeholder: 'XX.XXX.XXX/XXXX-XX', maxlength: 18 },
-      'Nome do responsável legal': { tipo: 'text', placeholder: 'Digite o nome do responsável legal', maxlength: 300 },
-      'Pessoa gestora indicada pela administração pública': { tipo: 'select_pg', placeholder: 'Selecione a pessoa gestora' },
-      'Objeto da parceria': { tipo: 'textarea', placeholder: 'Descreva o objeto da parceria' },
-      'Quantidade de beneficiários diretos': { tipo: 'number', placeholder: 'Quantidade', min: 0 },
-      'Cláusulas gerais': { tipo: 'textarea', placeholder: 'Descreva as cláusulas gerais' },
-      'Alteração de norma geral aplicável': { tipo: 'textarea', placeholder: 'Descreva a alteração da norma' },
-      'Aumento de valor total da parceria': { tipo: 'money', placeholder: 'R$ 0,00' },
-      'Redução de valor de valor total da parceria': { tipo: 'money', placeholder: 'R$ 0,00' },
-      'Remanejamentos sem alteração de valor mensal': { tipo: 'text', placeholder: 'SEI do orçamento', maxlength: 12 },
-      'FACC': { tipo: 'text', placeholder: '1511-x / 15138-9' },
-      'Prorrogação de vigência': { tipo: 'date', placeholder: 'Nova data final' },
-      'Adequação de vigência': { tipo: 'date_range', placeholder: 'Novas datas de início e fim' },
-      'Redução de vigência da parceria': { tipo: 'date', placeholder: 'Nova data final' },
-      'Suspensão de vigência da parceria': { tipo: 'date', placeholder: 'Data da suspensão' },
-      'Retomada de vigência da parceria': { tipo: 'date', placeholder: 'Data da retomada' },
-      'Justificativa do Projeto': { tipo: 'textarea', placeholder: 'Justificativa do projeto' },
-      'Abragência geográfica': { tipo: 'text', placeholder: 'Abrangência geográfica do projeto' },
-      'Quantidade de beneficiários indiretos': { tipo: 'number', placeholder: 'Quantidade', min: 0 }
-    };
+    // Mapeamento de tipos para campos dinâmicos (construído a partir dos dados do banco)
+    const tiposCampos = {};
+    tiposAlteracao.forEach(tipo => {
+      if (tipo.alt_campo_tipo) {
+        tiposCampos[tipo.alt_tipo] = {
+          tipo: tipo.alt_campo_tipo,
+          placeholder: tipo.alt_campo_placeholder || '',
+          maxlength: tipo.alt_campo_maxlength || null,
+          min: tipo.alt_campo_min || null
+        };
+      }
+    });
     
     let contadorTipos = 0;
     let tiposSelecionados = new Set();
 
     $(document).ready(function() {
       // Nada aqui - seção será adicionada quando modal abrir
+      
+      // Interceptar submit do formulário para processar endereços
+      $('#formAlteracao').on('submit', function(e) {
+        // Processar campos de endereços antes de enviar
+        $('.endereco-tipo-localizacao').each(function() {
+          const index = $(this).data('index');
+          const jsonField = $(`#enderecos_json_${index}`);
+          
+          if (jsonField.length && jsonField.val()) {
+            // O valor JSON já está no campo hidden correto como alt_info[]
+            console.log(`[DEBUG SUBMIT] Endereços para índice ${index}:`, jsonField.val());
+          }
+        });
+        
+        // Permitir submit normal
+        return true;
+      });
     });
 
     // Inicializar Select2 quando o modal for aberto
@@ -618,6 +693,7 @@
       }
       
       const config = tiposCampos[tipoSelecionado];
+      
       let campoHTML = '';
       
       campoHTML += `<label class="form-label"><i class="bi bi-pencil-square"></i> Nova Informação *</label>`;
@@ -693,11 +769,50 @@
             });
           }, 100);
           break;
+        
+        case 'enderecos':
+          // Interface especial para editar múltiplos endereços
+          campoHTML += `
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle"></i> Os endereços atuais serão carregados para edição. 
+              Você pode modificar, remover ou adicionar novos endereços.
+            </div>
+            <div class="endereco-tipo-localizacao" data-index="${index}">
+              <div id="enderecosContainer_${index}" class="mb-2">
+                <div class="text-center">
+                  <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                  </div>
+                  <small class="text-muted d-block">Carregando endereços...</small>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarEnderecoAlteracao(${index})">
+                <i class="bi bi-plus-circle"></i> Adicionar Novo Endereço
+              </button>
+              <input type="hidden" name="alt_info[]" id="enderecos_json_${index}" value="">
+            </div>`;
+          
+          // Carregar endereços existentes via AJAX
+          setTimeout(() => {
+            const numeroTermo = $('#numero_termo').val();
+            if (numeroTermo) {
+              carregarEnderecosAlteracao(index, numeroTermo);
+            } else {
+              $(`#enderecosContainer_${index}`).html(`
+                <div class="alert alert-warning">
+                  <i class="bi bi-exclamation-triangle"></i> 
+                  Selecione um termo primeiro para carregar os endereços.
+                </div>`);
+            }
+          }, 100);
+          break;
       }
       
       campoHTML += `<small class="text-muted">Preencha a nova informação para este tipo de alteração</small>`;
       
+      console.log(`[DEBUG atualizarCampoDinamico] HTML gerado (${campoHTML.length} caracteres)`);
       campoContainer.html(campoHTML).show();
+      console.log(`[DEBUG atualizarCampoDinamico] Campo mostrado e HTML inserido`);
       
       // Aplicar máscara de dinheiro se necessário
       if (config.tipo === 'money') {
@@ -707,6 +822,162 @@
           this.value = 'R$ ' + value.replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
         });
       }
+      
+      console.log(`[DEBUG atualizarCampoDinamico] Finalizado para índice ${index}`);
+    }
+
+    // ========== FUNÇÕES PARA ENDEREÇOS (LOCALIZAÇÃO DO PROJETO) ==========
+    
+    let enderecosData = {}; // Armazena endereços por índice
+    let contadorEnderecosAlt = {}; // Contador por índice de alteração
+    
+    function carregarEnderecosAlteracao(index, numeroTermo) {
+      $.ajax({
+        url: `/parcerias/api/enderecos/${numeroTermo}`,
+        method: 'GET',
+        success: function(response) {
+          if (response.success) {
+            enderecosData[index] = response.enderecos;
+            contadorEnderecosAlt[index] = response.enderecos.length;
+            renderizarEnderecosAlteracao(index);
+          } else {
+            $(`#enderecosContainer_${index}`).html(`
+              <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i> Nenhum endereço encontrado para este termo.
+              </div>`);
+            enderecosData[index] = [];
+            contadorEnderecosAlt[index] = 0;
+          }
+        },
+        error: function() {
+          $(`#enderecosContainer_${index}`).html(`
+            <div class="alert alert-danger">
+              <i class="bi bi-x-circle"></i> Erro ao carregar endereços.
+            </div>`);
+          enderecosData[index] = [];
+          contadorEnderecosAlt[index] = 0;
+        }
+      });
+    }
+    
+    function renderizarEnderecosAlteracao(index) {
+      const container = $(`#enderecosContainer_${index}`);
+      container.empty();
+      
+      if (!enderecosData[index] || enderecosData[index].length === 0) {
+        container.html(`
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Nenhum endereço cadastrado. Clique em "Adicionar Novo Endereço" para criar.
+          </div>`);
+        atualizarJsonEnderecos(index);
+        return;
+      }
+      
+      enderecosData[index].forEach((endereco, idx) => {
+        const enderecoHTML = `
+          <div class="card mb-2" data-endereco-idx="${idx}">
+            <div class="card-body">
+              <div class="d-flex justify-content-between mb-2">
+                <h6 class="mb-0">Endereço #${idx + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerEnderecoAlteracao(${index}, ${idx})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+              
+              <div class="row g-2 mb-2">
+                <div class="col-md-8">
+                  <label class="form-label small">Logradouro</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_logradouro || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_logradouro', this.value)">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Número</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_numero || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_numero', this.value)">
+                </div>
+              </div>
+              
+              <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                  <label class="form-label small">Complemento</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_complemento || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_complemento', this.value)">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">CEP</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_cep || ''}"
+                         placeholder="00000-000"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_cep', this.value)">
+                </div>
+              </div>
+              
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label small">Distrito</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_distrito || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_distrito', this.value)">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Observação</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.observacao || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'observacao', this.value)">
+                </div>
+              </div>
+            </div>
+          </div>`;
+        
+        container.append(enderecoHTML);
+      });
+      
+      atualizarJsonEnderecos(index);
+    }
+    
+    function adicionarEnderecoAlteracao(index) {
+      if (!enderecosData[index]) {
+        enderecosData[index] = [];
+      }
+      if (!contadorEnderecosAlt[index]) {
+        contadorEnderecosAlt[index] = 0;
+      }
+      
+      // Adicionar novo endereço vazio (sem ID = será INSERT)
+      enderecosData[index].push({
+        parceria_logradouro: '',
+        parceria_numero: '',
+        parceria_complemento: '',
+        parceria_cep: '',
+        parceria_distrito: '',
+        observacao: ''
+      });
+      
+      renderizarEnderecosAlteracao(index);
+    }
+    
+    function removerEnderecoAlteracao(index, enderecoIdx) {
+      if (confirm('Deseja remover este endereço?')) {
+        enderecosData[index].splice(enderecoIdx, 1);
+        renderizarEnderecosAlteracao(index);
+      }
+    }
+    
+    function atualizarEnderecoAlteracao(index, enderecoIdx, campo, valor) {
+      if (enderecosData[index] && enderecosData[index][enderecoIdx]) {
+        enderecosData[index][enderecoIdx][campo] = valor;
+        atualizarJsonEnderecos(index);
+      }
+    }
+    
+    function atualizarJsonEnderecos(index) {
+      // Serializar endereços como JSON no campo hidden
+      const json = JSON.stringify(enderecosData[index] || []);
+      $(`#enderecos_json_${index}`).val(json);
+      console.log(`[DEBUG] Endereços atualizados para índice ${index}:`, json);
     }
 
     // Função para editar alteração
@@ -785,7 +1056,13 @@
           
           // Preencher status, responsavel e observacao
           $('#alt_status').val(data.status || 'Iniciado');
-          $('#alt_responsavel').val(data.responsavel || '');
+          
+          // Preencher múltiplos responsáveis (separados por ;)
+          if (data.responsavel) {
+            const responsaveis = data.responsavel.split(';').map(r => r.trim());
+            $('#alt_responsavel').val(responsaveis);
+          }
+          
           $('#alt_observacao').val(data.observacao || '');
           
           // Limpar tipos anteriores e adicionar os tipos do banco
@@ -793,42 +1070,104 @@
           contadorTipos = 0;
           tiposSelecionados.clear();
           
-          // Adicionar seções para cada tipo
-          data.tipos.forEach((tipo, idx) => {
-            adicionarSecaoTipo();
-            const currentIndex = contadorTipos;
-            
-            // Preencher select do tipo
-            $(`#alt_tipo_${currentIndex}`).val(tipo);
-            tiposSelecionados.add(tipo);
-            
-            // Atualizar campo dinâmico
-            atualizarCampoDinamico(currentIndex);
-            
-            // Esperar um pouco e preencher o valor de alt_info
-            setTimeout(() => {
-              const info = data.infos[idx] || '';
-              
-              // Se for date_range, separar os valores
-              if (tipo === 'Adequação de vigência' && info.includes('|')) {
-                const datas = info.split('|');
-                $(`#campo_info_${currentIndex} input[name="alt_info_inicio[]"]`).val(datas[0]);
-                $(`#campo_info_${currentIndex} input[name="alt_info_fim[]"]`).val(datas[1]);
-              } else {
-                // Para outros tipos
-                $(`#campo_info_${currentIndex} input[name="alt_info[]"]`).val(info);
-                $(`#campo_info_${currentIndex} textarea[name="alt_info[]"]`).val(info);
-                $(`#campo_info_${currentIndex} select[name="alt_info[]"]`).val(info);
-              }
-            }, 300);
-          });
+          // Verificar se há tipos e infos
+          console.log('[DEBUG EDITAR] ========== INÍCIO CARREGAMENTO ==========');
+          console.log('[DEBUG EDITAR] Tipos recebidos:', data.tipos);
+          console.log('[DEBUG EDITAR] Quantidade de tipos:', data.tipos ? data.tipos.length : 0);
+          console.log('[DEBUG EDITAR] Infos recebidas:', data.infos);
+          console.log('[DEBUG EDITAR] Quantidade de infos:', data.infos ? data.infos.length : 0);
           
-          if (data.tipos.length === 0) {
+          // Adicionar seções para cada tipo
+          if (data.tipos && data.tipos.length > 0) {
+            // Criar todas as seções primeiro
+            for (let idx = 0; idx < data.tipos.length; idx++) {
+              adicionarSecaoTipo();
+              console.log(`[DEBUG EDITAR] Seção ${idx + 1} criada com ID: tipo_${contadorTipos}`);
+            }
+            
+            // Aguardar um pouco para garantir que o DOM foi atualizado
+            setTimeout(() => {
+              data.tipos.forEach((tipo, idx) => {
+                const sectionIndex = idx + 1; // Seções começam em 1
+                const selectElement = $(`#alt_tipo_${sectionIndex}`);
+                
+                if (selectElement.length > 0) {
+                  // Preencher select do tipo
+                  selectElement.val(tipo);
+                  tiposSelecionados.add(tipo);
+                  
+                  // Atualizar campo dinâmico
+                  atualizarCampoDinamico(sectionIndex);
+                  
+                  // Aguardar o campo dinâmico ser criado e então preencher
+                  setTimeout(() => {
+                    const info = data.infos[idx] || '';
+                    console.log(`[DEBUG EDITAR] Preenchendo info na seção ${sectionIndex}: "${info}"`);
+                    
+                    const campoInfo = $(`#campo_info_${sectionIndex}`);
+                    console.log(`[DEBUG EDITAR] Campo info encontrado: ${campoInfo.length > 0 ? 'SIM' : 'NÃO'}`);
+                    console.log(`[DEBUG EDITAR] Campo info visível: ${campoInfo.is(':visible') ? 'SIM' : 'NÃO'}`);
+                    
+                    // Se for date_range, separar os valores
+                    if (tipo === 'Adequação de vigência' && info.includes('|')) {
+                      const datas = info.split('|');
+                      const inputInicio = $(`#campo_info_${sectionIndex} input[name="alt_info_inicio[]"]`);
+                      const inputFim = $(`#campo_info_${sectionIndex} input[name="alt_info_fim[]"]`);
+                      
+                      console.log(`[DEBUG EDITAR] Input início encontrado: ${inputInicio.length}`);
+                      console.log(`[DEBUG EDITAR] Input fim encontrado: ${inputFim.length}`);
+                      
+                      if (inputInicio.length) inputInicio.val(datas[0]);
+                      if (inputFim.length) inputFim.val(datas[1]);
+                      
+                      console.log(`[DEBUG EDITAR] Valores preenchidos: ${datas[0]} / ${datas[1]}`);
+                    } else {
+                      // Para outros tipos - testar todos os seletores
+                      const inputText = $(`#campo_info_${sectionIndex} input[name="alt_info[]"]`);
+                      const textarea = $(`#campo_info_${sectionIndex} textarea[name="alt_info[]"]`);
+                      const select = $(`#campo_info_${sectionIndex} select[name="alt_info[]"]`);
+                      
+                      console.log(`[DEBUG EDITAR] Input text encontrado: ${inputText.length}`);
+                      console.log(`[DEBUG EDITAR] Textarea encontrado: ${textarea.length}`);
+                      console.log(`[DEBUG EDITAR] Select encontrado: ${select.length}`);
+                      
+                      if (inputText.length) {
+                        inputText.val(info);
+                        console.log(`[DEBUG EDITAR] Preenchido input text com: "${info}"`);
+                      }
+                      if (textarea.length) {
+                        textarea.val(info);
+                        console.log(`[DEBUG EDITAR] Preenchido textarea com: "${info}"`);
+                      }
+                      if (select.length) {
+                        select.val(info);
+                        console.log(`[DEBUG EDITAR] Preenchido select com: "${info}"`);
+                      }
+                    }
+                  }, 500); // Delay para campo dinâmico ser criado
+                } else {
+                  console.error(`[DEBUG EDITAR] ERRO: Select #alt_tipo_${sectionIndex} não encontrado!`);
+                }
+              });
+              
+              console.log('[DEBUG EDITAR] ========== FIM CARREGAMENTO ==========');
+              
+              // Mostrar alerta para o usuário
+              const msg = `Carregados ${data.tipos.length} tipo(s) de alteração. Verifique o console (F12) para detalhes.`;
+              console.log(`[DEBUG EDITAR] ${msg}`);
+              
+              // Atualizar instrumento baseado no primeiro tipo
+              setTimeout(() => {
+                atualizarInstrumento();
+              }, 1000);
+              
+            }, 200); // Delay inicial para garantir que todas as seções foram criadas
+            
+          } else {
+            // Se não há tipos, adicionar uma seção vazia
+            console.log('[DEBUG EDITAR] Nenhum tipo encontrado, adicionando seção vazia');
             adicionarSecaoTipo();
           }
-          
-          // Atualizar instrumento baseado no primeiro tipo
-          atualizarInstrumento();
           
           // Alterar título e ação do modal
           $('#modalCadastroAlteracaoLabel').text('Editar Alteração');

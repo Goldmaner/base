@@ -702,13 +702,16 @@
           let mensagem = 'Usuário atualizado com sucesso!';
           
           // Se o usuário editado está logado neste momento
-          const userEmail = document.getElementById('usuarioEmailEdit').value;
-          const sessionEmail = '{{ session.get("email", "") }}';
-          
-          if (userEmail === sessionEmail) {
-            mensagem += '\n\n⚠️ ATENÇÃO: Você editou suas próprias permissões!\nAs alterações foram aplicadas imediatamente.';
-          } else {
-            mensagem += '\n\nSe o usuário estiver logado, as permissões serão atualizadas automaticamente na próxima ação.';
+          const userEmailElement = document.getElementById('usuarioEmailEdit');
+          if (userEmailElement) {
+            const userEmail = userEmailElement.value;
+            const sessionEmail = '{{ session.get("email", "") }}';
+            
+            if (userEmail === sessionEmail) {
+              mensagem += '\n\n⚠️ ATENÇÃO: Você editou suas próprias permissões!\nAs alterações foram aplicadas imediatamente.';
+            } else {
+              mensagem += '\n\nSe o usuário estiver logado, as permissões serão atualizadas automaticamente na próxima ação.';
+            }
           }
           
           alert(mensagem);

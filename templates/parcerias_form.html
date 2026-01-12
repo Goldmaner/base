@@ -7,6 +7,7 @@
   <title>Formulário de Parceria - Módulo</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <style>
     body { background-color: #f8f9fa; padding: 20px; }
     .header-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
@@ -379,6 +380,101 @@
           </div>
         </div>
 
+        <!-- Seção: Informações Adicionais (Collapsed) -->
+        <div class="section-title" data-bs-toggle="collapse" data-bs-target="#secaoInfosAdicionais" 
+             style="cursor: pointer; user-select: none;">
+          <i class="bi bi-plus-circle me-2" id="iconInfosAdicionais"></i>
+          INFORMAÇÕES ADICIONAIS
+        </div>
+        <div class="collapse" id="secaoInfosAdicionais">
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <label for="parceria_responsavel_legal" class="form-label">Responsável Legal</label>
+              <input type="text" class="form-control" id="parceria_responsavel_legal" name="parceria_responsavel_legal" 
+                     value="{{ infos_adicionais.parceria_responsavel_legal or '' }}">
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <label for="parceria_objeto" class="form-label">Objeto da Parceria</label>
+              <textarea class="form-control" id="parceria_objeto" name="parceria_objeto" rows="3">{{ infos_adicionais.parceria_objeto or '' }}</textarea>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="parceria_beneficiarios_diretos" class="form-label">Beneficiários Diretos</label>
+              <input type="number" class="form-control" id="parceria_beneficiarios_diretos" name="parceria_beneficiarios_diretos" 
+                     value="{{ infos_adicionais.parceria_beneficiarios_diretos or '' }}" min="0">
+            </div>
+            <div class="col-md-6">
+              <label for="parceria_beneficiarios_indiretos" class="form-label">Beneficiários Indiretos</label>
+              <input type="number" class="form-control" id="parceria_beneficiarios_indiretos" name="parceria_beneficiarios_indiretos" 
+                     value="{{ infos_adicionais.parceria_beneficiarios_indiretos or '' }}" min="0">
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <label for="parceria_justificativa_projeto" class="form-label">Justificativa do Projeto</label>
+              <textarea class="form-control" id="parceria_justificativa_projeto" name="parceria_justificativa_projeto" rows="4">{{ infos_adicionais.parceria_justificativa_projeto or '' }}</textarea>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <label for="parceria_abrangencia_projeto" class="form-label">Abrangência do Projeto</label>
+              <textarea class="form-control" id="parceria_abrangencia_projeto" name="parceria_abrangencia_projeto" rows="3">{{ infos_adicionais.parceria_abrangencia_projeto or '' }}</textarea>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="parceria_data_suspensao" class="form-label">Data de Suspensão</label>
+              <input type="date" class="form-control" id="parceria_data_suspensao" name="parceria_data_suspensao" 
+                     value="{{ infos_adicionais.parceria_data_suspensao or '' }}">
+            </div>
+            <div class="col-md-6">
+              <label for="parceria_data_retomada" class="form-label">Data de Retomada</label>
+              <input type="date" class="form-control" id="parceria_data_retomada" name="parceria_data_retomada" 
+                     value="{{ infos_adicionais.parceria_data_retomada or '' }}">
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção: Endereços (Collapsed) -->
+        <div class="section-title" data-bs-toggle="collapse" data-bs-target="#secaoEnderecos" 
+             style="cursor: pointer; user-select: none;">
+          <i class="bi bi-plus-circle me-2" id="iconEnderecos"></i>
+          ENDEREÇOS DO PROJETO
+        </div>
+        <div class="collapse" id="secaoEnderecos">
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="projetoOnline" name="projeto_online" 
+                       onchange="toggleEnderecosFields()">
+                <label class="form-check-label" for="projetoOnline">
+                  <strong>Projeto Online</strong> <small class="text-muted">(Marque se não houver endereço físico)</small>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div id="enderecosContainer">
+            <!-- Endereços serão carregados dinamicamente -->
+          </div>
+
+          <div id="botaoAdicionarEndereco" class="row mb-3">
+            <div class="col-md-12">
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarEndereco()">
+                <i class="bi bi-plus-circle"></i> Adicionar Endereço
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Botões de Ação -->
         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
           <button type="button" class="btn btn-danger" onclick="exportarPDF()">
@@ -402,6 +498,8 @@
     </div>
   </div>
 
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
   <script>
@@ -967,6 +1065,197 @@
         btnExportar.innerHTML = textoOriginal;
       }, 2000);
     }
+
+    // ========== INFORMAÇÕES ADICIONAIS E ENDEREÇOS ==========
+    
+    let contadorEnderecos = 0;
+
+    // Toggle ícones de collapsed
+    document.getElementById('secaoInfosAdicionais').addEventListener('show.bs.collapse', function() {
+      document.getElementById('iconInfosAdicionais').className = 'bi bi-dash-circle me-2';
+    });
+    document.getElementById('secaoInfosAdicionais').addEventListener('hide.bs.collapse', function() {
+      document.getElementById('iconInfosAdicionais').className = 'bi bi-plus-circle me-2';
+    });
+    document.getElementById('secaoEnderecos').addEventListener('show.bs.collapse', function() {
+      document.getElementById('iconEnderecos').className = 'bi bi-dash-circle me-2';
+    });
+    document.getElementById('secaoEnderecos').addEventListener('hide.bs.collapse', function() {
+      document.getElementById('iconEnderecos').className = 'bi bi-plus-circle me-2';
+    });
+
+    // Toggle campos de endereço quando marcar "Projeto Online"
+    function toggleEnderecosFields() {
+      const checked = document.getElementById('projetoOnline').checked;
+      const container = document.getElementById('enderecosContainer');
+      const botaoAdicionar = document.getElementById('botaoAdicionarEndereco');
+      
+      if (checked) {
+        container.style.display = 'none';
+        botaoAdicionar.style.display = 'none';
+      } else {
+        container.style.display = 'block';
+        botaoAdicionar.style.display = 'block';
+      }
+    }
+
+    // Adicionar novo endereço
+    function adicionarEndereco(dados = {}) {
+      contadorEnderecos++;
+      const id = dados.id || `novo_${contadorEnderecos}`;
+      
+      const enderecoHTML = `
+        <div class="endereco-item border rounded p-3 mb-3" data-endereco-id="${id}">
+          <div class="d-flex justify-content-between mb-2">
+            <h6 class="mb-0">Endereço #${contadorEnderecos}</h6>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerEndereco('${id}')">
+              <i class="bi bi-trash"></i> Remover
+            </button>
+          </div>
+          
+          <input type="hidden" name="endereco_id[]" value="${id}">
+          
+          <div class="row mb-2">
+            <div class="col-md-8">
+              <label class="form-label">Logradouro</label>
+              <input type="text" class="form-control" name="parceria_logradouro[]" value="${dados.parceria_logradouro || ''}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Número</label>
+              <input type="number" class="form-control" name="parceria_numero[]" value="${dados.parceria_numero || ''}">
+            </div>
+          </div>
+          
+          <div class="row mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Complemento</label>
+              <input type="text" class="form-control" name="parceria_complemento[]" value="${dados.parceria_complemento || ''}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">CEP</label>
+              <input type="text" class="form-control cep-mask" name="parceria_cep[]" value="${dados.parceria_cep || ''}" placeholder="00000-000">
+            </div>
+          </div>
+          
+          <div class="row mb-2">
+            <div class="col-md-4">
+              <label class="form-label">Distrito</label>
+              <select class="form-select select2-distrito" name="parceria_distrito[]" data-endereco-id="${id}" onchange="atualizarRegionalizacao('${id}')">
+                <option value="">-- Selecione --</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Subprefeitura</label>
+              <input type="text" class="form-control" name="parceria_subprefeitura[]" id="subprefeitura_${id}" readonly value="${dados.subprefeitura || ''}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Região</label>
+              <input type="text" class="form-control" name="parceria_regiao[]" id="regiao_${id}" readonly value="${dados.regiao || ''}">
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('enderecosContainer').insertAdjacentHTML('beforeend', enderecoHTML);
+      
+      // Inicializar Select2 para o novo distrito
+      const selectElement = document.querySelector(`[data-endereco-id="${id}"].select2-distrito`);
+      $(selectElement).select2({
+        ajax: {
+          url: '/parcerias/api/distritos',
+          dataType: 'json',
+          delay: 250,
+          data: function (params) {
+            return { q: params.term };
+          },
+          processResults: function (data) {
+            return { results: data };
+          }
+        },
+        placeholder: 'Digite para buscar...',
+        minimumInputLength: 0
+      });
+      
+      // Se tem dados de distrito, pré-selecionar
+      if (dados.parceria_distrito) {
+        const option = new Option(dados.distrito_nome || dados.parceria_distrito, dados.parceria_distrito, true, true);
+        $(selectElement).append(option).trigger('change');
+      }
+      
+      // Aplicar máscara CEP
+      aplicarMascaraCEP();
+    }
+
+    // Remover endereço
+    function removerEndereco(id) {
+      if (confirm('Deseja remover este endereço?')) {
+        const elemento = document.querySelector(`[data-endereco-id="${id}"]`);
+        if (elemento) {
+          elemento.remove();
+        }
+      }
+    }
+
+    // Atualizar regionalização ao selecionar distrito
+    function atualizarRegionalizacao(enderecoId) {
+      const select = document.querySelector(`[data-endereco-id="${enderecoId}"].select2-distrito`);
+      const codigo = select.value;
+      
+      if (!codigo) {
+        document.getElementById(`subprefeitura_${enderecoId}`).value = '';
+        document.getElementById(`regiao_${enderecoId}`).value = '';
+        return;
+      }
+      
+      fetch(`/parcerias/api/distrito-info/${codigo}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            document.getElementById(`subprefeitura_${enderecoId}`).value = data.subprefeitura || '';
+            document.getElementById(`regiao_${enderecoId}`).value = data.regiao || '';
+          }
+        })
+        .catch(error => console.error('Erro ao buscar info do distrito:', error));
+    }
+
+    // Aplicar máscara CEP
+    function aplicarMascaraCEP() {
+      document.querySelectorAll('.cep-mask').forEach(input => {
+        input.addEventListener('input', function(e) {
+          let value = e.target.value.replace(/\D/g, '');
+          if (value.length > 5) {
+            value = value.slice(0, 5) + '-' + value.slice(5, 8);
+          }
+          e.target.value = value;
+        });
+      });
+    }
+
+    // Carregar endereços existentes ao carregar página
+    document.addEventListener('DOMContentLoaded', function() {
+      // Se houver endereços salvos, carregar
+      {% if enderecos %}
+        {% for endereco in enderecos %}
+          adicionarEndereco({
+            id: '{{ endereco.id }}',
+            parceria_logradouro: '{{ endereco.parceria_logradouro or "" }}',
+            parceria_numero: '{{ endereco.parceria_numero or "" }}',
+            parceria_complemento: '{{ endereco.parceria_complemento or "" }}',
+            parceria_cep: '{{ endereco.parceria_cep or "" }}',
+            parceria_distrito: '{{ endereco.parceria_distrito or "" }}',
+            distrito_nome: '{{ endereco.distrito_nome or "" }}',
+            subprefeitura: '{{ endereco.subprefeitura or "" }}',
+            regiao: '{{ endereco.regiao or "" }}'
+          });
+        {% endfor %}
+      {% endif %}
+      
+      // Verificar se é projeto online
+      {% if projeto_online %}
+        document.getElementById('projetoOnline').checked = true;
+        toggleEnderecosFields();
+      {% endif %}
+    });
   </script>
 </body>
 </html>

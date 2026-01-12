@@ -480,6 +480,81 @@
           checkDiv.appendChild(input);
           checkDiv.appendChild(checkLabel);
           div.appendChild(checkDiv);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'checkbox_multiple') {
+          // Checkbox múltiplo - buscar opções dinamicamente
+          const labelContainer = document.createElement('div');
+          labelContainer.className = 'd-flex justify-content-between align-items-center mb-2';
+          
+          const labelSpan = document.createElement('span');
+          labelSpan.textContent = configAtual.labels[col];
+          labelSpan.className = 'form-label mb-0';
+          
+          const marcarTodosBtn = document.createElement('button');
+          marcarTodosBtn.type = 'button';
+          marcarTodosBtn.className = 'btn btn-sm btn-outline-primary';
+          marcarTodosBtn.textContent = 'Marcar todos';
+          marcarTodosBtn.dataset.campo = col;
+          marcarTodosBtn.onclick = function() {
+            const checkboxes = document.querySelectorAll(`input[data-campo="${col}"]`);
+            const todosMarkados = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(cb => cb.checked = !todosMarkados);
+            this.textContent = todosMarkados ? 'Marcar todos' : 'Desmarcar todos';
+          };
+          
+          labelContainer.appendChild(labelSpan);
+          labelContainer.appendChild(marcarTodosBtn);
+          div.appendChild(labelContainer);
+          
+          const checkboxGroup = document.createElement('div');
+          checkboxGroup.className = 'border rounded p-2';
+          checkboxGroup.style.maxHeight = '200px';
+          checkboxGroup.style.overflowY = 'auto';
+          checkboxGroup.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>';
+          
+          div.appendChild(checkboxGroup);
+          
+          // Criar campo hidden para armazenar os valores
+          input = document.createElement('input');
+          input.type = 'hidden';
+          input.id = `campo_${col}`;
+          div.appendChild(input);
+          
+          // Buscar opções assincronamente
+          (async () => {
+            try {
+              const response = await fetch(`/listas/api/opcoes/${tabelaAtual}/${col}`);
+              const data = await response.json();
+              const opcoes = data.opcoes || [];
+              
+              checkboxGroup.innerHTML = '';
+              
+              opcoes.forEach(opcao => {
+                const checkDiv = document.createElement('div');
+                checkDiv.className = 'form-check';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'form-check-input';
+                checkbox.value = opcao.value || opcao;
+                checkbox.dataset.campo = col;
+                
+                const checkLabel = document.createElement('label');
+                checkLabel.className = 'form-check-label';
+                checkLabel.textContent = opcao.label || opcao;
+                
+                checkDiv.appendChild(checkbox);
+                checkDiv.appendChild(checkLabel);
+                checkboxGroup.appendChild(checkDiv);
+              });
+            } catch (error) {
+              checkboxGroup.innerHTML = '<div class="text-danger">Erro ao carregar opções</div>';
+              console.error('Erro ao carregar opções:', error);
+            }
+          })();
+          
+          camposDiv.appendChild(div);
+          continue; // Pular o resto do loop
         } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'textarea') {
           // Textarea genérico com suporte a rows configurável
           input = document.createElement('textarea');
@@ -658,30 +733,7 @@
           checkboxGroup.className = 'border rounded p-2';
           checkboxGroup.style.maxHeight = '200px';
           checkboxGroup.style.overflowY = 'auto';
-          
-          const opcoes = configAtual.tipos_campo[`opcoes_${col}`] || [];
-          const valorAtual = registro[col] || '';
-          const selecionados = valorAtual ? valorAtual.split(';') : [];
-          
-          opcoes.forEach(opcao => {
-            const checkDiv = document.createElement('div');
-            checkDiv.className = 'form-check';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.className = 'form-check-input';
-            checkbox.value = opcao.value || opcao;
-            checkbox.checked = selecionados.includes(checkbox.value);
-            checkbox.dataset.campo = col;
-            
-            const checkLabel = document.createElement('label');
-            checkLabel.className = 'form-check-label';
-            checkLabel.textContent = opcao.label || opcao;
-            
-            checkDiv.appendChild(checkbox);
-            checkDiv.appendChild(checkLabel);
-            checkboxGroup.appendChild(checkDiv);
-          });
+          checkboxGroup.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>';
           
           div.appendChild(checkboxGroup);
           
@@ -690,6 +742,46 @@
           input.type = 'hidden';
           input.id = `campo_${col}`;
           div.appendChild(input);
+          
+          // Buscar opções assincronamente
+          const valorAtual = registro[col] || '';
+          const selecionados = valorAtual ? valorAtual.split(';') : [];
+          
+          (async () => {
+            try {
+              const response = await fetch(`/listas/api/opcoes/${tabelaAtual}/${col}`);
+              const data = await response.json();
+              const opcoes = data.opcoes || [];
+              
+              checkboxGroup.innerHTML = '';
+              
+              opcoes.forEach(opcao => {
+                const checkDiv = document.createElement('div');
+                checkDiv.className = 'form-check';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'form-check-input';
+                checkbox.value = opcao.value || opcao;
+                checkbox.checked = selecionados.includes(checkbox.value);
+                checkbox.dataset.campo = col;
+                
+                const checkLabel = document.createElement('label');
+                checkLabel.className = 'form-check-label';
+                checkLabel.textContent = opcao.label || opcao;
+                
+                checkDiv.appendChild(checkbox);
+                checkDiv.appendChild(checkLabel);
+                checkboxGroup.appendChild(checkDiv);
+              });
+            } catch (error) {
+              checkboxGroup.innerHTML = '<div class="text-danger">Erro ao carregar opções</div>';
+              console.error('Erro ao carregar opções:', error);
+            }
+          })();
+          
+          camposDiv.appendChild(div);
+          continue; // Pular o resto do loop
         } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'textarea') {
           // Textarea genérico com suporte a rows configurável
           input = document.createElement('textarea');

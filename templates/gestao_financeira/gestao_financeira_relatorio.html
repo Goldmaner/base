@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Acompanhamento - Gestão Financeira</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body { 
+            background: linear-gradient(135deg, #20c997 0%, #198754 100%); 
+            min-height: 100vh; 
+            padding: 20px; 
+        }
+        .main-container { 
+            max-width: 1800px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 15px; 
+            padding: 30px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+        }
+        .btn-voltar {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+        }
+        .btn-voltar:hover {
+            background-color: #5a6268;
+            color: white;
+        }
+        .btn-novo {
+            background-color: #20c997;
+            color: white;
+            border: none;
+        }
+        .btn-novo:hover {
+            background-color: #1aa179;
+            color: white;
+        }
+        
+        /* Filtros */
+        .filtros-container {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        /* Tabela editável */
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .table-editable {
+            font-size: 0.9rem;
+        }
+        .table-editable thead th {
+            position: sticky;
+            top: 0;
+            background-color: #198754;
+            color: white;
+            z-index: 10;
+            font-weight: 600;
+            text-align: center;
+            vertical-align: middle;
+            border: 1px solid #146c43;
+            padding: 12px 8px;
+        }
+        .table-editable tbody td {
+            vertical-align: middle;
+            padding: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .table-editable tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        /* Campos editáveis */
+        .campo-editavel {
+            border: 1px solid transparent;
+            padding: 4px 8px;
+            border-radius: 4px;
+            min-height: 32px;
+            cursor: text;
+            transition: all 0.2s;
+        }
+        .campo-editavel:hover {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+        }
+        .campo-editavel:focus {
+            outline: none;
+            background-color: #fff;
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        /* Select status */
+        .select-status {
+            width: 100%;
+            padding: 4px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .select-status:focus {
+            border-color: #0d6efd;
+            outline: none;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        /* Feedback de salvamento */
+        .saving-feedback {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            padding: 12px 20px;
+            border-radius: 8px;
+            background-color: #198754;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* Badge responsável */
+        .badge-responsavel {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+        }
+        
+        /* Alinhamentos */
+        .text-center-cell {
+            text-align: center !important;
+        }
+        .text-right-cell {
+            text-align: right !important;
+        }
+        
+        /* Input number customizado */
+        input[type="number"].campo-numero {
+            text-align: right;
+            width: 100%;
+            border: 1px solid transparent;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        input[type="number"].campo-numero:hover {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+        }
+        input[type="number"].campo-numero:focus {
+            outline: none;
+            background-color: #fff;
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        /* Textarea observações */
+        textarea.campo-textarea {
+            width: 100%;
+            min-height: 50px;
+            border: 1px solid transparent;
+            padding: 4px 8px;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        textarea.campo-textarea:hover {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+        }
+        textarea.campo-textarea:focus {
+            outline: none;
+            background-color: #fff;
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        /* Botões de ação */
+        .btn-acao {
+            padding: 4px 8px;
+            font-size: 0.85rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-ver {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .btn-ver:hover {
+            background-color: #0b5ed7;
+        }
+        .btn-excluir {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-excluir:hover {
+            background-color: #bb2d3b;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Cabeçalho -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">
+                <i class="bi bi-graph-up-arrow me-2"></i>Relatório de Acompanhamento de Empenhos
+            </h2>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('gestao_financeira.encaminhamento') }}" class="btn btn-novo">
+                    <i class="bi bi-plus-circle me-2"></i>Novo Encaminhamento
+                </a>
+                <a href="{{ url_for('gestao_financeira.index') }}" class="btn btn-voltar">
+                    <i class="bi bi-arrow-left me-2"></i>Voltar
+                </a>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filtros-container">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-search me-2"></i>Filtrar por Termo
+                    </label>
+                    <input type="text" class="form-control" id="filtroTermo" placeholder="Digite o número do termo...">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-person me-2"></i>Filtrar por Responsável
+                    </label>
+                    <input type="text" class="form-control" id="filtroResponsavel" placeholder="Digite o nome...">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-funnel me-2"></i>Filtrar por Status
+                    </label>
+                    <select class="form-select" id="filtroStatus">
+                        <option value="">Todos os Status</option>
+                        <option value="DEOF: Enviado para empenho">DEOF: Enviado para empenho</option>
+                        <option value="Empenhado">Empenhado</option>
+                        <option value="Empenhado Parcialmente">Empenhado Parcialmente</option>
+                        <option value="Enviado, mas não empenhado">Enviado, mas não empenhado</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <button class="btn btn-primary" onclick="carregarDados()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Aplicar Filtros
+                    </button>
+                    <button class="btn btn-secondary ms-2" onclick="limparFiltros()">
+                        <i class="bi bi-x-circle me-2"></i>Limpar Filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela Editável -->
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered table-editable" id="tabelaRelatorio">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th style="width: 60px;">Adit.</th>
+                        <th style="width: 100px;">Parcela</th>
+                        <th style="width: 250px;">Número do Termo</th>
+                        <th style="width: 180px;">Responsável</th>
+                        <th style="width: 260px;">Status</th>
+                        <th style="width: 100px;">NE 2023</th>
+                        <th style="width: 120px;">SEI NE 2023</th>
+                        <th style="width: 100px;">NE 2024</th>
+                        <th style="width: 120px;">SEI NE 2024</th>
+                        <th style="width: 120px;">Total Emp. 23</th>
+                        <th style="width: 120px;">Total Emp. 24</th>
+                        <th style="width: 250px;">Observações</th>
+                        <th style="width: 120px;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="corpoTabela">
+                    <!-- Dados carregados via AJAX -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Indicador de carregamento -->
+        <div class="text-center py-5" id="loadingIndicator" style="display: none;">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="mt-2 text-muted">Carregando dados...</p>
+        </div>
+
+        <!-- Mensagem quando vazio -->
+        <div class="text-center py-5" id="mensagemVazio" style="display: none;">
+            <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+            <p class="mt-3 text-muted">Nenhum registro encontrado</p>
+            <a href="{{ url_for('gestao_financeira.encaminhamento') }}" class="btn btn-success mt-2">
+                <i class="bi bi-plus-circle me-2"></i>Criar Primeiro Encaminhamento
+            </a>
+        </div>
+    </div>
+
+    <!-- Feedback de salvamento -->
+    <div class="saving-feedback" id="savingFeedback">
+        <i class="bi bi-check-circle me-2"></i>Salvo automaticamente
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let debounceTimer = null;
+
+        // Carregar dados ao iniciar página
+        $(document).ready(function() {
+            carregarDados();
+        });
+
+        // Função para carregar dados da API
+        function carregarDados() {
+            const termo = $('#filtroTermo').val();
+            const responsavel = $('#filtroResponsavel').val();
+            const status = $('#filtroStatus').val();
+
+            $('#loadingIndicator').show();
+            $('#mensagemVazio').hide();
+            $('#tabelaRelatorio tbody').empty();
+
+            $.ajax({
+                url: '{{ url_for("gestao_financeira.api_relatorio_empenhos") }}',
+                method: 'GET',
+                data: {
+                    termo: termo,
+                    responsavel: responsavel,
+                    status: status
+                },
+                success: function(response) {
+                    $('#loadingIndicator').hide();
+                    
+                    if (response.success && response.data.length > 0) {
+                        renderizarTabela(response.data);
+                    } else {
+                        $('#mensagemVazio').show();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $('#loadingIndicator').hide();
+                    alert('Erro ao carregar dados: ' + error);
+                }
+            });
+        }
+
+        // Renderizar tabela
+        function renderizarTabela(dados) {
+            const tbody = $('#corpoTabela');
+            tbody.empty();
+
+            dados.forEach(function(registro) {
+                const tr = $('<tr>').attr('data-id', registro.id);
+
+                // # (Número sequencial)
+                tr.append($('<td>').addClass('text-center-cell').text(registro.numero));
+
+                // Aditivo
+                tr.append($('<td>').addClass('text-center-cell').text(registro.aditivo));
+
+                // Parcela (numero_parcela + tipo_parcela)
+                const parcelaTexto = registro.numero_parcela && registro.tipo_parcela 
+                    ? `${registro.numero_parcela} (${registro.tipo_parcela})`
+                    : registro.numero_parcela || '-';
+                tr.append($('<td>').addClass('text-center-cell').text(parcelaTexto));
+
+                // Número do Termo
+                tr.append($('<td>').text(registro.numero_termo));
+
+                // Responsável
+                tr.append($('<td>').html(
+                    `<span class="badge bg-info badge-responsavel">${registro.responsavel}</span>`
+                ));
+
+                // Status (select editável)
+                const selectStatus = $('<select>')
+                    .addClass('select-status')
+                    .attr('data-campo', 'status')
+                    .html(`
+                        <option value="DEOF: Enviado para empenho" ${registro.status === 'DEOF: Enviado para empenho' ? 'selected' : ''}>DEOF: Enviado para empenho</option>
+                        <option value="Empenhado" ${registro.status === 'Empenhado' ? 'selected' : ''}>Empenhado</option>
+                        <option value="Empenhado Parcialmente" ${registro.status === 'Empenhado Parcialmente' ? 'selected' : ''}>Empenhado Parcialmente</option>
+                        <option value="Enviado, mas não empenhado" ${registro.status === 'Enviado, mas não empenhado' ? 'selected' : ''}>Enviado, mas não empenhado</option>
+                    `)
+                    .on('change', function() {
+                        salvarCampo(registro.id, 'status', $(this).val());
+                    });
+                tr.append($('<td>').append(selectStatus));
+
+                // NE 2023 (number)
+                const inputNE23 = $('<input>')
+                    .attr('type', 'number')
+                    .addClass('campo-numero')
+                    .attr('data-campo', 'nota_empenho_23')
+                    .val(registro.nota_empenho_23 || '')
+                    .on('blur', function() {
+                        salvarCampo(registro.id, 'nota_empenho_23', $(this).val());
+                    });
+                tr.append($('<td>').append(inputNE23));
+
+                // SEI NE 2023 (text)
+                const inputSEI23 = $('<input>')
+                    .attr('type', 'text')
+                    .addClass('campo-editavel')
+                    .attr('data-campo', 'sei_nota_empenho_23')
+                    .val(registro.sei_nota_empenho_23)
+                    .on('blur', function() {
+                        salvarCampo(registro.id, 'sei_nota_empenho_23', $(this).val());
+                    });
+                tr.append($('<td>').append(inputSEI23));
+
+                // NE 2024 (number)
+                const inputNE24 = $('<input>')
+                    .attr('type', 'number')
+                    .addClass('campo-numero')
+                    .attr('data-campo', 'nota_empenho_24')
+                    .val(registro.nota_empenho_24 || '')
+                    .on('blur', function() {
+                        salvarCampo(registro.id, 'nota_empenho_24', $(this).val());
+                    });
+                tr.append($('<td>').append(inputNE24));
+
+                // SEI NE 2024 (text)
+                const inputSEI24 = $('<input>')
+                    .attr('type', 'text')
+                    .addClass('campo-editavel')
+                    .attr('data-campo', 'sei_nota_empenho_24')
+                    .val(registro.sei_nota_empenho_24)
+                    .on('blur', function() {
+                        salvarCampo(registro.id, 'sei_nota_empenho_24', $(this).val());
+                    });
+                tr.append($('<td>').append(inputSEI24));
+
+                // Total Empenhado 23 (number com decimais)
+                const inputTotal23 = $('<input>')
+                    .attr('type', 'number')
+                    .attr('step', '0.01')
+                    .addClass('campo-numero')
+                    .attr('data-campo', 'total_empenhado_23')
+                    .val(registro.total_empenhado_23 || '')
+                    .on('blur', function() {
+                        salvarCampo(registro.id, 'total_empenhado_23', $(this).val());
+                    });
+                tr.append($('<td>').append(inputTotal23));
+
+                // Total Empenhado 24 (number com decimais)
+                const inputTotal24 = $('<input>')
+                    .attr('type', 'number')
+                    .attr('step', '0.01')
+                    .addClass('campo-numero')
+                    .attr('data-campo', 'total_empenhado_24')
+                    .val(registro.total_empenhado_24 || '')
+                    .on('blur', function() {
+                        salvarCampo(registro.id, 'total_empenhado_24', $(this).val());
+                    });
+                tr.append($('<td>').append(inputTotal24));
+
+                // Observações (textarea)
+                const textareaObs = $('<textarea>')
+                    .addClass('campo-textarea')
+                    .attr('data-campo', 'observacoes')
+                    .attr('rows', '2')
+                    .val(registro.observacoes)
+                    .on('blur', function() {
+                        salvarCampo(registro.id, 'observacoes', $(this).val());
+                    });
+                tr.append($('<td>').append(textareaObs));
+
+                // Ações
+                const tdAcoes = $('<td>').addClass('text-center-cell');
+                
+                // Botão Ver Encaminhamento
+                const btnVer = $('<button>')
+                    .addClass('btn-acao btn-ver me-1')
+                    .attr('title', 'Ver Encaminhamento')
+                    .html('<i class="bi bi-eye"></i>')
+                    .on('click', function() {
+                        verEncaminhamento(registro.numero_termo, registro.numero);
+                    });
+                
+                // Botão Excluir
+                const btnExcluir = $('<button>')
+                    .addClass('btn-acao btn-excluir')
+                    .attr('title', 'Excluir Registro')
+                    .html('<i class="bi bi-trash"></i>')
+                    .on('click', function() {
+                        excluirRegistro(registro.id);
+                    });
+                
+                tdAcoes.append(btnVer).append(btnExcluir);
+                tr.append(tdAcoes);
+
+                tbody.append(tr);
+            });
+        }
+
+        // Salvar campo com debounce
+        function salvarCampo(id, campo, valor) {
+            // Limpar timeout anterior
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+            }
+
+            // Criar novo timeout
+            debounceTimer = setTimeout(function() {
+                $.ajax({
+                    url: `/gestao_financeira/api/atualizar-empenho/${id}`,
+                    method: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        campo: campo,
+                        valor: valor
+                    }),
+                    success: function(response) {
+                        if (response.success) {
+                            mostrarFeedback();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Erro ao salvar: ' + error);
+                    }
+                });
+            }, 500); // 500ms de delay
+        }
+
+        // Mostrar feedback de salvamento
+        function mostrarFeedback() {
+            const feedback = $('#savingFeedback');
+            feedback.fadeIn(300);
+            
+            setTimeout(function() {
+                feedback.fadeOut(300);
+            }, 2000);
+        }
+
+        // Limpar filtros
+        function limparFiltros() {
+            $('#filtroTermo').val('');
+            $('#filtroResponsavel').val('');
+            $('#filtroStatus').val('');
+            carregarDados();
+        }
+
+        // Enter nos filtros carrega dados
+        $('#filtroTermo, #filtroResponsavel').on('keypress', function(e) {
+            if (e.which === 13) {
+                carregarDados();
+            }
+        });
+
+        // Ver Encaminhamento
+        function verEncaminhamento(numeroTermo, numeroSeq) {
+            // Abrir em nova aba com o número sequencial do relatório
+            const url = `/gestao_financeira/ver-encaminhamento?termo=${encodeURIComponent(numeroTermo)}&numero=${numeroSeq}`;
+            window.open(url, '_blank');
+        }
+
+        // Excluir Registro
+        function excluirRegistro(id) {
+            if (!confirm('Tem certeza que deseja excluir este registro?\n\nEsta ação não pode ser desfeita.')) {
+                return;
+            }
+
+            $.ajax({
+                url: `/gestao_financeira/api/excluir-empenho/${id}`,
+                method: 'DELETE',
+                success: function(response) {
+                    if (response.success) {
+                        // Remover linha da tabela
+                        $(`tr[data-id="${id}"]`).fadeOut(300, function() {
+                            $(this).remove();
+                            
+                            // Verificar se tabela ficou vazia
+                            if ($('#corpoTabela tr').length === 0) {
+                                $('#mensagemVazio').show();
+                            }
+                        });
+                        
+                        mostrarFeedback('Registro excluído com sucesso', 'success');
+                    } else {
+                        alert('Erro ao excluir: ' + response.error);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert('Erro ao excluir: ' + error);
+                }
+            });
+        }
+
+        // Mostrar feedback customizado
+        function mostrarFeedback(mensagem = 'Salvo automaticamente', tipo = 'success') {
+            const feedback = $('#savingFeedback');
+            const icon = tipo === 'success' ? 'check-circle' : 'exclamation-circle';
+            feedback.html(`<i class="bi bi-${icon} me-2"></i>${mensagem}`);
+            feedback.fadeIn(300);
+            
+            setTimeout(function() {
+                feedback.fadeOut(300);
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

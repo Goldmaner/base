@@ -385,9 +385,114 @@ def nova():
             
             if resultado_insert:
                 print("[DEBUG NOVA] INSERT bem-sucedido! Processando auditoria...")
+                numero_termo = request.form.get('numero_termo')
+                
+                # === SALVAR INFORMAÇÕES ADICIONAIS ===
+                try:
+                    # Verificar se já existe registro
+                    cur_check = get_cursor()
+                    cur_check.execute(
+                        "SELECT id FROM public.parcerias_infos_adicionais WHERE numero_termo = %s",
+                        (numero_termo,)
+                    )
+                    exists = cur_check.fetchone()
+                    cur_check.close()
+                    
+                    if exists:
+                        # Atualizar registro existente
+                        infos_query = """
+                            UPDATE public.parcerias_infos_adicionais SET
+                                parceria_responsavel_legal = %s,
+                                parceria_objeto = %s,
+                                parceria_beneficiarios_diretos = %s,
+                                parceria_beneficiarios_indiretos = %s,
+                                parceria_justificativa_projeto = %s,
+                                parceria_abrangencia_projeto = %s,
+                                parceria_data_suspensao = %s,
+                                parceria_data_retomada = %s
+                            WHERE numero_termo = %s
+                        """
+                        infos_params = (
+                            request.form.get('parceria_responsavel_legal') or None,
+                            request.form.get('parceria_objeto') or None,
+                            request.form.get('parceria_beneficiarios_diretos') or None,
+                            request.form.get('parceria_beneficiarios_indiretos') or None,
+                            request.form.get('parceria_justificativa_projeto') or None,
+                            request.form.get('parceria_abrangencia_projeto') or None,
+                            request.form.get('parceria_data_suspensao') or None,
+                            request.form.get('parceria_data_retomada') or None,
+                            numero_termo
+                        )
+                    else:
+                        # Inserir novo registro
+                        infos_query = """
+                            INSERT INTO public.parcerias_infos_adicionais (
+                                numero_termo, parceria_responsavel_legal, parceria_objeto,
+                                parceria_beneficiarios_diretos, parceria_beneficiarios_indiretos,
+                                parceria_justificativa_projeto, parceria_abrangencia_projeto,
+                                parceria_data_suspensao, parceria_data_retomada
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """
+                        infos_params = (
+                            numero_termo,
+                            request.form.get('parceria_responsavel_legal') or None,
+                            request.form.get('parceria_objeto') or None,
+                            request.form.get('parceria_beneficiarios_diretos') or None,
+                            request.form.get('parceria_beneficiarios_indiretos') or None,
+                            request.form.get('parceria_justificativa_projeto') or None,
+                            request.form.get('parceria_abrangencia_projeto') or None,
+                            request.form.get('parceria_data_suspensao') or None,
+                            request.form.get('parceria_data_retomada') or None
+                        )
+                    
+                    execute_query(infos_query, infos_params)
+                    print(f"[DEBUG NOVA] Informações adicionais salvas para {numero_termo}")
+                except Exception as e:
+                    print(f"[ERRO] Falha ao salvar informações adicionais: {e}")
+                
+                # === SALVAR ENDEREÇOS ===
+                try:
+                    # Deletar endereços existentes (caso seja uma atualização)
+                    delete_enderecos = "DELETE FROM public.parcerias_enderecos WHERE numero_termo = %s"
+                    execute_query(delete_enderecos, (numero_termo,))
+                    
+                    # Verificar se projeto é online
+                    projeto_online = request.form.get('projeto_online') == 'on'
+                    
+                    if not projeto_online:
+                        # Pegar todos os endereços (arrays do formulário)
+                        logradouros = request.form.getlist('parceria_logradouro[]')
+                        numeros = request.form.getlist('parceria_numero[]')
+                        complementos = request.form.getlist('parceria_complemento[]')
+                        ceps = request.form.getlist('parceria_cep[]')
+                        distritos = request.form.getlist('parceria_distrito[]')
+                        observacoes = request.form.getlist('observacao[]')
+                        
+                        # Inserir cada endereço
+                        for idx, logradouro in enumerate(logradouros):
+                            if logradouro:  # Só insere se logradouro foi preenchido
+                                endereco_query = """
+                                    INSERT INTO public.parcerias_enderecos (
+                                        numero_termo, parceria_logradouro, parceria_complemento, parceria_numero,
+                                        parceria_cep, parceria_distrito, observacao
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                """
+                                endereco_params = (
+                                    numero_termo,
+                                    logradouro,
+                                    complementos[idx] if idx < len(complementos) else None,
+                                    numeros[idx] if idx < len(numeros) else None,
+                                    ceps[idx] if idx < len(ceps) else None,
+                                    distritos[idx] if idx < len(distritos) else None,
+                                    observacoes[idx] if idx < len(observacoes) else None
+                                )
+                                execute_query(endereco_query, endereco_params)
+                        
+                        print(f"[DEBUG NOVA] {len(logradouros)} endereço(s) salvo(s) para {numero_termo}")
+                except Exception as e:
+                    print(f"[ERRO] Falha ao salvar endereços: {e}")
                 
                 # Salvar/atualizar termo_sei_doc em parcerias_sei se fornecido
-                numero_termo = request.form.get('numero_termo')
                 termo_sei_doc = request.form.get('termo_sei_doc', '').strip()
                 
                 if termo_sei_doc:
@@ -506,6 +611,11 @@ def nova():
         'cnpj': ''  # Será preenchido via JavaScript no frontend
     }
     
+    # Buscar informações adicionais e endereços (vazios para nova)
+    infos_adicionais = {}
+    enderecos = []
+    projeto_online = False
+    
     return render_template("parcerias_form.html", 
                          parceria=parceria_preenchida,
                          tipos_contrato=tipos_contrato,
@@ -513,6 +623,9 @@ def nova():
                          pessoas_gestoras=pessoas_gestoras,
                          rf_pessoa_gestora=None,
                          termo_sei_doc=termo_sei_doc,
+                         infos_adicionais=infos_adicionais,
+                         enderecos=enderecos,
+                         projeto_online=projeto_online,
                          modo_importacao=True if numero_termo_param else False)
 
 
@@ -612,6 +725,111 @@ def editar(numero_termo):
             )
             
             if execute_query(query, params):
+                # === SALVAR INFORMAÇÕES ADICIONAIS ===
+                try:
+                    # Verificar se já existe registro
+                    cur_check = get_cursor()
+                    cur_check.execute(
+                        "SELECT id FROM public.parcerias_infos_adicionais WHERE numero_termo = %s",
+                        (numero_termo,)
+                    )
+                    exists = cur_check.fetchone()
+                    cur_check.close()
+                    
+                    if exists:
+                        # Atualizar registro existente
+                        infos_query = """
+                            UPDATE public.parcerias_infos_adicionais SET
+                                parceria_responsavel_legal = %s,
+                                parceria_objeto = %s,
+                                parceria_beneficiarios_diretos = %s,
+                                parceria_beneficiarios_indiretos = %s,
+                                parceria_justificativa_projeto = %s,
+                                parceria_abrangencia_projeto = %s,
+                                parceria_data_suspensao = %s,
+                                parceria_data_retomada = %s
+                            WHERE numero_termo = %s
+                        """
+                        infos_params = (
+                            request.form.get('parceria_responsavel_legal') or None,
+                            request.form.get('parceria_objeto') or None,
+                            request.form.get('parceria_beneficiarios_diretos') or None,
+                            request.form.get('parceria_beneficiarios_indiretos') or None,
+                            request.form.get('parceria_justificativa_projeto') or None,
+                            request.form.get('parceria_abrangencia_projeto') or None,
+                            request.form.get('parceria_data_suspensao') or None,
+                            request.form.get('parceria_data_retomada') or None,
+                            numero_termo
+                        )
+                    else:
+                        # Inserir novo registro
+                        infos_query = """
+                            INSERT INTO public.parcerias_infos_adicionais (
+                                numero_termo, parceria_responsavel_legal, parceria_objeto,
+                                parceria_beneficiarios_diretos, parceria_beneficiarios_indiretos,
+                                parceria_justificativa_projeto, parceria_abrangencia_projeto,
+                                parceria_data_suspensao, parceria_data_retomada
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """
+                        infos_params = (
+                            numero_termo,
+                            request.form.get('parceria_responsavel_legal') or None,
+                            request.form.get('parceria_objeto') or None,
+                            request.form.get('parceria_beneficiarios_diretos') or None,
+                            request.form.get('parceria_beneficiarios_indiretos') or None,
+                            request.form.get('parceria_justificativa_projeto') or None,
+                            request.form.get('parceria_abrangencia_projeto') or None,
+                            request.form.get('parceria_data_suspensao') or None,
+                            request.form.get('parceria_data_retomada') or None
+                        )
+                    
+                    execute_query(infos_query, infos_params)
+                    print(f"[DEBUG EDITAR] Informações adicionais salvas para {numero_termo}")
+                except Exception as e:
+                    print(f"[ERRO] Falha ao salvar informações adicionais: {e}")
+                
+                # === SALVAR ENDEREÇOS ===
+                try:
+                    # Deletar endereços existentes
+                    delete_enderecos = "DELETE FROM public.parcerias_enderecos WHERE numero_termo = %s"
+                    execute_query(delete_enderecos, (numero_termo,))
+                    
+                    # Verificar se projeto é online
+                    projeto_online = request.form.get('projeto_online') == 'on'
+                    
+                    if not projeto_online:
+                        # Pegar todos os endereços (arrays do formulário)
+                        logradouros = request.form.getlist('parceria_logradouro[]')
+                        numeros = request.form.getlist('parceria_numero[]')
+                        complementos = request.form.getlist('parceria_complemento[]')
+                        ceps = request.form.getlist('parceria_cep[]')
+                        distritos = request.form.getlist('parceria_distrito[]')
+                        observacoes = request.form.getlist('observacao[]')
+                        
+                        # Inserir cada endereço
+                        for idx, logradouro in enumerate(logradouros):
+                            if logradouro:  # Só insere se logradouro foi preenchido
+                                endereco_query = """
+                                    INSERT INTO public.parcerias_enderecos (
+                                        numero_termo, parceria_logradouro, parceria_complemento, parceria_numero,
+                                        parceria_cep, parceria_distrito, observacao
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                """
+                                endereco_params = (
+                                    numero_termo,
+                                    logradouro,
+                                    complementos[idx] if idx < len(complementos) else None,
+                                    numeros[idx] if idx < len(numeros) else None,
+                                    ceps[idx] if idx < len(ceps) else None,
+                                    distritos[idx] if idx < len(distritos) else None,
+                                    observacoes[idx] if idx < len(observacoes) else None
+                                )
+                                execute_query(endereco_query, endereco_params)
+                        
+                        print(f"[DEBUG EDITAR] {len(logradouros)} endereço(s) salvo(s) para {numero_termo}")
+                except Exception as e:
+                    print(f"[ERRO] Falha ao salvar endereços: {e}")
+                
                 # Salvar/atualizar termo_sei_doc em parcerias_sei se fornecido
                 termo_sei_doc = request.form.get('termo_sei_doc', '').strip()
                 
@@ -805,6 +1023,34 @@ def editar(numero_termo):
     except Exception as e:
         print(f"[ERRO] Falha ao buscar termo_sei_doc em editar: {e}")
     
+    # Buscar informações adicionais
+    cur.execute("""
+        SELECT parceria_responsavel_legal, parceria_objeto, parceria_beneficiarios_diretos, 
+               parceria_beneficiarios_indiretos, parceria_justificativa_projeto, 
+               parceria_abrangencia_projeto, parceria_data_suspensao, parceria_data_retomada
+        FROM public.parcerias_infos_adicionais
+        WHERE numero_termo = %s
+    """, (numero_termo,))
+    infos_result = cur.fetchone()
+    infos_adicionais = dict(infos_result) if infos_result else {}
+    
+    # Buscar endereços
+    cur.execute("""
+        SELECT e.id, e.parceria_logradouro, e.parceria_numero, e.parceria_complemento, 
+               e.parceria_cep, e.parceria_distrito, e.observacao,
+               r.distrito as distrito_nome, r.subprefeitura, r.regiao
+        FROM public.parcerias_enderecos e
+        LEFT JOIN categoricas.c_geral_regionalizacao r ON e.parceria_distrito = r.codigo_distrital
+        WHERE e.numero_termo = %s
+        ORDER BY e.id
+    """, (numero_termo,))
+    enderecos = cur.fetchall()
+    
+    # Verificar se é projeto online
+    projeto_online = False
+    if enderecos and len(enderecos) == 1 and enderecos[0].get('observacao') == 'Projeto Online':
+        projeto_online = True
+    
     cur.close()
     
     return render_template("parcerias_form.html", 
@@ -814,6 +1060,9 @@ def editar(numero_termo):
                          pessoas_gestoras=pessoas_gestoras,
                          rf_pessoa_gestora=rf_pessoa_gestora,
                          termo_sei_doc=termo_sei_doc,
+                         infos_adicionais=infos_adicionais,
+                         enderecos=enderecos,
+                         projeto_online=projeto_online,
                          termo_rescindido=termo_rescindido,
                          data_rescisao=data_rescisao)
 
@@ -1901,9 +2150,15 @@ def dgp_alteracoes():
     cur = get_cursor()
     
     try:
-        # Buscar tipos de alteração com seus instrumentos
+        # Buscar tipos de alteração com seus instrumentos e configurações de campo
         cur.execute("""
-            SELECT alt_tipo, alt_instrumento 
+            SELECT 
+                alt_tipo, 
+                alt_instrumento,
+                alt_campo_tipo,
+                alt_campo_placeholder,
+                alt_campo_maxlength,
+                alt_campo_min
             FROM categoricas.c_alt_tipo 
             ORDER BY alt_tipo
         """)
@@ -1932,17 +2187,50 @@ def dgp_alteracoes():
             # Fallback para lista estática se tabela não existir
             analistas_dgp = ['Administrador', 'Sistema']
         
-        # Buscar alterações cadastradas (agrupadas por número do termo)
-        cur.execute("""
+        # Buscar alterações cadastradas com filtros
+        filtro_termo = request.args.get('filtro_termo', '').strip()
+        filtro_instrumento = request.args.get('filtro_instrumento', '').strip()
+        filtro_tipos = request.args.getlist('filtro_tipos[]')
+        filtro_responsavel = request.args.get('filtro_responsavel', '').strip()
+        
+        # Construir query base
+        query_base = """
             SELECT 
                 numero_termo,
                 instrumento_alteracao,
                 alt_numero,
-                string_agg(DISTINCT alt_tipo, ', ' ORDER BY alt_tipo) as tipos_alteracao
+                string_agg(DISTINCT alt_tipo, ', ' ORDER BY alt_tipo) as tipos_alteracao,
+                MAX(alt_responsavel) as responsavel
             FROM public.termos_alteracoes
+            WHERE 1=1
+        """
+        
+        params = []
+        
+        # Aplicar filtros
+        if filtro_termo:
+            query_base += " AND numero_termo ILIKE %s"
+            params.append(f"%{filtro_termo}%")
+        
+        if filtro_instrumento:
+            query_base += " AND instrumento_alteracao = %s"
+            params.append(filtro_instrumento)
+        
+        if filtro_tipos:
+            placeholders = ','.join(['%s'] * len(filtro_tipos))
+            query_base += f" AND alt_tipo IN ({placeholders})"
+            params.extend(filtro_tipos)
+        
+        if filtro_responsavel:
+            query_base += " AND alt_responsavel LIKE %s"
+            params.append(f"%{filtro_responsavel}%")
+        
+        query_base += """
             GROUP BY numero_termo, instrumento_alteracao, alt_numero
             ORDER BY numero_termo
-        """)
+        """
+        
+        cur.execute(query_base, params)
         alteracoes = cur.fetchall()
         
         cur.close()
@@ -2069,7 +2357,9 @@ def salvar_alteracao():
         instrumento_alteracao = request.form.get('instrumento_alteracao', '').strip()
         alt_numero = int(request.form.get('alt_numero', 0))
         alt_status = request.form.get('alt_status', '').strip()
-        alt_responsavel = request.form.get('alt_responsavel', '').strip()
+        # Múltiplos responsáveis concatenados com ;
+        alt_responsaveis = request.form.getlist('alt_responsavel[]')
+        alt_responsavel = ';'.join([r.strip() for r in alt_responsaveis if r.strip()])
         alt_observacao = request.form.get('alt_observacao', '').strip()
         
         # Validar campos obrigatórios
@@ -2161,6 +2451,8 @@ def _capturar_valor_antigo(cur, numero_termo, alt_tipo):
     """
     Captura o valor antigo da tabela original antes de atualizar
     """
+    import json
+    
     try:
         mapa = {
             'Nome do projeto': ('public.parcerias', 'projeto'),
@@ -2184,6 +2476,39 @@ def _capturar_valor_antigo(cur, numero_termo, alt_tipo):
             'Quantidade de beneficiários indiretos': ('public.parcerias_infos_adicionais', 'parceria_beneficiarios_indiretos'),
         }
         
+        # Caso especial para Localização do projeto - capturar todos os endereços
+        if alt_tipo == 'Localização do projeto':
+            cur.execute("""
+                SELECT 
+                    id,
+                    parceria_logradouro,
+                    parceria_numero,
+                    parceria_complemento,
+                    parceria_cep,
+                    parceria_distrito,
+                    observacao
+                FROM public.parcerias_enderecos
+                WHERE numero_termo = %s
+                ORDER BY id
+            """, (numero_termo,))
+            
+            enderecos = cur.fetchall()
+            if enderecos:
+                # Serializar como JSON
+                dados_enderecos = []
+                for end in enderecos:
+                    dados_enderecos.append({
+                        'id': end['id'],
+                        'parceria_logradouro': end['parceria_logradouro'],
+                        'parceria_numero': end['parceria_numero'],
+                        'parceria_complemento': end['parceria_complemento'],
+                        'parceria_cep': end['parceria_cep'],
+                        'parceria_distrito': end['parceria_distrito'],
+                        'observacao': end['observacao']
+                    })
+                return json.dumps(dados_enderecos, ensure_ascii=False)
+            return None
+        
         if alt_tipo not in mapa:
             return None
         
@@ -2197,9 +2522,9 @@ def _capturar_valor_antigo(cur, numero_termo, alt_tipo):
             if row:
                 return f"{row[col1]}|{row[col2]}" if row[col1] and row[col2] else None
         else:
-            # Caso especial para pessoa gestora
+            # Caso especial para pessoa gestora - pegar a mais recente
             if tabela == 'public.parcerias_pg':
-                cur.execute(f"SELECT {coluna} FROM {tabela} WHERE numero_termo = %s AND vigente = TRUE LIMIT 1", (numero_termo,))
+                cur.execute(f"SELECT {coluna} FROM {tabela} WHERE numero_termo = %s ORDER BY data_de_criacao DESC LIMIT 1", (numero_termo,))
             else:
                 cur.execute(f"SELECT {coluna} FROM {tabela} WHERE numero_termo = %s", (numero_termo,))
             
@@ -2240,11 +2565,10 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info):
             """, (alt_info, numero_termo))
         
         elif alt_tipo == 'Pessoa gestora indicada pela administração pública':
-            # Desativar a atual e criar nova
-            cur.execute("UPDATE public.parcerias_pg SET vigente = FALSE WHERE numero_termo = %s", (numero_termo,))
+            # Inserir nova pessoa gestora (histórico mantido por data_de_criacao)
             cur.execute("""
-                INSERT INTO public.parcerias_pg (numero_termo, nome_pg, vigente)
-                VALUES (%s, %s, TRUE)
+                INSERT INTO public.parcerias_pg (numero_termo, nome_pg)
+                VALUES (%s, %s)
             """, (numero_termo, alt_info))
         
         elif alt_tipo == 'Objeto da parceria':
@@ -2322,6 +2646,75 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info):
                 SET parceria_beneficiarios_indiretos = %s 
                 WHERE numero_termo = %s
             """, (int(alt_info), numero_termo))
+        
+        elif alt_tipo == 'Localização do projeto':
+            # Atualizar endereços - alt_info contém JSON com array de endereços
+            import json
+            
+            try:
+                enderecos_novos = json.loads(alt_info)
+                
+                # IDs dos endereços que devem permanecer
+                ids_manter = [end['id'] for end in enderecos_novos if end.get('id') and isinstance(end['id'], int)]
+                
+                # Deletar endereços que não estão na nova lista (foram removidos)
+                if ids_manter:
+                    placeholders = ','.join(['%s'] * len(ids_manter))
+                    cur.execute(f"""
+                        DELETE FROM public.parcerias_enderecos 
+                        WHERE numero_termo = %s AND id NOT IN ({placeholders})
+                    """, (numero_termo, *ids_manter))
+                else:
+                    # Se não há IDs para manter, deletar todos
+                    cur.execute("DELETE FROM public.parcerias_enderecos WHERE numero_termo = %s", (numero_termo,))
+                
+                # Processar cada endereço
+                for endereco in enderecos_novos:
+                    endereco_id = endereco.get('id')
+                    
+                    if endereco_id and isinstance(endereco_id, int):
+                        # UPDATE endereço existente
+                        cur.execute("""
+                            UPDATE public.parcerias_enderecos SET
+                                parceria_logradouro = %s,
+                                parceria_numero = %s,
+                                parceria_complemento = %s,
+                                parceria_cep = %s,
+                                parceria_distrito = %s,
+                                observacao = %s
+                            WHERE id = %s AND numero_termo = %s
+                        """, (
+                            endereco.get('parceria_logradouro'),
+                            endereco.get('parceria_numero'),
+                            endereco.get('parceria_complemento'),
+                            endereco.get('parceria_cep'),
+                            endereco.get('parceria_distrito'),
+                            endereco.get('observacao'),
+                            endereco_id,
+                            numero_termo
+                        ))
+                    else:
+                        # INSERT novo endereço
+                        cur.execute("""
+                            INSERT INTO public.parcerias_enderecos (
+                                numero_termo, parceria_logradouro, parceria_numero,
+                                parceria_complemento, parceria_cep, parceria_distrito, observacao
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            numero_termo,
+                            endereco.get('parceria_logradouro'),
+                            endereco.get('parceria_numero'),
+                            endereco.get('parceria_complemento'),
+                            endereco.get('parceria_cep'),
+                            endereco.get('parceria_distrito'),
+                            endereco.get('observacao')
+                        ))
+                
+                print(f"[INFO] {len(enderecos_novos)} endereço(s) atualizado(s) para {numero_termo}")
+                
+            except json.JSONDecodeError as je:
+                print(f"[ERRO] Erro ao decodificar JSON de endereços: {str(je)}")
+                raise
         
         print(f"[INFO] Tabela original atualizada para {alt_tipo}: {alt_info}")
         
@@ -2432,7 +2825,9 @@ def atualizar_alteracao():
         instrumento_alteracao = request.form.get('instrumento_alteracao', '').strip()
         alt_numero = int(request.form.get('alt_numero', 0))
         alt_status = request.form.get('alt_status', '').strip()
-        alt_responsavel = request.form.get('alt_responsavel', '').strip()
+        # Múltiplos responsáveis concatenados com ;
+        alt_responsaveis = request.form.getlist('alt_responsavel[]')
+        alt_responsavel = ';'.join([r.strip() for r in alt_responsaveis if r.strip()])
         alt_observacao = request.form.get('alt_observacao', '').strip()
         
         # Validar campos obrigatórios
@@ -2564,3 +2959,141 @@ def deletar_alteracao():
         get_db().rollback()
         flash(f'Erro ao deletar alteração: {str(e)}', 'danger')
         return redirect(url_for('parcerias.dgp_alteracoes'))
+
+
+# ========== APIs para Informações Adicionais e Endereços ==========
+
+@parcerias_bp.route("/api/distritos", methods=["GET"])
+@login_required
+@requires_access('parcerias')
+def api_distritos():
+    """
+    API para buscar distritos de c_geral_regionalizacao
+    Retorna lista para Select2
+    """
+    q = request.args.get('q', '').strip()
+    
+    cur = get_cursor()
+    
+    try:
+        if q:
+            cur.execute("""
+                SELECT DISTINCT codigo_distrital, distrito, subprefeitura, regiao
+                FROM categoricas.c_geral_regionalizacao
+                WHERE distrito ILIKE %s
+                ORDER BY distrito
+                LIMIT 50
+            """, (f'%{q}%',))
+        else:
+            cur.execute("""
+                SELECT DISTINCT codigo_distrital, distrito, subprefeitura, regiao
+                FROM categoricas.c_geral_regionalizacao
+                ORDER BY distrito
+                LIMIT 50
+            """)
+        
+        distritos = cur.fetchall()
+        
+        # Formatar para Select2
+        resultado = []
+        for row in distritos:
+            resultado.append({
+                'id': row['codigo_distrital'],
+                'text': row['distrito'],
+                'subprefeitura': row['subprefeitura'],
+                'regiao': row['regiao']
+            })
+        
+        cur.close()
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar distritos: {str(e)}")
+        return jsonify([]), 500
+
+
+@parcerias_bp.route("/api/distrito-info/<codigo>", methods=["GET"])
+@login_required
+@requires_access('parcerias')
+def api_distrito_info(codigo):
+    """
+    API para buscar informações de um distrito específico
+    Retorna subprefeitura e região
+    """
+    cur = get_cursor()
+    
+    try:
+        cur.execute("""
+            SELECT DISTINCT distrito, subprefeitura, regiao
+            FROM categoricas.c_geral_regionalizacao
+            WHERE codigo_distrital = %s
+            LIMIT 1
+        """, (codigo,))
+        
+        info = cur.fetchone()
+        cur.close()
+        
+        if info:
+            return jsonify({
+                'success': True,
+                'distrito': info['distrito'],
+                'subprefeitura': info['subprefeitura'],
+                'regiao': info['regiao']
+            })
+        else:
+            return jsonify({'success': False}), 404
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar info do distrito: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@parcerias_bp.route("/api/enderecos/<numero_termo>", methods=["GET"])
+@login_required
+@requires_access('parcerias')
+def api_enderecos_termo(numero_termo):
+    """
+    API para buscar todos os endereços de um termo
+    Usado na alteração "Localização do projeto"
+    """
+    cur = get_cursor()
+    
+    try:
+        cur.execute("""
+            SELECT 
+                id,
+                parceria_logradouro,
+                parceria_numero,
+                parceria_complemento,
+                parceria_cep,
+                parceria_distrito,
+                observacao
+            FROM public.parcerias_enderecos
+            WHERE numero_termo = %s
+            ORDER BY id
+        """, (numero_termo,))
+        
+        enderecos = cur.fetchall()
+        cur.close()
+        
+        # Converter para lista de dicionários
+        resultado = []
+        for end in enderecos:
+            resultado.append({
+                'id': end['id'],
+                'parceria_logradouro': end['parceria_logradouro'] or '',
+                'parceria_numero': end['parceria_numero'] or '',
+                'parceria_complemento': end['parceria_complemento'] or '',
+                'parceria_cep': end['parceria_cep'] or '',
+                'parceria_distrito': end['parceria_distrito'] or '',
+                'observacao': end['observacao'] or ''
+            })
+        
+        return jsonify({
+            'success': True,
+            'enderecos': resultado
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar endereços: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500

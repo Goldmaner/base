@@ -78,22 +78,7 @@
 
         <!-- Menu de Opções -->
         <div class="row g-4">
-            <!-- Card 1: Reservas e Empenhos -->
-            <div class="col-md-6 col-lg-4">
-                <a href="{{ url_for('gestao_financeira.reservas_empenhos') }}" class="text-decoration-none">
-                    <div class="card menu-card">
-                        <div class="card-body text-center p-4">
-                            <i class="bi bi-journal-check menu-icon"></i>
-                            <h5 class="menu-title">Reservas e Empenhos</h5>
-                            <p class="menu-description">
-                                Acompanhamento de reservas orçamentárias e notas de empenho por parcela
-                            </p>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Card 2: Encaminhamento Reservas e Empenhos -->
+            <!-- Card 1: Encaminhamento Reservas e Empenhos -->
             <div class="col-md-6 col-lg-4">
                 <a href="{{ url_for('gestao_financeira.encaminhamento') }}" class="text-decoration-none">
                     <div class="card menu-card">
@@ -102,6 +87,21 @@
                             <h5 class="menu-title">Encaminhamento Reservas e Empenhos</h5>
                             <p class="menu-description">
                                 Gerar documentos de encaminhamento automático para reservas e empenhos
+                            </p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Card 2: Relatório de Acompanhamento -->
+            <div class="col-md-6 col-lg-4">
+                <a href="{{ url_for('gestao_financeira.relatorio_empenhos') }}" class="text-decoration-none">
+                    <div class="card menu-card">
+                        <div class="card-body text-center p-4">
+                            <i class="bi bi-graph-up-arrow menu-icon" style="color: #0d6efd;"></i>
+                            <h5 class="menu-title">Relatório de Acompanhamento</h5>
+                            <p class="menu-description">
+                                Acompanhamento de status e valores empenhados por parcela
                             </p>
                         </div>
                     </div>
