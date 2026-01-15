@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gestão de Férias - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      padding: 20px; 
+    }
+    .header-section { 
+      background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+      color: white;
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .form-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table th { 
+      background-color: #6f42c1; 
+      color: white; 
+      white-space: nowrap; 
+    }
+    .badge-dias {
+      font-size: 0.9rem;
+      padding: 5px 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="bi bi-calendar-check"></i> Gestão de Férias</h2>
+          <p class="mb-0">Controle de férias dos colaboradores</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalCriar">
+            <i class="bi bi-plus-circle"></i> Cadastrar Férias
+          </button>
+          <a href="{{ url_for('ferias.calendario') }}" class="btn btn-warning">
+            <i class="bi bi-calendar-event"></i> Ver Calendário
+          </a>
+          <a href="{{ url_for('main.index') }}" class="btn btn-light">
+            <i class="bi bi-arrow-left"></i> Voltar para Início
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensagens Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Seção de Filtros -->
+    <div class="form-section mb-3">
+      <h5 class="mb-3">
+        <button class="btn btn-link text-decoration-none p-0 d-flex align-items-center" type="button" 
+                data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" 
+                aria-expanded="false" aria-controls="filtrosCollapse">
+          <i class="bi bi-funnel me-2"></i> Filtros
+          <i class="bi bi-chevron-down ms-2" id="filtrosChevron"></i>
+        </button>
+      </h5>
+      <div class="collapse" id="filtrosCollapse">
+        <form method="GET" action="{{ url_for('ferias.listar') }}" id="formFiltros">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label for="filtro_nome" class="form-label">Nome do Colaborador</label>
+              <select class="form-select" id="filtro_nome" name="filtro_nome" onchange="this.form.submit()">
+                <option value="">-- Todos --</option>
+                {% for nome in nomes_disponiveis %}
+                  <option value="{{ nome }}" {{ 'selected' if request.args.get('filtro_nome') == nome }}>
+                    {{ nome }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label for="filtro_d_usuario" class="form-label">Registro</label>
+              <input type="text" class="form-control" id="filtro_d_usuario" name="filtro_d_usuario" 
+                     value="{{ request.args.get('filtro_d_usuario', '') }}" placeholder="Ex: d843702"
+                     onchange="this.form.submit()">
+            </div>
+            {% if mostrar_tipo_agente %}
+            <div class="col-md-3">
+              <label for="filtro_tipo_agente" class="form-label">Tipo de Agente</label>
+              <select class="form-select" id="filtro_tipo_agente" name="filtro_tipo_agente" onchange="this.form.submit()">
+                <option value="">-- Todos --</option>
+                {% for tipo in tipos_agente_disponiveis %}
+                  <option value="{{ tipo }}" {{ 'selected' if request.args.get('filtro_tipo_agente') == tipo }}>
+                    {{ tipo }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            <div class="col-md-{{ '2' if mostrar_tipo_agente else '3' }}">
+              <label for="filtro_ano" class="form-label">Ano</label>
+              <select class="form-select" id="filtro_ano" name="filtro_ano" onchange="this.form.submit()">
+                <option value="">-- Todos --</option>
+                {% for ano in anos_disponiveis %}
+                  <option value="{{ ano }}" {{ 'selected' if request.args.get('filtro_ano')|string == ano|string }}>
+                    {{ ano }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <a href="{{ url_for('ferias.listar') }}" class="btn btn-secondary w-100">
+                <i class="bi bi-x-circle"></i> Limpar
+              </a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tabela de Férias -->
+    <div class="table-section">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">
+          <i class="bi bi-table"></i> Férias Cadastradas
+          <span class="badge bg-primary">{{ total_count if total_count else 0 }}</span>
+        </h4>
+        <div class="d-flex align-items-center gap-3">
+          <a href="{{ url_for('ferias.exportar_csv') }}?{{ request.query_string.decode('utf-8') }}" 
+             class="btn btn-success">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+          </a>
+          {% if total_pages > 1 %}
+          <div class="text-muted">
+            Página {{ page }} de {{ total_pages }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if ferias %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped">
+            <thead>
+              <tr>
+                <th style="width: {{ '9%' if mostrar_tipo_agente else '10%' }};">Registro</th>
+                <th style="width: {{ '19%' if mostrar_tipo_agente else '24%' }};">Nome</th>
+                {% if mostrar_tipo_agente %}
+                <th style="width: 10%;">Tipo de Agente</th>
+                {% endif %}
+                <th style="width: 9%;">Início Férias</th>
+                <th style="width: 9%;">Fim Férias</th>
+                <th style="width: 7%;">Dias</th>
+                <th style="width: 11%;">Período Aquisitivo Início</th>
+                <th style="width: 11%;">Período Aquisitivo Fim</th>
+                <th style="width: 10%;" class="text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in ferias %}
+                <tr>
+                  <td><code>{{ f.d_usuario }}</code></td>
+                  <td><strong>{{ f.nome_completo }}</strong></td>
+                  {% if mostrar_tipo_agente %}
+                  <td>
+                    <span class="badge bg-info">{{ f.tipo_usuario or '-' }}</span>
+                  </td>
+                  {% endif %}
+                  <td>{{ f.ferias_inicio.strftime('%d/%m/%Y') if f.ferias_inicio else '-' }}</td>
+                  <td>{{ f.ferias_fim.strftime('%d/%m/%Y') if f.ferias_fim else '-' }}</td>
+                  <td class="text-center">
+                    <span class="badge badge-dias {% if f.dias_ferias >= 20 %}bg-success{% elif f.dias_ferias >= 10 %}bg-info{% else %}bg-secondary{% endif %}">
+                      {{ f.dias_ferias }} dias
+                    </span>
+                  </td>
+                  <td>{{ f.aquisitivo_inicio.strftime('%d/%m/%Y') if f.aquisitivo_inicio else '-' }}</td>
+                  <td>{{ f.aquisitivo_fim.strftime('%d/%m/%Y') if f.aquisitivo_fim else '-' }}</td>
+                  <td class="text-center">
+                    <button class="btn btn-sm btn-warning me-1" 
+                            onclick="editarFerias({{ f.id }}, '{{ f.d_usuario }}', '{{ f.nome_completo }}', '{{ f.ferias_inicio }}', '{{ f.ferias_fim }}', '{{ f.aquisitivo_inicio }}', '{{ f.aquisitivo_fim }}')"
+                            title="Editar">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" 
+                            onclick="confirmarExclusao({{ f.id }}, '{{ f.nome_completo }}')"
+                            title="Excluir">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Paginação -->
+        {% if total_pages > 1 %}
+        <nav aria-label="Navegação de páginas" class="mt-4">
+          <ul class="pagination justify-content-center">
+            <!-- Botão Primeira Página -->
+            <li class="page-item {{ 'disabled' if page == 1 else '' }}">
+              <a class="page-link" href="{{ url_for('ferias.listar', page=1, **request.args) }}">
+                <i class="bi bi-chevron-double-left"></i>
+              </a>
+            </li>
+            
+            <!-- Botão Anterior -->
+            <li class="page-item {{ 'disabled' if page == 1 else '' }}">
+              <a class="page-link" href="{{ url_for('ferias.listar', page=page-1, **request.args) }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+            
+            <!-- Números de Página -->
+            {% set start_page = [1, page - 2]|max %}
+            {% set end_page = [total_pages, page + 2]|min %}
+            
+            {% if start_page > 1 %}
+              <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+            
+            {% for p in range(start_page, end_page + 1) %}
+              <li class="page-item {{ 'active' if p == page else '' }}">
+                <a class="page-link" href="{{ url_for('ferias.listar', page=p, **request.args) }}">{{ p }}</a>
+              </li>
+            {% endfor %}
+            
+            {% if end_page < total_pages %}
+              <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+            
+            <!-- Botão Próximo -->
+            <li class="page-item {{ 'disabled' if page == total_pages else '' }}">
+              <a class="page-link" href="{{ url_for('ferias.listar', page=page+1, **request.args) }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+            
+            <!-- Botão Última Página -->
+            <li class="page-item {{ 'disabled' if page == total_pages else '' }}">
+              <a class="page-link" href="{{ url_for('ferias.listar', page=total_pages, **request.args) }}">
+                <i class="bi bi-chevron-double-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Nenhuma férias cadastrada ainda.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Modal de Criar Férias -->
+  <div class="modal fade" id="modalCriar" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title">
+            <i class="bi bi-plus-circle"></i> Cadastrar Novo Período de Férias
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form method="POST" action="{{ url_for('ferias.criar') }}">
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="criar_d_usuario" class="form-label">
+                  <i class="bi bi-card-text"></i> Registro (D-Usuário) *
+                </label>
+                <select class="form-select" id="criar_d_usuario" name="d_usuario" required>
+                  <option value="">-- Selecione --</option>
+                  {% for usuario in usuarios_disponiveis %}
+                    <option value="{{ usuario.d_usuario }}" title="{{ usuario.email }}">
+                      {{ usuario.d_usuario }} ({{ usuario.email }})
+                    </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">Selecione o registro do colaborador</small>
+              </div>
+              <div class="col-md-6">
+                <label for="criar_nome_completo" class="form-label">
+                  <i class="bi bi-person"></i> Nome Completo *
+                </label>
+                <input type="text" class="form-control" id="criar_nome_completo" name="nome_completo" 
+                       placeholder="Nome completo do colaborador" required>
+              </div>
+              <div class="col-md-6">
+                <label for="criar_ferias_inicio" class="form-label">
+                  <i class="bi bi-calendar-check"></i> Início das Férias *
+                </label>
+                <input type="date" class="form-control" id="criar_ferias_inicio" name="ferias_inicio" required>
+              </div>
+              <div class="col-md-6">
+                <label for="criar_ferias_fim" class="form-label">
+                  <i class="bi bi-calendar-x"></i> Fim das Férias *
+                </label>
+                <input type="date" class="form-control" id="criar_ferias_fim" name="ferias_fim" required>
+              </div>
+              <div class="col-md-6">
+                <label for="criar_aquisitivo_inicio" class="form-label">
+                  <i class="bi bi-calendar3"></i> Período Aquisitivo Início *
+                </label>
+                <input type="date" class="form-control" id="criar_aquisitivo_inicio" name="aquisitivo_inicio" required>
+              </div>
+              <div class="col-md-6">
+                <label for="criar_aquisitivo_fim" class="form-label">
+                  <i class="bi bi-calendar3"></i> Período Aquisitivo Fim *
+                </label>
+                <input type="date" class="form-control" id="criar_aquisitivo_fim" name="aquisitivo_fim" required>
+              </div>
+            </div>
+            <small class="text-muted d-block mt-3">
+              <i class="bi bi-info-circle"></i> Todos os campos são obrigatórios
+            </small>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="bi bi-x-circle"></i> Cancelar
+            </button>
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-check-circle"></i> Cadastrar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Editar Férias -->
+  <div class="modal fade" id="modalEditar" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-warning">
+          <h5 class="modal-title">
+            <i class="bi bi-pencil"></i> Editar Período de Férias
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form method="POST" id="formEditar">
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="editar_d_usuario" class="form-label">
+                  <i class="bi bi-card-text"></i> Registro (D-Usuário) *
+                </label>
+                <select class="form-select" id="editar_d_usuario" name="d_usuario" required>
+                  <option value="">-- Selecione --</option>
+                  {% for usuario in usuarios_disponiveis %}
+                    <option value="{{ usuario.d_usuario }}" title="{{ usuario.email }}">
+                      {{ usuario.d_usuario }} ({{ usuario.email }})
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="editar_nome_completo" class="form-label">
+                  <i class="bi bi-person"></i> Nome Completo *
+                </label>
+                <input type="text" class="form-control" id="editar_nome_completo" name="nome_completo" required>
+              </div>
+              <div class="col-md-6">
+                <label for="editar_ferias_inicio" class="form-label">
+                  <i class="bi bi-calendar-check"></i> Início das Férias *
+                </label>
+                <input type="date" class="form-control" id="editar_ferias_inicio" name="ferias_inicio" required>
+              </div>
+              <div class="col-md-6">
+                <label for="editar_ferias_fim" class="form-label">
+                  <i class="bi bi-calendar-x"></i> Fim das Férias *
+                </label>
+                <input type="date" class="form-control" id="editar_ferias_fim" name="ferias_fim" required>
+              </div>
+              <div class="col-md-6">
+                <label for="editar_aquisitivo_inicio" class="form-label">
+                  <i class="bi bi-calendar3"></i> Período Aquisitivo Início *
+                </label>
+                <input type="date" class="form-control" id="editar_aquisitivo_inicio" name="aquisitivo_inicio" required>
+              </div>
+              <div class="col-md-6">
+                <label for="editar_aquisitivo_fim" class="form-label">
+                  <i class="bi bi-calendar3"></i> Período Aquisitivo Fim *
+                </label>
+                <input type="date" class="form-control" id="editar_aquisitivo_fim" name="aquisitivo_fim" required>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="bi bi-x-circle"></i> Cancelar
+            </button>
+            <button type="submit" class="btn btn-warning">
+              <i class="bi bi-check-circle"></i> Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmação de Exclusão -->
+  <div class="modal fade" id="modalExcluir" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">
+            <i class="bi bi-exclamation-triangle"></i> Confirmar Exclusão
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Tem certeza que deseja excluir as férias de:</p>
+          <div class="alert alert-warning">
+            <strong id="nomeExcluir"></strong>
+          </div>
+          <p class="text-muted small">Esta ação não pode ser desfeita.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <form method="POST" id="formExcluir" style="display: inline;">
+            <button type="submit" class="btn btn-danger">
+              <i class="bi bi-trash"></i> Confirmar Exclusão
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Animar ícone de colapso dos filtros
+    document.getElementById('filtrosCollapse').addEventListener('show.bs.collapse', function() {
+      document.getElementById('filtrosChevron').classList.remove('bi-chevron-down');
+      document.getElementById('filtrosChevron').classList.add('bi-chevron-up');
+    });
+    document.getElementById('filtrosCollapse').addEventListener('hide.bs.collapse', function() {
+      document.getElementById('filtrosChevron').classList.remove('bi-chevron-up');
+      document.getElementById('filtrosChevron').classList.add('bi-chevron-down');
+    });
+    
+    // Função para editar férias
+    function editarFerias(id, dUsuario, nome, inicioFerias, fimFerias, inicioAquis, fimAquis) {
+      document.getElementById('editar_d_usuario').value = dUsuario;
+      document.getElementById('editar_nome_completo').value = nome;
+      document.getElementById('editar_ferias_inicio').value = inicioFerias;
+      document.getElementById('editar_ferias_fim').value = fimFerias;
+      document.getElementById('editar_aquisitivo_inicio').value = inicioAquis;
+      document.getElementById('editar_aquisitivo_fim').value = fimAquis;
+      
+      document.getElementById('formEditar').action = `/ferias/editar/${id}`;
+      
+      new bootstrap.Modal(document.getElementById('modalEditar')).show();
+    }
+    
+    // Função para confirmar exclusão
+    function confirmarExclusao(id, nome) {
+      document.getElementById('nomeExcluir').textContent = nome;
+      document.getElementById('formExcluir').action = `/ferias/deletar/${id}`;
+      
+      new bootstrap.Modal(document.getElementById('modalExcluir')).show();
+    }
+  </script>
+</body>
+</html>

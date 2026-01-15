@@ -18,7 +18,7 @@ def index():
     """
     # Buscar dados do usuário para exibir nome / tipo
     cur = get_cursor()
-    cur.execute("SELECT id, email, tipo_usuario, data_criacao, acessos FROM usuarios WHERE id = %s", (session["user_id"],))
+    cur.execute("SELECT id, email, tipo_usuario, data_criacao, acessos FROM gestao_pessoas.usuarios WHERE id = %s", (session["user_id"],))
     user = cur.fetchone()
     cur.close()
     

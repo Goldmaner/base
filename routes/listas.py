@@ -411,6 +411,23 @@ TABELAS_CONFIG = {
             'opcoes_status_pg': ['Ativo', 'Inativo', 'Desconhecido']
         }
     },
+    'c_dp_status_edital': {
+        'nome': 'DP: Status de Edital',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['status', 'descricao'],
+        'colunas_obrigatorias': ['status'],
+        'labels': {
+            'status': 'Status',
+            'descricao': 'Descrição'
+        },
+        'colunas_filtro': ['status'],
+        'ordem': 'status',
+        'tipos_campo': {
+            'status': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3
+        }
+    },
     'c_dac_responsabilidade_analise': {
         'nome': 'DAC: Responsabilidades de Análise',
         'schema': 'categoricas',
@@ -708,6 +725,34 @@ TABELAS_CONFIG = {
         },
         'inline_edit': True,
         'inline_columns': ['status']
+    },
+    'c_geral_vereadores': {
+        'nome': 'Geral: Vereadores e Legislaturas',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['vereador_nome', 'partido', 'legislatura_inicio', 'legislatura_fim', 'legislatura_numero', 'situacao'],
+        'labels': {
+            'vereador_nome': 'Nome do Vereador',
+            'partido': 'Partido',
+            'legislatura_inicio': 'Início da Legislatura',
+            'legislatura_fim': 'Fim da Legislatura',
+            'legislatura_numero': 'Nº Legislatura',
+            'situacao': 'Situação'
+        },
+        'colunas_filtro': ['vereador_nome', 'partido', 'situacao', 'legislatura_numero'],
+        'ordem': 'legislatura_numero DESC NULLS LAST, vereador_nome',
+        'tipos_campo': {
+            'legislatura_inicio': 'date',
+            'legislatura_fim': 'date',
+            'legislatura_numero': 'select',
+            'opcoes_legislatura_numero': ['19', '18', '17', '16', '15'],
+            'auto_fill_legislatura': {
+                '17': {'inicio': '2017-01-01', 'fim': '2020-12-31'},
+                '18': {'inicio': '2021-01-01', 'fim': '2024-12-31'},
+                '19': {'inicio': '2025-01-01', 'fim': '2028-12-31'}
+            },
+            'situacao': 'select',
+            'opcoes_situacao': ['Ativo', 'Suplente', 'Mandato Encerrado', 'Licenciado']
+        }
     }
 }
 
@@ -772,6 +817,12 @@ def obter_dados(tabela):
                 # Converter valores booleanos para formato frontend
                 valor = row[col]
                 item[col] = converter_valor_para_frontend(valor, col)
+                
+                # Formatar datas para formato brasileiro (DD/MM/YYYY)
+                if col in ['legislatura_inicio', 'legislatura_fim'] and valor:
+                    from datetime import date, datetime
+                    if isinstance(valor, (date, datetime)):
+                        item[col] = valor.strftime('%d/%m/%Y')
             resultado.append(item)
         
         # Se for pessoa_gestora, adicionar contagem de pareceres e parcerias

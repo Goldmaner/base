@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Futuros Aditamentos de Prorrogação - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      padding: 20px; 
+    }
+    .header-section { 
+      background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+      color: white;
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .form-section { 
+      background: #fff; 
+      padding: 25px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table thead { 
+      background-color: #ff9800; 
+      color: white; 
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .table-container {
+      max-height: 70vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    
+    /* Degradê de urgência nas linhas */
+    .urgencia-vencido {
+      background: linear-gradient(to right, #dc3545 0%, #ff6b6b 100%) !important;
+      color: white;
+      font-weight: bold;
+    }
+    .urgencia-vencido td {
+      color: white !important;
+    }
+    .urgencia-critico {
+      background: linear-gradient(to right, #ff6b6b 0%, #ff8787 100%) !important;
+    }
+    .urgencia-alto {
+      background: linear-gradient(to right, #ffc107 0%, #ffd454 100%) !important;
+    }
+    .urgencia-medio {
+      background: linear-gradient(to right, #ffd454 0%, #fff3cd 100%) !important;
+    }
+    .urgencia-baixo {
+      background-color: #d1e7dd !important;
+    }
+    .urgencia-sem_data {
+      background-color: #e9ecef !important;
+      color: #6c757d;
+    }
+    
+    .badge-urgencia {
+      font-size: 0.75rem;
+      padding: 0.35em 0.65em;
+      font-weight: 600;
+    }
+    
+    .legenda-urgencia {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    
+    .legenda-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .legenda-cor {
+      width: 30px;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid #dee2e6;
+    }
+    
+    .stats-card {
+      text-align: center;
+      padding: 20px;
+      border-radius: 8px;
+      color: white;
+      margin-bottom: 20px;
+    }
+    
+    .stats-card h3 {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .stats-card.vencidos {
+      background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    }
+    
+    .stats-card.criticos {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ff4757 100%);
+    }
+    
+    .stats-card.altos {
+      background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    }
+    
+    .stats-card.total {
+      background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="bi bi-calendar-event"></i> Futuros Aditamentos de Prorrogação de Vigência</h2>
+          <p class="mb-0">Gerenciamento de aditamentos de prorrogação pendentes (ACC, TCL e Convênios)</p>
+        </div>
+        <div>
+          <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="btn btn-light">
+            <i class="bi bi-arrow-left"></i> Voltar para Alterações
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <div class="stats-card vencidos">
+          <h3>{{ parcerias|selectattr('urgencia', 'equalto', 'vencido')|list|length }}</h3>
+          <p class="mb-0">Vencidos</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stats-card criticos">
+          <h3>{{ parcerias|selectattr('urgencia', 'equalto', 'critico')|list|length }}</h3>
+          <p class="mb-0">Críticos (≤30 dias)</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stats-card altos">
+          <h3>{{ parcerias|selectattr('urgencia', 'equalto', 'alto')|list|length }}</h3>
+          <p class="mb-0">Altos (31-60 dias)</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stats-card total">
+          <h3>{{ parcerias|length }}</h3>
+          <p class="mb-0">Total de Termos</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legenda de Urgência -->
+    <div class="legenda-urgencia">
+      <strong><i class="bi bi-info-circle"></i> Legenda de Urgência:</strong>
+      <div class="legenda-item">
+        <div class="legenda-cor" style="background: linear-gradient(to right, #dc3545, #ff6b6b);"></div>
+        <span><strong>Vencido</strong> (prazo expirado)</span>
+      </div>
+      <div class="legenda-item">
+        <div class="legenda-cor" style="background: linear-gradient(to right, #ff6b6b, #ff8787);"></div>
+        <span><strong>Crítico</strong> (≤ 30 dias)</span>
+      </div>
+      <div class="legenda-item">
+        <div class="legenda-cor" style="background: linear-gradient(to right, #ffc107, #ffd454);"></div>
+        <span><strong>Alto</strong> (31-60 dias)</span>
+      </div>
+      <div class="legenda-item">
+        <div class="legenda-cor" style="background: linear-gradient(to right, #ffd454, #fff3cd);"></div>
+        <span><strong>Médio</strong> (61-90 dias)</span>
+      </div>
+      <div class="legenda-item">
+        <div class="legenda-cor" style="background-color: #d1e7dd;"></div>
+        <span><strong>Baixo</strong> (> 90 dias)</span>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="form-section">
+      <h5 class="mb-3">
+        <button class="btn btn-link text-decoration-none p-0 d-flex align-items-center" type="button" 
+                data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" 
+                aria-expanded="false" aria-controls="filtrosCollapse">
+          <i class="bi bi-funnel me-2"></i> Filtros
+          <i class="bi bi-chevron-down ms-2" id="filtrosChevron"></i>
+        </button>
+      </h5>
+      <div class="collapse" id="filtrosCollapse">
+        <form method="GET" action="{{ url_for('parcerias.dgp_alteracoes_futuro') }}" id="formFiltros">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">Nome da OSC</label>
+              <input type="text" class="form-control" name="filtro_osc" 
+                     value="{{ filtro_osc }}" placeholder="Digite o nome da OSC">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Coordenação</label>
+              <select class="form-select" name="filtro_coordenacao">
+                <option value="">Todas</option>
+                {% for coord in coordenacoes %}
+                  <option value="{{ coord }}" {% if filtro_coordenacao == coord %}selected{% endif %}>
+                    {{ coord }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Tipo de Contrato</label>
+              <select class="form-select" name="filtro_tipo_termo">
+                <option value="">Todos</option>
+                <option value="Cooperação" {% if filtro_tipo_termo == 'Cooperação' %}selected{% endif %}>
+                  Acordo de Cooperação
+                </option>
+                <option value="Colaboração" {% if filtro_tipo_termo == 'Colaboração' %}selected{% endif %}>
+                  Termo de Colaboração
+                </option>
+                <option value="Convênio" {% if filtro_tipo_termo == 'Convênio' %}selected{% endif %}>
+                  Convênio
+                </option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Nível de Urgência</label>
+              <select class="form-select" name="filtro_urgencia">
+                <option value="">Todos</option>
+                <option value="vencido" {% if filtro_urgencia == 'vencido' %}selected{% endif %}>
+                  🔴 Vencido
+                </option>
+                <option value="critico" {% if filtro_urgencia == 'critico' %}selected{% endif %}>
+                  🟠 Crítico (≤30 dias)
+                </option>
+                <option value="alto" {% if filtro_urgencia == 'alto' %}selected{% endif %}>
+                  🟡 Alto (31-60 dias)
+                </option>
+                <option value="medio" {% if filtro_urgencia == 'medio' %}selected{% endif %}>
+                  🟢 Médio (61-90 dias)
+                </option>
+                <option value="baixo" {% if filtro_urgencia == 'baixo' %}selected{% endif %}>
+                  ⚪ Baixo (>90 dias)
+                </option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Mês de Término</label>
+              <select class="form-select" name="filtro_mes">
+                <option value="">Todos</option>
+                <option value="1" {% if filtro_mes == '1' %}selected{% endif %}>Janeiro</option>
+                <option value="2" {% if filtro_mes == '2' %}selected{% endif %}>Fevereiro</option>
+                <option value="3" {% if filtro_mes == '3' %}selected{% endif %}>Março</option>
+                <option value="4" {% if filtro_mes == '4' %}selected{% endif %}>Abril</option>
+                <option value="5" {% if filtro_mes == '5' %}selected{% endif %}>Maio</option>
+                <option value="6" {% if filtro_mes == '6' %}selected{% endif %}>Junho</option>
+                <option value="7" {% if filtro_mes == '7' %}selected{% endif %}>Julho</option>
+                <option value="8" {% if filtro_mes == '8' %}selected{% endif %}>Agosto</option>
+                <option value="9" {% if filtro_mes == '9' %}selected{% endif %}>Setembro</option>
+                <option value="10" {% if filtro_mes == '10' %}selected{% endif %}>Outubro</option>
+                <option value="11" {% if filtro_mes == '11' %}selected{% endif %}>Novembro</option>
+                <option value="12" {% if filtro_mes == '12' %}selected{% endif %}>Dezembro</option>
+              </select>
+            </div>
+            <div class="col-md-1">
+              <label class="form-label">Ano</label>
+              <input type="number" class="form-control" name="filtro_ano" 
+                     value="{{ filtro_ano }}" placeholder="2026" min="2020" max="2030">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-search"></i> Filtrar
+              </button>
+            </div>
+          </div>
+          <div class="row mt-2">
+            <div class="col-md-12 text-end">
+              <a href="{{ url_for('parcerias.dgp_alteracoes_futuro') }}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-x-circle"></i> Limpar Filtros
+              </a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tabela de Parcerias -->
+    <div class="table-section">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">
+          <i class="bi bi-table"></i> Termos Pendentes de Prorrogação
+          <span class="badge bg-secondary">{{ parcerias|length }}</span>
+        </h4>
+        <div>
+          <a href="{{ url_for('parcerias.dgp_alteracoes_futuro_csv') }}?{{ request.query_string.decode('utf-8') }}" 
+             class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+          </a>
+        </div>
+      </div>
+
+      {% if parcerias %}
+        <div class="table-container">
+          <table class="table table-hover table-bordered">
+            <thead>
+              <tr>
+                <th style="width: 5%">#</th>
+                <th style="width: 12%">Urgência</th>
+                <th style="width: 15%">Nome da OSC</th>
+                <th style="width: 15%">Projeto</th>
+                <th style="width: 10%">Tipo</th>
+                <th style="width: 12%">Número do Termo</th>
+                <th style="width: 10%">Processo SEI</th>
+                <th style="width: 8%">Início</th>
+                <th style="width: 8%">Término</th>
+                <th style="width: 5%">Coord.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for parceria in parcerias %}
+                <tr class="urgencia-{{ parceria.urgencia }}">
+                  <td class="text-center">{{ loop.index }}</td>
+                  <td class="text-center">
+                    {% if parceria.urgencia == 'vencido' %}
+                      <span class="badge bg-danger badge-urgencia">
+                        🔴 VENCIDO
+                      </span><br>
+                      <small style="{% if parceria.urgencia == 'vencido' %}color: white{% endif %}">
+                        {{ parceria.dias_restantes|abs }} dias atrás
+                      </small>
+                    {% elif parceria.urgencia == 'critico' %}
+                      <span class="badge bg-danger badge-urgencia">
+                        🟠 CRÍTICO
+                      </span><br>
+                      <small>{{ parceria.dias_restantes }} dias</small>
+                    {% elif parceria.urgencia == 'alto' %}
+                      <span class="badge bg-warning badge-urgencia">
+                        🟡 ALTO
+                      </span><br>
+                      <small>{{ parceria.dias_restantes }} dias</small>
+                    {% elif parceria.urgencia == 'medio' %}
+                      <span class="badge bg-info badge-urgencia">
+                        🟢 MÉDIO
+                      </span><br>
+                      <small>{{ parceria.dias_restantes }} dias</small>
+                    {% elif parceria.urgencia == 'baixo' %}
+                      <span class="badge bg-success badge-urgencia">
+                        ⚪ BAIXO
+                      </span><br>
+                      <small>{{ parceria.dias_restantes }} dias</small>
+                    {% else %}
+                      <span class="badge bg-secondary badge-urgencia">
+                        SEM DATA
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>{{ parceria.osc }}</td>
+                  <td>{{ parceria.projeto }}</td>
+                  <td>
+                    {% if 'Cooperação' in parceria.tipo_termo %}
+                      <span class="badge bg-primary">ACC</span>
+                    {% elif 'Colaboração' in parceria.tipo_termo %}
+                      <span class="badge bg-info">TCL</span>
+                    {% elif 'Convênio' in parceria.tipo_termo %}
+                      <span class="badge bg-success">Convênio</span>
+                    {% else %}
+                      {{ parceria.tipo_termo }}
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <small style="font-family: monospace;">{{ parceria.numero_termo }}</small>
+                  </td>
+                  <td class="text-center">
+                    <small style="font-family: monospace;">{{ parceria.sei_celeb or '-' }}</small>
+                  </td>
+                  <td class="text-center">
+                    {{ parceria.inicio.strftime('%d/%m/%Y') if parceria.inicio else '-' }}
+                  </td>
+                  <td class="text-center">
+                    <strong>{{ parceria.final.strftime('%d/%m/%Y') if parceria.final else '-' }}</strong>
+                  </td>
+                  <td class="text-center">
+                    <span class="badge bg-secondary">{{ parceria.coordenacao }}</span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Nenhum termo encontrado com os filtros aplicados.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Animar ícone de colapso dos filtros
+    document.getElementById('filtrosCollapse').addEventListener('show.bs.collapse', function() {
+      document.getElementById('filtrosChevron').classList.remove('bi-chevron-down');
+      document.getElementById('filtrosChevron').classList.add('bi-chevron-up');
+    });
+    document.getElementById('filtrosCollapse').addEventListener('hide.bs.collapse', function() {
+      document.getElementById('filtrosChevron').classList.remove('bi-chevron-up');
+      document.getElementById('filtrosChevron').classList.add('bi-chevron-down');
+    });
+  </script>
+</body>
+</html>

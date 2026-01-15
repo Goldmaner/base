@@ -2,7 +2,7 @@
 Blueprint de orçamento (listagem e edição)
 """
 
-from flask import Blueprint, render_template, request, Response, jsonify
+from flask import Blueprint, render_template, request, Response, jsonify, session
 from db import get_cursor
 from utils import login_required
 from decorators import requires_access
@@ -690,3 +690,95 @@ def exportar_csv():
         return f"Erro ao exportar CSV: {str(e)}", 500
     except Exception as e:
         return jsonify({"error": f"Erro: {str(e)}"}), 500
+
+
+@orcamento_bp.route("/observacoes/<path:numero_termo>", methods=["GET"])
+@login_required
+@requires_access('orcamento')
+def buscar_observacoes(numero_termo):
+    """
+    Buscar observações de um termo específico
+    """
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT observacoes, responsavel, criado_em, atualizado_em
+            FROM public.parcerias_despesas_obs
+            WHERE numero_termo = %s
+            ORDER BY atualizado_em DESC NULLS LAST, criado_em DESC
+            LIMIT 1
+        """, (numero_termo,))
+        
+        resultado = cur.fetchone()
+        cur.close()
+        
+        if resultado:
+            return jsonify({
+                "success": True,
+                "observacoes": resultado["observacoes"],
+                "responsavel": resultado["responsavel"],
+                "criado_em": resultado["criado_em"].isoformat() if resultado["criado_em"] else None,
+                "atualizado_em": resultado["atualizado_em"].isoformat() if resultado["atualizado_em"] else None
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "observacoes": "",
+                "responsavel": None,
+                "criado_em": None,
+                "atualizado_em": None
+            })
+    
+    except Exception as e:
+        return jsonify({"error": f"Erro ao buscar observações: {str(e)}"}), 500
+
+
+@orcamento_bp.route("/observacoes/<path:numero_termo>", methods=["POST"])
+@login_required
+@requires_access('orcamento')
+def salvar_observacoes(numero_termo):
+    """
+    Salvar ou atualizar observações de um termo
+    """
+    try:
+        data = request.get_json()
+        observacoes = data.get('observacoes', '').strip()
+        responsavel = session.get('email', session.get('user_id', 'Desconhecido'))
+        
+        cur = get_cursor()
+        
+        # Verificar se já existe registro para este termo
+        cur.execute("""
+            SELECT id FROM public.parcerias_despesas_obs
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        
+        existe = cur.fetchone()
+        
+        if existe:
+            # Atualizar registro existente
+            cur.execute("""
+                UPDATE public.parcerias_despesas_obs
+                SET observacoes = %s,
+                    atualizado_em = NOW(),
+                    responsavel = %s
+                WHERE numero_termo = %s
+            """, (observacoes, responsavel, numero_termo))
+        else:
+            # Inserir novo registro
+            cur.execute("""
+                INSERT INTO public.parcerias_despesas_obs 
+                (numero_termo, observacoes, responsavel, criado_em)
+                VALUES (%s, %s, %s, NOW())
+            """, (numero_termo, observacoes, responsavel))
+        
+        cur.connection.commit()
+        cur.close()
+        
+        return jsonify({
+            "success": True,
+            "message": "Observações salvas com sucesso!"
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Erro ao salvar observações: {str(e)}"}), 500

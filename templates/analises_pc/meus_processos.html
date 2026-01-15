@@ -140,8 +140,8 @@
                         <!-- Filtros para processos não atribuídos -->
                         <div class="col-md-12" id="filtrosNaoAtribuidos" style="display: none;">
                             <div class="row g-3">
-                                <div class="col-md-4">
-                                    <div class="form-check">
+                                <div class="col-md-3">
+                                    <div class="form-check mt-4">
                                         <input class="form-check-input" type="checkbox" name="ocultar_encerrados" 
                                                id="ocultarEncerrados" value="true" {% if ocultar_encerrados %}checked{% endif %}>
                                         <label class="form-check-label" for="ocultarEncerrados">
@@ -149,7 +149,7 @@
                                         </label>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label for="responsabilidadeFiltro" class="form-label"><strong>Responsabilidade:</strong></label>
                                     <select id="responsabilidadeFiltro" name="responsabilidade" class="form-select">
                                         <option value="">Todas</option>
@@ -158,7 +158,29 @@
                                         <option value="3" {% if responsabilidade_filtro == '3' %}selected{% endif %}>Pessoa Gestora</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
+                                    <label for="tipoContratoFiltro" class="form-label"><strong>Tipo de Contrato:</strong></label>
+                                    <select id="tipoContratoFiltro" name="tipo_contrato" class="form-select">
+                                        <option value="">Todos</option>
+                                        {% for tipo in tipos_contrato %}
+                                        <option value="{{ tipo.tipo_termo }}" {% if filtro_tipo_contrato == tipo.tipo_termo %}selected{% endif %}>
+                                            {{ tipo.tipo_termo }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="areaTematicaFiltro" class="form-label"><strong>Área Temática:</strong></label>
+                                    <select id="areaTematicaFiltro" name="area_tematica" class="form-select">
+                                        <option value="">Todas</option>
+                                        {% for area in areas_tematicas %}
+                                        <option value="{{ area.area_tematica }}" {% if filtro_area_tematica == area.area_tematica %}selected{% endif %}>
+                                            {{ area.area_tematica }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-12">
                                     <label for="filtroTermo" class="form-label"><strong>Nº do Termo:</strong></label>
                                     <input type="text" class="form-control" id="filtroTermo" name="filtro_termo" 
                                            placeholder="Digite o número do termo" value="{{ filtro_termo }}">
@@ -167,10 +189,36 @@
                         </div>
                         
                         <!-- Filtro de termo para processos atribuídos -->
-                        <div class="col-md-6" id="filtroTermoAtribuidos">
-                            <label for="filtroTermoAtrib" class="form-label"><strong>Nº do Termo:</strong></label>
-                            <input type="text" class="form-control" id="filtroTermoAtrib" name="filtro_termo" 
-                                   placeholder="Digite o número do termo" value="{{ filtro_termo }}">
+                        <div class="col-md-12" id="filtroTermoAtribuidos">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="tipoContratoAtrib" class="form-label"><strong>Tipo de Contrato:</strong></label>
+                                    <select id="tipoContratoAtrib" name="tipo_contrato" class="form-select">
+                                        <option value="">Todos</option>
+                                        {% for tipo in tipos_contrato %}
+                                        <option value="{{ tipo.tipo_termo }}" {% if filtro_tipo_contrato == tipo.tipo_termo %}selected{% endif %}>
+                                            {{ tipo.tipo_termo }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="areaTematicaAtrib" class="form-label"><strong>Área Temática:</strong></label>
+                                    <select id="areaTematicaAtrib" name="area_tematica" class="form-select">
+                                        <option value="">Todas</option>
+                                        {% for area in areas_tematicas %}
+                                        <option value="{{ area.area_tematica }}" {% if filtro_area_tematica == area.area_tematica %}selected{% endif %}>
+                                            {{ area.area_tematica }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="filtroTermoAtrib" class="form-label"><strong>Nº do Termo:</strong></label>
+                                    <input type="text" class="form-control" id="filtroTermoAtrib" name="filtro_termo" 
+                                           placeholder="Digite o número do termo" value="{{ filtro_termo }}">
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="col-md-12">
@@ -420,6 +468,22 @@
             document.getElementById('filtroAnalista').style.display = naoAtribuidos ? 'none' : 'block';
             document.getElementById('filtroTermoAtribuidos').style.display = naoAtribuidos ? 'none' : 'block';
             document.getElementById('filtrosNaoAtribuidos').style.display = naoAtribuidos ? 'block' : 'none';
+            
+            // Desabilitar campos ocultos para evitar conflitos no formulário
+            const filtrosNaoAtrib = document.querySelectorAll('#filtrosNaoAtribuidos select, #filtrosNaoAtribuidos input');
+            const filtrosAtrib = document.querySelectorAll('#filtroTermoAtribuidos select, #filtroTermoAtribuidos input, #filtroAnalista select');
+            
+            if (naoAtribuidos) {
+                // Desabilitar filtros de processos atribuídos
+                filtrosAtrib.forEach(campo => campo.disabled = true);
+                // Habilitar filtros de processos não atribuídos
+                filtrosNaoAtrib.forEach(campo => campo.disabled = false);
+            } else {
+                // Habilitar filtros de processos atribuídos
+                filtrosAtrib.forEach(campo => campo.disabled = false);
+                // Desabilitar filtros de processos não atribuídos
+                filtrosNaoAtrib.forEach(campo => campo.disabled = true);
+            }
         }
         
         function abrirModalAtribuir(numeroTermo) {

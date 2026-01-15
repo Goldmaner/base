@@ -571,6 +571,14 @@
           
           div.appendChild(label);
           div.appendChild(input);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'date') {
+          // Campo de data
+          input = document.createElement('input');
+          input.type = 'date';
+          input.className = 'form-control';
+          
+          div.appendChild(label);
+          div.appendChild(input);
         } else {
           input = document.createElement('input');
           input.type = 'text';
@@ -582,9 +590,23 @@
         
         input.id = `campo_${col}`;
         // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto, oculto e solucao
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao'];
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
+        }
+        
+        // Adicionar listener para preenchimento automático de datas baseado na legislatura
+        if (col === 'legislatura_numero' && configAtual.tipos_campo && configAtual.tipos_campo.auto_fill_legislatura) {
+          input.addEventListener('change', function() {
+            const legislatura = this.value;
+            const autoFill = configAtual.tipos_campo.auto_fill_legislatura[legislatura];
+            if (autoFill) {
+              const inputInicio = document.getElementById('campo_legislatura_inicio');
+              const inputFim = document.getElementById('campo_legislatura_fim');
+              if (inputInicio) inputInicio.value = autoFill.inicio;
+              if (inputFim) inputFim.value = autoFill.fim;
+            }
+          });
         }
         
         div.appendChild(label);
@@ -800,6 +822,24 @@
           
           div.appendChild(label);
           div.appendChild(input);
+        } else if (configAtual.tipos_campo && configAtual.tipos_campo[col] === 'date') {
+          // Campo de data
+          input = document.createElement('input');
+          input.type = 'date';
+          input.className = 'form-control';
+          
+          // Converter data brasileira DD/MM/YYYY para formato ISO YYYY-MM-DD
+          let valorData = registro[col] || '';
+          if (valorData && valorData.includes('/')) {
+            const partes = valorData.split('/');
+            if (partes.length === 3) {
+              valorData = `${partes[2]}-${partes[1]}-${partes[0]}`;
+            }
+          }
+          input.value = valorData;
+          
+          div.appendChild(label);
+          div.appendChild(input);
         } else {
           input = document.createElement('input');
           input.type = 'text';
@@ -812,9 +852,23 @@
         
         input.id = `campo_${col}`;
         // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto, oculto e solucao
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao'];
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
+        }
+        
+        // Adicionar listener para preenchimento automático de datas baseado na legislatura
+        if (col === 'legislatura_numero' && configAtual.tipos_campo && configAtual.tipos_campo.auto_fill_legislatura) {
+          input.addEventListener('change', function() {
+            const legislatura = this.value;
+            const autoFill = configAtual.tipos_campo.auto_fill_legislatura[legislatura];
+            if (autoFill) {
+              const inputInicio = document.getElementById('campo_legislatura_inicio');
+              const inputFim = document.getElementById('campo_legislatura_fim');
+              if (inputInicio) inputInicio.value = autoFill.inicio;
+              if (inputFim) inputFim.value = autoFill.fim;
+            }
+          });
         }
         
         camposDiv.appendChild(div);

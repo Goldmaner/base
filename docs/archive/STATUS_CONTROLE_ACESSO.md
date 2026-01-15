@@ -24,7 +24,7 @@
 - ✅ Salvar permissões via API
 
 ### 4. Banco de Dados
-- ✅ Coluna `acessos` (TEXT) criada em `public.usuarios`
+- ✅ Coluna `acessos` (TEXT) criada em `gestao_pessoas.usuarios`
 - ✅ Formato: `instrucoes;analises;orcamento;parcerias`
 
 ---

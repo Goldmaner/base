@@ -74,7 +74,7 @@ def meus_processos():
         # Verificar se o usuário é admin
         cur.execute("""
             SELECT tipo_usuario 
-            FROM public.usuarios 
+            FROM gestao_pessoas.usuarios 
             WHERE email = %s
         """, (session['email'],))
         
@@ -90,11 +90,32 @@ def meus_processos():
         """)
         todos_analistas = cur.fetchall()
         
+        # Buscar tipos de contrato disponíveis (para todos os usuários)
+        cur.execute("""
+            SELECT DISTINCT tipo_termo 
+            FROM public.parcerias 
+            WHERE tipo_termo IS NOT NULL 
+            ORDER BY tipo_termo
+        """)
+        tipos_contrato = cur.fetchall()
+        
+        # Buscar áreas temáticas únicas (extrair após última barra do número do termo)
+        cur.execute("""
+            SELECT DISTINCT UPPER(SUBSTRING(numero_termo FROM '/([^/]+)$')) as area_tematica
+            FROM public.parcerias
+            WHERE numero_termo LIKE '%/%'
+              AND SUBSTRING(numero_termo FROM '/([^/]+)$') IS NOT NULL
+            ORDER BY area_tematica
+        """)
+        areas_tematicas = cur.fetchall()
+        
         # Verificar se foi solicitado visualização de processos não atribuídos
         mostrar_nao_atribuidos = request.args.get('nao_atribuidos') == 'true' and is_admin
         ocultar_encerrados = request.args.get('ocultar_encerrados', 'true') == 'true'
         responsabilidade_filtro = request.args.get('responsabilidade', '')
         filtro_termo = request.args.get('filtro_termo', '').strip()
+        filtro_tipo_contrato = request.args.get('tipo_contrato', '').strip()
+        filtro_area_tematica = request.args.get('area_tematica', '').strip()
         
         if mostrar_nao_atribuidos:
             # Admin visualizando processos não atribuídos
@@ -112,7 +133,8 @@ def meus_processos():
                     p.sei_pc,
                     pa.responsavel_dp,
                     ca.nome_analista as responsavel_previo,
-                    pa.tipo_prestacao
+                    pa.tipo_prestacao,
+                    p.tipo_termo
                 FROM public.parcerias_analises pa
                 LEFT JOIN public.parcerias p ON pa.numero_termo = p.numero_termo
                 LEFT JOIN categoricas.c_dac_analistas ca ON pa.responsavel_dp = ca.id
@@ -140,6 +162,16 @@ def meus_processos():
                 conditions.append("pa.numero_termo ILIKE %s")
                 params.append(f'%{filtro_termo}%')
             
+            # Filtro: tipo de contrato
+            if filtro_tipo_contrato:
+                conditions.append("p.tipo_termo = %s")
+                params.append(filtro_tipo_contrato)
+            
+            # Filtro: área temática (extraída do número do termo após última barra)
+            if filtro_area_tematica:
+                conditions.append("UPPER(SUBSTRING(pa.numero_termo FROM '/([^/]+)$')) = %s")
+                params.append(filtro_area_tematica.upper())
+            
             if conditions:
                 query += " AND " + " AND ".join(conditions)
             
@@ -164,7 +196,7 @@ def meus_processos():
                 # Usuário normal ou admin sem filtro - buscar por R.F.
                 cur.execute("""
                     SELECT d_usuario 
-                    FROM public.usuarios 
+                    FROM gestao_pessoas.usuarios 
                     WHERE email = %s
                 """, (session['email'],))
                 
@@ -176,6 +208,8 @@ def meus_processos():
                     return render_template('analises_pc/meus_processos.html', 
                                            processos=[], 
                                            todos_analistas=todos_analistas if is_admin else [],
+                                           tipos_contrato=tipos_contrato,
+                                           areas_tematicas=areas_tematicas,
                                            is_admin=is_admin,
                                            mostrar_nao_atribuidos=mostrar_nao_atribuidos,
                                            mensagem="Você não possui R.F. cadastrado. Entre em contato com o administrador.")
@@ -203,6 +237,8 @@ def meus_processos():
                     return render_template('analises_pc/meus_processos.html', 
                                            processos=[], 
                                            todos_analistas=todos_analistas if is_admin else [],
+                                           tipos_contrato=tipos_contrato,
+                                           areas_tematicas=areas_tematicas,
                                            is_admin=is_admin,
                                            mostrar_nao_atribuidos=mostrar_nao_atribuidos,
                                            mensagem="Nenhum analista cadastrado corresponde ao seu R.F.")
@@ -221,6 +257,16 @@ def meus_processos():
                 query_conditions.append("ct.numero_termo ILIKE %s")
                 query_params.append(f'%{filtro_termo}%')
             
+            # Filtro: tipo de contrato
+            if filtro_tipo_contrato:
+                query_conditions.append("p.tipo_termo = %s")
+                query_params.append(filtro_tipo_contrato)
+            
+            # Filtro: área temática
+            if filtro_area_tematica:
+                query_conditions.append("UPPER(SUBSTRING(ct.numero_termo FROM '/([^/]+)$')) = %s")
+                query_params.append(filtro_area_tematica.upper())
+            
             where_clause = f"WHERE ca.nome_analista IN ({placeholders})"
             if query_conditions:
                 where_clause += " AND " + " AND ".join(query_conditions)
@@ -234,7 +280,8 @@ def meus_processos():
                     BOOL_OR(COALESCE(pa_final.e_notificacao, false)) as documentos_sei_1,
                     BOOL_OR(COALESCE(pa_final.e_parecer, false)) as emissao_parecer,
                     BOOL_OR(COALESCE(pa_final.e_encerramento, false)) as encaminhamento_encerramento,
-                    MAX(p.sei_pc) as sei_pc
+                    MAX(p.sei_pc) as sei_pc,
+                    MAX(p.tipo_termo) as tipo_termo
                 FROM analises_pc.checklist_termo ct
                 INNER JOIN analises_pc.checklist_analista ca 
                     ON ct.numero_termo = ca.numero_termo 
@@ -278,11 +325,15 @@ def meus_processos():
         return render_template('analises_pc/meus_processos.html', 
                                processos=processos,
                                todos_analistas=todos_analistas if is_admin else [],
+                               tipos_contrato=tipos_contrato,
+                               areas_tematicas=areas_tematicas,
                                is_admin=is_admin,
                                mostrar_nao_atribuidos=mostrar_nao_atribuidos,
                                ocultar_encerrados=ocultar_encerrados,
                                responsabilidade_filtro=responsabilidade_filtro,
                                filtro_termo=filtro_termo,
+                               filtro_tipo_contrato=filtro_tipo_contrato,
+                               filtro_area_tematica=filtro_area_tematica,
                                analista_selecionado=analista_filtro if not mostrar_nao_atribuidos else '',
                                mensagem=mensagem_contexto)
     
@@ -294,6 +345,8 @@ def meus_processos():
         return render_template('analises_pc/meus_processos.html', 
                                processos=[], 
                                todos_analistas=[],
+                               tipos_contrato=[],
+                               areas_tematicas=[],
                                is_admin=False,
                                mostrar_nao_atribuidos=False,
                                mensagem=f"Erro ao carregar processos: {str(e)}")
@@ -312,7 +365,7 @@ def criar_pasta_modelo():
         # Buscar R.F. do usuário logado
         cur.execute("""
             SELECT d_usuario 
-            FROM public.usuarios 
+            FROM gestao_pessoas.usuarios 
             WHERE email = %s
         """, (session['email'],))
         
@@ -414,7 +467,7 @@ def atribuir_processo():
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
-        cur.execute("SELECT tipo_usuario FROM public.usuarios WHERE email = %s", (session['email'],))
+        cur.execute("SELECT tipo_usuario FROM gestao_pessoas.usuarios WHERE email = %s", (session['email'],))
         user_data = cur.fetchone()
         
         if not user_data or user_data['tipo_usuario'] != 'Agente Público':

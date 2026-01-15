@@ -340,6 +340,25 @@
           </div>
         </div>
 
+        <div class="row mb-3">
+          <div class="col-md-12">
+            <label for="edital_nome" class="form-label">
+              Edital
+              <small class="text-muted">(Vincule esta parceria a um edital específico ou opção válida)</small>
+            </label>
+            <select class="form-select" id="edital_nome" name="edital_nome">
+              <option value="">-- Selecione --</option>
+              {% for edital in editais %}
+                <option value="{{ edital }}" {% if parceria and parceria.get('edital_nome') == edital %}selected{% endif %}>{{ edital }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              <i class="bi bi-info-circle"></i> 
+              Selecione o edital relacionado a esta parceria, se aplicável.
+            </div>
+          </div>
+        </div>
+
         <!-- Seção: Pessoa Gestora -->
         <div class="section-title">PESSOA GESTORA</div>
         

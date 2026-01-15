@@ -398,7 +398,7 @@ def gerar_encaminhamento():
         
         cur.execute("""
             SELECT u.d_usuario, u.email
-            FROM public.usuarios u
+            FROM gestao_pessoas.usuarios u
             WHERE u.id = %s
         """, (usuario_id,))
         

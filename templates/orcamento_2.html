@@ -66,6 +66,16 @@
   tr.linha-destacada { background-color: #fff3cd !important; border-left: 4px solid #ffc107; }
   tr.linha-destacada td { background-color: #fff3cd !important; }
   tr.linha-destacada .row-number { background-color: #ffc107 !important; color: white; font-weight: bold; }
+  /* Botão de observações */
+  #btnObservacoes {
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+  }
+  #btnObservacoes:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  }
   </style>
 </head>
 <body class="p-4">
@@ -95,25 +105,32 @@
       </select>
     </div>
 
-    <div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
-      <a class="btn btn-light btn-sm" href="{{ url_for('orcamento.listar') }}">&larr; Voltar</a>
-      <button id="listarTudoBtn" class="btn btn-success btn-sm" title="Replica o último valor preenchido para todos os meses seguintes em TODAS as linhas">
-        📋 Listar Tudo
-      </button>
-      <button id="toggleMonthsBtn" class="btn btn-outline-secondary btn-sm">
-        <span id="toggleMonthsText">👁️ Ocultar Meses</span>
-      </button>
-      <div class="input-group input-group-sm w-auto">
-        <span class="input-group-text">Adicionar meses</span>
-        <input id="numCols" type="number" class="form-control" min="1" value="1" style="width:80px">
+    <div class="mt-3 d-flex gap-2 align-items-center flex-wrap justify-content-between">
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <a class="btn btn-light btn-sm" href="{{ url_for('orcamento.listar') }}">&larr; Voltar</a>
+        <button id="listarTudoBtn" class="btn btn-success btn-sm" title="Replica o último valor preenchido para todos os meses seguintes em TODAS as linhas">
+          📋 Listar Tudo
+        </button>
+        <button id="toggleMonthsBtn" class="btn btn-outline-secondary btn-sm">
+          <span id="toggleMonthsText">👁️ Ocultar Meses</span>
+        </button>
+        <div class="input-group input-group-sm w-auto">
+          <span class="input-group-text">Adicionar meses</span>
+          <input id="numCols" type="number" class="form-control" min="1" value="1" style="width:80px">
+        </div>
+        <button id="addMonthsBtn" class="btn btn-secondary btn-sm">Adicionar</button>
+        <!-- Import Excel -->
+        <div class="input-group input-group-sm ms-2">
+          <input id="excelFileInput" type="file" accept=".xlsx,.xls" class="form-control">
+          <button id="importExcelBtn" class="btn btn-outline-primary">Importar Excel</button>
+          <button id="downloadTemplateBtn" class="btn btn-outline-secondary ms-1">Modelo de Importação</button>
+        </div>
       </div>
-      <button id="addMonthsBtn" class="btn btn-secondary btn-sm">Adicionar</button>
-      <!-- Import Excel -->
-      <div class="input-group input-group-sm ms-2">
-        <input id="excelFileInput" type="file" accept=".xlsx,.xls" class="form-control">
-        <button id="importExcelBtn" class="btn btn-outline-primary">Importar Excel</button>
-        <button id="downloadTemplateBtn" class="btn btn-outline-secondary ms-1">Modelo de Importação</button>
-      </div>
+      
+      <!-- Botão de Observações -->
+      <button id="btnObservacoes" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalObservacoes">
+        💬 Observações
+      </button>
     </div>
 
     <div class="mt-3">
@@ -221,6 +238,48 @@
           </div>
         </div>
         <small id="progressStatus" class="text-muted d-block mt-1">Preparando dados...</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Observações -->
+  <div class="modal fade" id="modalObservacoes" tabindex="-1" aria-labelledby="modalObservacoesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header bg-warning">
+          <h5 class="modal-title" id="modalObservacoesLabel">
+            💬 Observações do Termo: <strong>{{ numero_termo }}</strong>
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="textareaObservacoes" class="form-label fw-bold">Digite suas observações:</label>
+            <textarea class="form-control" id="textareaObservacoes" rows="12" 
+                      placeholder="Insira observações sobre este termo (ex: pendências, correções necessárias, alertas...)"></textarea>
+            <small class="text-muted">
+              <i class="bi bi-info-circle"></i> Estas observações ficam vinculadas ao termo <strong>{{ numero_termo }}</strong>
+            </small>
+          </div>
+          
+          <!-- Informações de histórico -->
+          <div id="infoHistorico" class="d-none">
+            <hr>
+            <div class="alert alert-info mb-0">
+              <strong>📝 Última atualização:</strong><br>
+              <small>
+                <strong>Responsável:</strong> <span id="infoResponsavel"></span><br>
+                <strong>Data:</strong> <span id="infoData"></span>
+              </small>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btnSalvarObservacoes">
+            <i class="bi bi-save"></i> Salvar Observações
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1346,6 +1405,95 @@
       });
       // Recarregar dados do aditivo selecionado
       carregarDadosExistentes();
+    });
+    
+    // === FUNCIONALIDADE DE OBSERVAÇÕES ===
+    
+    // Carregar observações ao abrir o modal
+    const modalObservacoes = document.getElementById('modalObservacoes');
+    modalObservacoes.addEventListener('show.bs.modal', function() {
+      carregarObservacoes();
+    });
+    
+    function carregarObservacoes() {
+      const numeroTermo = "{{ numero_termo }}";
+      const textarea = document.getElementById('textareaObservacoes');
+      const infoHistorico = document.getElementById('infoHistorico');
+      
+      // Mostrar loading
+      textarea.disabled = true;
+      textarea.value = 'Carregando...';
+      
+      fetch(`/orcamento/observacoes/${encodeURIComponent(numeroTermo)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            textarea.value = data.observacoes || '';
+            textarea.disabled = false;
+            
+            // Mostrar informações de histórico se existirem
+            if (data.responsavel && (data.atualizado_em || data.criado_em)) {
+              document.getElementById('infoResponsavel').textContent = data.responsavel;
+              const dataFormatada = data.atualizado_em || data.criado_em;
+              const dataObj = new Date(dataFormatada);
+              document.getElementById('infoData').textContent = dataObj.toLocaleString('pt-BR');
+              infoHistorico.classList.remove('d-none');
+            } else {
+              infoHistorico.classList.add('d-none');
+            }
+          } else {
+            alert('❌ Erro ao carregar observações: ' + (data.error || 'Erro desconhecido'));
+            textarea.disabled = false;
+            textarea.value = '';
+          }
+        })
+        .catch(error => {
+          console.error('Erro ao carregar observações:', error);
+          alert('❌ Erro ao carregar observações: ' + error.message);
+          textarea.disabled = false;
+          textarea.value = '';
+        });
+    }
+    
+    // Salvar observações
+    document.getElementById('btnSalvarObservacoes').addEventListener('click', function() {
+      const numeroTermo = "{{ numero_termo }}";
+      const observacoes = document.getElementById('textareaObservacoes').value.trim();
+      const btn = this;
+      
+      // Desabilitar botão enquanto salva
+      btn.disabled = true;
+      const htmlOriginal = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+      
+      fetch(`/orcamento/observacoes/${encodeURIComponent(numeroTermo)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ observacoes: observacoes })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          alert('✅ ' + data.message);
+          // Recarregar observações para atualizar histórico
+          carregarObservacoes();
+          // Fechar modal após 1 segundo
+          setTimeout(() => {
+            bootstrap.Modal.getInstance(modalObservacoes).hide();
+          }, 1000);
+        } else {
+          alert('❌ Erro ao salvar: ' + (data.error || 'Erro desconhecido'));
+        }
+      })
+      .catch(error => {
+        console.error('Erro ao salvar observações:', error);
+        alert('❌ Erro ao salvar observações: ' + error.message);
+      })
+      .finally(() => {
+        // Reabilitar botão
+        btn.disabled = false;
+        btn.innerHTML = htmlOriginal;
+      });
     });
   </script>
 </body>

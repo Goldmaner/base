@@ -80,7 +80,10 @@
           <h2><i class="bi bi-arrow-repeat"></i> Alterações DGP</h2>
           <p class="mb-0">Cadastro e gerenciamento de alterações em termos de parceria</p>
         </div>
-        <div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('parcerias.dgp_alteracoes_futuro') }}" class="btn btn-warning">
+            <i class="bi bi-calendar-event"></i> Futuros Aditamentos
+          </a>
           <a href="{{ url_for('parcerias.listar') }}" class="btn btn-light">
             <i class="bi bi-arrow-left"></i> Voltar para Parcerias
           </a>
@@ -202,9 +205,17 @@
               </label>
               <select class="form-select" id="alt_responsavel" name="alt_responsavel[]" multiple required size="5">
                 {% for analista in analistas_dgp %}
-                  <option value="{{ analista }}">{{ analista }}</option>
+                  {% if analista.status %}
+                  <option value="{{ analista.nome }}">{{ analista.nome }}</option>
+                  {% endif %}
                 {% endfor %}
               </select>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="mostrar_inativos" onchange="toggleAnalistasInativos()">
+                <label class="form-check-label" for="mostrar_inativos">
+                  Mostrar analistas inativos
+                </label>
+              </div>
               <small class="text-muted">Selecione uma ou mais pessoas responsáveis (Ctrl+Clique para múltipla seleção)</small>
             </div>
           </div>
@@ -371,7 +382,10 @@
             <select class="form-select" id="filtro_responsavel" name="filtro_responsavel">
               <option value="">-- Todos --</option>
               {% for analista in analistas_dgp %}
-                <option value="{{ analista }}" {{ 'selected' if request.args.get('filtro_responsavel') == analista }}>{{ analista }}</option>
+                <option value="{{ analista.nome if analista is mapping else analista }}" 
+                  {{ 'selected' if request.args.get('filtro_responsavel') == (analista.nome if analista is mapping else analista) }}>
+                  {{ analista.nome if analista is mapping else analista }}
+                </option>
               {% endfor %}
             </select>
           </div>
@@ -407,11 +421,17 @@
           <i class="bi bi-table"></i> Alterações Cadastradas
           <span class="badge bg-primary">{{ total_count if total_count else 0 }}</span>
         </h4>
-        {% if total_pages > 1 %}
-        <div class="text-muted">
-          Página {{ page }} de {{ total_pages }}
+        <div class="d-flex align-items-center gap-3">
+          <a href="{{ url_for('parcerias.dgp_alteracoes_exportar_csv') }}?{{ request.query_string.decode('utf-8') }}" 
+             class="btn btn-success">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+          </a>
+          {% if total_pages > 1 %}
+          <div class="text-muted">
+            Página {{ page }} de {{ total_pages }}
+          </div>
+          {% endif %}
         </div>
-        {% endif %}
       </div>
 
       {% if alteracoes %}
@@ -420,11 +440,12 @@
             <thead>
               <tr>
                 <th style="width: 12%;">Número do Termo</th>
-                <th style="width: 15%;">Instrumento</th>
-                <th style="width: 6%;">Numeração</th>
-                <th style="width: 20%;">Tipos de Alteração</th>
-                <th style="width: 10%;">Status</th>
-                <th style="width: 10%;">Nº SEI Doc</th>
+                <th style="width: 14%;">Instrumento</th>
+                <th style="width: 5%;">Numeração</th>
+                <th style="width: 18%;">Tipos de Alteração</th>
+                <th style="width: 8%;">Status</th>
+                <th style="width: 8%;">Data Assinatura</th>
+                <th style="width: 8%;">Nº SEI Doc</th>
                 <th style="width: 15%;">Responsáveis</th>
                 <th style="width: 12%;" class="text-center">Ações</th>
               </tr>
@@ -464,6 +485,13 @@
                       <span class="badge bg-info">{{ alteracao.alt_status }}</span>
                     {% else %}
                       <span class="badge bg-secondary">{{ alteracao.alt_status or 'N/A' }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if alteracao.data_assinatura %}
+                      <small><strong>{{ alteracao.data_assinatura.strftime('%d/%m/%Y') }}</strong></small>
+                    {% else %}
+                      <span class="text-muted">-</span>
                     {% endif %}
                   </td>
                   <td>
@@ -578,6 +606,8 @@
     // Dados dos tipos de alteração vindos do backend
     const tiposAlteracao = {{ tipos_alteracao|tojson if tipos_alteracao else '[]'|safe }};
     const instrumentos = {{ instrumentos|tojson if instrumentos else '[]'|safe }};
+    const analistasAtivos = {{ analistas_ativos|tojson if analistas_ativos else '[]'|safe }};
+    const analistasInativos = {{ analistas_inativos|tojson if analistas_inativos else '[]'|safe }};
     
     // Mapeamento de tipos para campos dinâmicos (construído a partir dos dados do banco)
     const tiposCampos = {};
@@ -594,6 +624,65 @@
     
     let contadorTipos = 0;
     let tiposSelecionados = new Set();
+    
+    // Função para toggle de analistas inativos
+    function toggleAnalistasInativos() {
+      const checkbox = $('#mostrar_inativos');
+      const select = $('#alt_responsavel');
+      const valoresSelecionados = select.val() || [];
+      
+      select.empty();
+      
+      // Sempre adicionar ativos
+      analistasAtivos.forEach(analista => {
+        select.append(`<option value="${analista.nome}">${analista.nome}</option>`);
+      });
+      
+      // Adicionar inativos se checkbox marcado
+      if (checkbox.is(':checked')) {
+        analistasInativos.forEach(analista => {
+          select.append(`<option value="${analista.nome}" class="text-muted" style="font-style: italic;">${analista.nome} (Inativo)</option>`);
+        });
+      }
+      
+      // Restaurar seleção
+      select.val(valoresSelecionados);
+    }
+    
+    // Função para buscar próximo número de alteração
+    function buscarProximoNumero() {
+      const numeroTermo = $('#numero_termo').val();
+      const instrumento = $('#instrumento_alteracao').val();
+      
+      if (!numeroTermo || !instrumento) return;
+      
+      // Apenas buscar para Aditamento ou Apostilamento
+      if (instrumento !== 'Termo de Aditamento' && instrumento !== 'Termo de Apostilamento') {
+        return;
+      }
+      
+      $.ajax({
+        url: '/parcerias/alteracao/proximo_numero',
+        method: 'GET',
+        data: {
+          numero_termo: numeroTermo,
+          instrumento: instrumento
+        },
+        success: function(response) {
+          if (response.success) {
+            const proximoNumero = response.proximo_numero;
+            
+            if (instrumento === 'Termo de Aditamento' || instrumento === 'Termo de Apostilamento') {
+              $('#alt_numero_simples').val(proximoNumero);
+              console.log(`[DEBUG] Próximo número sugerido: ${proximoNumero}`);
+            }
+          }
+        },
+        error: function(xhr) {
+          console.error('Erro ao buscar próximo número:', xhr.responseJSON?.error);
+        }
+      });
+    }
 
     $(document).ready(function() {
       // Nada aqui - seção será adicionada quando modal abrir
@@ -652,6 +741,11 @@
             return "Buscando...";
           }
         }
+      });
+      
+      // Listener para buscar próximo número quando termo for selecionado
+      $('#numero_termo').on('select2:select', function() {
+        buscarProximoNumero();
       });
     });
     
@@ -787,6 +881,7 @@
     // Listener para mudanças manuais no instrumento
     $(document).on('change', '#instrumento_alteracao', function() {
       mostrarCamposNumeracao($(this).val());
+      buscarProximoNumero(); // Buscar número quando instrumento mudar
     });
 
     // Mostrar campos de numeração apropriados

@@ -118,10 +118,10 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 <th style="width:3%" class="text-center">
     <input type="checkbox" id="selecionarTodos" class="checkbox-alteracao" title="Selecionar todas as alterações">
 </th>
-<th style="width:50%">Nome da OSC</th>
-<th style="width:22%">CNPJ (Exemplo)</th>
-<th style="width:10%" class="text-center">Termos</th>
-<th style="width:15%" class="text-center">Ações</th>
+<th style="width:40%">Nome da OSC</th>
+<th style="width:18%">CNPJ (Exemplo)</th>
+<th style="width:9%" class="text-center">Termos</th>
+<th style="width:30%" class="text-center">Ações</th>
 </tr></thead>
 <tbody id="tbody">
 {% for osc_item in oscs %}
@@ -139,7 +139,14 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
         <i class="bi bi-list-ul"></i> {{ osc_item.total_termos }}
     </span>
 </td>
-<td class="text-center"><button class="btn btn-primary btn-sm btn-salvar" onclick="salvarOSC(this)"><i class="bi bi-check-lg"></i> Salvar</button></td>
+<td class="text-center">
+    <button class="btn btn-primary btn-sm btn-salvar me-1" onclick="salvarOSC(this)" title="Salvar alterações">
+        <i class="bi bi-check-lg"></i> Salvar
+    </button>
+    <button class="btn btn-info btn-sm" onclick="gerenciarContatos('{{ osc_item.osc }}')" title="Gerenciar contatos">
+        <i class="bi bi-person-lines-fill"></i> Contatos
+    </button>
+</td>
 </tr>
 {% endfor %}
 </tbody>
@@ -188,6 +195,155 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Contatos -->
+<div class="modal fade" id="modalContatos" tabindex="-1" aria-labelledby="modalContatosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="modalContatosLabel">
+                    <i class="bi bi-person-lines-fill"></i> Gerenciar Contatos da OSC
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3">
+                    <strong>OSC:</strong> <span id="oscNomeContatos"></span>
+                </div>
+                
+                <!-- Formulário de Novo Contato -->
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Adicionar Novo Contato</h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="formNovoContato">
+                            <!-- Campos Únicos -->
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label for="novo_contato_nome" class="form-label">
+                                        Nome *
+                                        <i class="bi bi-info-circle text-primary" 
+                                           data-bs-toggle="tooltip" 
+                                           data-bs-placement="right" 
+                                           title="Para contatos institucionais, pode usar apenas 'Institucional'"
+                                           style="cursor: help;"></i>
+                                    </label>
+                                    <input type="text" class="form-control" id="novo_contato_nome" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="novo_contato_posicao" class="form-label">Posição</label>
+                                    <input type="text" class="form-control" id="novo_contato_posicao" placeholder="Ex: Diretor, Coordenador">
+                                </div>
+                            </div>
+                            
+                            <!-- Blocos de Contato Dinâmicos -->
+                            <div class="border rounded p-3 mb-3 bg-light">
+                                <h6 class="mb-3">Tipos de Contato</h6>
+                                <div id="contatosContainer"></div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarBlocoContato()">
+                                    <i class="bi bi-plus-circle"></i> Adicionar Tipo de Contato
+                                </button>
+                            </div>
+                            
+                            <!-- Observação -->
+                            <div class="mb-3">
+                                <label for="novo_observacao" class="form-label">Observação</label>
+                                <textarea class="form-control" id="novo_observacao" rows="3" placeholder="Informações adicionais (opcional)"></textarea>
+                            </div>
+                            
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-check-circle"></i> Salvar Contato(s)
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Lista de Contatos Existentes -->
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0"><i class="bi bi-list-ul"></i> Contatos Cadastrados</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="listaContatos">
+                            <div class="text-center">
+                                <div class="spinner-border text-info" role="status">
+                                    <span class="visually-hidden">Carregando...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Editar Contato -->
+<div class="modal fade" id="modalEditarContato" tabindex="-1" aria-labelledby="modalEditarContatoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="modalEditarContatoLabel">
+                    <i class="bi bi-pencil"></i> Editar Contato
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarContato">
+                    <input type="hidden" id="edit_contato_id">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="edit_contato_nome" class="form-label">Nome *</label>
+                            <input type="text" class="form-control" id="edit_contato_nome" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_contato_posicao" class="form-label">Posição</label>
+                            <input type="text" class="form-control" id="edit_contato_posicao">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_contato_tipo" class="form-label">Tipo de Contato *</label>
+                            <select class="form-select" id="edit_contato_tipo" required onchange="ajustarMascara('edit')">
+                                <option value="">-- Selecione --</option>
+                                <option value="E-mail Institucional">E-mail Institucional</option>
+                                <option value="E-mail Pessoal">E-mail Pessoal</option>
+                                <option value="Telefone Institucional">Telefone Institucional</option>
+                                <option value="Telefone Pessoal">Telefone Pessoal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_contato_info" class="form-label">Informação de Contato *</label>
+                            <input type="text" class="form-control" id="edit_contato_info" required>
+                            <small class="text-muted" id="hint_edit"></small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_status" class="form-label">Status *</label>
+                            <select class="form-select" id="edit_status" required>
+                                <option value="Ativo">Ativo</option>
+                                <option value="Inativo">Inativo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_observacao" class="form-label">Observação</label>
+                            <input type="text" class="form-control" id="edit_observacao">
+                        </div>
+                    </div>
+                    <div class="mt-3 text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-check-lg"></i> Salvar Alterações
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -419,7 +575,10 @@ function realizarBuscaGlobal(termo) {
                             <i class="bi bi-list-ul"></i> ${osc.total_termos}
                         </span>
                     </td>
-                    <td class="text-center"><button class="btn btn-primary btn-sm btn-salvar" onclick="salvarOSC(this)"><i class="bi bi-check-lg"></i> Salvar</button></td>
+                    <td class="text-center">
+                        <button class="btn btn-primary btn-sm btn-salvar me-1" onclick="salvarOSC(this)" title="Salvar alterações"><i class="bi bi-check-lg"></i> Salvar</button>
+                        <button class="btn btn-info btn-sm" onclick="gerenciarContatos('${osc.osc}')" title="Gerenciar contatos"><i class="bi bi-person-lines-fill"></i> Contatos</button>
+                    </td>
                 </tr>
                 `;
             });
@@ -669,6 +828,387 @@ function handleBadgeClick() {
     const osc = this.getAttribute('data-osc');
     const totalTermos = this.getAttribute('data-total-termos');
     verTermos(osc, totalTermos);
+}
+
+// ============================================================================
+// GERENCIAMENTO DE CONTATOS
+// ============================================================================
+
+let oscAtualContatos = '';
+let contatoIdCounter = 0;
+
+function gerenciarContatos(osc) {
+    oscAtualContatos = osc;
+    document.getElementById('oscNomeContatos').textContent = osc;
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('modalContatos'));
+    modal.show();
+    
+    // Limpar formulário e blocos
+    document.getElementById('formNovoContato').reset();
+    document.getElementById('contatosContainer').innerHTML = '';
+    contatoIdCounter = 0;
+    
+    // Adicionar primeiro bloco
+    adicionarBlocoContato();
+    
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Carregar contatos
+    carregarContatos(osc);
+}
+
+function adicionarBlocoContato() {
+    contatoIdCounter++;
+    const id = contatoIdCounter;
+    
+    const html = `
+        <div class="card mb-2" id="blocoContato_${id}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>Contato #${id}</strong>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removerBlocoContato(${id})" title="Remover">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label">Tipo *</label>
+                        <select class="form-select form-select-sm" id="tipo_${id}" required onchange="ajustarMascaraBloco(${id})">
+                            <option value="">-- Selecione --</option>
+                            <option value="E-mail Institucional">E-mail Institucional</option>
+                            <option value="E-mail Pessoal">E-mail Pessoal</option>
+                            <option value="Telefone Institucional">Telefone Institucional</option>
+                            <option value="Telefone Pessoal">Telefone Pessoal</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Informação *</label>
+                        <input type="text" class="form-control form-control-sm" id="info_${id}" required>
+                        <small class="text-muted" id="hint_${id}">Selecione o tipo</small>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status *</label>
+                        <select class="form-select form-select-sm" id="status_${id}" required>
+                            <option value="Ativo" selected>Ativo</option>
+                            <option value="Inativo">Inativo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('contatosContainer').insertAdjacentHTML('beforeend', html);
+}
+
+function removerBlocoContato(id) {
+    const bloco = document.getElementById('blocoContato_' + id);
+    if (bloco) {
+        bloco.remove();
+    }
+    
+    // Renumerar blocos restantes
+    const blocos = document.querySelectorAll('[id^="blocoContato_"]');
+    blocos.forEach((bloco, index) => {
+        const strong = bloco.querySelector('strong');
+        if (strong) {
+            strong.textContent = 'Contato #' + (index + 1);
+        }
+    });
+}
+
+function ajustarMascaraBloco(id) {
+    const tipoSelect = document.getElementById('tipo_' + id);
+    const infoInput = document.getElementById('info_' + id);
+    const hint = document.getElementById('hint_' + id);
+    
+    const tipo = tipoSelect.value;
+    
+    // Remover máscara anterior
+    infoInput.value = '';
+    infoInput.removeAttribute('inputmode');
+    infoInput.removeAttribute('maxlength');
+    infoInput.type = 'text';
+    
+    if (tipo.includes('E-mail')) {
+        infoInput.type = 'email';
+        infoInput.placeholder = 'exemplo@dominio.com';
+        hint.textContent = 'Digite um e-mail válido';
+    } else if (tipo.includes('Telefone')) {
+        infoInput.inputMode = 'tel';
+        infoInput.placeholder = '(11) 98888-8888';
+        infoInput.maxLength = 15;
+        hint.textContent = 'Formato: (XX) XXXXX-XXXX';
+        
+        // Aplicar máscara de telefone
+        infoInput.addEventListener('input', function(e) {
+            let valor = e.target.value.replace(/\D/g, '');
+            if (valor.length > 11) valor = valor.substring(0, 11);
+            
+            if (valor.length >= 11) {
+                valor = valor.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+            } else if (valor.length >= 7) {
+                valor = valor.replace(/^(\d{2})(\d{4,5})(\d{0,4}).*/, '($1) $2-$3');
+            } else if (valor.length >= 3) {
+                valor = valor.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+            } else if (valor.length >= 1) {
+                valor = valor.replace(/^(\d*)/, '($1');
+            }
+            
+            e.target.value = valor;
+        });
+    } else {
+        hint.textContent = 'Selecione o tipo';
+        infoInput.placeholder = '';
+    }
+}
+
+function carregarContatos(osc) {
+    const listaContatos = document.getElementById('listaContatos');
+    listaContatos.innerHTML = '<div class="text-center"><div class="spinner-border text-info" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
+    
+    fetch('/parcerias/contatos/' + encodeURIComponent(osc))
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                listaContatos.innerHTML = '<div class="alert alert-danger">❌ Erro: ' + data.error + '</div>';
+                return;
+            }
+            
+            if (data.contatos.length === 0) {
+                listaContatos.innerHTML = '<div class="alert alert-warning"><i class="bi bi-info-circle"></i> Nenhum contato cadastrado ainda. Use o formulário acima para adicionar.</div>';
+                return;
+            }
+            
+            // Criar tabela com os contatos
+            let html = '<div class="table-responsive"><table class="table table-hover table-striped">';
+            html += '<thead class="table-info"><tr>';
+            html += '<th>Nome</th>';
+            html += '<th>Posição</th>';
+            html += '<th>Tipo</th>';
+            html += '<th>Contato</th>';
+            html += '<th>Status</th>';
+            html += '<th>Ações</th>';
+            html += '</tr></thead><tbody>';
+            
+            data.contatos.forEach(contato => {
+                const statusBadge = contato.status === 'Ativo' ? 'bg-success' : 'bg-secondary';
+                const contatoIcon = contato.contato_tipo.includes('E-mail') ? 'bi-envelope' : 'bi-telephone';
+                
+                html += '<tr>';
+                html += '<td><strong>' + contato.contato_nome + '</strong></td>';
+                html += '<td>' + (contato.contato_posicao || '-') + '</td>';
+                html += '<td><span class="badge bg-primary">' + contato.contato_tipo + '</span></td>';
+                html += '<td><i class="bi ' + contatoIcon + '"></i> ' + contato.contato_info + '</td>';
+                html += '<td><span class="badge ' + statusBadge + '">' + contato.status + '</span></td>';
+                html += '<td>';
+                html += '<button class="btn btn-sm btn-warning me-1" onclick="editarContato(' + contato.id + ')" title="Editar"><i class="bi bi-pencil"></i></button>';
+                html += '<button class="btn btn-sm btn-danger" onclick="excluirContato(' + contato.id + ', \'' + contato.contato_nome + '\')" title="Excluir"><i class="bi bi-trash"></i></button>';
+                html += '</td>';
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table></div>';
+            listaContatos.innerHTML = html;
+        })
+        .catch(error => {
+            listaContatos.innerHTML = '<div class="alert alert-danger">❌ Erro ao carregar contatos: ' + error + '</div>';
+        });
+}
+
+function ajustarMascara(prefixo) {
+    const tipoSelect = document.getElementById(prefixo + '_contato_tipo');
+    const infoInput = document.getElementById(prefixo + '_contato_info');
+    const hint = document.getElementById('hint_' + prefixo);
+    
+    const tipo = tipoSelect.value;
+    
+    // Remover máscara anterior
+    infoInput.value = '';
+    infoInput.removeAttribute('inputmode');
+    infoInput.removeAttribute('maxlength');
+    infoInput.type = 'text';
+    
+    if (tipo.includes('E-mail')) {
+        infoInput.type = 'email';
+        infoInput.placeholder = 'exemplo@dominio.com';
+        hint.textContent = 'Digite um e-mail válido';
+    } else if (tipo.includes('Telefone')) {
+        infoInput.inputMode = 'tel';
+        infoInput.placeholder = '(11) 98888-8888';
+        infoInput.maxLength = 15;
+        hint.textContent = 'Digite no formato (XX) XXXXX-XXXX';
+        
+        // Aplicar máscara de telefone
+        infoInput.addEventListener('input', function(e) {
+            let valor = e.target.value.replace(/\D/g, '');
+            if (valor.length > 11) valor = valor.substring(0, 11);
+            
+            if (valor.length >= 11) {
+                valor = valor.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+            } else if (valor.length >= 7) {
+                valor = valor.replace(/^(\d{2})(\d{4,5})(\d{0,4}).*/, '($1) $2-$3');
+            } else if (valor.length >= 3) {
+                valor = valor.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+            } else if (valor.length >= 1) {
+                valor = valor.replace(/^(\d*)/, '($1');
+            }
+            
+            e.target.value = valor;
+        });
+    } else {
+        hint.textContent = 'Selecione o tipo primeiro';
+        infoInput.placeholder = '';
+    }
+}
+
+// Formulário de novo contato
+document.getElementById('formNovoContato').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Coletar todos os blocos de contato
+    const blocos = document.querySelectorAll('[id^="blocoContato_"]');
+    const contatos = [];
+    
+    blocos.forEach(bloco => {
+        const id = bloco.id.replace('blocoContato_', '');
+        const tipo = document.getElementById('tipo_' + id)?.value;
+        const info = document.getElementById('info_' + id)?.value.trim();
+        const status = document.getElementById('status_' + id)?.value;
+        
+        if (tipo && info) {
+            contatos.push({ tipo, info, status });
+        }
+    });
+    
+    if (contatos.length === 0) {
+        alert('⚠ Adicione pelo menos um tipo de contato!');
+        return;
+    }
+    
+    const dados = {
+        osc: oscAtualContatos,
+        contato_nome: document.getElementById('novo_contato_nome').value.trim(),
+        contato_posicao: document.getElementById('novo_contato_posicao').value.trim(),
+        observacao: document.getElementById('novo_observacao').value.trim(),
+        contatos: contatos
+    };
+    
+    fetch('/parcerias/contatos/criar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(dados)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert('❌ Erro: ' + data.error);
+        } else {
+            alert('✅ ' + data.message);
+            document.getElementById('formNovoContato').reset();
+            document.getElementById('contatosContainer').innerHTML = '';
+            contatoIdCounter = 0;
+            adicionarBlocoContato();
+            carregarContatos(oscAtualContatos);
+        }
+    })
+    .catch(error => {
+        alert('❌ Erro ao criar contato: ' + error);
+    });
+});
+
+function editarContato(id) {
+    // Buscar dados do contato
+    fetch('/parcerias/contatos/' + encodeURIComponent(oscAtualContatos))
+        .then(r => r.json())
+        .then(data => {
+            const contato = data.contatos.find(c => c.id === id);
+            if (!contato) {
+                alert('❌ Contato não encontrado!');
+                return;
+            }
+            
+            // Preencher formulário
+            document.getElementById('edit_contato_id').value = contato.id;
+            document.getElementById('edit_contato_nome').value = contato.contato_nome;
+            document.getElementById('edit_contato_posicao').value = contato.contato_posicao || '';
+            document.getElementById('edit_contato_tipo').value = contato.contato_tipo;
+            document.getElementById('edit_contato_info').value = contato.contato_info;
+            document.getElementById('edit_status').value = contato.status;
+            document.getElementById('edit_observacao').value = contato.observacao || '';
+            
+            // Ajustar máscara
+            ajustarMascara('edit');
+            
+            // Mostrar modal
+            const modal = new bootstrap.Modal(document.getElementById('modalEditarContato'));
+            modal.show();
+        })
+        .catch(error => {
+            alert('❌ Erro ao buscar contato: ' + error);
+        });
+}
+
+// Formulário de editar contato
+document.getElementById('formEditarContato').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('edit_contato_id').value;
+    const dados = {
+        contato_nome: document.getElementById('edit_contato_nome').value.trim(),
+        contato_posicao: document.getElementById('edit_contato_posicao').value.trim(),
+        contato_tipo: document.getElementById('edit_contato_tipo').value,
+        contato_info: document.getElementById('edit_contato_info').value.trim(),
+        status: document.getElementById('edit_status').value,
+        observacao: document.getElementById('edit_observacao').value.trim()
+    };
+    
+    fetch('/parcerias/contatos/editar/' + id, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(dados)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert('❌ Erro: ' + data.error);
+        } else {
+            alert('✅ ' + data.message);
+            bootstrap.Modal.getInstance(document.getElementById('modalEditarContato')).hide();
+            carregarContatos(oscAtualContatos);
+        }
+    })
+    .catch(error => {
+        alert('❌ Erro ao editar contato: ' + error);
+    });
+});
+
+function excluirContato(id, nome) {
+    if (!confirm('⚠ Tem certeza que deseja excluir o contato de:\n"' + nome + '"?')) {
+        return;
+    }
+    
+    fetch('/parcerias/contatos/deletar/' + id, {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert('❌ Erro: ' + data.error);
+        } else {
+            alert('✅ ' + data.message);
+            carregarContatos(oscAtualContatos);
+        }
+    })
+    .catch(error => {
+        alert('❌ Erro ao excluir contato: ' + error);
+    });
 }
 </script>
 </body>

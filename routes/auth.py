@@ -20,7 +20,7 @@ def login():
         senha_input = request.form["password"]
 
         cur = get_cursor()
-        cur.execute("SELECT id, email, senha, tipo_usuario, acessos FROM usuarios WHERE email = %s", (email_input,))
+        cur.execute("SELECT id, email, senha, tipo_usuario, acessos, d_usuario FROM gestao_pessoas.usuarios WHERE email = %s", (email_input,))
         user = cur.fetchone()
         cur.close()
         
@@ -37,6 +37,7 @@ def login():
             session["email"] = user["email"]
             session["tipo_usuario"] = user["tipo_usuario"]
             session["acessos"] = user["acessos"] or ""  # Armazenar acessos na sessão
+            session["d_usuario"] = user["d_usuario"] or ""  # Armazenar d_usuario na sessão
             flash("Logado com sucesso.", "success")
             return redirect(url_for("main.index"))
         else:
@@ -76,7 +77,7 @@ def listar_usuarios():
         cur = get_cursor()
         cur.execute("""
             SELECT id, email, tipo_usuario, d_usuario, data_criacao, acessos
-            FROM usuarios 
+            FROM gestao_pessoas.usuarios 
             ORDER BY data_criacao DESC
         """)
         usuarios = cur.fetchall()
@@ -140,7 +141,7 @@ def criar_usuario():
         cur = get_cursor()
         try:
             cur.execute("""
-                INSERT INTO usuarios (email, senha, tipo_usuario, d_usuario)
+                INSERT INTO gestao_pessoas.usuarios (email, senha, tipo_usuario, d_usuario)
                 VALUES (%s, %s, %s, %s)
                 RETURNING id
             """, (email, senha_hash, tipo_usuario, d_usuario if d_usuario else None))
@@ -178,7 +179,7 @@ def obter_usuario(user_id):
         cur = get_cursor()
         cur.execute("""
             SELECT id, email, tipo_usuario, d_usuario, data_criacao, acessos
-            FROM usuarios 
+            FROM gestao_pessoas.usuarios 
             WHERE id = %s
         """, (user_id,))
         
@@ -251,7 +252,7 @@ def atualizar_usuario(user_id):
         params.append(user_id)
         
         cur.execute(f"""
-            UPDATE usuarios 
+            UPDATE gestao_pessoas.usuarios 
             SET {', '.join(updates)}
             WHERE id = %s
         """, params)
@@ -268,13 +269,14 @@ def atualizar_usuario(user_id):
         if 'user_id' in session and session['user_id'] == user_id:
             # Recarregar dados do usuário na sessão atual
             cur = get_cursor()
-            cur.execute("SELECT tipo_usuario, acessos FROM usuarios WHERE id = %s", (user_id,))
+            cur.execute("SELECT tipo_usuario, acessos, d_usuario FROM gestao_pessoas.usuarios WHERE id = %s", (user_id,))
             updated_user = cur.fetchone()
             cur.close()
             
             if updated_user:
                 session['tipo_usuario'] = updated_user['tipo_usuario']
                 session['acessos'] = updated_user['acessos'] or ""
+                session['d_usuario'] = updated_user['d_usuario'] or ""
                 print(f"[INFO] Sessão atualizada para usuário ID {user_id}")
         
         return jsonify({"mensagem": "Usuário atualizado com sucesso"}), 200
@@ -299,7 +301,7 @@ def excluir_usuario(user_id):
     
     try:
         cur = get_cursor()
-        cur.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
+        cur.execute("DELETE FROM gestao_pessoas.usuarios WHERE id = %s", (user_id,))
         
         if cur.rowcount == 0:
             cur.close()
@@ -341,7 +343,7 @@ def resetar_senha(user_id):
         # Atualizar no banco
         cur = get_cursor()
         cur.execute("""
-            UPDATE usuarios 
+            UPDATE gestao_pessoas.usuarios 
             SET senha = %s 
             WHERE id = %s
         """, (senha_hash, user_id))

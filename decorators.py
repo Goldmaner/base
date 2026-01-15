@@ -37,7 +37,7 @@ def requires_access(modulo):
                 try:
                     cursor = get_cursor()
                     cursor.execute("""
-                        SELECT acessos, tipo_usuario FROM usuarios WHERE id = %s
+                        SELECT acessos, tipo_usuario FROM gestao_pessoas.usuarios WHERE id = %s
                     """, (session['user_id'],))
                     result = cursor.fetchone()
                     cursor.close()
