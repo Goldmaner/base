@@ -8,6 +8,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
   <style>
     body { background-color: #f8f9fa; padding: 20px; }
     .header-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
@@ -19,6 +20,15 @@
       margin: 20px -30px 20px -30px; 
       font-weight: bold; 
       color: #495057;
+    }
+    
+    /* Estilo personalizado para Select2 combinar com Bootstrap 5 */
+    .select2-container--bootstrap-5 .select2-selection {
+      min-height: 38px !important;
+    }
+    
+    .select2-container {
+      width: 100% !important;
     }
   </style>
 </head>
@@ -509,6 +519,33 @@
               <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarEndereco()">
                 <i class="bi bi-plus-circle"></i> Adicionar Endereço
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção: Informações do Vereador (Emendas Parlamentares) -->
+        <div id="secaoVereadores" style="display: none;">
+          <div class="section-title" data-bs-toggle="collapse" data-bs-target="#secaoVereadoresCollapse" 
+               style="cursor: pointer; user-select: none;">
+            <i class="bi bi-plus-circle me-2" id="iconVereadores"></i>
+            INFORMAÇÕES DO VEREADOR (EMENDA PARLAMENTAR)
+          </div>
+          <div class="collapse" id="secaoVereadoresCollapse">
+            <div class="alert alert-info mb-3">
+              <i class="bi bi-info-circle"></i> 
+              Esta parceria possui emenda parlamentar. Informe os vereadores responsáveis.
+            </div>
+
+            <div id="vereadoresContainer">
+              <!-- Vereadores serão carregados dinamicamente -->
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-12">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarVereador()">
+                  <i class="bi bi-plus-circle"></i> Adicionar Vereador
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1121,6 +1158,12 @@
     document.getElementById('secaoEnderecos').addEventListener('hide.bs.collapse', function() {
       document.getElementById('iconEnderecos').className = 'bi bi-plus-circle me-2';
     });
+    document.getElementById('secaoVereadoresCollapse').addEventListener('show.bs.collapse', function() {
+      document.getElementById('iconVereadores').className = 'bi bi-dash-circle me-2';
+    });
+    document.getElementById('secaoVereadoresCollapse').addEventListener('hide.bs.collapse', function() {
+      document.getElementById('iconVereadores').className = 'bi bi-plus-circle me-2';
+    });
 
     // Toggle campos de endereço quando marcar "Projeto Online"
     function toggleEnderecosFields() {
@@ -1199,6 +1242,8 @@
       // Inicializar Select2 para o novo distrito
       const selectElement = document.querySelector(`[data-endereco-id="${id}"].select2-distrito`);
       $(selectElement).select2({
+        theme: 'bootstrap-5',
+        width: '100%',
         ajax: {
           url: '/parcerias/api/distritos',
           dataType: 'json',
@@ -1208,9 +1253,11 @@
           },
           processResults: function (data) {
             return { results: data };
-          }
+          },
+          cache: true
         },
-        placeholder: 'Digite para buscar...',
+        placeholder: 'Digite para buscar distrito...',
+        allowClear: true,
         minimumInputLength: 0
       });
       
@@ -1293,7 +1340,173 @@
         document.getElementById('projetoOnline').checked = true;
         toggleEnderecosFields();
       {% endif %}
+      
+      // Inicializar verificação de emenda parlamentar
+      verificarEmendaParlamentar();
+      
+      // Se houver vereadores salvos, carregar
+      {% if vereadores_emenda %}
+        {% for vereador in vereadores_emenda %}
+          adicionarVereador({
+            id: '{{ vereador.id }}',
+            vereador_nome: '{{ vereador.vereador_nome or "" }}',
+            status: '{{ vereador.status or "" }}',
+            valor: '{{ vereador.valor or "" }}',
+            observacoes: '{{ vereador.observacoes or "" }}'
+          });
+        {% endfor %}
+      {% endif %}
     });
+
+    // ========== SEÇÃO VEREADORES (EMENDAS PARLAMENTARES) ==========
+    
+    let contadorVereadores = 0;
+
+    // Verificar se deve mostrar seção de vereadores
+    function verificarEmendaParlamentar() {
+      const editalSelect = document.getElementById('edital_nome');
+      const secaoVereadores = document.getElementById('secaoVereadores');
+      
+      if (editalSelect.value === 'Sem Edital (Emenda Parlamentar)') {
+        secaoVereadores.style.display = 'block';
+      } else {
+        secaoVereadores.style.display = 'none';
+      }
+    }
+
+    // Observar mudanças no campo edital
+    document.getElementById('edital_nome').addEventListener('change', verificarEmendaParlamentar);
+
+    // Adicionar novo vereador
+    function adicionarVereador(dados = {}) {
+      contadorVereadores++;
+      const id = dados.id || `novo_${contadorVereadores}`;
+      const statusCalculado = dados.status || '{{ "Celebrado" if data_assinatura else "" }}';
+      
+      const vereadorHTML = `
+        <div class="vereador-item border rounded p-3 mb-3" data-vereador-id="${id}">
+          <div class="d-flex justify-content-between mb-2">
+            <h6 class="mb-0">Vereador #${contadorVereadores}</h6>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerVereador('${id}')">
+              <i class="bi bi-trash"></i> Remover
+            </button>
+          </div>
+          
+          <input type="hidden" name="vereador_id[]" value="${id}">
+          
+          <div class="row mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Nome do Vereador</label>
+              <select class="form-select select2-vereador" name="vereador_nome[]" data-vereador-id="${id}">
+                <option value="">-- Selecione --</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Status</label>
+              <input type="text" class="form-control" name="vereador_status[]" value="${statusCalculado}" readonly style="background-color: #e9ecef;">
+              <small class="text-muted">Status calculado automaticamente</small>
+            </div>
+          </div>
+          
+          <div class="row mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Valor (R$)</label>
+              <input type="text" class="form-control valor-monetario-vereador" name="vereador_valor[]" 
+                     value="${dados.valor ? formatarMoedaVereador(dados.valor) : ''}" placeholder="0,00">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Observações</label>
+              <input type="text" class="form-control" name="vereador_observacoes[]" value="${dados.observacoes || ''}">
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('vereadoresContainer').insertAdjacentHTML('beforeend', vereadorHTML);
+      
+      // Inicializar Select2 para o novo vereador
+      const selectElement = document.querySelector(`[data-vereador-id="${id}"].select2-vereador`);
+      $(selectElement).select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        ajax: {
+          url: '/parcerias/api/lista/c_geral_vereadores',
+          dataType: 'json',
+          delay: 250,
+          data: function (params) {
+            return { q: params.term };
+          },
+          processResults: function (data) {
+            return { 
+              results: data.map(item => ({
+                id: item.vereador_nome,
+                text: item.vereador_nome
+              }))
+            };
+          },
+          cache: true
+        },
+        placeholder: 'Digite para buscar vereador...',
+        allowClear: true,
+        minimumInputLength: 0,
+        language: {
+          noResults: function() {
+            return "Nenhum vereador encontrado";
+          },
+          searching: function() {
+            return "Buscando...";
+          },
+          inputTooShort: function() {
+            return "Digite para buscar";
+          }
+        }
+      });
+      
+      // Se tem dados de vereador, pré-selecionar
+      if (dados.vereador_nome) {
+        const option = new Option(dados.vereador_nome, dados.vereador_nome, true, true);
+        $(selectElement).append(option).trigger('change');
+      }
+      
+      // Aplicar formatação monetária
+      aplicarFormatacaoMonetariaVereador();
+    }
+
+    // Remover vereador
+    function removerVereador(id) {
+      if (confirm('Deseja remover este vereador?')) {
+        const elemento = document.querySelector(`[data-vereador-id="${id}"]`);
+        if (elemento) {
+          elemento.remove();
+        }
+      }
+    }
+
+    // Formatação monetária para campos de vereador
+    function formatarMoedaVereador(valor) {
+      if (!valor) return '0,00';
+      valor = valor.toString().replace(/\D/g, '');
+      valor = (parseInt(valor) / 100).toFixed(2);
+      valor = valor.replace('.', ',');
+      valor = valor.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      return valor;
+    }
+
+    function aplicarFormatacaoMonetariaVereador() {
+      document.querySelectorAll('.valor-monetario-vereador').forEach(input => {
+        input.addEventListener('input', function(e) {
+          let valor = e.target.value.replace(/\D/g, '');
+          e.target.value = formatarMoedaVereador(valor);
+        });
+        
+        input.addEventListener('blur', function(e) {
+          if (!e.target.value || e.target.value === '') {
+            e.target.value = '0,00';
+          }
+        });
+      });
+    }
+  
   </script>
 </body>
 </html>

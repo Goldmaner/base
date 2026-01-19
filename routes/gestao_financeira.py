@@ -236,7 +236,8 @@ def gerar_encaminhamento():
         sei_aditamento = None
         
         for record in sei_records:
-            if record['aditamento'] != '-':
+            # Verificar se aditamento não é None e não é '-'
+            if record['aditamento'] and record['aditamento'] != '-':
                 # Tentar converter para número para pegar o maior
                 try:
                     num_aditamento = int(record['aditamento'])

@@ -55,108 +55,265 @@
 
     <!-- Seção de Filtros -->
     <div class="filter-section">
-      <form method="get" action="{{ url_for('parcerias.listar') }}">
-        <div class="row mb-3">
-          <div class="col-md-12">
-            <h5><i class="bi bi-funnel"></i> Filtros</h5>
-          </div>
-        </div>
-        
-        <div class="row g-3 mb-3">
-          <div class="col-md-3">
-            <label for="filtro_termo" class="form-label">Número do Termo</label>
-            <input type="text" class="form-control" id="filtro_termo" name="filtro_termo" 
-                   value="{{ filtro_termo or '' }}" placeholder="Ex: TCL/001/2024">
-          </div>
-          <div class="col-md-3">
-            <label for="filtro_osc" class="form-label">OSC</label>
-            <input type="text" class="form-control" id="filtro_osc" name="filtro_osc" 
-                   value="{{ filtro_osc or '' }}" placeholder="Nome da OSC">
-          </div>
-          <div class="col-md-3">
-            <label for="filtro_projeto" class="form-label">Projeto</label>
-            <input type="text" class="form-control" id="filtro_projeto" name="filtro_projeto" 
-                   value="{{ filtro_projeto or '' }}" placeholder="Nome do projeto">
-          </div>
-          <div class="col-md-3">
-            <label for="filtro_tipo_termo" class="form-label">Tipo de Termo</label>
-            <select class="form-select" id="filtro_tipo_termo" name="filtro_tipo_termo">
-              <option value="">-- Todos --</option>
-              {% for tipo in tipos_contrato %}
-                <option value="{{ tipo }}" {% if filtro_tipo_termo == tipo %}selected{% endif %}>{{ tipo }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-md-3">
-            <label for="filtro_status" class="form-label">Status do Termo</label>
-            <select class="form-select" id="filtro_status" name="filtro_status">
-              <option value="">-- Todos --</option>
-              <option value="vigente" {% if filtro_status == 'vigente' %}selected{% endif %}>Vigente</option>
-              <option value="encerrado" {% if filtro_status == 'encerrado' %}selected{% endif %}>Encerrado</option>
-              <option value="nao_iniciado" {% if filtro_status == 'nao_iniciado' %}selected{% endif %}>Não iniciado</option>
-              <option value="rescindido" {% if filtro_status == 'rescindido' %}selected{% endif %}>Rescindido</option>
-              <option value="suspenso" {% if filtro_status == 'suspenso' %}selected{% endif %}>Suspenso</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label for="filtro_pessoa_gestora" class="form-label">Pessoa Gestora</label>
-            <select class="form-select" id="filtro_pessoa_gestora" name="filtro_pessoa_gestora">
-              <option value="">-- Todas --</option>
-              <option value="Nenhuma" {% if filtro_pessoa_gestora == 'Nenhuma' %}selected{% endif %}>Nenhuma</option>
-              <option value="Inativos" {% if filtro_pessoa_gestora == 'Inativos' %}selected{% endif %}>Inativos</option>
-              {% for pg in pessoas_gestoras_filtro %}
-                <option value="{{ pg }}" {% if filtro_pessoa_gestora == pg %}selected{% endif %}>{{ pg }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-
-        <div class="row mb-3">
-          <div class="col-md-12">
-            <h6><i class="bi bi-search"></i> Pesquisa por Processo SEI</h6>
-          </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-md-6">
-            <label for="busca_sei_celeb" class="form-label">SEI de Celebração</label>
-            <input type="text" class="form-control" id="busca_sei_celeb" name="busca_sei_celeb" 
-                   value="{{ busca_sei_celeb or '' }}" placeholder="Ex: 6074.2024/0001234-5">
-          </div>
-          <div class="col-md-6">
-            <label for="busca_sei_pc" class="form-label">SEI de Pagamento/PC</label>
-            <input type="text" class="form-control" id="busca_sei_pc" name="busca_sei_pc" 
-                   value="{{ busca_sei_pc or '' }}" placeholder="Ex: 6074.2024/0005678-9">
-          </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-md-12">
-            <label for="limite" class="form-label">Mostrar somente</label>
-            <select class="form-select" id="limite" name="limite" style="width: 200px;">
-              <option value="10" {% if limite == '10' %}selected{% endif %}>10 linhas</option>
-              <option value="50" {% if limite == '50' %}selected{% endif %}>50 linhas</option>
-              <option value="100" {% if limite == '100' %}selected{% endif %}>100 linhas</option>
-              <option value="1000" {% if limite == '1000' %}selected{% endif %}>1000 linhas</option>
-              <option value="todas" {% if limite == 'todas' %}selected{% endif %}>Todas</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col-md-12 d-flex gap-2">
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-search"></i> Aplicar Filtros
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">
+          <i class="bi bi-funnel"></i> Filtros
+        </h5>
+        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
+          <i class="bi bi-chevron-down" id="iconFiltros"></i> Mostrar/Ocultar Todos os Filtros
+        </button>
+      </div>
+      
+      <div class="collapse" id="filtrosCollapse">
+        <form method="get" action="{{ url_for('parcerias.listar') }}">
+          
+          <!-- SEÇÃO 1: INFORMAÇÕES GERAIS -->
+          <div class="mb-3">
+            <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoGeral" aria-expanded="true">
+              <span><i class="bi bi-file-text"></i> <strong>Informações Gerais</strong></span>
+              <i class="bi bi-chevron-down"></i>
             </button>
-            <a href="{{ url_for('parcerias.listar') }}" class="btn btn-secondary">
-              <i class="bi bi-x-circle"></i> Limpar Filtros
-            </a>
+            <div class="collapse show" id="secaoGeral">
+              <div class="card card-body mt-2">
+                <div class="row g-3">
+                  <div class="col-md-3">
+                    <label for="filtro_termo" class="form-label">Número do Termo</label>
+                    <input type="text" class="form-control" id="filtro_termo" name="filtro_termo" 
+                           value="{{ filtro_termo or '' }}" placeholder="Ex: TCL/001/2024">
+                  </div>
+                  <div class="col-md-3">
+                    <label for="filtro_osc" class="form-label">OSC</label>
+                    <input type="text" class="form-control" id="filtro_osc" name="filtro_osc" 
+                           value="{{ filtro_osc or '' }}" placeholder="Nome da OSC">
+                  </div>
+                  <div class="col-md-3">
+                    <label for="filtro_projeto" class="form-label">Projeto</label>
+                    <input type="text" class="form-control" id="filtro_projeto" name="filtro_projeto" 
+                           value="{{ filtro_projeto or '' }}" placeholder="Nome do projeto">
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Tipo de Termo</label>
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="tipo_todos" onchange="toggleAllCheckboxes('tipo', this.checked)">
+                        <label class="form-check-label" for="tipo_todos"><strong>Todos</strong></label>
+                      </div>
+                      <hr class="my-1">
+                      {% for tipo in tipos_contrato %}
+                        <div class="form-check">
+                          <input class="form-check-input tipo-check" type="checkbox" name="filtro_tipo_termo" value="{{ tipo }}" id="tipo_{{ loop.index }}" {% if tipo in filtro_tipo_termo %}checked{% endif %}>
+                          <label class="form-check-label" for="tipo_{{ loop.index }}">{{ tipo }}</label>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Status do Termo</label>
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="status_todos" onchange="toggleAllCheckboxes('status', this.checked)">
+                        <label class="form-check-label" for="status_todos"><strong>Todos</strong></label>
+                      </div>
+                      <hr class="my-1">
+                      <div class="form-check">
+                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="vigente" id="status_vigente" {% if 'vigente' in filtro_status %}checked{% endif %}>
+                        <label class="form-check-label" for="status_vigente">Vigente</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="encerrado" id="status_encerrado" {% if 'encerrado' in filtro_status %}checked{% endif %}>
+                        <label class="form-check-label" for="status_encerrado">Encerrado</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="nao_iniciado" id="status_nao_iniciado" {% if 'nao_iniciado' in filtro_status %}checked{% endif %}>
+                        <label class="form-check-label" for="status_nao_iniciado">Não iniciado</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="rescindido" id="status_rescindido" {% if 'rescindido' in filtro_status %}checked{% endif %}>
+                        <label class="form-check-label" for="status_rescindido">Rescindido</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="suspenso" id="status_suspenso" {% if 'suspenso' in filtro_status %}checked{% endif %}>
+                        <label class="form-check-label" for="status_suspenso">Suspenso</label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </form>
+
+          <!-- SEÇÃO 2: PESSOA GESTORA E EDITAL -->
+          <div class="mb-3">
+            <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoPessoaEdital" aria-expanded="false">
+              <span><i class="bi bi-person-badge"></i> <strong>Pessoa Gestora e Edital</strong></span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="collapse" id="secaoPessoaEdital">
+              <div class="card card-body mt-2">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Pessoa Gestora</label>
+                    <div style="max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="pg_todos" onchange="toggleAllCheckboxes('pg', this.checked)">
+                        <label class="form-check-label" for="pg_todos"><strong>Todas</strong></label>
+                      </div>
+                      <hr class="my-1">
+                      <div class="form-check">
+                        <input class="form-check-input pg-check" type="checkbox" name="filtro_pessoa_gestora" value="Nenhuma" id="pg_nenhuma" {% if 'Nenhuma' in filtro_pessoa_gestora %}checked{% endif %}>
+                        <label class="form-check-label" for="pg_nenhuma"><em>Nenhuma</em></label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input pg-check" type="checkbox" name="filtro_pessoa_gestora" value="Inativos" id="pg_inativos" {% if 'Inativos' in filtro_pessoa_gestora %}checked{% endif %}>
+                        <label class="form-check-label" for="pg_inativos"><em>Inativos</em></label>
+                      </div>
+                      <hr class="my-1">
+                      {% for pg in pessoas_gestoras_filtro %}
+                        <div class="form-check">
+                          <input class="form-check-input pg-check" type="checkbox" name="filtro_pessoa_gestora" value="{{ pg }}" id="pg_{{ loop.index }}" {% if pg in filtro_pessoa_gestora %}checked{% endif %}>
+                          <label class="form-check-label" for="pg_{{ loop.index }}">{{ pg }}</label>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Edital</label>
+                    <div style="max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="edital_todos" onchange="toggleAllCheckboxes('edital', this.checked)">
+                        <label class="form-check-label" for="edital_todos"><strong>Todos</strong></label>
+                      </div>
+                      <hr class="my-1">
+                      {% for edital in editais_filtro %}
+                        <div class="form-check">
+                          <input class="form-check-input edital-check" type="checkbox" name="filtro_edital" value="{{ edital }}" id="edital_{{ loop.index }}" {% if edital in filtro_edital %}checked{% endif %}>
+                          <label class="form-check-label" for="edital_{{ loop.index }}">{{ edital }}</label>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 3: PROCESSOS SEI -->
+          <div class="mb-3">
+            <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoSEI" aria-expanded="false">
+              <span><i class="bi bi-search"></i> <strong>Processos SEI</strong></span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="collapse" id="secaoSEI">
+              <div class="card card-body mt-2">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label for="busca_sei_celeb" class="form-label">SEI de Celebração</label>
+                    <input type="text" class="form-control" id="busca_sei_celeb" name="busca_sei_celeb" 
+                           value="{{ busca_sei_celeb or '' }}" placeholder="Ex: 6074.2024/0001234-5">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="busca_sei_pc" class="form-label">SEI de Pagamento/PC</label>
+                    <input type="text" class="form-control" id="busca_sei_pc" name="busca_sei_pc" 
+                           value="{{ busca_sei_pc or '' }}" placeholder="Ex: 6074.2024/0005678-9">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 4: FILTROS POR DATAS -->
+          <div class="mb-3">
+            <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoDatas" aria-expanded="false">
+              <span><i class="bi bi-calendar-range"></i> <strong>Filtros por Datas</strong></span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="collapse" id="secaoDatas">
+              <div class="card card-body mt-2">
+                <!-- Data de Assinatura -->
+                <div class="row g-3 mb-3">
+                  <div class="col-md-12">
+                    <h6 class="text-muted mb-2"><i class="bi bi-pen"></i> Data de Assinatura</h6>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="data_assinatura_inicio" class="form-label">De</label>
+                    <input type="date" class="form-control" id="data_assinatura_inicio" name="data_assinatura_inicio" 
+                           value="{{ data_assinatura_inicio or '' }}">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="data_assinatura_fim" class="form-label">Até</label>
+                    <input type="date" class="form-control" id="data_assinatura_fim" name="data_assinatura_fim" 
+                           value="{{ data_assinatura_fim or '' }}">
+                  </div>
+                </div>
+
+                <hr>
+
+                <!-- Data de Início -->
+                <div class="row g-3 mb-3">
+                  <div class="col-md-12">
+                    <h6 class="text-muted mb-2"><i class="bi bi-play-circle"></i> Data de Início</h6>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="data_inicio_de" class="form-label">De</label>
+                    <input type="date" class="form-control" id="data_inicio_de" name="data_inicio_de" 
+                           value="{{ data_inicio_de or '' }}">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="data_inicio_ate" class="form-label">Até</label>
+                    <input type="date" class="form-control" id="data_inicio_ate" name="data_inicio_ate" 
+                           value="{{ data_inicio_ate or '' }}">
+                  </div>
+                </div>
+
+                <hr>
+
+                <!-- Data de Término -->
+                <div class="row g-3">
+                  <div class="col-md-12">
+                    <h6 class="text-muted mb-2"><i class="bi bi-stop-circle"></i> Data de Término</h6>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="data_termino_de" class="form-label">De</label>
+                    <input type="date" class="form-control" id="data_termino_de" name="data_termino_de" 
+                           value="{{ data_termino_de or '' }}">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="data_termino_ate" class="form-label">Até</label>
+                    <input type="date" class="form-control" id="data_termino_ate" name="data_termino_ate" 
+                           value="{{ data_termino_ate or '' }}">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Limite de resultados -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-12">
+              <label for="limite" class="form-label"><i class="bi bi-list-ol"></i> Mostrar somente</label>
+              <select class="form-select" id="limite" name="limite" style="width: 200px;">
+                <option value="10" {% if limite == '10' %}selected{% endif %}>10 linhas</option>
+                <option value="50" {% if limite == '50' %}selected{% endif %}>50 linhas</option>
+                <option value="100" {% if limite == '100' %}selected{% endif %}>100 linhas</option>
+                <option value="1000" {% if limite == '1000' %}selected{% endif %}>1000 linhas</option>
+                <option value="todas" {% if limite == 'todas' %}selected{% endif %}>Todas</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Botões de ação -->
+          <div class="row">
+            <div class="col-md-12 d-flex gap-2">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search"></i> Aplicar Filtros
+              </button>
+              <a href="{{ url_for('parcerias.listar') }}" class="btn btn-secondary">
+                <i class="bi bi-x-circle"></i> Limpar Filtros
+              </a>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Tabela de Parcerias -->
@@ -174,18 +331,21 @@
               <th class="text-center">Status</th>
               <th class="text-center">Pessoa Gestora</th>
               <th class="text-center sortable" onclick="sortTable(6)" style="cursor: pointer;">
-                Data de Início <i class="bi bi-arrow-down-up"></i>
+                Data de Assinatura <i class="bi bi-arrow-down-up"></i>
               </th>
               <th class="text-center sortable" onclick="sortTable(7)" style="cursor: pointer;">
-                Data de Término <i class="bi bi-arrow-down-up"></i>
+                Data de Início <i class="bi bi-arrow-down-up"></i>
               </th>
               <th class="text-center sortable" onclick="sortTable(8)" style="cursor: pointer;">
-                Meses do Projeto <i class="bi bi-arrow-down-up"></i>
+                Data de Término <i class="bi bi-arrow-down-up"></i>
               </th>
               <th class="text-center sortable" onclick="sortTable(9)" style="cursor: pointer;">
-                Total Valor Previsto <i class="bi bi-arrow-down-up"></i>
+                Meses do Projeto <i class="bi bi-arrow-down-up"></i>
               </th>
               <th class="text-center sortable" onclick="sortTable(10)" style="cursor: pointer;">
+                Total Valor Previsto <i class="bi bi-arrow-down-up"></i>
+              </th>
+              <th class="text-center sortable" onclick="sortTable(11)" style="cursor: pointer;">
                 Total Valor Pago <i class="bi bi-arrow-down-up"></i>
               </th>
               <th class="text-center">SEI de Celebração</th>
@@ -224,6 +384,7 @@
                     {% endif %}
                   {% endif %}
                 </td>
+                <td class="text-center">{{ parceria.data_assinatura_termo.strftime('%d/%m/%Y') if parceria.data_assinatura_termo else '-' }}</td>
                 <td class="text-center">{{ parceria.inicio.strftime('%d/%m/%Y') if parceria.inicio else '-' }}</td>
                 <td class="text-center">{{ parceria.final.strftime('%d/%m/%Y') if parceria.final else '-' }}</td>
                 <td class="text-center">{{ parceria.meses if parceria.meses is not none else '-' }}</td>
@@ -279,6 +440,42 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    // Toggle ícone do collapse de filtros principal
+    document.getElementById('filtrosCollapse').addEventListener('show.bs.collapse', function() {
+      document.getElementById('iconFiltros').className = 'bi bi-chevron-up';
+    });
+    document.getElementById('filtrosCollapse').addEventListener('hide.bs.collapse', function() {
+      document.getElementById('iconFiltros').className = 'bi bi-chevron-down';
+    });
+    
+    // Função para marcar/desmarcar todos os checkboxes de um grupo
+    function toggleAllCheckboxes(group, checked) {
+      const checkboxes = document.querySelectorAll('.' + group + '-check');
+      checkboxes.forEach(cb => cb.checked = checked);
+    }
+    
+    // Toggle ícones dos collapses de seções
+    const secoes = ['secaoGeral', 'secaoPessoaEdital', 'secaoSEI', 'secaoDatas'];
+    secoes.forEach(function(secaoId) {
+      const secaoElement = document.getElementById(secaoId);
+      if (secaoElement) {
+        secaoElement.addEventListener('show.bs.collapse', function() {
+          const button = document.querySelector('[data-bs-target="#' + secaoId + '"]');
+          if (button) {
+            const icon = button.querySelector('.bi-chevron-down, .bi-chevron-up');
+            if (icon) icon.className = 'bi bi-chevron-up';
+          }
+        });
+        secaoElement.addEventListener('hide.bs.collapse', function() {
+          const button = document.querySelector('[data-bs-target="#' + secaoId + '"]');
+          if (button) {
+            const icon = button.querySelector('.bi-chevron-down, .bi-chevron-up');
+            if (icon) icon.className = 'bi bi-chevron-down';
+          }
+        });
+      }
+    });
+    
     function exportarCSV() {
       // Mostrar indicador de carregamento
       const btnExportar = event.target.closest('button');

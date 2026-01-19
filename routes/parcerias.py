@@ -31,11 +31,18 @@ def listar():
     filtro_termo = request.args.get('filtro_termo', '').strip()
     filtro_osc = request.args.get('filtro_osc', '').strip()
     filtro_projeto = request.args.get('filtro_projeto', '').strip()
-    filtro_tipo_termo = request.args.get('filtro_tipo_termo', '').strip()
-    filtro_status = request.args.get('filtro_status', '').strip()
-    filtro_pessoa_gestora = request.args.get('filtro_pessoa_gestora', '').strip()
+    filtro_tipo_termo = request.args.getlist('filtro_tipo_termo')  # Multi-seleção
+    filtro_status = request.args.getlist('filtro_status')  # Multi-seleção
+    filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')  # Multi-seleção
+    filtro_edital = request.args.getlist('filtro_edital')  # Multi-seleção
     busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
     busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
+    data_assinatura_inicio = request.args.get('data_assinatura_inicio', '').strip()
+    data_assinatura_fim = request.args.get('data_assinatura_fim', '').strip()
+    data_inicio_de = request.args.get('data_inicio_de', '').strip()
+    data_inicio_ate = request.args.get('data_inicio_ate', '').strip()
+    data_termino_de = request.args.get('data_termino_de', '').strip()
+    data_termino_ate = request.args.get('data_termino_ate', '').strip()
     
     # Obter parâmetro de paginação (padrão: 100)
     limite = request.args.get('limite', '100')
@@ -57,6 +64,15 @@ def listar():
     # Buscar pessoas gestoras para o dropdown de filtro (todas, incluindo inativas)
     cur.execute("SELECT DISTINCT nome_pg FROM categoricas.c_geral_pessoa_gestora ORDER BY nome_pg")
     pessoas_gestoras_filtro = [row['nome_pg'] for row in cur.fetchall()]
+    
+    # Buscar editais para o dropdown de filtro
+    cur.execute("""
+        SELECT DISTINCT edital_nome 
+        FROM public.parcerias 
+        WHERE edital_nome IS NOT NULL 
+        ORDER BY edital_nome
+    """)
+    editais_filtro = [row['edital_nome'] for row in cur.fetchall()]
     
     # DEBUG: Verificar duplicação
     print(f"[DEBUG] Total de tipos_contrato retornados: {len(tipos_contrato)}")
@@ -94,7 +110,15 @@ def listar():
              FROM parcerias_pg pg 
              WHERE pg.numero_termo = p.numero_termo 
              ORDER BY pg.data_de_criacao DESC 
-             LIMIT 1) as solicitacao
+             LIMIT 1) as solicitacao,
+            (SELECT ps.data_assinatura
+             FROM public.parcerias_sei ps
+             WHERE ps.numero_termo = p.numero_termo
+               AND (ps.aditamento = '-' OR ps.aditamento IS NULL)
+               AND (ps.apostilamento = '-' OR ps.apostilamento IS NULL)
+               AND ps.termo_tipo_sei IS NULL
+             ORDER BY ps.id ASC
+             LIMIT 1) as data_assinatura_termo
         FROM Parcerias p
         WHERE 1=1
     """
@@ -115,19 +139,35 @@ def listar():
         params.append(f"%{filtro_projeto}%")
     
     if filtro_tipo_termo:
-        query += " AND p.tipo_termo ILIKE %s"
-        params.append(f"%{filtro_tipo_termo}%")
+        # Múltiplos tipos de termo
+        placeholders = ','.join(['%s'] * len(filtro_tipo_termo))
+        query += f" AND p.tipo_termo IN ({placeholders})"
+        params.extend(filtro_tipo_termo)
     
     if filtro_pessoa_gestora:
-        if filtro_pessoa_gestora.lower() == 'nenhuma':
-            # Filtrar parcerias que NÃO têm pessoa gestora
-            query += """ AND NOT EXISTS (
+        # Separar filtros especiais de nomes específicos
+        filtros_especiais = []
+        nomes_pg = []
+        
+        for pg in filtro_pessoa_gestora:
+            if pg.lower() == 'nenhuma':
+                filtros_especiais.append('nenhuma')
+            elif pg.lower() == 'inativos':
+                filtros_especiais.append('inativos')
+            else:
+                nomes_pg.append(pg)
+        
+        # Construir condições OR
+        condicoes_pg = []
+        
+        if 'nenhuma' in filtros_especiais:
+            condicoes_pg.append(""" NOT EXISTS (
                 SELECT 1 FROM parcerias_pg pg 
                 WHERE pg.numero_termo = p.numero_termo
-            )"""
-        elif filtro_pessoa_gestora.lower() == 'inativos':
-            # Filtrar parcerias com pessoas gestoras inativas
-            query += """ AND EXISTS (
+            )""")
+        
+        if 'inativos' in filtros_especiais:
+            condicoes_pg.append(""" EXISTS (
                 SELECT 1 FROM parcerias_pg pg 
                 LEFT JOIN categoricas.c_geral_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
                 WHERE pg.numero_termo = p.numero_termo 
@@ -137,20 +177,24 @@ def listar():
                     FROM parcerias_pg 
                     WHERE numero_termo = p.numero_termo
                 )
-            )"""
-        else:
-            # Filtrar parcerias com pessoa gestora específica
-            query += """ AND EXISTS (
+            )""")
+        
+        if nomes_pg:
+            placeholders = ','.join(['%s'] * len(nomes_pg))
+            condicoes_pg.append(f""" EXISTS (
                 SELECT 1 FROM parcerias_pg pg 
                 WHERE pg.numero_termo = p.numero_termo 
-                AND pg.nome_pg ILIKE %s
+                AND pg.nome_pg IN ({placeholders})
                 AND pg.data_de_criacao = (
                     SELECT MAX(data_de_criacao) 
                     FROM parcerias_pg 
                     WHERE numero_termo = p.numero_termo
                 )
-            )"""
-            params.append(f"%{filtro_pessoa_gestora}%")
+            )""")
+            params.extend(nomes_pg)
+        
+        if condicoes_pg:
+            query += " AND (" + " OR ".join(condicoes_pg) + ")"
     
     if busca_sei_celeb:
         query += " AND sei_celeb ILIKE %s"
@@ -160,22 +204,74 @@ def listar():
         query += " AND sei_pc ILIKE %s"
         params.append(f"%{busca_sei_pc}%")
     
-    # Filtro de status baseado em datas
+    if filtro_edital:
+        # Múltiplos editais
+        placeholders = ','.join(['%s'] * len(filtro_edital))
+        query += f" AND p.edital_nome IN ({placeholders})"
+        params.extend(filtro_edital)
+    
+    # Filtro por data de assinatura
+    if data_assinatura_inicio:
+        query += """ AND EXISTS (
+            SELECT 1 FROM public.parcerias_sei ps
+            WHERE ps.numero_termo = p.numero_termo
+              AND (ps.aditamento = '-' OR ps.aditamento IS NULL)
+              AND (ps.apostilamento = '-' OR ps.apostilamento IS NULL)
+              AND ps.termo_tipo_sei IS NULL
+              AND ps.data_assinatura >= %s
+        )"""
+        params.append(data_assinatura_inicio)
+    
+    if data_assinatura_fim:
+        query += """ AND EXISTS (
+            SELECT 1 FROM public.parcerias_sei ps
+            WHERE ps.numero_termo = p.numero_termo
+              AND (ps.aditamento = '-' OR ps.aditamento IS NULL)
+              AND (ps.apostilamento = '-' OR ps.apostilamento IS NULL)
+              AND ps.termo_tipo_sei IS NULL
+              AND ps.data_assinatura <= %s
+        )"""
+        params.append(data_assinatura_fim)
+    
+    # Filtro por data de início
+    if data_inicio_de:
+        query += " AND p.inicio >= %s"
+        params.append(data_inicio_de)
+    
+    if data_inicio_ate:
+        query += " AND p.inicio <= %s"
+        params.append(data_inicio_ate)
+    
+    # Filtro por data de término
+    if data_termino_de:
+        query += " AND p.final >= %s"
+        params.append(data_termino_de)
+    
+    if data_termino_ate:
+        query += " AND p.final <= %s"
+        params.append(data_termino_ate)
+    
+    # Filtro de status baseado em datas (múltiplos status)
     # Vigente: inicio <= HOJE <= final
     # Encerrado: final < HOJE
     # Não iniciado: inicio > HOJE
     # Rescindido e Suspenso: deixar para depois (não filtrar por enquanto)
     if filtro_status:
-        if filtro_status == 'vigente':
-            query += " AND inicio <= CURRENT_DATE AND final >= CURRENT_DATE"
-        elif filtro_status == 'encerrado':
-            query += " AND final < CURRENT_DATE"
-        elif filtro_status == 'nao_iniciado':
-            query += " AND inicio > CURRENT_DATE"
-        elif filtro_status in ['rescindido', 'suspenso']:
-            # Por enquanto, não implementado - não retorna nada
-            # No futuro, adicionar coluna de status na tabela
-            query += " AND 1=0"  # Condição falsa para não retornar resultados
+        condicoes_status = []
+        
+        for status in filtro_status:
+            if status == 'vigente':
+                condicoes_status.append("(inicio <= CURRENT_DATE AND final >= CURRENT_DATE)")
+            elif status == 'encerrado':
+                condicoes_status.append("(final < CURRENT_DATE)")
+            elif status == 'nao_iniciado':
+                condicoes_status.append("(inicio > CURRENT_DATE)")
+            elif status in ['rescindido', 'suspenso']:
+                # Por enquanto, não implementado - adiciona condição falsa
+                condicoes_status.append("(1=0)")
+        
+        if condicoes_status:
+            query += " AND (" + " OR ".join(condicoes_status) + ")"
     
     query += " ORDER BY numero_termo"
     
@@ -210,6 +306,17 @@ def listar():
             except (ValueError, TypeError) as e:
                 print(f"[ERRO] Data final inválida para termo {parceria['numero_termo']}: {parceria['final_str']} - {e}")
                 parceria['final'] = None
+            
+            # Converter data_assinatura_termo
+            try:
+                if parceria.get('data_assinatura_termo'):
+                    # Se for string, converter
+                    if isinstance(parceria['data_assinatura_termo'], str):
+                        parceria['data_assinatura_termo'] = datetime.strptime(parceria['data_assinatura_termo'], '%Y-%m-%d').date()
+                    # Se já for date, manter
+            except (ValueError, TypeError) as e:
+                print(f"[ERRO] Data assinatura inválida para termo {parceria['numero_termo']}: {parceria.get('data_assinatura_termo')} - {e}")
+                parceria['data_assinatura_termo'] = None
         
     except ValueError as e:
         print(f"[ERRO] Erro ao processar datas das parcerias: {e}")
@@ -294,14 +401,22 @@ def listar():
                          parcerias=parcerias,
                          tipos_contrato=tipos_contrato,
                          pessoas_gestoras_filtro=pessoas_gestoras_filtro,
+                         editais_filtro=editais_filtro,
                          filtro_termo=filtro_termo,
                          filtro_osc=filtro_osc,
                          filtro_projeto=filtro_projeto,
                          filtro_tipo_termo=filtro_tipo_termo,
                          filtro_status=filtro_status,
                          filtro_pessoa_gestora=filtro_pessoa_gestora,
+                         filtro_edital=filtro_edital,
                          busca_sei_celeb=busca_sei_celeb,
                          busca_sei_pc=busca_sei_pc,
+                         data_assinatura_inicio=data_assinatura_inicio,
+                         data_assinatura_fim=data_assinatura_fim,
+                         data_inicio_de=data_inicio_de,
+                         data_inicio_ate=data_inicio_ate,
+                         data_termino_de=data_termino_de,
+                         data_termino_ate=data_termino_ate,
                          limite=limite,
                          contagem_status=contagem_status,
                          total_geral=total_geral)
@@ -530,6 +645,64 @@ def nova():
                     except Exception as e:
                         print(f"[ERRO] Falha ao salvar termo_sei_doc e data_assinatura: {e}")
                 
+                # === SALVAR VEREADORES (EMENDAS PARLAMENTARES) ===
+                try:
+                    # Buscar sei_celeb da parceria recém-criada
+                    cur_sei = get_cursor()
+                    cur_sei.execute("SELECT sei_celeb FROM public.parcerias WHERE numero_termo = %s", (numero_termo,))
+                    result_sei = cur_sei.fetchone()
+                    sei_celeb = result_sei['sei_celeb'] if result_sei else None
+                    cur_sei.close()
+                    
+                    if sei_celeb:
+                        # Deletar vereadores existentes para este sei_celeb
+                        delete_vereadores = "DELETE FROM public.parcerias_emendas WHERE sei_celeb = %s"
+                        execute_query(delete_vereadores, (sei_celeb,))
+                        
+                        # Pegar todos os vereadores (arrays do formulário)
+                        vereadores_nomes = request.form.getlist('vereador_nome[]')
+                        vereadores_status = request.form.getlist('vereador_status[]')
+                        vereadores_valores = request.form.getlist('vereador_valor[]')
+                        vereadores_obs = request.form.getlist('vereador_observacoes[]')
+                        
+                        # Inserir cada vereador
+                        count_vereadores = 0
+                        for idx, vereador_nome in enumerate(vereadores_nomes):
+                            if vereador_nome and vereador_nome.strip():  # Só insere se nome foi preenchido
+                                status = vereadores_status[idx] if idx < len(vereadores_status) else None
+                                valor_str = vereadores_valores[idx] if idx < len(vereadores_valores) else None
+                                observacoes = vereadores_obs[idx] if idx < len(vereadores_obs) else None
+                                
+                                # Converter valor monetário de formato brasileiro para decimal
+                                valor = None
+                                if valor_str:
+                                    try:
+                                        # Remove pontos de milhar e substitui vírgula por ponto
+                                        valor_clean = valor_str.replace('.', '').replace(',', '.')
+                                        valor = float(valor_clean)
+                                    except:
+                                        valor = None
+                                
+                                vereador_query = """
+                                    INSERT INTO public.parcerias_emendas (
+                                        sei_celeb, vereador_nome, status, valor, observacoes
+                                    ) VALUES (%s, %s, %s, %s, %s)
+                                """
+                                vereador_params = (
+                                    sei_celeb,
+                                    vereador_nome.strip(),
+                                    status if status and status.strip() else None,
+                                    valor,
+                                    observacoes if observacoes and observacoes.strip() else None
+                                )
+                                execute_query(vereador_query, vereador_params)
+                                count_vereadores += 1
+                        
+                        if count_vereadores > 0:
+                            print(f"[DEBUG NOVA] {count_vereadores} vereador(es) salvo(s) para SEI {sei_celeb}")
+                except Exception as e:
+                    print(f"[ERRO] Falha ao salvar vereadores: {e}")
+                
                 # Registrar na tabela de auditoria parcerias_pg
                 pessoa_gestora = request.form.get('pessoa_gestora')
                 solicitacao_checkbox = request.form.get('solicitacao_alteracao')
@@ -626,7 +799,9 @@ def nova():
     # Buscar informações adicionais e endereços (vazios para nova)
     infos_adicionais = {}
     enderecos = []
+    vereadores_emenda = []
     projeto_online = False
+    data_assinatura = None
     
     return render_template("parcerias_form.html", 
                          parceria=parceria_preenchida,
@@ -636,8 +811,10 @@ def nova():
                          editais=editais,
                          rf_pessoa_gestora=None,
                          termo_sei_doc=termo_sei_doc,
+                         data_assinatura=data_assinatura,
                          infos_adicionais=infos_adicionais,
                          enderecos=enderecos,
+                         vereadores_emenda=vereadores_emenda,
                          projeto_online=projeto_online,
                          modo_importacao=True if numero_termo_param else False)
 
@@ -881,6 +1058,64 @@ def editar(numero_termo):
                     except Exception as e:
                         print(f"[ERRO] Falha ao salvar termo_sei_doc e data_assinatura em editar: {e}")
                 
+                # === SALVAR VEREADORES (EMENDAS PARLAMENTARES) ===
+                try:
+                    # Buscar sei_celeb da parceria
+                    cur_sei = get_cursor()
+                    cur_sei.execute("SELECT sei_celeb FROM public.parcerias WHERE numero_termo = %s", (numero_termo,))
+                    result_sei = cur_sei.fetchone()
+                    sei_celeb = result_sei['sei_celeb'] if result_sei else None
+                    cur_sei.close()
+                    
+                    if sei_celeb:
+                        # Deletar vereadores existentes para este sei_celeb
+                        delete_vereadores = "DELETE FROM public.parcerias_emendas WHERE sei_celeb = %s"
+                        execute_query(delete_vereadores, (sei_celeb,))
+                        
+                        # Pegar todos os vereadores (arrays do formulário)
+                        vereadores_nomes = request.form.getlist('vereador_nome[]')
+                        vereadores_status = request.form.getlist('vereador_status[]')
+                        vereadores_valores = request.form.getlist('vereador_valor[]')
+                        vereadores_obs = request.form.getlist('vereador_observacoes[]')
+                        
+                        # Inserir cada vereador
+                        count_vereadores = 0
+                        for idx, vereador_nome in enumerate(vereadores_nomes):
+                            if vereador_nome and vereador_nome.strip():  # Só insere se nome foi preenchido
+                                status = vereadores_status[idx] if idx < len(vereadores_status) else None
+                                valor_str = vereadores_valores[idx] if idx < len(vereadores_valores) else None
+                                observacoes = vereadores_obs[idx] if idx < len(vereadores_obs) else None
+                                
+                                # Converter valor monetário de formato brasileiro para decimal
+                                valor = None
+                                if valor_str:
+                                    try:
+                                        # Remove pontos de milhar e substitui vírgula por ponto
+                                        valor_clean = valor_str.replace('.', '').replace(',', '.')
+                                        valor = float(valor_clean)
+                                    except:
+                                        valor = None
+                                
+                                vereador_query = """
+                                    INSERT INTO public.parcerias_emendas (
+                                        sei_celeb, vereador_nome, status, valor, observacoes
+                                    ) VALUES (%s, %s, %s, %s, %s)
+                                """
+                                vereador_params = (
+                                    sei_celeb,
+                                    vereador_nome.strip(),
+                                    status if status and status.strip() else None,
+                                    valor,
+                                    observacoes if observacoes and observacoes.strip() else None
+                                )
+                                execute_query(vereador_query, vereador_params)
+                                count_vereadores += 1
+                        
+                        if count_vereadores > 0:
+                            print(f"[DEBUG EDITAR] {count_vereadores} vereador(es) salvo(s) para SEI {sei_celeb}")
+                except Exception as e:
+                    print(f"[ERRO] Falha ao salvar vereadores: {e}")
+                
                 # Registrar na tabela de auditoria parcerias_pg se houve mudança
                 solicitacao_checkbox = request.form.get('solicitacao_alteracao')
                 solicitacao = True if solicitacao_checkbox == 'on' else False
@@ -1080,6 +1315,19 @@ def editar(numero_termo):
     if enderecos and len(enderecos) == 1 and enderecos[0].get('observacao') == 'Projeto Online':
         projeto_online = True
     
+    # Buscar vereadores (emendas parlamentares)
+    vereadores_emenda = []
+    if parceria and parceria.get('sei_celeb'):
+        cur = get_cursor()
+        cur.execute("""
+            SELECT id, vereador_nome, status, valor, observacoes
+            FROM public.parcerias_emendas
+            WHERE sei_celeb = %s
+            ORDER BY id
+        """, (parceria['sei_celeb'],))
+        vereadores_emenda = cur.fetchall()
+        cur.close()
+    
     cur.close()
     
     return render_template("parcerias_form.html", 
@@ -1094,6 +1342,7 @@ def editar(numero_termo):
                          infos_adicionais=infos_adicionais,
                          enderecos=enderecos,
                          projeto_online=projeto_online,
+                         vereadores_emenda=vereadores_emenda,
                          termo_rescindido=termo_rescindido,
                          data_rescisao=data_rescisao)
 
@@ -1149,6 +1398,55 @@ def api_sigla_tipo_termo():
     return jsonify(mapeamento)
 
 
+@parcerias_bp.route("/api/lista/<tabela>", methods=["GET"])
+@login_required
+def api_lista_generica(tabela):
+    """
+    API genérica para buscar dados de listas categóricas com autocomplete
+    Exemplo: /api/lista/c_geral_vereadores?q=João
+    """
+    from flask import jsonify, request
+    
+    # Lista de tabelas permitidas (segurança)
+    tabelas_permitidas = ['c_geral_vereadores']
+    
+    if tabela not in tabelas_permitidas:
+        return jsonify({'error': 'Tabela não permitida'}), 403
+    
+    query_param = request.args.get('q', '').strip()
+    
+    cur = get_cursor()
+    
+    if tabela == 'c_geral_vereadores':
+        # Buscar vereadores ativos
+        if query_param:
+            cur.execute("""
+                SELECT vereador_nome, partido, legislatura_numero, situacao
+                FROM categoricas.c_geral_vereadores
+                WHERE situacao = 'Ativo'
+                  AND vereador_nome ILIKE %s
+                ORDER BY vereador_nome
+                LIMIT 20
+            """, (f'%{query_param}%',))
+        else:
+            # Se não há busca, retornar os 20 mais recentes
+            cur.execute("""
+                SELECT vereador_nome, partido, legislatura_numero, situacao
+                FROM categoricas.c_geral_vereadores
+                WHERE situacao = 'Ativo'
+                ORDER BY legislatura_numero DESC, vereador_nome
+                LIMIT 20
+            """)
+    
+    resultados = cur.fetchall()
+    cur.close()
+    
+    # Converter para lista de dicionários
+    lista = [dict(row) for row in resultados]
+    
+    return jsonify(lista)
+
+
 @parcerias_bp.route("/exportar-csv", methods=["GET"])
 @login_required
 @requires_access('parcerias')
@@ -1161,11 +1459,18 @@ def exportar_csv():
         filtro_termo = request.args.get('filtro_termo', '').strip()
         filtro_osc = request.args.get('filtro_osc', '').strip()
         filtro_projeto = request.args.get('filtro_projeto', '').strip()
-        filtro_tipo_termo = request.args.get('filtro_tipo_termo', '').strip()
-        filtro_status = request.args.get('filtro_status', '').strip()
-        filtro_pessoa_gestora = request.args.get('filtro_pessoa_gestora', '').strip()
+        filtro_tipo_termo = request.args.getlist('filtro_tipo_termo')  # Multi-seleção
+        filtro_status = request.args.getlist('filtro_status')  # Multi-seleção
+        filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')  # Multi-seleção
+        filtro_edital = request.args.getlist('filtro_edital')  # Multi-seleção
         busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
         busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
+        data_assinatura_inicio = request.args.get('data_assinatura_inicio', '').strip()
+        data_assinatura_fim = request.args.get('data_assinatura_fim', '').strip()
+        data_inicio_de = request.args.get('data_inicio_de', '').strip()
+        data_inicio_ate = request.args.get('data_inicio_ate', '').strip()
+        data_termino_de = request.args.get('data_termino_de', '').strip()
+        data_termino_ate = request.args.get('data_termino_ate', '').strip()
         
         cur = get_cursor()
         
@@ -1217,17 +1522,35 @@ def exportar_csv():
             params.append(f"%{filtro_projeto}%")
         
         if filtro_tipo_termo:
-            query += " AND p.tipo_termo ILIKE %s"
-            params.append(f"%{filtro_tipo_termo}%")
+            # Múltiplos tipos de termo
+            placeholders = ','.join(['%s'] * len(filtro_tipo_termo))
+            query += f" AND p.tipo_termo IN ({placeholders})"
+            params.extend(filtro_tipo_termo)
         
         if filtro_pessoa_gestora:
-            if filtro_pessoa_gestora.lower() == 'nenhuma':
-                query += """ AND NOT EXISTS (
+            # Separar filtros especiais de nomes específicos
+            filtros_especiais = []
+            nomes_pg = []
+            
+            for pg in filtro_pessoa_gestora:
+                if pg.lower() == 'nenhuma':
+                    filtros_especiais.append('nenhuma')
+                elif pg.lower() == 'inativos':
+                    filtros_especiais.append('inativos')
+                else:
+                    nomes_pg.append(pg)
+            
+            # Construir condições OR
+            condicoes_pg = []
+            
+            if 'nenhuma' in filtros_especiais:
+                condicoes_pg.append(""" NOT EXISTS (
                     SELECT 1 FROM parcerias_pg pg 
                     WHERE pg.numero_termo = p.numero_termo
-                )"""
-            elif filtro_pessoa_gestora.lower() == 'inativos':
-                query += """ AND EXISTS (
+                )""")
+            
+            if 'inativos' in filtros_especiais:
+                condicoes_pg.append(""" EXISTS (
                     SELECT 1 FROM parcerias_pg pg 
                     LEFT JOIN categoricas.c_geral_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
                     WHERE pg.numero_termo = p.numero_termo 
@@ -1237,19 +1560,24 @@ def exportar_csv():
                         FROM parcerias_pg 
                         WHERE numero_termo = p.numero_termo
                     )
-                )"""
-            else:
-                query += """ AND EXISTS (
+                )""")
+            
+            if nomes_pg:
+                placeholders = ','.join(['%s'] * len(nomes_pg))
+                condicoes_pg.append(f""" EXISTS (
                     SELECT 1 FROM parcerias_pg pg 
                     WHERE pg.numero_termo = p.numero_termo 
-                    AND pg.nome_pg ILIKE %s
+                    AND pg.nome_pg IN ({placeholders})
                     AND pg.data_de_criacao = (
                         SELECT MAX(data_de_criacao) 
                         FROM parcerias_pg 
                         WHERE numero_termo = p.numero_termo
                     )
-                )"""
-                params.append(f"%{filtro_pessoa_gestora}%")
+                )""")
+                params.extend(nomes_pg)
+            
+            if condicoes_pg:
+                query += " AND (" + " OR ".join(condicoes_pg) + ")"
         
         if busca_sei_celeb:
             query += " AND p.sei_celeb ILIKE %s"
@@ -1259,16 +1587,69 @@ def exportar_csv():
             query += " AND p.sei_pc ILIKE %s"
             params.append(f"%{busca_sei_pc}%")
         
-        # Filtro de status baseado em datas
+        if filtro_edital:
+            # Múltiplos editais
+            placeholders = ','.join(['%s'] * len(filtro_edital))
+            query += f" AND p.edital_nome IN ({placeholders})"
+            params.extend(filtro_edital)
+        
+        # Filtro por data de assinatura
+        if data_assinatura_inicio:
+            query += """ AND EXISTS (
+                SELECT 1 FROM public.parcerias_sei ps
+                WHERE ps.numero_termo = p.numero_termo
+                  AND (ps.aditamento = '-' OR ps.aditamento IS NULL)
+                  AND (ps.apostilamento = '-' OR ps.apostilamento IS NULL)
+                  AND ps.termo_tipo_sei IS NULL
+                  AND ps.data_assinatura >= %s
+            )"""
+            params.append(data_assinatura_inicio)
+        
+        if data_assinatura_fim:
+            query += """ AND EXISTS (
+                SELECT 1 FROM public.parcerias_sei ps
+                WHERE ps.numero_termo = p.numero_termo
+                  AND (ps.aditamento = '-' OR ps.aditamento IS NULL)
+                  AND (ps.apostilamento = '-' OR ps.apostilamento IS NULL)
+                  AND ps.termo_tipo_sei IS NULL
+                  AND ps.data_assinatura <= %s
+            )"""
+            params.append(data_assinatura_fim)
+        
+        # Filtro por data de início
+        if data_inicio_de:
+            query += " AND p.inicio >= %s"
+            params.append(data_inicio_de)
+        
+        if data_inicio_ate:
+            query += " AND p.inicio <= %s"
+            params.append(data_inicio_ate)
+        
+        # Filtro por data de término
+        if data_termino_de:
+            query += " AND p.final >= %s"
+            params.append(data_termino_de)
+        
+        if data_termino_ate:
+            query += " AND p.final <= %s"
+            params.append(data_termino_ate)
+        
+        # Filtro de status baseado em datas (múltiplos status)
         if filtro_status:
-            if filtro_status == 'vigente':
-                query += " AND p.inicio <= CURRENT_DATE AND p.final >= CURRENT_DATE"
-            elif filtro_status == 'encerrado':
-                query += " AND p.final < CURRENT_DATE"
-            elif filtro_status == 'nao_iniciado':
-                query += " AND p.inicio > CURRENT_DATE"
-            elif filtro_status in ['rescindido', 'suspenso']:
-                query += " AND 1=0"  # Condição falsa para não retornar resultados
+            condicoes_status = []
+            
+            for status in filtro_status:
+                if status == 'vigente':
+                    condicoes_status.append("(p.inicio <= CURRENT_DATE AND p.final >= CURRENT_DATE)")
+                elif status == 'encerrado':
+                    condicoes_status.append("(p.final < CURRENT_DATE)")
+                elif status == 'nao_iniciado':
+                    condicoes_status.append("(p.inicio > CURRENT_DATE)")
+                elif status in ['rescindido', 'suspenso']:
+                    condicoes_status.append("(1=0)")
+            
+            if condicoes_status:
+                query += " AND (" + " OR ".join(condicoes_status) + ")"
         
         query += " ORDER BY p.numero_termo"
         
@@ -3243,6 +3624,18 @@ def salvar_alteracao():
             flash('Selecione pelo menos um tipo de alteração!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
+        # VALIDAR DUPLICATAS: verificar se já existe alteração com mesmo termo + instrumento + número
+        cur.execute("""
+            SELECT COUNT(*) as total FROM public.termos_alteracoes
+            WHERE numero_termo = %s 
+              AND instrumento_alteracao = %s 
+              AND alt_numero = %s
+        """, (numero_termo, instrumento_alteracao, alt_numero))
+        duplicata = cur.fetchone()
+        if duplicata and duplicata['total'] > 0:
+            flash(f'Já existe uma alteração cadastrada para {instrumento_alteracao} nº {alt_numero} do termo {numero_termo}. Por favor, edite o registro existente.', 'warning')
+            return redirect(url_for('parcerias.dgp_alteracoes'))
+        
         # Processar cada tipo de alteração
         registros_inseridos = 0
         idx_info = 0
@@ -3272,6 +3665,7 @@ def salvar_alteracao():
             
             # Inserir registro
             data_fim = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+            usuario_atual = session.get('email', 'Sistema')
             
             cur.execute(f"""
                 INSERT INTO public.termos_alteracoes 
@@ -3289,12 +3683,12 @@ def salvar_alteracao():
                 alt_old_info,
                 alt_responsavel,
                 alt_observacao if alt_observacao else None,
-                session.get('username', 'Sistema')
+                usuario_atual
             ))
             
-            # Se concluído, atualizar tabelas originais
+            # Se concluído, atualizar tabelas originais (somente se for o mais recente)
             if alt_status == 'Concluído' and alt_info:
-                _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info)
+                _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero, instrumento_alteracao)
             
             registros_inseridos += 1
         
@@ -3482,14 +3876,43 @@ def _capturar_valor_antigo(cur, numero_termo, alt_tipo):
         return None
 
 
-def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info):
+def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero=None, instrumento_alteracao=None):
     """
     Atualiza a tabela original com o novo valor quando status = "Concluído"
+    IMPORTANTE: Só atualiza se for o aditamento/alteração mais recente (maior número)
     """
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
     
     try:
+        # VALIDAÇÃO: Verificar se este é o maior número de alteração CONCLUÍDO para este tipo
+        if alt_numero is not None and instrumento_alteracao is not None:
+            cur.execute("""
+                SELECT alt_numero 
+                FROM public.termos_alteracoes 
+                WHERE numero_termo = %s 
+                  AND instrumento_alteracao = %s 
+                  AND alt_tipo = %s 
+                  AND alt_status = 'Concluído'
+                ORDER BY alt_numero DESC
+                LIMIT 1
+            """, (numero_termo, instrumento_alteracao, alt_tipo))
+            resultado = cur.fetchone()
+            
+            if resultado:
+                maior_numero = resultado['alt_numero']
+                # Converter alt_numero para inteiro para comparação
+                try:
+                    alt_numero_int = int(alt_numero)
+                    maior_numero_int = int(maior_numero)
+                    
+                    if alt_numero_int < maior_numero_int:
+                        print(f"[INFO] Ignorando atualização de '{alt_tipo}' - Aditamento nº {alt_numero} é anterior ao nº {maior_numero} (mais recente)")
+                        return  # NÃO atualizar se não for o mais recente
+                except (ValueError, TypeError):
+                    # Se não conseguir converter para int, prosseguir com atualização (fallback)
+                    pass
+        
         # Mapear tipo de alteração para tabela e coluna
         if alt_tipo == 'Nome do projeto':
             cur.execute("UPDATE public.parcerias SET projeto = %s WHERE numero_termo = %s", (alt_info, numero_termo))
@@ -3834,6 +4257,30 @@ def atualizar_alteracao():
             flash('Selecione pelo menos um tipo de alteração!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
+        # LÓGICA DE REVERSÃO: Buscar tipos que foram removidos e restaurar alt_old_info
+        cur.execute("""
+            SELECT alt_tipo, alt_old_info, alt_status
+            FROM public.termos_alteracoes
+            WHERE numero_termo = %s 
+              AND instrumento_alteracao = %s 
+              AND alt_numero = %s
+              AND alt_old_info IS NOT NULL
+              AND alt_status = 'Concluído'
+        """, (numero_termo_original, instrumento_original, alt_numero_original))
+        registros_antigos = cur.fetchall()
+        
+        # Identificar tipos removidos (estavam antes, não estão agora)
+        tipos_antigos = {r['alt_tipo']: r['alt_old_info'] for r in registros_antigos}
+        tipos_novos = set([t.strip() for t in tipos_alteracao if t.strip()])
+        tipos_removidos = set(tipos_antigos.keys()) - tipos_novos
+        
+        # Para cada tipo removido, restaurar o valor antigo na tabela original
+        for tipo_removido in tipos_removidos:
+            valor_antigo = tipos_antigos[tipo_removido]
+            if valor_antigo:
+                print(f"[INFO] Revertendo alteração de '{tipo_removido}': restaurando valor '{valor_antigo}'")
+                _atualizar_tabela_original(cur, numero_termo_original, tipo_removido, valor_antigo)
+        
         # Deletar registros antigos
         cur.execute("""
             DELETE FROM public.termos_alteracoes
@@ -3871,6 +4318,7 @@ def atualizar_alteracao():
             
             # Inserir registro
             data_fim = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+            usuario_atual = session.get('email', 'Sistema')
             
             cur.execute(f"""
                 INSERT INTO public.termos_alteracoes 
@@ -3889,13 +4337,13 @@ def atualizar_alteracao():
                 alt_old_info,
                 alt_responsavel,
                 alt_observacao if alt_observacao else None,
-                session.get('username', 'Sistema'),
-                session.get('username', 'Sistema')
+                usuario_atual,
+                usuario_atual
             ))
             
-            # Se concluído, atualizar tabelas originais
+            # Se concluído, atualizar tabelas originais (somente se for o mais recente)
             if alt_status == 'Concluído' and alt_info:
-                _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info)
+                _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero, instrumento_alteracao)
             
             registros_inseridos += 1
         
