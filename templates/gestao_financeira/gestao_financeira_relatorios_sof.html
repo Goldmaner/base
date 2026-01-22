@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatórios SOF - Gestão Financeira</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        .header-section {
+            background: linear-gradient(135deg, #6f42c1 0%, #563d7c 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .section-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .section-title {
+            color: #6f42c1;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #6f42c1;
+        }
+        .upload-box {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        .upload-box:hover {
+            border-color: #6f42c1;
+            background-color: #f8f9fa;
+        }
+        .upload-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+        .status-badge {
+            font-size: 0.85rem;
+            padding: 6px 12px;
+        }
+        .btn-import {
+            background-color: #6f42c1;
+            color: white;
+            border: none;
+        }
+        .btn-import:hover {
+            background-color: #563d7c;
+            color: white;
+        }
+        .btn-import-all {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            font-size: 1.1rem;
+            padding: 12px 40px;
+        }
+        .btn-import-all:hover {
+            opacity: 0.9;
+            color: white;
+        }
+        .update-info {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid" style="max-width: 1400px;">
+        <!-- Cabeçalho -->
+        <div class="header-section">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="bi bi-file-earmark-arrow-up"></i> Relatórios SOF</h1>
+                    <p class="mb-0">Importação de arquivos CSV (Dotação, Reservas e Empenhos)</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('gestao_financeira.index') }}" class="btn btn-light btn-lg">
+                        <i class="bi bi-arrow-left"></i> Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensagens Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- SEÇÃO 1: DOTAÇÃO -->
+        <div class="section-card">
+            <h3 class="section-title">
+                <i class="bi bi-1-circle-fill me-2"></i>Dotação Orçamentária
+            </h3>
+            
+            <div class="update-info mb-3">
+                <i class="bi bi-clock-history me-2"></i>
+                <strong>Última atualização:</strong> 
+                <span id="dataDotacao">{{ data_dotacao or 'Nenhuma importação realizada' }}</span>
+            </div>
+
+            <form id="formDotacao" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.10 (Verba Municipal)</label>
+                            <input type="file" class="form-control" name="dotacao_3410" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.20 (FUMCAF)</label>
+                            <input type="file" class="form-control" name="dotacao_3420" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">08.10 (FMID)</label>
+                            <input type="file" class="form-control" name="dotacao_0810" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">90.10 (FUMCAD)</label>
+                            <input type="file" class="form-control" name="dotacao_9010" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">78.10 (FAASP)</label>
+                            <input type="file" class="form-control" name="dotacao_7810" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+                <div class="text-end mt-3">
+                    <button type="button" class="btn btn-import" onclick="importarSecao('dotacao')">
+                        <i class="bi bi-cloud-upload me-2"></i>Importar Dotação
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- SEÇÃO 2: RESERVAS -->
+        <div class="section-card">
+            <h3 class="section-title">
+                <i class="bi bi-2-circle-fill me-2"></i>Reservas
+            </h3>
+            
+            <div class="update-info mb-3">
+                <i class="bi bi-clock-history me-2"></i>
+                <strong>Última atualização:</strong> 
+                <span id="dataReservas">{{ data_reservas or 'Nenhuma importação realizada' }}</span>
+            </div>
+
+            <form id="formReservas" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="upload-box">
+                            <label class="upload-label">34.10 (Verba Municipal) - Executor</label>
+                            <input type="file" class="form-control" name="reservas_3410" accept=".csv" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-end mt-3">
+                    <button type="button" class="btn btn-import" onclick="importarSecao('reservas')">
+                        <i class="bi bi-cloud-upload me-2"></i>Importar Reservas
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- SEÇÃO 3: EMPENHOS -->
+        <div class="section-card">
+            <h3 class="section-title">
+                <i class="bi bi-3-circle-fill me-2"></i>Empenhos
+            </h3>
+            
+            <div class="update-info mb-3">
+                <i class="bi bi-clock-history me-2"></i>
+                <strong>Última atualização:</strong> 
+                <span id="dataEmpenhos">{{ data_empenhos or 'Nenhuma importação realizada' }}</span>
+            </div>
+
+            <form id="formEmpenhos" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.10 (Verba Municipal)</label>
+                            <input type="file" class="form-control" name="empenhos_3410" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.20 (FUMCAF)</label>
+                            <input type="file" class="form-control" name="empenhos_3420" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">08.10 (FMID)</label>
+                            <input type="file" class="form-control" name="empenhos_0810" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">90.10 (FUMCAD)</label>
+                            <input type="file" class="form-control" name="empenhos_9010" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">78.10 (FAASP)</label>
+                            <input type="file" class="form-control" name="empenhos_7810" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+                <div class="text-end mt-3">
+                    <button type="button" class="btn btn-import" onclick="importarSecao('empenhos')">
+                        <i class="bi bi-cloud-upload me-2"></i>Importar Empenhos
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- SEÇÃO 4: SINCRONIZAÇÃO COM ACOMPANHAMENTO -->
+        <div class="section-card" style="border: 2px solid #28a745;">
+            <h3 class="section-title" style="color: #28a745; border-bottom-color: #28a745;">
+                <i class="bi bi-arrow-left-right me-2"></i>Sincronizar Empenhos com Acompanhamento
+            </h3>
+            
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>O que faz esta função?</strong><br>
+                Vincula os dados de empenhos importados do SOF com o acompanhamento de parcelas (temp_acomp_empenhos):
+                <ul class="mb-0 mt-2">
+                    <li>Identifica empenhos por processo de celebração</li>
+                    <li>Distribui valores empenhados nas parcelas programadas</li>
+                    <li>Atualiza status: Empenhado / Empenhado Parcialmente / Enviado, mas não empenhado</li>
+                    <li>Detecta discrepâncias entre valores previstos e empenhados</li>
+                </ul>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <div>
+                    <span class="text-muted" id="ultimaSincronizacao">
+                        <i class="bi bi-clock-history me-2"></i>Última sincronização: Nunca executada
+                    </span>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-warning btn-lg" onclick="gerarRelatorioSincronizacao()">
+                        <i class="bi bi-file-earmark-text me-2"></i>Gerar Relatório de Sincronização
+                    </button>
+                    <button type="button" class="btn btn-success btn-lg ms-2" onclick="executarSincronizacao()" id="btnExecutarSync" disabled>
+                        <i class="bi bi-check-circle me-2"></i>Executar Sincronização
+                    </button>
+                </div>
+            </div>
+
+            <!-- Área de Relatório -->
+            <div id="areaRelatorioSync" class="mt-4" style="display: none;">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Relatório de Sincronização</h5>
+                    </div>
+                    <div class="card-body" id="conteudoRelatorioSync" style="max-height: 500px; overflow-y: auto;">
+                        <!-- Será preenchido via JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botão Importação Geral -->
+        <div class="text-center mt-4 mb-5">
+            <button type="button" class="btn btn-import-all btn-lg" onclick="importarTodos()">
+                <i class="bi bi-cloud-arrow-up me-2"></i>Importar Todos os Arquivos
+            </button>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        function importarSecao(secao) {
+            const formId = `form${secao.charAt(0).toUpperCase() + secao.slice(1)}`;
+            const form = document.getElementById(formId);
+            const formData = new FormData(form);
+            
+            // Verificar se há arquivos selecionados
+            let temArquivo = false;
+            for (let pair of formData.entries()) {
+                if (pair[1] instanceof File && pair[1].size > 0) {
+                    temArquivo = true;
+                    break;
+                }
+            }
+            
+            if (!temArquivo) {
+                alert('Por favor, selecione pelo menos um arquivo para importar.');
+                return;
+            }
+            
+            // Desabilitar botão e mostrar loading
+            const btn = event.target;
+            const textoOriginal = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importando...';
+            
+            $.ajax({
+                url: `/gestao_financeira/api/importar-${secao}`,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        alert(`✅ ${response.message}\n\nRegistros importados: ${response.total_importados}`);
+                        
+                        // Atualizar data de atualização
+                        if (response.data_atualizacao) {
+                            $(`#data${secao.charAt(0).toUpperCase() + secao.slice(1)}`).text(response.data_atualizacao);
+                        }
+                        
+                        // Limpar formulário
+                        form.reset();
+                    } else {
+                        alert('❌ Erro: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    const response = xhr.responseJSON;
+                    let mensagem = 'Erro ao importar arquivos.';
+                    
+                    if (response && response.error) {
+                        mensagem = response.error;
+                    }
+                    
+                    if (response && response.detalhes) {
+                        mensagem += '\n\nDetalhes:\n' + response.detalhes;
+                    }
+                    
+                    alert('❌ ' + mensagem);
+                },
+                complete: function() {
+                    btn.disabled = false;
+                    btn.innerHTML = textoOriginal;
+                }
+            });
+        }
+        
+        function importarTodos() {
+            if (!confirm('Deseja importar TODOS os arquivos selecionados nas 3 seções?\n\nEsta operação pode levar alguns minutos.')) {
+                return;
+            }
+            
+            const btn = event.target;
+            const textoOriginal = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importando Tudo...';
+            
+            // Preparar FormData com todos os arquivos
+            const formData = new FormData();
+            
+            // Dotação
+            $('#formDotacao input[type="file"]').each(function() {
+                if (this.files[0]) {
+                    formData.append(this.name, this.files[0]);
+                }
+            });
+            
+            // Reservas
+            $('#formReservas input[type="file"]').each(function() {
+                if (this.files[0]) {
+                    formData.append(this.name, this.files[0]);
+                }
+            });
+            
+            // Empenhos
+            $('#formEmpenhos input[type="file"]').each(function() {
+                if (this.files[0]) {
+                    formData.append(this.name, this.files[0]);
+                }
+            });
+            
+            $.ajax({
+                url: '/gestao_financeira/api/importar-todos',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        let mensagem = `✅ Importação concluída!\n\n`;
+                        mensagem += `Dotação: ${response.dotacao_importados} registros\n`;
+                        mensagem += `Reservas: ${response.reservas_importados} registros\n`;
+                        mensagem += `Empenhos: ${response.empenhos_importados} registros\n`;
+                        mensagem += `\nTotal: ${response.total_importados} registros`;
+                        
+                        alert(mensagem);
+                        
+                        // Atualizar datas
+                        if (response.datas) {
+                            $('#dataDotacao').text(response.datas.dotacao || 'N/A');
+                            $('#dataReservas').text(response.datas.reservas || 'N/A');
+                            $('#dataEmpenhos').text(response.datas.empenhos || 'N/A');
+                        }
+                        
+                        // Limpar formulários
+                        $('#formDotacao, #formReservas, #formEmpenhos').each(function() {
+                            this.reset();
+                        });
+                    } else {
+                        alert('❌ Erro: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    const response = xhr.responseJSON;
+                    alert('❌ Erro: ' + (response?.error || 'Erro desconhecido'));
+                },
+                complete: function() {
+                    btn.disabled = false;
+                    btn.innerHTML = textoOriginal;
+                }
+            });
+        }
+
+        // ===== FUNÇÕES DE SINCRONIZAÇÃO =====
+        
+        function gerarRelatorioSincronizacao() {
+            const btn = event.target;
+            const textoOriginal = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Gerando Relatório...';
+            
+            $.ajax({
+                url: '/gestao_financeira/api/sincronizar-empenhos',
+                type: 'POST',
+                data: JSON.stringify({ apenas_relatorio: true }),
+                contentType: 'application/json',
+                success: function(response) {
+                    if (response.success) {
+                        exibirRelatorio(response.relatorio);
+                        document.getElementById('btnExecutarSync').disabled = false;
+                    } else {
+                        alert('❌ Erro ao gerar relatório: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    const response = xhr.responseJSON;
+                    alert('❌ Erro: ' + (response?.error || 'Erro desconhecido'));
+                },
+                complete: function() {
+                    btn.disabled = false;
+                    btn.innerHTML = textoOriginal;
+                }
+            });
+        }
+
+        function executarSincronizacao() {
+            if (!confirm('⚠️ Você confirma a execução da sincronização?\n\nIsso irá atualizar os dados de temp_acomp_empenhos com base nos empenhos importados.')) {
+                return;
+            }
+
+            const btn = document.getElementById('btnExecutarSync');
+            const textoOriginal = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sincronizando...';
+            
+            $.ajax({
+                url: '/gestao_financeira/api/sincronizar-empenhos',
+                type: 'POST',
+                data: JSON.stringify({ apenas_relatorio: false }),
+                contentType: 'application/json',
+                success: function(response) {
+                    if (response.success) {
+                        let mensagem = `✅ Sincronização concluída!\n\n`;
+                        mensagem += `Termos atualizados: ${response.termos_atualizados}\n`;
+                        mensagem += `Parcelas atualizadas: ${response.parcelas_atualizadas}\n`;
+                        
+                        if (response.alertas && response.alertas.length > 0) {
+                            mensagem += `\n⚠️ Alertas: ${response.alertas.length}`;
+                        }
+                        
+                        alert(mensagem);
+                        
+                        // Atualizar timestamp
+                        const agora = new Date().toLocaleString('pt-BR');
+                        document.getElementById('ultimaSincronizacao').innerHTML = 
+                            `<i class="bi bi-clock-history me-2"></i>Última sincronização: ${agora}`;
+                        
+                        // Esconder relatório
+                        document.getElementById('areaRelatorioSync').style.display = 'none';
+                        btn.disabled = true;
+                    } else {
+                        alert('❌ Erro na sincronização: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    const response = xhr.responseJSON;
+                    alert('❌ Erro: ' + (response?.error || 'Erro desconhecido'));
+                },
+                complete: function() {
+                    btn.innerHTML = textoOriginal;
+                }
+            });
+        }
+
+        function exibirRelatorio(relatorio) {
+            const area = document.getElementById('areaRelatorioSync');
+            const conteudo = document.getElementById('conteudoRelatorioSync');
+            
+            let html = '<div class="relatorio-sync">';
+            
+            // Resumo
+            html += '<div class="alert alert-primary mb-4">';
+            html += '<h5><i class="bi bi-info-circle me-2"></i>Resumo</h5>';
+            html += `<p class="mb-1"><strong>Total de termos a processar:</strong> ${relatorio.total_termos}</p>`;
+            html += `<p class="mb-1"><strong>Total de parcelas:</strong> ${relatorio.total_parcelas}</p>`;
+            html += `<p class="mb-0"><strong>Total de empenhos encontrados:</strong> ${relatorio.total_empenhos}</p>`;
+            html += '</div>';
+            
+            // Alertas
+            if (relatorio.alertas && relatorio.alertas.length > 0) {
+                html += '<div class="alert alert-warning mb-4">';
+                html += '<h5><i class="bi bi-exclamation-triangle me-2"></i>Alertas</h5>';
+                html += '<ul class="mb-0">';
+                relatorio.alertas.forEach(alerta => {
+                    html += `<li>${alerta}</li>`;
+                });
+                html += '</ul>';
+                html += '</div>';
+            }
+            
+            // Detalhamento por termo
+            if (relatorio.detalhes && relatorio.detalhes.length > 0) {
+                html += '<h5 class="mb-3"><i class="bi bi-list-check me-2"></i>Detalhamento por Termo</h5>';
+                
+                relatorio.detalhes.forEach(termo => {
+                    html += '<div class="card mb-3">';
+                    html += '<div class="card-header bg-light">';
+                    html += `<strong>${termo.numero_termo}</strong>`;
+                    if (termo.processo_celebracao) {
+                        html += ` <span class="badge bg-secondary">${termo.processo_celebracao}</span>`;
+                    }
+                    html += '</div>';
+                    html += '<div class="card-body">';
+                    
+                    if (termo.parcelas && termo.parcelas.length > 0) {
+                        html += '<table class="table table-sm table-bordered">';
+                        html += '<thead><tr>';
+                        html += '<th>Parcela</th>';
+                        html += '<th>Previsto 23</th>';
+                        html += '<th>Empenhado 23</th>';
+                        html += '<th>NE 23</th>';
+                        html += '<th>Previsto 24</th>';
+                        html += '<th>Empenhado 24</th>';
+                        html += '<th>NE 24</th>';
+                        html += '<th>Status</th>';
+                        html += '</tr></thead><tbody>';
+                        
+                        termo.parcelas.forEach(parcela => {
+                            html += '<tr>';
+                            html += `<td>${parcela.numero_parcela || '-'}</td>`;
+                            html += `<td>R$ ${formatarMoeda(parcela.previsto_23)}</td>`;
+                            html += `<td>R$ ${formatarMoeda(parcela.empenhado_23)}</td>`;
+                            html += `<td>${parcela.ne_23 || '-'}</td>`;
+                            html += `<td>R$ ${formatarMoeda(parcela.previsto_24)}</td>`;
+                            html += `<td>R$ ${formatarMoeda(parcela.empenhado_24)}</td>`;
+                            html += `<td>${parcela.ne_24 || '-'}</td>`;
+                            
+                            let statusClass = 'secondary';
+                            if (parcela.status === 'Empenhado') statusClass = 'success';
+                            else if (parcela.status === 'Empenhado Parcialmente') statusClass = 'warning';
+                            else if (parcela.status === 'Enviado, mas não empenhado') statusClass = 'danger';
+                            
+                            html += `<td><span class="badge bg-${statusClass}">${parcela.status}</span></td>`;
+                            html += '</tr>';
+                        });
+                        
+                        html += '</tbody></table>';
+                    } else {
+                        html += '<p class="text-muted mb-0">Nenhuma parcela encontrada</p>';
+                    }
+                    
+                    html += '</div></div>';
+                });
+            }
+            
+            html += '</div>';
+            
+            conteudo.innerHTML = html;
+            area.style.display = 'block';
+            
+            // Scroll suave até o relatório
+            area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function formatarMoeda(valor) {
+            if (!valor || valor === 0) return '0,00';
+            return parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+    </script>
+</body>
+</html>

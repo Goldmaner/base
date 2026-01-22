@@ -106,7 +106,7 @@
       </div>
       {% endif %}
 
-      <form method="post" action="{{ url_for('parcerias.nova') if modo_importacao or not parceria else url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
+      <form method="post" action="{{ url_for('parcerias.nova') if modo_importacao or not parceria or not parceria.numero_termo else url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
         
         <!-- Campo hidden para preservar origem da conferência -->
         {% if request.args.get('origem') == 'conferencia' %}

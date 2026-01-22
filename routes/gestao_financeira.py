@@ -485,8 +485,86 @@ def relatorio_empenhos():
     """
     Relatório de Acompanhamento de Empenhos
     Exibe tabela editável com status e informações de empenho
+    Inclui estatísticas de parcelas e termos enviados
     """
-    return render_template('gestao_financeira/gestao_financeira_relatorio.html')
+    cur = get_cursor()
+    
+    try:
+        # Estatística 1: Parcelas enviadas vs total
+        cur.execute("SELECT COUNT(*) as total FROM gestao_financeira.temp_acomp_empenhos")
+        parcelas_enviadas = cur.fetchone()['total']
+        
+        cur.execute("SELECT COUNT(*) as total FROM gestao_financeira.temp_reservas_empenhos")
+        parcelas_total = cur.fetchone()['total']
+        
+        percentual_parcelas = (parcelas_enviadas / parcelas_total * 100) if parcelas_total > 0 else 0
+        
+        # Estatística 2: Termos únicos enviados vs total
+        cur.execute("SELECT COUNT(DISTINCT numero_termo) as total FROM gestao_financeira.temp_acomp_empenhos")
+        termos_enviados = cur.fetchone()['total']
+        
+        cur.execute("SELECT COUNT(DISTINCT numero_termo) as total FROM gestao_financeira.temp_reservas_empenhos")
+        termos_total = cur.fetchone()['total']
+        
+        percentual_termos = (termos_enviados / termos_total * 100) if termos_total > 0 else 0
+        
+        cur.close()
+        
+        return render_template(
+            'gestao_financeira/gestao_financeira_relatorio.html',
+            parcelas_enviadas=parcelas_enviadas,
+            parcelas_total=parcelas_total,
+            percentual_parcelas=percentual_parcelas,
+            termos_enviados=termos_enviados,
+            termos_total=termos_total,
+            percentual_termos=percentual_termos
+        )
+        
+    except Exception as e:
+        print(f"[ERRO] relatorio_empenhos: {str(e)}")
+        return render_template(
+            'gestao_financeira/gestao_financeira_relatorio.html',
+            parcelas_enviadas=0,
+            parcelas_total=0,
+            percentual_parcelas=0,
+            termos_enviados=0,
+            termos_total=0,
+            percentual_termos=0
+        )
+
+
+@gestao_financeira_bp.route('/api/relatorio-empenhos-termos', methods=['GET'])
+@login_required
+@requires_access('gestao_financeira')
+def api_relatorio_empenhos_termos():
+    """
+    API para buscar lista de termos disponíveis em temp_acomp_empenhos
+    """
+    cur = get_cursor()
+    
+    try:
+        cur.execute("""
+            SELECT DISTINCT numero_termo 
+            FROM gestao_financeira.temp_acomp_empenhos 
+            WHERE numero_termo IS NOT NULL 
+            ORDER BY numero_termo
+        """)
+        
+        termos = [r['numero_termo'] for r in cur.fetchall()]
+        
+        cur.close()
+        
+        return jsonify({
+            'success': True,
+            'termos': termos
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar termos: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @gestao_financeira_bp.route('/api/relatorio-empenhos', methods=['GET'])
@@ -505,13 +583,14 @@ def api_relatorio_empenhos():
         responsavel = request.args.get('responsavel', '').strip()
         status = request.args.get('status', '').strip()
         
-        # Query base com JOIN para buscar numero_parcela
+        # Query base com JOIN para buscar numero_parcela e processo de celebração
         query = """
             SELECT 
                 t.id,
                 t.numero,
                 t.aditivo,
                 t.numero_termo,
+                p.sei_celeb AS processo_celebracao,
                 t.responsavel,
                 t.status,
                 t.nota_empenho_23,
@@ -525,6 +604,7 @@ def api_relatorio_empenhos():
                 r.numero_parcela,
                 r.tipo_parcela
             FROM gestao_financeira.temp_acomp_empenhos t
+            LEFT JOIN public.parcerias p ON p.numero_termo = t.numero_termo
             LEFT JOIN LATERAL (
                 SELECT numero_parcela, tipo_parcela
                 FROM gestao_financeira.temp_reservas_empenhos
@@ -564,6 +644,7 @@ def api_relatorio_empenhos():
                 'numero': r['numero'],
                 'aditivo': r['aditivo'],
                 'numero_termo': r['numero_termo'],
+                'processo_celebracao': r['processo_celebracao'] or '',
                 'responsavel': r['responsavel'],
                 'status': r['status'],
                 'nota_empenho_23': r['nota_empenho_23'],
@@ -929,3 +1010,1076 @@ def ver_encaminhamento():
         traceback.print_exc()
         flash(f'Erro ao visualizar encaminhamento: {str(e)}', 'danger')
         return redirect(url_for('gestao_financeira.relatorio_empenhos'))
+
+
+# ============================================================================
+# RELATÓRIOS SOF - IMPORTAÇÃO DE CSV
+# ============================================================================
+
+@gestao_financeira_bp.route('/relatorios-sof')
+@login_required
+@requires_access('gestao_financeira')
+def relatorios_sof():
+    """
+    Página de importação de relatórios SOF (Dotação, Reservas, Empenhos)
+    """
+    cur = get_cursor()
+    
+    try:
+        # Buscar data da última atualização de cada tabela
+        cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_dotacao")
+        result_dotacao = cur.fetchone()
+        data_dotacao = result_dotacao['ultima'] if result_dotacao else None
+        
+        cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_reservas")
+        result_reservas = cur.fetchone()
+        data_reservas = result_reservas['ultima'] if result_reservas else None
+        
+        cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_empenhos")
+        result_empenhos = cur.fetchone()
+        data_empenhos = result_empenhos['ultima'] if result_empenhos else None
+        
+        cur.close()
+        
+        # Formatar datas em pt-br
+        from datetime import datetime
+        data_dotacao_fmt = data_dotacao.strftime('%d/%m/%Y') if data_dotacao else None
+        data_reservas_fmt = data_reservas.strftime('%d/%m/%Y') if data_reservas else None
+        data_empenhos_fmt = data_empenhos.strftime('%d/%m/%Y') if data_empenhos else None
+        
+        return render_template(
+            'gestao_financeira/gestao_financeira_relatorios_sof.html',
+            data_dotacao=data_dotacao_fmt,
+            data_reservas=data_reservas_fmt,
+            data_empenhos=data_empenhos_fmt
+        )
+        
+    except Exception as e:
+        print(f"[ERRO] relatorios_sof: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return render_template(
+            'gestao_financeira/gestao_financeira_relatorios_sof.html',
+            data_dotacao=None,
+            data_reservas=None,
+            data_empenhos=None
+        )
+
+
+@gestao_financeira_bp.route('/api/importar-dotacao', methods=['POST'])
+@login_required
+@requires_access('gestao_financeira')
+def api_importar_dotacao():
+    """
+    API para importar arquivos CSV de dotação orçamentária
+    """
+    import csv
+    from io import StringIO
+    
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        total_importados = 0
+        
+        # Processar cada arquivo enviado
+        arquivos = ['dotacao_3410', 'dotacao_3420', 'dotacao_0810', 'dotacao_9010', 'dotacao_7810']
+        
+        for arquivo_key in arquivos:
+            if arquivo_key not in request.files:
+                continue
+                
+            arquivo = request.files[arquivo_key]
+            if arquivo.filename == '':
+                continue
+            
+            # Ler conteúdo do CSV com encoding robusto
+            conteudo_bytes = arquivo.read()
+            for encoding in ['utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
+                try:
+                    conteudo = conteudo_bytes.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                return jsonify({'success': False, 'error': f'Não foi possível decodificar o arquivo {arquivo.filename}'}), 400
+            
+            csv_reader = csv.DictReader(StringIO(conteudo), delimiter=';')
+            
+            # Inserir registros
+            for linha in csv_reader:
+                try:
+                    cur.execute("""
+                        INSERT INTO gestao_financeira.back_dotacao (
+                            COD_IDT_DOTA, COD_ORG_EMP, TXT_ORG_EMP, COD_UNID_ORCM_SOF, TXT_UNID_ORCM,
+                            COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR,
+                            COD_PGM_GOVR, TXT_PGM_GOVR, COD_PROJ_ATVD_SOF, TXT_PROJ_ATVD,
+                            COD_CTA_DESP, TXT_CTA_DESP, COD_FONT_REC, TXT_FONT_REC,
+                            COD_EX_FONT_REC, COD_DSTN_REC, COD_VINC_REC_PMSP, COD_TIP_CRED_ORCM,
+                            IND_ACTC_REDC, IND_CNTR_COTA_PESL, IND_COTA_PESL, IND_DOTA_LQDD_PAGO,
+                            DT_CRIA_DOTA, VAL_DOTA_AUTR, VAL_TOT_CRED_SPLM, VAL_TOT_CRED_ESPC,
+                            VAL_TOT_CRED_EXT, VAL_TOT_REDC, ORCADO_ATUAL, VAL_TOT_CNGL,
+                            VAL_TOT_BLOQ_DECR, ORCADO_DISPONIVEL, VAL_SLDO_RESV_DOTA, SALDO_DOTACAO,
+                            VAL_TOT_EPH, VAL_TOT_CANC_EPH, SALDO_EMPENHADO, SALDO_RESERVADO,
+                            VAL_TOT_LQDC_EPH, VAL_TOT_PGTO_DOTA, IND_EMND_ORCM, DOTACAO_FORMATADA,
+                            IND_DVDA_PUBC, IND_LANC_RCTA
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                  %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (COD_IDT_DOTA) DO UPDATE SET
+                            TXT_ORG_EMP = EXCLUDED.TXT_ORG_EMP,
+                            ORCADO_ATUAL = EXCLUDED.ORCADO_ATUAL,
+                            SALDO_DOTACAO = EXCLUDED.SALDO_DOTACAO,
+                            criado_em = NOW()
+                    """, (
+                        linha.get('COD_IDT_DOTA'), linha.get('COD_ORG_EMP'), linha.get('TXT_ORG_EMP'),
+                        linha.get('COD_UNID_ORCM_SOF'), linha.get('TXT_UNID_ORCM'), linha.get('COD_FCAO_GOVR'),
+                        linha.get('TXT_FCAO_GOVR'), linha.get('COD_SUB_FCAO_GOVR'), linha.get('TXT_SUB_FCAO_GOVR'),
+                        linha.get('COD_PGM_GOVR'), linha.get('TXT_PGM_GOVR'), linha.get('COD_PROJ_ATVD_SOF'),
+                        linha.get('TXT_PROJ_ATVD'), linha.get('COD_CTA_DESP'), linha.get('TXT_CTA_DESP'),
+                        linha.get('COD_FONT_REC'), linha.get('TXT_FONT_REC'), linha.get('COD_EX_FONT_REC'),
+                        linha.get('COD_DSTN_REC'), linha.get('COD_VINC_REC_PMSP'), linha.get('COD_TIP_CRED_ORCM'),
+                        linha.get('IND_ACTC_REDC'), linha.get('IND_CNTR_COTA_PESL'), linha.get('IND_COTA_PESL'),
+                        linha.get('IND_DOTA_LQDD_PAGO'), linha.get('DT_CRIA_DOTA'), linha.get('VAL_DOTA_AUTR'),
+                        linha.get('VAL_TOT_CRED_SPLM'), linha.get('VAL_TOT_CRED_ESPC'), linha.get('VAL_TOT_CRED_EXT'),
+                        linha.get('VAL_TOT_REDC'), linha.get('ORCADO_ATUAL'), linha.get('VAL_TOT_CNGL'),
+                        linha.get('VAL_TOT_BLOQ_DECR'), linha.get('ORCADO_DISPONIVEL'), linha.get('VAL_SLDO_RESV_DOTA'),
+                        linha.get('SALDO_DOTACAO'), linha.get('VAL_TOT_EPH'), linha.get('VAL_TOT_CANC_EPH'),
+                        linha.get('SALDO_EMPENHADO'), linha.get('SALDO_RESERVADO'), linha.get('VAL_TOT_LQDC_EPH'),
+                        linha.get('VAL_TOT_PGTO_DOTA'), linha.get('IND_EMND_ORCM'), linha.get('DOTACAO_FORMATADA'),
+                        linha.get('IND_DVDA_PUBC'), linha.get('IND_LANC_RCTA')
+                    ))
+                    total_importados += 1
+                except Exception as e:
+                    conn.rollback()
+                    colunas_faltando = [col for col in ['COD_IDT_DOTA', 'COD_ORG_EMP', 'TXT_ORG_EMP'] if col not in linha]
+                    return jsonify({
+                        'success': False,
+                        'error': f'Erro na linha: {str(e)}',
+                        'detalhes': f'Verifique se o CSV tem as colunas corretas. Colunas obrigatórias ausentes: {colunas_faltando if colunas_faltando else "Erro de dados"}'
+                    }), 400
+        
+        conn.commit()
+        
+        # Buscar data atualizada
+        cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_dotacao")
+        result = cur.fetchone()
+        data_atual = result[0] if result and result[0] else None
+        cur.close()
+        
+        from datetime import datetime
+        data_fmt = data_atual.strftime('%d/%m/%Y') if data_atual else None
+        
+        return jsonify({
+            'success': True,
+            'message': 'Dotação importada com sucesso!',
+            'total_importados': total_importados,
+            'data_atualizacao': data_fmt
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] api_importar_dotacao: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'detalhes': 'Verifique o formato do arquivo CSV e tente novamente.'
+        }), 500
+
+
+@gestao_financeira_bp.route('/api/importar-reservas', methods=['POST'])
+@login_required
+@requires_access('gestao_financeira')
+def api_importar_reservas():
+    """
+    API para importar arquivo CSV de reservas
+    """
+    import csv
+    from io import StringIO
+    
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        total_importados = 0
+        
+        # Processar arquivo único
+        if 'reservas_3410' not in request.files:
+            return jsonify({'success': False, 'error': 'Nenhum arquivo enviado'}), 400
+            
+        arquivo = request.files['reservas_3410']
+        if arquivo.filename == '':
+            return jsonify({'success': False, 'error': 'Arquivo vazio'}), 400
+        
+        # Ler conteúdo do CSV com encoding robusto
+        conteudo_bytes = arquivo.read()
+        for encoding in ['utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
+            try:
+                conteudo = conteudo_bytes.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            return jsonify({'success': False, 'error': 'Não foi possível decodificar o arquivo'}), 400
+        
+        csv_reader = csv.DictReader(StringIO(conteudo), delimiter=';')
+        
+        # Debug: verificar colunas do CSV
+        colunas_esperadas = [
+            'COD_RESV_DOTA_SOF', 'DT_EFET_RESV', 'ANO_RESV', 'DOTACAO_FORMATADA', 'COD_NRO_PCSS_SOF',
+            'HIST_RESV', 'VL_RESV', 'VL_TRANSF_RESV', 'VL_CANC_RESV', 'VL_EPH', 'VL_SALDO_RESV',
+            'COD_ORG_EMP', 'COD_UNID_ORCM_SOF', 'ORGDESC', 'TXT_UNID_ORCM', 'COD_ORG_EMP_EXEC',
+            'COD_UNID_ORCM_SOF_EXEC', 'TXT_ORG_EMP_EXECT', 'TXT_UNID_ORCM_EXECT',
+            'COD_CATG_ECMC', 'COD_GRUP_DESP', 'COD_MODL_APLC', 'COD_ELEM_DESP', 'COD_SUB_ELEM_CONTA_DESP',
+            'COD_FCAO_GOVR', 'TXT_FCAO_GOVR', 'COD_SUB_FCAO_GOVR', 'TXT_SUB_FCAO_GOVR',
+            'COD_PGM_GOVR', 'TXT_PGM_GOVR', 'COD_PROJ_ATVD_SOF', 'COD_CTA_DESP', 'COD_FONT_REC'
+        ]
+        
+        primeira_linha = next(csv_reader, None)
+        if primeira_linha:
+            colunas_csv = list(primeira_linha.keys())
+            colunas_faltando = [col for col in colunas_esperadas if col not in colunas_csv]
+            colunas_extras = [col for col in colunas_csv if col not in colunas_esperadas]
+            
+            if colunas_faltando or colunas_extras:
+                conn.rollback()
+                mensagem = ""
+                if colunas_faltando:
+                    mensagem += f"Colunas faltando: {', '.join(colunas_faltando[:5])}{'...' if len(colunas_faltando) > 5 else ''}. "
+                if colunas_extras:
+                    mensagem += f"Colunas extras: {', '.join(colunas_extras[:5])}{'...' if len(colunas_extras) > 5 else ''}. "
+                mensagem += f"Total no CSV: {len(colunas_csv)} colunas, esperado: {len(colunas_esperadas)} colunas."
+                return jsonify({
+                    'success': False,
+                    'error': 'Estrutura do CSV incompatível',
+                    'detalhes': mensagem
+                }), 400
+        
+        # Inserir registros
+        for linha in csv_reader:
+            try:
+                cur.execute("""
+                    INSERT INTO gestao_financeira.back_reservas (
+                        COD_RESV_DOTA_SOF, DT_EFET_RESV, ANO_RESV, DOTACAO_FORMATADA, COD_NRO_PCSS_SOF,
+                        HIST_RESV, VL_RESV, VL_TRANSF_RESV, VL_CANC_RESV, VL_EPH, VL_SALDO_RESV,
+                        COD_ORG_EMP, COD_UNID_ORCM_SOF, ORGDESC, TXT_UNID_ORCM, COD_ORG_EMP_EXEC,
+                        COD_UNID_ORCM_SOF_EXEC, TXT_ORG_EMP_EXECT, TXT_UNID_ORCM_EXECT,
+                        COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP, COD_SUB_ELEM_CONTA_DESP,
+                        COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR,
+                        COD_PGM_GOVR, TXT_PGM_GOVR, COD_PROJ_ATVD_SOF, COD_CTA_DESP, COD_FONT_REC
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                              %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (COD_RESV_DOTA_SOF) DO UPDATE SET
+                        VL_RESV = EXCLUDED.VL_RESV,
+                        VL_SALDO_RESV = EXCLUDED.VL_SALDO_RESV,
+                        criado_em = NOW()
+                """, (
+                    linha.get('COD_RESV_DOTA_SOF'), linha.get('DT_EFET_RESV'), linha.get('ANO_RESV'),
+                    linha.get('DOTACAO_FORMATADA'), linha.get('COD_NRO_PCSS_SOF'), linha.get('HIST_RESV'),
+                    linha.get('VL_RESV'), linha.get('VL_TRANSF_RESV'), linha.get('VL_CANC_RESV'),
+                    linha.get('VL_EPH'), linha.get('VL_SALDO_RESV'), linha.get('COD_ORG_EMP'),
+                    linha.get('COD_UNID_ORCM_SOF'), linha.get('ORGDESC'), linha.get('TXT_UNID_ORCM'),
+                    linha.get('COD_ORG_EMP_EXEC'), linha.get('COD_UNID_ORCM_SOF_EXEC'),
+                    linha.get('TXT_ORG_EMP_EXECT'), linha.get('TXT_UNID_ORCM_EXECT'),
+                    linha.get('COD_CATG_ECMC'), linha.get('COD_GRUP_DESP'), linha.get('COD_MODL_APLC'),
+                    linha.get('COD_ELEM_DESP'), linha.get('COD_SUB_ELEM_CONTA_DESP'),
+                    linha.get('COD_FCAO_GOVR'), linha.get('TXT_FCAO_GOVR'), linha.get('COD_SUB_FCAO_GOVR'),
+                    linha.get('TXT_SUB_FCAO_GOVR'), linha.get('COD_PGM_GOVR'), linha.get('TXT_PGM_GOVR'),
+                    linha.get('COD_PROJ_ATVD_SOF'), linha.get('COD_CTA_DESP'), linha.get('COD_FONT_REC')
+                ))
+                total_importados += 1
+            except Exception as e:
+                conn.rollback()
+                return jsonify({
+                    'success': False,
+                    'error': f'Erro na linha: {str(e)}',
+                    'detalhes': 'Verifique se o CSV tem todas as colunas necessárias.'
+                }), 400
+        
+        conn.commit()
+        
+        # Buscar data atualizada
+        cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_reservas")
+        result = cur.fetchone()
+        data_atual = result[0] if result and result[0] else None
+        cur.close()
+        
+        from datetime import datetime
+        data_fmt = data_atual.strftime('%d/%m/%Y') if data_atual else None
+        
+        return jsonify({
+            'success': True,
+            'message': 'Reservas importadas com sucesso!',
+            'total_importados': total_importados,
+            'data_atualizacao': data_fmt
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] api_importar_reservas: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@gestao_financeira_bp.route('/api/importar-empenhos', methods=['POST'])
+@login_required
+@requires_access('gestao_financeira')
+def api_importar_empenhos():
+    """
+    API para importar arquivos CSV de empenhos
+    """
+    import csv
+    from io import StringIO
+    
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        total_importados = 0
+        
+        # Processar cada arquivo enviado
+        arquivos = ['empenhos_3410', 'empenhos_3420', 'empenhos_0810', 'empenhos_9010', 'empenhos_7810']
+        
+        for arquivo_key in arquivos:
+            if arquivo_key not in request.files:
+                continue
+                
+            arquivo = request.files[arquivo_key]
+            if arquivo.filename == '':
+                continue
+            
+            # Ler conteúdo do CSV com encoding robusto
+            conteudo_bytes = arquivo.read()
+            for encoding in ['utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
+                try:
+                    conteudo = conteudo_bytes.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                return jsonify({'success': False, 'error': f'Não foi possível decodificar o arquivo {arquivo.filename}'}), 400
+            
+            csv_reader = csv.DictReader(StringIO(conteudo), delimiter=';')
+            
+            # Debug: mostrar colunas do CSV
+            primeira_linha = next(csv_reader, None)
+            if primeira_linha:
+                colunas_csv = list(primeira_linha.keys())
+                print(f"[DEBUG] Arquivo {arquivo_key}: CSV tem {len(colunas_csv)} colunas")
+                print(f"[DEBUG] Primeiras 10 colunas: {colunas_csv[:10]}")
+                print(f"[DEBUG] Últimas 10 colunas: {colunas_csv[-10:]}")
+                
+                # Processar primeira linha
+                try:
+                    # Debug: contar colunas e valores
+                    colunas_insert = [
+                        'COD_IDT_EPH', 'DT_EPH', 'COD_EPH', 'ANO_EPH', 'COD_TIP_EPH_SOF', 'COD_NRO_PCSS_SOF',
+                        'COD_TIP_DOC', 'COD_IDT_MODL_LICI', 'TXT_OBS_EPH', 'VAL_TOT_EPH', 'VAL_TOT_CANC_EPH',
+                        'VAL_TOT_LQDC_EPH', 'VAL_TOT_PAGO_EPH', 'VAL_TOT_A_LIQ_EPH', 'VAL_TOT_A_PAG_EPH',
+                        'COD_IDT_CRDR_SOF', 'NOM_RZAO_SOCI_SOF', 'COD_NAT_CRDR', 'COD_CPF_CNPJ_SOF',
+                        'COD_IDT_ITEM_DESP', 'COD_ITEM_DESP_SOF', 'TXT_ITEM_DESP', 'COD_IDT_SUB_ELEM',
+                        'COD_SUB_ELEM_DESP', 'TXT_SUB_ELEM', 'COD_IDT_CTA_DESP', 'IND_CTA_SINT_ANLT',
+                        'COD_CATG_ECMC', 'COD_GRUP_DESP', 'COD_MODL_APLC', 'COD_ELEM_DESP',
+                        'COD_SUB_ELEM_CONTA_DESP', 'COD_IDT_FCAO_GOVR', 'COD_IDT_SUB_FCAO',
+                        'COD_IDT_PGM_GOVR', 'COD_IDT_PROJ_ATVD', 'COD_ORG_EMP_EXECT', 'TXT_ORG_EMP_EXECT',
+                        'COD_UNID_ORCM_SOF_EXECT', 'TXT_UNID_ORCM_EXECT', 'TXT_DOTACAO_FMT',
+                        'COD_FCAO_GOVR', 'TXT_FCAO_GOVR', 'COD_PGM_GOVR', 'TXT_PGM_GOVR',
+                        'COD_SUB_FCAO_GOVR', 'TXT_SUB_FCAO_GOVR', 'COD_PROJ_ATVD_SOF_P', 'TXT_PROJ_ATVD_P',
+                        'COD_MODL_LICI_SOF', 'TXT_MODL_LICI', 'COD_EMP_PMSP', 'NOM_EMP_SOF',
+                        'COD_IDT_FONT_REC', 'COD_IDT_DOTA', 'COD_IDT_CTA_DESP1', 'COD_CTA_DESP',
+                        'TXT_CTA_DESP', 'COD_FONT_REC', 'TXT_FONT_REC', 'COD_FONT_REC_EXEC',
+                        'TXT_FONT_REC_EXEC', 'COD_CAR', 'DESC_CAR'
+                    ]
+                    
+                    # Colunas que são INTEGER e precisam converter string vazia para NULL
+                    colunas_integer = {
+                        'COD_IDT_EPH', 'COD_EPH', 'ANO_EPH', 'COD_IDT_MODL_LICI', 'COD_IDT_CRDR_SOF',
+                        'COD_IDT_ITEM_DESP', 'COD_ITEM_DESP_SOF', 'COD_IDT_SUB_ELEM', 'COD_SUB_ELEM_DESP',
+                        'COD_IDT_CTA_DESP', 'COD_CATG_ECMC', 'COD_GRUP_DESP', 'COD_MODL_APLC', 'COD_ELEM_DESP',
+                        'COD_SUB_ELEM_CONTA_DESP', 'COD_IDT_FCAO_GOVR', 'COD_IDT_SUB_FCAO', 'COD_IDT_PGM_GOVR',
+                        'COD_IDT_PROJ_ATVD', 'COD_ORG_EMP_EXECT', 'COD_UNID_ORCM_SOF_EXECT', 'COD_FCAO_GOVR',
+                        'COD_PGM_GOVR', 'COD_SUB_FCAO_GOVR', 'COD_PROJ_ATVD_SOF_P', 'COD_MODL_LICI_SOF',
+                        'COD_EMP_PMSP', 'COD_IDT_FONT_REC', 'COD_IDT_DOTA', 'COD_IDT_CTA_DESP1', 'COD_CAR'
+                    }
+                    
+                    def limpar_valor(col, val):
+                        # Limpar formato Excel ="número" para apenas número
+                        if val and isinstance(val, str):
+                            # Remove ="..." deixando só o conteúdo
+                            if val.startswith('="') and val.endswith('"'):
+                                val = val[2:-1]  # Remove =" do início e " do fim
+                        
+                        # Converter string vazia para None apenas em colunas INTEGER
+                        if (val == '' or val is None) and col in colunas_integer:
+                            return None
+                        return val
+                    
+                    valores = tuple(limpar_valor(col, primeira_linha.get(col)) for col in colunas_insert)
+                    
+                    print(f"[DEBUG] Colunas INSERT: {len(colunas_insert)}")
+                    print(f"[DEBUG] Valores tuple: {len(valores)}")
+                    print(f"[DEBUG] Colunas faltando no CSV: {[col for col in colunas_insert if col not in primeira_linha.keys()]}")
+                    print(f"[DEBUG] Colunas extras no CSV: {[col for col in primeira_linha.keys() if col not in colunas_insert]}")
+                    
+                    # Debug: mostrar tamanho dos valores VARCHAR
+                    print("\n[DEBUG] Tamanho dos valores VARCHAR:")
+                    for i, col in enumerate(colunas_insert):
+                        val = valores[i]
+                        if val and isinstance(val, str) and len(val) > 50:
+                            print(f"  {col}: {len(val)} chars - '{val[:100]}...'")
+                    
+                    cur.execute("""
+                        INSERT INTO gestao_financeira.back_empenhos (
+                            COD_IDT_EPH, DT_EPH, COD_EPH, ANO_EPH, COD_TIP_EPH_SOF, COD_NRO_PCSS_SOF,
+                            COD_TIP_DOC, COD_IDT_MODL_LICI, TXT_OBS_EPH, VAL_TOT_EPH, VAL_TOT_CANC_EPH,
+                            VAL_TOT_LQDC_EPH, VAL_TOT_PAGO_EPH, VAL_TOT_A_LIQ_EPH, VAL_TOT_A_PAG_EPH,
+                            COD_IDT_CRDR_SOF, NOM_RZAO_SOCI_SOF, COD_NAT_CRDR, COD_CPF_CNPJ_SOF,
+                            COD_IDT_ITEM_DESP, COD_ITEM_DESP_SOF, TXT_ITEM_DESP, COD_IDT_SUB_ELEM,
+                            COD_SUB_ELEM_DESP, TXT_SUB_ELEM, COD_IDT_CTA_DESP, IND_CTA_SINT_ANLT,
+                            COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP,
+                            COD_SUB_ELEM_CONTA_DESP, COD_IDT_FCAO_GOVR, COD_IDT_SUB_FCAO,
+                            COD_IDT_PGM_GOVR, COD_IDT_PROJ_ATVD, COD_ORG_EMP_EXECT, TXT_ORG_EMP_EXECT,
+                            COD_UNID_ORCM_SOF_EXECT, TXT_UNID_ORCM_EXECT, TXT_DOTACAO_FMT,
+                            COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_PGM_GOVR, TXT_PGM_GOVR,
+                            COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR, COD_PROJ_ATVD_SOF_P, TXT_PROJ_ATVD_P,
+                            COD_MODL_LICI_SOF, TXT_MODL_LICI, COD_EMP_PMSP, NOM_EMP_SOF,
+                            COD_IDT_FONT_REC, COD_IDT_DOTA, COD_IDT_CTA_DESP1, COD_CTA_DESP,
+                            TXT_CTA_DESP, COD_FONT_REC, TXT_FONT_REC, COD_FONT_REC_EXEC,
+                            TXT_FONT_REC_EXEC, COD_CAR, DESC_CAR
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                  %s, %s, %s, %s)
+                        ON CONFLICT (COD_IDT_EPH) DO UPDATE SET
+                            VAL_TOT_EPH = EXCLUDED.VAL_TOT_EPH,
+                            VAL_TOT_LQDC_EPH = EXCLUDED.VAL_TOT_LQDC_EPH,
+                            VAL_TOT_PAGO_EPH = EXCLUDED.VAL_TOT_PAGO_EPH,
+                            criado_em = NOW()
+                    """, valores)
+                    total_importados += 1
+                except Exception as e:
+                    print(f"[ERRO] Erro ao inserir primeira linha: {str(e)}")
+                    conn.rollback()
+                    return jsonify({
+                        'success': False,
+                        'error': f'Erro ao inserir dados: {str(e)}',
+                        'detalhes': 'Verifique se o CSV tem todas as colunas necessárias'
+                    }), 400
+            
+            # Inserir restante dos registros
+            for linha in csv_reader:
+                try:
+                    cur.execute("""
+                        INSERT INTO gestao_financeira.back_empenhos (
+                            COD_IDT_EPH, DT_EPH, COD_EPH, ANO_EPH, COD_TIP_EPH_SOF, COD_NRO_PCSS_SOF,
+                            COD_TIP_DOC, COD_IDT_MODL_LICI, TXT_OBS_EPH, VAL_TOT_EPH, VAL_TOT_CANC_EPH,
+                            VAL_TOT_LQDC_EPH, VAL_TOT_PAGO_EPH, VAL_TOT_A_LIQ_EPH, VAL_TOT_A_PAG_EPH,
+                            COD_IDT_CRDR_SOF, NOM_RZAO_SOCI_SOF, COD_NAT_CRDR, COD_CPF_CNPJ_SOF,
+                            COD_IDT_ITEM_DESP, COD_ITEM_DESP_SOF, TXT_ITEM_DESP, COD_IDT_SUB_ELEM,
+                            COD_SUB_ELEM_DESP, TXT_SUB_ELEM, COD_IDT_CTA_DESP, IND_CTA_SINT_ANLT,
+                            COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP,
+                            COD_SUB_ELEM_CONTA_DESP, COD_IDT_FCAO_GOVR, COD_IDT_SUB_FCAO,
+                            COD_IDT_PGM_GOVR, COD_IDT_PROJ_ATVD, COD_ORG_EMP_EXECT, TXT_ORG_EMP_EXECT,
+                            COD_UNID_ORCM_SOF_EXECT, TXT_UNID_ORCM_EXECT, TXT_DOTACAO_FMT,
+                            COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_PGM_GOVR, TXT_PGM_GOVR,
+                            COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR, COD_PROJ_ATVD_SOF_P, TXT_PROJ_ATVD_P,
+                            COD_MODL_LICI_SOF, TXT_MODL_LICI, COD_EMP_PMSP, NOM_EMP_SOF,
+                            COD_IDT_FONT_REC, COD_IDT_DOTA, COD_IDT_CTA_DESP1, COD_CTA_DESP,
+                            TXT_CTA_DESP, COD_FONT_REC, TXT_FONT_REC, COD_FONT_REC_EXEC,
+                            TXT_FONT_REC_EXEC, COD_CAR, DESC_CAR
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                  %s, %s, %s, %s)
+                        ON CONFLICT (COD_IDT_EPH) DO UPDATE SET
+                            VAL_TOT_EPH = EXCLUDED.VAL_TOT_EPH,
+                            VAL_TOT_LQDC_EPH = EXCLUDED.VAL_TOT_LQDC_EPH,
+                            VAL_TOT_PAGO_EPH = EXCLUDED.VAL_TOT_PAGO_EPH,
+                            criado_em = NOW()
+                    """, tuple(limpar_valor(col, linha.get(col)) for col in colunas_insert))
+                    total_importados += 1
+                except Exception as e:
+                    conn.rollback()
+                    return jsonify({
+                        'success': False,
+                        'error': f'Erro na linha: {str(e)}',
+                        'detalhes': 'Verifique se o CSV tem todas as colunas necessárias.'
+                    }), 400
+        
+        conn.commit()
+        
+        # Buscar data atualizada
+        cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_empenhos")
+        result = cur.fetchone()
+        data_atual = result[0] if result and result[0] else None
+        cur.close()
+        
+        from datetime import datetime
+        data_fmt = data_atual.strftime('%d/%m/%Y') if data_atual else None
+        
+        return jsonify({
+            'success': True,
+            'message': 'Empenhos importados com sucesso!',
+            'total_importados': total_importados,
+            'data_atualizacao': data_fmt
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] api_importar_empenhos: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@gestao_financeira_bp.route('/api/importar-todos', methods=['POST'])
+@login_required
+@requires_access('gestao_financeira')
+def api_importar_todos():
+    """
+    API para importar todos os arquivos CSV de uma vez
+    """
+    try:
+        resultados = {
+            'dotacao_importados': 0,
+            'reservas_importados': 0,
+            'empenhos_importados': 0,
+            'datas': {}
+        }
+        
+        # Importar Dotação
+        arquivos_dotacao = ['dotacao_3410', 'dotacao_3420', 'dotacao_0810', 'dotacao_9010', 'dotacao_7810']
+        tem_dotacao = any(key in request.files and request.files[key].filename != '' for key in arquivos_dotacao)
+        
+        if tem_dotacao:
+            resp = api_importar_dotacao()
+            data = resp.get_json() if hasattr(resp, 'get_json') else {}
+            if data.get('success'):
+                resultados['dotacao_importados'] = data.get('total_importados', 0)
+                resultados['datas']['dotacao'] = data.get('data_atualizacao')
+        
+        # Importar Reservas
+        if 'reservas_3410' in request.files and request.files['reservas_3410'].filename != '':
+            resp = api_importar_reservas()
+            data = resp.get_json() if hasattr(resp, 'get_json') else {}
+            if data.get('success'):
+                resultados['reservas_importados'] = data.get('total_importados', 0)
+                resultados['datas']['reservas'] = data.get('data_atualizacao')
+        
+        # Importar Empenhos
+        arquivos_empenhos = ['empenhos_3410', 'empenhos_3420', 'empenhos_0810', 'empenhos_9010', 'empenhos_7810']
+        tem_empenhos = any(key in request.files and request.files[key].filename != '' for key in arquivos_empenhos)
+        
+        if tem_empenhos:
+            resp = api_importar_empenhos()
+            data = resp.get_json() if hasattr(resp, 'get_json') else {}
+            if data.get('success'):
+                resultados['empenhos_importados'] = data.get('total_importados', 0)
+                resultados['datas']['empenhos'] = data.get('data_atualizacao')
+        
+        total_geral = sum([resultados['dotacao_importados'], 
+                          resultados['reservas_importados'], 
+                          resultados['empenhos_importados']])
+        
+        return jsonify({
+            'success': True,
+            'message': 'Importação geral concluída!',
+            'total_importados': total_geral,
+            **resultados
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] api_importar_todos: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@gestao_financeira_bp.route("/api/sincronizar-empenhos", methods=["POST"])
+@login_required
+@requires_access('gestao_financeira')
+def api_sincronizar_empenhos():
+    """
+    Sincroniza empenhos do SOF (back_empenhos) com acompanhamento de parcelas (temp_acomp_empenhos)
+    
+    Lógica:
+    1. Busca empenhos em back_empenhos
+    2. Vincula com parcerias através do processo de celebração normalizado
+    3. Vincula com temp_acomp_empenhos e temp_reservas_empenhos através do numero_termo
+    4. Distribui valores empenhados nas parcelas programadas
+    5. Atualiza status e valores em temp_acomp_empenhos
+    
+    Parâmetros:
+        apenas_relatorio (bool): Se True, gera relatório sem atualizar banco
+    """
+    try:
+        dados = request.get_json() or {}
+        apenas_relatorio = dados.get('apenas_relatorio', True)
+        
+        cur = get_cursor()
+        conn = get_db()
+        
+        # Função auxiliar para normalizar processo (remove pontos, traços, barras)
+        def normalizar_processo(processo):
+            if not processo:
+                return ''
+            return str(processo).replace('.', '').replace('/', '').replace('-', '').strip()
+        
+        # Função para determinar status baseado em valores previstos vs empenhados
+        def calcular_status(previsto, empenhado, status_anterior):
+            previsto = float(previsto or 0)
+            empenhado = float(empenhado or 0)
+            
+            if empenhado == 0:
+                # Nada empenhado
+                if status_anterior == 'DEOF: Enviado para empenho':
+                    return 'Enviado, mas não empenhado'
+                return status_anterior
+            elif empenhado >= previsto:
+                return 'Empenhado'
+            else:
+                return 'Empenhado Parcialmente'
+        
+        # PASSO 1: Buscar todos os empenhos do back_empenhos
+        print("[DEBUG] Buscando empenhos do SOF...")
+        cur.execute("""
+            SELECT 
+                cod_idt_eph,
+                cod_nro_pcss_sof,
+                cod_eph,
+                cod_item_desp_sof,
+                val_tot_eph,
+                val_tot_canc_eph,
+                dt_eph
+            FROM gestao_financeira.back_empenhos
+            WHERE cod_nro_pcss_sof IS NOT NULL
+            ORDER BY cod_nro_pcss_sof, cod_item_desp_sof, cod_eph
+        """)
+        
+        empenhos_sof = cur.fetchall()
+        print(f"[DEBUG] Encontrados {len(empenhos_sof)} empenhos no SOF")
+        
+        # Debug: verificar tipo de retorno
+        if empenhos_sof:
+            print(f"[DEBUG] Tipo do primeiro elemento: {type(empenhos_sof[0])}")
+            print(f"[DEBUG] Primeiro elemento: {empenhos_sof[0]}")
+        
+        # Organizar empenhos por processo normalizado
+        empenhos_por_processo = {}
+        for emp in empenhos_sof:
+            # Acessar por nome de coluna (compatível com RealDictCursor)
+            try:
+                processo_norm = normalizar_processo(emp['cod_nro_pcss_sof'])
+                elemento = emp['cod_item_desp_sof']  # pode ser 23 ou 24
+                ne = emp['cod_eph']  # número da nota de empenho
+                val_total = emp['val_tot_eph']
+                val_canc = emp['val_tot_canc_eph']
+                dt_eph = emp['dt_eph']
+            except (KeyError, TypeError):
+                # Se falhar, tentar acesso por índice (tupla normal)
+                processo_norm = normalizar_processo(emp[1])
+                elemento = emp[3]
+                ne = emp[2]
+                val_total = emp[4]
+                val_canc = emp[5]
+                dt_eph = emp[6]
+            
+            # Calcular valor líquido (total - cancelado)
+            val_total_str = str(val_total or '0').replace('.', '').replace(',', '.')
+            val_canc_str = str(val_canc or '0').replace('.', '').replace(',', '.')
+            
+            try:
+                valor_liquido = float(val_total_str) - float(val_canc_str)
+            except (ValueError, TypeError):
+                print(f"[AVISO] Erro ao converter valores para empenho {ne}: total={val_total}, canc={val_canc}")
+                valor_liquido = 0
+            
+            if processo_norm not in empenhos_por_processo:
+                empenhos_por_processo[processo_norm] = {}
+            
+            if elemento not in empenhos_por_processo[processo_norm]:
+                empenhos_por_processo[processo_norm][elemento] = []
+            
+            empenhos_por_processo[processo_norm][elemento].append({
+                'ne': ne,
+                'valor': valor_liquido,
+                'data': dt_eph
+            })
+        
+        # PASSO 2: Vincular com parcerias e buscar numero_termo
+        print("[DEBUG] Vinculando processos com parcerias...")
+        cur.execute("""
+            SELECT 
+                sei_celeb,
+                numero_termo
+            FROM public.parcerias
+            WHERE sei_celeb IS NOT NULL
+              AND numero_termo IS NOT NULL
+        """)
+        
+        parcerias = cur.fetchall()
+        
+        # Mapa processo -> numero_termo
+        processo_to_termo = {}
+        for parc in parcerias:
+            try:
+                sei_celeb_norm = normalizar_processo(parc['sei_celeb'])
+                numero_termo = parc['numero_termo']
+            except (KeyError, TypeError):
+                sei_celeb_norm = normalizar_processo(parc[0])
+                numero_termo = parc[1]
+            
+            processo_to_termo[sei_celeb_norm] = numero_termo
+        
+        print(f"[DEBUG] Mapeados {len(processo_to_termo)} processos para termos")
+        
+        # PASSO 3: Buscar parcelas programadas de temp_reservas_empenhos
+        print("[DEBUG] Buscando parcelas programadas...")
+        cur.execute("""
+            SELECT 
+                id,
+                numero_termo,
+                numero_parcela,
+                elemento_23,
+                elemento_24,
+                parcela_total_previsto
+            FROM gestao_financeira.temp_reservas_empenhos
+            ORDER BY numero_termo, id
+        """)
+        
+        parcelas_programadas = cur.fetchall()
+        
+        # Organizar por termo (lista ordenada por id)
+        parcelas_por_termo = {}
+        for parcela in parcelas_programadas:
+            try:
+                id_reserva = parcela['id']
+                termo = parcela['numero_termo']
+                num_parcela = parcela['numero_parcela']
+                elem_23 = parcela['elemento_23']
+                elem_24 = parcela['elemento_24']
+                total_prev = parcela['parcela_total_previsto']
+            except (KeyError, TypeError):
+                id_reserva = parcela[0]
+                termo = parcela[1]
+                num_parcela = parcela[2]
+                elem_23 = parcela[3]
+                elem_24 = parcela[4]
+                total_prev = parcela[5]
+            
+            if termo not in parcelas_por_termo:
+                parcelas_por_termo[termo] = []
+            
+            parcelas_por_termo[termo].append({
+                'id_reserva': id_reserva,
+                'numero_parcela': num_parcela,
+                'previsto_23': float(elem_23 or 0),
+                'previsto_24': float(elem_24 or 0),
+                'previsto_total': float(total_prev or 0)
+            })
+        
+        # PASSO 3.5: Buscar parcelas de temp_acomp_empenhos (ordenadas por numero)
+        print("[DEBUG] Buscando parcelas de acompanhamento...")
+        cur.execute("""
+            SELECT 
+                id,
+                numero,
+                numero_termo,
+                status
+            FROM gestao_financeira.temp_acomp_empenhos
+            ORDER BY numero_termo, numero
+        """)
+        
+        parcelas_acomp = cur.fetchall()
+        
+        # Organizar por termo
+        acomp_por_termo = {}
+        for acomp in parcelas_acomp:
+            try:
+                id_acomp = acomp['id']
+                numero = acomp['numero']
+                termo = acomp['numero_termo']
+                status_atual = acomp['status']
+            except (KeyError, TypeError):
+                id_acomp = acomp[0]
+                numero = acomp[1]
+                termo = acomp[2]
+                status_atual = acomp[3] if len(acomp) > 3 else ''
+            
+            if termo not in acomp_por_termo:
+                acomp_por_termo[termo] = []
+            
+            acomp_por_termo[termo].append({
+                'id': id_acomp,
+                'numero': numero,
+                'status_atual': status_atual
+            })
+        
+        # PASSO 4: Processar cada termo e distribuir empenhos nas parcelas
+        relatorio = {
+            'total_termos': 0,
+            'total_parcelas': 0,
+            'total_empenhos': len(empenhos_sof),
+            'detalhes': [],
+            'alertas': []
+        }
+        
+        termos_atualizados = 0
+        parcelas_atualizadas = 0
+        
+        for processo_norm, empenhos_elementos in empenhos_por_processo.items():
+            # Buscar termo correspondente
+            if processo_norm not in processo_to_termo:
+                relatorio['alertas'].append(f"⚠️ Processo {processo_norm} não encontrado em parcerias")
+                continue
+            
+            numero_termo = processo_to_termo[processo_norm]
+            
+            # Verificar se tem parcelas programadas E parcelas de acompanhamento
+            if numero_termo not in parcelas_por_termo:
+                relatorio['alertas'].append(f"⚠️ Termo {numero_termo} não tem parcelas em temp_reservas_empenhos")
+                continue
+            
+            if numero_termo not in acomp_por_termo:
+                relatorio['alertas'].append(f"⚠️ Termo {numero_termo} não tem parcelas em temp_acomp_empenhos")
+                continue
+            
+            parcelas_reservas = parcelas_por_termo[numero_termo]
+            parcelas_enviadas = acomp_por_termo[numero_termo]
+            
+            # Verificar se quantidade bate (posicional)
+            if len(parcelas_reservas) != len(parcelas_enviadas):
+                relatorio['alertas'].append(
+                    f"⚠️ {numero_termo}: Quantidade de parcelas não bate - "
+                    f"Reservas: {len(parcelas_reservas)}, Enviadas: {len(parcelas_enviadas)}"
+                )
+                # Usa o mínimo para evitar erro de índice
+                qtd_parcelas = min(len(parcelas_reservas), len(parcelas_enviadas))
+            else:
+                qtd_parcelas = len(parcelas_reservas)
+            
+            relatorio['total_termos'] += 1
+            relatorio['total_parcelas'] += qtd_parcelas
+            
+            # Somar totais empenhados por elemento
+            total_empenhado_23 = sum([e['valor'] for e in empenhos_elementos.get(23, [])])
+            total_empenhado_24 = sum([e['valor'] for e in empenhos_elementos.get(24, [])])
+            
+            # Somar totais previstos por elemento
+            total_previsto_23 = sum([p['previsto_23'] for p in parcelas_reservas])
+            total_previsto_24 = sum([p['previsto_24'] for p in parcelas_reservas])
+            
+            # Alertas de discrepância
+            if total_empenhado_23 > total_previsto_23 * 1.01:  # Tolerância de 1%
+                relatorio['alertas'].append(
+                    f"⚠️ {numero_termo}: Empenhado no elemento 23 (R$ {total_empenhado_23:,.2f}) "
+                    f"excede previsto (R$ {total_previsto_23:,.2f})"
+                )
+            
+            if total_empenhado_24 > total_previsto_24 * 1.01:
+                relatorio['alertas'].append(
+                    f"⚠️ {numero_termo}: Empenhado no elemento 24 (R$ {total_empenhado_24:,.2f}) "
+                    f"excede previsto (R$ {total_previsto_24:,.2f})"
+                )
+            
+            # Distribuir valores nas parcelas EM CASCATA
+            detalhes_termo = {
+                'numero_termo': numero_termo,
+                'processo_celebracao': processo_norm,
+                'parcelas': []
+            }
+            
+            saldo_23 = total_empenhado_23
+            saldo_24 = total_empenhado_24
+            
+            # Concatenar notas de empenho
+            nes_23 = ';'.join([str(e['ne']) for e in empenhos_elementos.get(23, [])])
+            nes_24 = ';'.join([str(e['ne']) for e in empenhos_elementos.get(24, [])])
+            
+            # DISTRIBUIÇÃO EM CASCATA (ordem sequencial)
+            for i in range(qtd_parcelas):
+                parcela_reserva = parcelas_reservas[i]
+                parcela_enviada = parcelas_enviadas[i]
+                
+                # Alocar valores até esgotar saldo ou previsto (CASCATA)
+                empenhado_23 = min(saldo_23, parcela_reserva['previsto_23'])
+                empenhado_24 = min(saldo_24, parcela_reserva['previsto_24'])
+                
+                saldo_23 -= empenhado_23
+                saldo_24 -= empenhado_24
+                
+                # Determinar status
+                previsto_total_parcela = parcela_reserva['previsto_23'] + parcela_reserva['previsto_24']
+                empenhado_total_parcela = empenhado_23 + empenhado_24
+                
+                status_anterior = parcela_enviada['status_atual']
+                status = calcular_status(previsto_total_parcela, empenhado_total_parcela, status_anterior)
+                
+                # Determinar quais NEs usar (só incluir se houver valor empenhado)
+                ne_23_parcela = nes_23 if empenhado_23 > 0 else ''
+                ne_24_parcela = nes_24 if empenhado_24 > 0 else ''
+                
+                detalhes_termo['parcelas'].append({
+                    'numero': parcela_enviada['numero'],
+                    'numero_parcela': parcela_reserva['numero_parcela'],
+                    'previsto_23': parcela_reserva['previsto_23'],
+                    'empenhado_23': empenhado_23,
+                    'ne_23': ne_23_parcela,
+                    'previsto_24': parcela_reserva['previsto_24'],
+                    'empenhado_24': empenhado_24,
+                    'ne_24': ne_24_parcela,
+                    'status': status
+                })
+                
+                # ATUALIZAR BANCO (se não for apenas relatório)
+                if not apenas_relatorio:
+                    # UPDATE direto usando id de temp_acomp_empenhos
+                    cur.execute("""
+                        UPDATE gestao_financeira.temp_acomp_empenhos
+                        SET 
+                            nota_empenho_23 = CASE WHEN %s > 0 THEN %s ELSE nota_empenho_23 END,
+                            nota_empenho_24 = CASE WHEN %s > 0 THEN %s ELSE nota_empenho_24 END,
+                            total_empenhado_23 = %s,
+                            total_empenhado_24 = %s,
+                            status = %s
+                        WHERE id = %s
+                    """, (
+                        empenhado_23, ne_23_parcela.split(';')[0] if ne_23_parcela else None,
+                        empenhado_24, ne_24_parcela.split(';')[0] if ne_24_parcela else None,
+                        empenhado_23, empenhado_24, status,
+                        parcela_enviada['id']
+                    ))
+                    
+                    parcelas_atualizadas += 1
+            
+            detalhes_termo['total_empenhado_23'] = total_empenhado_23
+            detalhes_termo['total_empenhado_24'] = total_empenhado_24
+            detalhes_termo['total_previsto_23'] = total_previsto_23
+            detalhes_termo['total_previsto_24'] = total_previsto_24
+            
+            relatorio['detalhes'].append(detalhes_termo)
+            termos_atualizados += 1
+        
+        # Commit se não for apenas relatório
+        if not apenas_relatorio:
+            conn.commit()
+            print(f"[DEBUG] Sincronização concluída: {termos_atualizados} termos, {parcelas_atualizadas} parcelas")
+        
+        return jsonify({
+            'success': True,
+            'relatorio': relatorio,
+            'termos_atualizados': termos_atualizados,
+            'parcelas_atualizadas': parcelas_atualizadas,
+            'alertas': relatorio['alertas']
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] api_sincronizar_empenhos: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@gestao_financeira_bp.route("/api/adicionar-encaminhamento", methods=["POST"])
+@login_required
+@requires_access('gestao_financeira')
+def api_adicionar_encaminhamento():
+    """
+    Adiciona novo registro em temp_acomp_empenhos
+    
+    Campos:
+    - numero_termo (required)
+    - aditivo (optional)
+    - numero (required) - número sequencial da parcela
+    - responsavel (required)
+    - status (required)
+    - nota_empenho_23, sei_nota_empenho_23, total_empenhado_23
+    - nota_empenho_24, sei_nota_empenho_24, total_empenhado_24
+    - observacoes
+    """
+    try:
+        dados = request.get_json()
+        
+        # Validações básicas
+        if not dados.get('numero_termo'):
+            return jsonify({'success': False, 'error': 'Número do termo é obrigatório'}), 400
+        
+        if not dados.get('numero'):
+            return jsonify({'success': False, 'error': 'Número da parcela é obrigatório'}), 400
+        
+        if not dados.get('responsavel'):
+            return jsonify({'success': False, 'error': 'Responsável é obrigatório'}), 400
+        
+        if not dados.get('status'):
+            return jsonify({'success': False, 'error': 'Status é obrigatório'}), 400
+        
+        cur = get_cursor()
+        conn = get_db()
+        
+        # Inserir registro
+        cur.execute("""
+            INSERT INTO gestao_financeira.temp_acomp_empenhos (
+                numero_termo,
+                aditivo,
+                numero,
+                responsavel,
+                status,
+                nota_empenho_23,
+                sei_nota_empenho_23,
+                nota_empenho_24,
+                sei_nota_empenho_24,
+                total_empenhado_23,
+                total_empenhado_24,
+                observacoes,
+                criado_em
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+            ) RETURNING id
+        """, (
+            dados['numero_termo'],
+            dados.get('aditivo'),
+            dados['numero'],
+            dados['responsavel'],
+            dados['status'],
+            dados.get('nota_empenho_23'),
+            dados.get('sei_nota_empenho_23'),
+            dados.get('nota_empenho_24'),
+            dados.get('sei_nota_empenho_24'),
+            dados.get('total_empenhado_23', 0),
+            dados.get('total_empenhado_24', 0),
+            dados.get('observacoes')
+        ))
+        
+        novo_id = cur.fetchone()
+        try:
+            novo_id = novo_id['id']
+        except (KeyError, TypeError):
+            novo_id = novo_id[0] if novo_id else None
+        
+        conn.commit()
+        
+        print(f"[DEBUG] Novo encaminhamento criado: ID {novo_id}, Termo: {dados['numero_termo']}, Parcela: {dados['numero']}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Encaminhamento adicionado com sucesso',
+            'id': novo_id
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] api_adicionar_encaminhamento: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

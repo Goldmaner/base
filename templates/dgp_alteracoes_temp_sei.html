@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Relatório de alterações e SEIS - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <!-- DataTables CSS -->
+  <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      padding: 20px; 
+    }
+    .header-section { 
+      background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+      color: white;
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .table-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table th { 
+      background-color: #17a2b8; 
+      color: white; 
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .editable-cell {
+      cursor: pointer;
+      border: 1px solid transparent;
+      padding: 8px;
+      min-height: 35px;
+    }
+    .editable-cell:hover {
+      background-color: #fff3cd;
+      border-color: #ffc107;
+    }
+    .editing {
+      background-color: #e7f3ff !important;
+      border-color: #0d6efd !important;
+    }
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 0.8rem;
+    }
+    #dataTable_filter input {
+      margin-left: 0.5em;
+    }
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .loading-content {
+      background: white;
+      padding: 2rem 3rem;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    .loading-content .spinner-border {
+      width: 3rem;
+      height: 3rem;
+    }
+    /* Inicialmente esconde a tabela */
+    #dataTable_wrapper {
+      opacity: 0;
+      transition: opacity 0.3s ease-in;
+    }
+    #dataTable_wrapper.ready {
+      opacity: 1;
+    }
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .loading-content {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    .spinner-border {
+      width: 3rem;
+      height: 3rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+      <div class="spinner-border text-primary mb-3" role="status">
+        <span class="visually-hidden">Carregando...</span>
+      </div>
+      <h5>Carregando registros...</h5>
+      <p class="text-muted">Aguarde...</p>
+    </div>
+  </div>
+
+  <div class="container-fluid">
+    <!-- Header -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="bi bi-file-earmark-text"></i> Relatório de alterações e SEIS</h2>
+          <p class="mb-0">Edição inline de registros da tabela parcerias_sei</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="btn btn-light">
+            <i class="bi bi-arrow-left"></i> Voltar
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensagens Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Tabela de dados -->
+    <div class="table-section">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">
+          <i class="bi bi-table"></i> Registros de SEI
+        </h5>
+        <div class="d-flex gap-2">
+          <button id="btnExportarCSV" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+          </button>
+          <button id="btnExcluirSelecionados" class="btn btn-danger btn-sm" disabled>
+            <i class="bi bi-trash"></i> Excluir Selecionados (<span id="contadorSelecionados">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table id="dataTable" class="table table-striped table-hover table-bordered" style="width:100%">
+          <thead>
+            <tr>
+              <th style="width: 40px;">
+                <input type="checkbox" id="checkAll" title="Selecionar todos">
+              </th>
+              <th>Número Termo</th>
+              <th>SEI Doc</th>
+              <th>Data Assinatura</th>
+              <th>Aditamento</th>
+              <th>Apostilamento</th>
+              <th style="width: 80px;">Ação</th>
+            </tr>
+            <tr class="filters">
+              <th></th>
+              <th><input type="text" class="form-control form-control-sm" placeholder="Termo"></th>
+              <th><input type="text" class="form-control form-control-sm" placeholder="SEI"></th>
+              <th><input type="text" class="form-control form-control-sm" placeholder="Data"></th>
+              <th><input type="text" class="form-control form-control-sm" placeholder="Aditamento"></th>
+              <th><input type="text" class="form-control form-control-sm" placeholder="Apostilamento"></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Preenchido via AJAX -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+  <script>
+    let table;
+    
+    $(document).ready(function() {
+      // Inicializar DataTable com server-side processing
+      table = $('#dataTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+          url: '/parcerias/api/parcerias_sei/dados',
+          type: 'POST',
+          contentType: 'application/json',
+          data: function(d) {
+            return JSON.stringify(d);
+          },
+          error: function(xhr, error, code) {
+            console.error('Erro ao carregar dados:', error);
+            alert('Erro ao carregar dados. Tente novamente.');
+          }
+        },
+        columns: [
+          { 
+            data: 0,
+            orderable: false,
+            render: function(data, type, row) {
+              return '<input type="checkbox" class="checkbox-linha" value="' + data + '">';
+            }
+          },
+          { 
+            data: 1,
+            render: function(data, type, row) {
+              return '<span class="editable-cell" data-campo="numero_termo">' + data + '</span>';
+            }
+          },
+          { 
+            data: 2,
+            render: function(data, type, row) {
+              return '<span class="editable-cell" data-campo="termo_sei_doc">' + data + '</span>';
+            }
+          },
+          { 
+            data: 3,
+            render: function(data, type, row) {
+              // Guardar valor original em formato yyyy-mm-dd para edição
+              let dataValor = data ? data.split('/').reverse().join('-') : '';
+              return '<span class="editable-cell" data-campo="data_assinatura" data-valor="' + dataValor + '">' + data + '</span>';
+            }
+          },
+          { 
+            data: 4,
+            render: function(data, type, row) {
+              return '<span class="editable-cell" data-campo="aditamento">' + data + '</span>';
+            }
+          },
+          { 
+            data: 5,
+            render: function(data, type, row) {
+              return '<span class="editable-cell" data-campo="apostilamento">' + data + '</span>';
+            }
+          },
+          { 
+            data: 6,
+            orderable: false,
+            render: function(data, type, row) {
+              return '<button class="btn btn-danger btn-sm btn-excluir" data-id="' + data + '" title="Excluir"><i class="bi bi-trash"></i></button>';
+            }
+          }
+        ],
+        order: [[1, 'desc']], // Ordenar por coluna 1 (Número Termo) DESC - mostra registros mais recentes
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        dom: 'lfrtip',
+        language: {
+          url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json',
+          processing: '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div>'
+        },
+        drawCallback: function(settings) {
+          // Adicionar data-id às linhas para compatibilidade com código existente
+          var api = this.api();
+          api.rows({page: 'current'}).every(function(rowIdx, tableLoop, rowLoop) {
+            var data = this.data();
+            $(this.node()).attr('data-id', data[0]);
+          });
+        },
+        initComplete: function() {
+          // Adicionar filtros por coluna
+          this.api().columns([1, 2, 3, 4, 5]).every(function() {
+            var column = this;
+            var input = $('.filters th').eq(column.index()).find('input');
+            
+            input.on('keyup change clear', function() {
+              if (column.search() !== this.value) {
+                column.search(this.value).draw();
+              }
+            });
+          });
+          
+          // Remover overlay e mostrar tabela com fade in
+          $('#loadingOverlay').fadeOut(400, function() {
+            $(this).remove();
+          });
+          $('#dataTable_wrapper').addClass('ready');
+        }
+      });
+
+      // Selecionar/desselecionar todos
+      $('#checkAll').on('change', function() {
+        $('.checkbox-linha').prop('checked', this.checked);
+        atualizarContador();
+      });
+
+      // Atualizar contador ao selecionar individual
+      $(document).on('change', '.checkbox-linha', function() {
+        atualizarContador();
+      });
+
+      // Edição inline ao clicar em célula editável
+      $(document).on('click', '.editable-cell:not(.editing)', function() {
+        const $cell = $(this);
+        const valorAtual = $cell.text().trim();
+        const campo = $cell.data('campo');
+        const linha = $cell.closest('tr');
+        const id = linha.data('id');
+
+        // Prevenir múltiplas edições simultâneas
+        if ($('.editing').length > 0) {
+          return;
+        }
+
+        $cell.addClass('editing');
+        const tipoInput = campo === 'data_assinatura' ? 'date' : 'text';
+        // Para data, usar valor em formato yyyy-mm-dd do data-valor
+        const valorInput = campo === 'data_assinatura' ? ($cell.data('valor') || '') : valorAtual;
+        const $input = $(`<input type="${tipoInput}" class="form-control form-control-sm" value="${valorInput}">`);
+        $cell.html($input);
+        $input.focus();
+
+        // Salvar ao perder foco
+        $input.on('blur', function() {
+          salvarCampo(id, campo, $input.val(), $cell);
+        });
+
+        // Salvar ao pressionar Enter
+        $input.on('keypress', function(e) {
+          if (e.which === 13) {
+            $input.blur();
+          }
+        });
+
+        // Cancelar ao pressionar Esc
+        $input.on('keydown', function(e) {
+          if (e.which === 27) {
+            $cell.removeClass('editing');
+            $cell.text(valorAtual);
+          }
+        });
+      });
+
+      // Exclusão individual
+      $(document).on('click', '.btn-excluir', function() {
+        const id = $(this).data('id');
+        if (confirm(`Confirma exclusão do registro ID ${id}?`)) {
+          excluirRegistros([id]);
+        }
+      });
+
+      // Exclusão em lote
+      $('#btnExcluirSelecionados').on('click', function() {
+        const ids = [];
+        $('.checkbox-linha:checked').each(function() {
+          ids.push(parseInt($(this).val()));
+        });
+
+        if (ids.length === 0) {
+          return;
+        }
+
+        if (confirm(`Confirma exclusão de ${ids.length} registro(s)?`)) {
+          excluirRegistros(ids);
+        }
+      });
+
+      // Exportar CSV com filtros aplicados
+      $('#btnExportarCSV').on('click', function() {
+        const btn = $(this);
+        const textoOriginal = btn.html();
+        
+        // Mostrar loading
+        btn.prop('disabled', true);
+        btn.html('<span class="spinner-border spinner-border-sm me-2"></span>Exportando...');
+        
+        // Obter estado atual da tabela (filtros, busca, etc)
+        const tableState = table.state();
+        const ajaxData = {
+          search: tableState.search,
+          columns: tableState.columns.map(function(col, idx) {
+            return {
+              search: {
+                value: col.search.search || ''
+              }
+            };
+          })
+        };
+        
+        // Fazer requisição de exportação
+        fetch('/parcerias/api/parcerias_sei/exportar_csv', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(ajaxData)
+        })
+        .then(response => {
+          if (!response.ok) throw new Error('Erro ao exportar');
+          return response.blob();
+        })
+        .then(blob => {
+          // Criar download
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'parcerias_sei_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.csv';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          
+          // Restaurar botão
+          btn.prop('disabled', false);
+          btn.html(textoOriginal);
+        })
+        .catch(error => {
+          alert('Erro ao exportar CSV: ' + error.message);
+          btn.prop('disabled', false);
+          btn.html(textoOriginal);
+        });
+      });
+    });
+
+    function atualizarContador() {
+      const total = $('.checkbox-linha:checked').length;
+      $('#contadorSelecionados').text(total);
+      $('#btnExcluirSelecionados').prop('disabled', total === 0);
+      
+      // Atualizar estado do checkAll
+      const totalCheckboxes = $('.checkbox-linha').length;
+      $('#checkAll').prop('checked', total === totalCheckboxes && total > 0);
+    }
+
+    function salvarCampo(id, campo, valor, $cell) {
+      $.ajax({
+        url: '/parcerias/api/parcerias_sei/atualizar',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+          id: id,
+          campo: campo,
+          valor: valor
+        }),
+        success: function(response) {
+          $cell.removeClass('editing');
+          
+          // Se for data, converter para formato brasileiro (dd/mm/yyyy) e armazenar valor original
+          if (campo === 'data_assinatura' && valor) {
+            const partes = valor.split('-');
+            const dataFormatada = `${partes[2]}/${partes[1]}/${partes[0]}`;
+            $cell.text(dataFormatada);
+            $cell.data('valor', valor); // Manter valor yyyy-mm-dd
+          } else {
+            $cell.text(valor);
+          }
+          
+          // Feedback visual temporário
+          $cell.css('background-color', '#d1e7dd');
+          setTimeout(function() {
+            $cell.css('background-color', '');
+          }, 1000);
+        },
+        error: function(xhr) {
+          alert('Erro ao salvar: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+          $cell.removeClass('editing');
+          // Recarregar valor original
+          location.reload();
+        }
+      });
+    }
+
+    function excluirRegistros(ids) {
+      $.ajax({
+        url: '/parcerias/api/parcerias_sei/excluir',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ ids: ids }),
+        success: function(response) {
+          alert(response.message);
+          // Remover linhas da tabela
+          ids.forEach(function(id) {
+            table.row($(`tr[data-id="${id}"]`)).remove();
+          });
+          table.draw();
+          atualizarContador();
+        },
+        error: function(xhr) {
+          alert('Erro ao excluir: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+        }
+      });
+    }
+  </script>
+</body>
+</html>

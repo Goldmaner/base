@@ -2,7 +2,7 @@
 Servidor de DESENVOLVIMENTO - Porta 8080
 Com hot reload ativado para reiniciar automaticamente ao editar código
 & C:/Users/d843702/AppData/Local/Programs/Python/Python312/python.exe "c:/Users/d843702/OneDrive - rede.sp/Área de Trabalho/FAF/FAF/run_dev.py"
-"""
+""" 
 import os
 os.environ['FLASK_ENV'] = 'development'
 os.environ['PORT'] = '8080'

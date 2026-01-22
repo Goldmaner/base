@@ -30,7 +30,7 @@
         <label for="seletorTabela" class="form-label fw-bold">Selecione a tabela:</label>
         <select id="seletorTabela" class="form-select form-select-lg" onchange="carregarTabela()">
           <option value="">-- Escolha uma tabela --</option>
-          {% for chave, config in tabelas.items() %}
+          {% for chave, config in tabelas.items()|sort(attribute='1.nome') %}
           <option value="{{ chave }}">{{ config.nome }}</option>
           {% endfor %}
         </select>
@@ -589,8 +589,8 @@
         }
         
         input.id = `campo_${col}`;
-        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto, oculto e solucao
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim'];
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto, oculto, solucao e status_secundario
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim', 'status_secundario'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
@@ -851,8 +851,8 @@
         }
         
         input.id = `campo_${col}`;
-        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto, oculto e solucao
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim'];
+        // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto, oculto, solucao e status_secundario
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim', 'status_secundario'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
@@ -892,8 +892,8 @@
           const valores = Array.from(checkboxes).map(cb => cb.value);
           dados[col] = valores.join(';');
         } else {
-          // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, aplicacao, categoria_texto e oculto
-          const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'aplicacao', 'categoria_texto', 'oculto'];
+          // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, aplicacao, categoria_texto, oculto e status_secundario
+          const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'aplicacao', 'categoria_texto', 'oculto', 'status_secundario'];
           if (!input.value.trim() && !camposOpcionais.includes(col)) {
             alert(`O campo ${configAtual.labels[col]} é obrigatório`);
             return;

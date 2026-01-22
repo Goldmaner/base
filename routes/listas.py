@@ -753,6 +753,74 @@ TABELAS_CONFIG = {
             'situacao': 'select',
             'opcoes_situacao': ['Ativo', 'Suplente', 'Mandato Encerrado', 'Licenciado']
         }
+    },
+    'c_dac_status_pagamento': {
+        'nome': 'DAC: Status de Pagamento',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['status_principal', 'status_secundario', 'status_descricao'],
+        'labels': {
+            'status_principal': 'Status Principal',
+            'status_secundario': 'Status Secundário',
+            'status_descricao': 'Descrição'
+        },
+        'colunas_filtro': ['status_principal', 'status_secundario'],
+        'colunas_ordenacao': ['status_principal', 'status_secundario'],
+        'ordem': 'status_principal, status_secundario',
+        'tipos_campo': {
+            'status_principal': 'text',
+            'status_secundario': 'text',
+            'status_descricao': 'textarea',
+            'rows_status_descricao': 4
+        }
+    },
+    'c_geral_dotacoes': {
+        'nome': 'Geral: Dotações Orçamentárias',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['dotacao_numero', 'programa_aplicacao', 'coordenacao', 'condicoes_termo', 'condicoes_unidade', 'condicoes_osc'],
+        'labels': {
+            'dotacao_numero': 'Número da Dotação',
+            'programa_aplicacao': 'Programa/Aplicação',
+            'coordenacao': 'Coordenação',
+            'condicoes_termo': 'Condições do Termo',
+            'condicoes_unidade': 'Condições da Unidade',
+            'condicoes_osc': 'Condições da OSC'
+        },
+        'colunas_filtro': ['dotacao_numero', 'programa_aplicacao', 'coordenacao'],
+        'colunas_ordenacao': ['dotacao_numero', 'coordenacao'],
+        'ordem': 'dotacao_numero',
+        'tipos_campo': {
+            'dotacao_numero': 'text',
+            'programa_aplicacao': 'text',
+            'coordenacao': 'text',
+            'condicoes_termo': 'textarea',
+            'rows_condicoes_termo': 5,
+            'condicoes_unidade': 'textarea',
+            'rows_condicoes_unidade': 5,
+            'condicoes_osc': 'textarea',
+            'rows_condicoes_osc': 5
+        }
+    },
+    'c_dac_tipos_parcelas': {
+        'nome': 'DAC: Tipos de Parcelas',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['parcela_tipo', 'descricao', 'status'],
+        'labels': {
+            'parcela_tipo': 'Tipo de Parcela',
+            'descricao': 'Descrição',
+            'status': 'Status'
+        },
+        'colunas_filtro': ['parcela_tipo', 'status'],
+        'colunas_ordenacao': ['parcela_tipo', 'status'],
+        'ordem': 'parcela_tipo',
+        'tipos_campo': {
+            'parcela_tipo': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 4,
+            'status': 'select',
+            'opcoes_status': ['Ativo', 'Inativo']
+        },
+        'inline_edit': True,
+        'inline_columns': ['status']
     }
 }
 
@@ -766,7 +834,10 @@ def index():
     """
     try:
         print("[DEBUG] Acessando rota /listas")
+        print(f"[DEBUG] Total de tabelas: {len(TABELAS_CONFIG)}")
         print(f"[DEBUG] Tabelas config: {list(TABELAS_CONFIG.keys())}")
+        for chave, config in TABELAS_CONFIG.items():
+            print(f"  - {chave}: {config.get('nome', 'SEM NOME')}")
         return render_template('listas.html', tabelas=TABELAS_CONFIG)
     except Exception as e:
         print(f"[ERRO] Erro ao renderizar listas.html: {str(e)}")

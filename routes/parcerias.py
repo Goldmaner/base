@@ -3587,6 +3587,361 @@ def buscar_proximo_numero_alteracao():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@parcerias_bp.route("/dgp_alteracoes_temp_sei", methods=["GET"])
+@login_required
+@requires_access('parcerias')
+def dgp_alteracoes_temp_sei():
+    """
+    Relatório editável de parcerias_sei - renderiza apenas o template
+    """
+    return render_template('dgp_alteracoes_temp_sei.html')
+
+
+@parcerias_bp.route("/api/parcerias_sei/dados", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def api_parcerias_sei_dados():
+    """
+    API para DataTables server-side processing
+    Retorna dados paginados com filtros e ordenação
+    """
+    try:
+        # Parâmetros DataTables
+        draw = request.json.get('draw', 1)
+        start = request.json.get('start', 0)
+        length = request.json.get('length', 25)
+        search_value = request.json.get('search', {}).get('value', '')
+        order_column_idx = request.json.get('order', [{}])[0].get('column', 1)
+        order_dir = request.json.get('order', [{}])[0].get('dir', 'desc')  # Padrão DESC para mostrar mais recentes
+        
+        # Filtros por coluna
+        column_filters = request.json.get('columns', [])
+        
+        # Mapeamento de índices para nomes de colunas
+        columns_map = {
+            0: 'id',  # Checkbox (não filtrável)
+            1: 'numero_termo',
+            2: 'termo_sei_doc',
+            3: 'data_assinatura',
+            4: 'aditamento',
+            5: 'apostilamento',
+            6: 'id'  # Ações (não filtrável)
+        }
+        
+        order_column = columns_map.get(order_column_idx, 'id')  # Padrão: ordenar por ID (mais recentes)
+        
+        cur = get_cursor()
+        
+        # Query base
+        query = """
+            SELECT 
+                id,
+                numero_termo,
+                termo_sei_doc,
+                data_assinatura,
+                aditamento,
+                apostilamento
+            FROM public.parcerias_sei
+            WHERE 1=1
+        """
+        
+        params = []
+        
+        # Filtro global (busca em todas as colunas)
+        if search_value:
+            query += """ AND (
+                numero_termo ILIKE %s OR
+                termo_sei_doc ILIKE %s OR
+                CAST(data_assinatura AS TEXT) ILIKE %s OR
+                aditamento ILIKE %s OR
+                apostilamento ILIKE %s
+            )"""
+            search_pattern = f"%{search_value}%"
+            params.extend([search_pattern] * 5)
+        
+        # Filtros por coluna individual
+        for idx, col_filter in enumerate(column_filters):
+            col_search = col_filter.get('search', {}).get('value', '')
+            if col_search and idx in [1, 2, 3, 4, 5]:  # Apenas colunas filtráveis
+                col_name = columns_map[idx]
+                if col_name == 'data_assinatura':
+                    query += f" AND CAST({col_name} AS TEXT) ILIKE %s"
+                else:
+                    query += f" AND {col_name} ILIKE %s"
+                params.append(f"%{col_search}%")
+        
+        # Total de registros (sem filtros)
+        cur.execute("SELECT COUNT(*) as total FROM public.parcerias_sei")
+        result_total = cur.fetchone()
+        records_total = result_total['total'] if result_total else 0
+        
+        # Total de registros filtrados - construir query de contagem separada
+        count_query = "SELECT COUNT(*) as total FROM public.parcerias_sei WHERE 1=1"
+        count_params = []
+        
+        # Adicionar os mesmos filtros da query principal
+        if search_value:
+            count_query += """ AND (
+                numero_termo ILIKE %s OR
+                termo_sei_doc ILIKE %s OR
+                CAST(data_assinatura AS TEXT) ILIKE %s OR
+                aditamento ILIKE %s OR
+                apostilamento ILIKE %s
+            )"""
+            search_pattern = f"%{search_value}%"
+            count_params.extend([search_pattern] * 5)
+        
+        # Filtros por coluna individual na query de contagem
+        for idx, col_filter in enumerate(column_filters):
+            col_search = col_filter.get('search', {}).get('value', '')
+            if col_search and idx in [1, 2, 3, 4, 5]:
+                col_name = columns_map[idx]
+                if col_name == 'data_assinatura':
+                    count_query += f" AND CAST({col_name} AS TEXT) ILIKE %s"
+                else:
+                    count_query += f" AND {col_name} ILIKE %s"
+                count_params.append(f"%{col_search}%")
+        
+        cur.execute(count_query, count_params)
+        result_filtered = cur.fetchone()
+        records_filtered = result_filtered['total'] if result_filtered else 0
+        
+        # Ordenação
+        query += f" ORDER BY {order_column} {order_dir.upper()}"
+        
+        # Paginação
+        query += " LIMIT %s OFFSET %s"
+        params.extend([length, start])
+        
+        # Executar query principal
+        cur.execute(query, params)
+        registros = cur.fetchall()
+        
+        # Formatar dados para DataTables
+        data = []
+        for reg in registros:
+            data.append([
+                reg['id'],  # Para checkbox
+                reg['numero_termo'] or '',
+                reg['termo_sei_doc'] or '',
+                reg['data_assinatura'].strftime('%d/%m/%Y') if reg['data_assinatura'] else '',
+                reg['aditamento'] or '',
+                reg['apostilamento'] or '',
+                reg['id']  # Para botão de ação
+            ])
+        
+        cur.close()
+        
+        return jsonify({
+            'draw': draw,
+            'recordsTotal': records_total,
+            'recordsFiltered': records_filtered,
+            'data': data
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] api_parcerias_sei_dados: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'draw': 1,
+            'recordsTotal': 0,
+            'recordsFiltered': 0,
+            'data': [],
+            'error': str(e)
+        }), 500
+
+
+@parcerias_bp.route("/api/parcerias_sei/exportar_csv", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def api_exportar_parcerias_sei_csv():
+    """
+    API para exportar registros de parcerias_sei em CSV
+    Respeita os mesmos filtros aplicados no DataTables
+    """
+    try:
+        # Receber parâmetros de filtro (mesma lógica do api_parcerias_sei_dados)
+        search_value = request.json.get('search', {}).get('value', '')
+        column_filters = request.json.get('columns', [])
+        
+        # Mapeamento de colunas
+        columns_map = {
+            0: 'id',
+            1: 'numero_termo',
+            2: 'termo_sei_doc',
+            3: 'data_assinatura',
+            4: 'aditamento',
+            5: 'apostilamento',
+            6: 'id'
+        }
+        
+        cur = get_cursor()
+        
+        # Query base
+        query = """
+            SELECT 
+                id,
+                numero_termo,
+                termo_sei_doc,
+                data_assinatura,
+                aditamento,
+                apostilamento
+            FROM public.parcerias_sei
+            WHERE 1=1
+        """
+        
+        params = []
+        
+        # Filtro global
+        if search_value:
+            query += """ AND (
+                numero_termo ILIKE %s OR
+                termo_sei_doc ILIKE %s OR
+                CAST(data_assinatura AS TEXT) ILIKE %s OR
+                aditamento ILIKE %s OR
+                apostilamento ILIKE %s
+            )"""
+            search_pattern = f"%{search_value}%"
+            params.extend([search_pattern] * 5)
+        
+        # Filtros por coluna individual
+        for idx, col_filter in enumerate(column_filters):
+            col_search = col_filter.get('search', {}).get('value', '')
+            if col_search and idx in [1, 2, 3, 4, 5]:
+                col_name = columns_map[idx]
+                if col_name == 'data_assinatura':
+                    query += f" AND CAST({col_name} AS TEXT) ILIKE %s"
+                else:
+                    query += f" AND {col_name} ILIKE %s"
+                params.append(f"%{col_search}%")
+        
+        # Ordenar por ID DESC (mais recentes primeiro)
+        query += " ORDER BY id DESC"
+        
+        cur.execute(query, params)
+        registros = cur.fetchall()
+        cur.close()
+        
+        # Gerar CSV
+        output = StringIO()
+        writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+        
+        # Cabeçalho
+        writer.writerow(['ID', 'Número Termo', 'SEI Doc', 'Data Assinatura', 'Aditamento', 'Apostilamento'])
+        
+        # Dados
+        for reg in registros:
+            writer.writerow([
+                reg['id'],
+                reg['numero_termo'] or '',
+                reg['termo_sei_doc'] or '',
+                reg['data_assinatura'].strftime('%d/%m/%Y') if reg['data_assinatura'] else '',
+                reg['aditamento'] or '',
+                reg['apostilamento'] or ''
+            ])
+        
+        # Preparar resposta com BOM para Excel
+        csv_data = output.getvalue()
+        output.close()
+        
+        # Adicionar BOM UTF-8
+        csv_bytes = '\ufeff' + csv_data
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'parcerias_sei_{timestamp}.csv'
+        
+        return Response(
+            csv_bytes,
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+    except Exception as e:
+        print(f"[ERRO] api_exportar_parcerias_sei_csv: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@parcerias_bp.route("/api/parcerias_sei/atualizar", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def api_atualizar_parcerias_sei():
+    """
+    API para atualizar campo específico de registro em parcerias_sei
+    """
+    try:
+        data = request.get_json()
+        registro_id = data.get('id')
+        campo = data.get('campo')
+        valor = data.get('valor')
+        
+        if not registro_id or not campo:
+            return jsonify({'success': False, 'error': 'Parâmetros inválidos'}), 400
+        
+        # Validar campo permitido
+        campos_permitidos = ['numero_termo', 'termo_sei_doc', 
+                            'data_assinatura', 'aditamento', 'apostilamento']
+        if campo not in campos_permitidos:
+            return jsonify({'success': False, 'error': 'Campo não permitido'}), 400
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        # Update usando parametrização segura
+        query = f"UPDATE public.parcerias_sei SET {campo} = %s WHERE id = %s"
+        cur.execute(query, (valor if valor != '' else None, registro_id))
+        conn.commit()
+        cur.close()
+        
+        return jsonify({'success': True, 'message': 'Atualizado com sucesso'})
+        
+    except Exception as e:
+        print(f"[ERRO] api_atualizar_parcerias_sei: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@parcerias_bp.route("/api/parcerias_sei/excluir", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def api_excluir_parcerias_sei():
+    """
+    API para excluir registro(s) de parcerias_sei
+    """
+    try:
+        data = request.get_json()
+        ids = data.get('ids', [])
+        
+        if not ids or not isinstance(ids, list):
+            return jsonify({'success': False, 'error': 'IDs inválidos'}), 400
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        # Excluir múltiplos IDs
+        placeholders = ','.join(['%s'] * len(ids))
+        query = f"DELETE FROM public.parcerias_sei WHERE id IN ({placeholders})"
+        cur.execute(query, ids)
+        conn.commit()
+        
+        total_excluidos = cur.rowcount
+        cur.close()
+        
+        return jsonify({'success': True, 'message': f'{total_excluidos} registro(s) excluído(s)'})
+        
+    except Exception as e:
+        print(f"[ERRO] api_excluir_parcerias_sei: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @parcerias_bp.route("/alteracao/salvar", methods=["POST"])
 @login_required
 @requires_access('parcerias')

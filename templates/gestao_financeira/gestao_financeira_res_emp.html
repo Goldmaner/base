@@ -80,10 +80,15 @@
 
         <!-- Tabela de Reservas e Empenhos -->
         <div class="table-section">
-            <h4 class="mb-4">
-                <i class="bi bi-table"></i> Registros de Reservas e Empenhos
-                <span class="badge bg-success">{{ registros|length if registros else 0 }}</span>
-            </h4>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0">
+                    <i class="bi bi-table"></i> Registros de Reservas e Empenhos
+                    <span class="badge bg-success">{{ registros|length if registros else 0 }}</span>
+                </h4>
+                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#modalAdicionarManual">
+                    <i class="bi bi-pencil-square"></i> Adicionar Manualmente
+                </button>
+            </div>
 
             {% if registros %}
                 <div class="table-responsive">
@@ -147,6 +152,170 @@
         </div>
     </div>
 
+    <!-- Modal Adicionar Manualmente -->
+    <div class="modal fade" id="modalAdicionarManual" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Adicionar Registro Manualmente</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Modo Manual:</strong> Preencha os campos abaixo para adicionar um novo registro diretamente, sem usar o sistema automático de encaminhamento.
+                    </div>
+                    <form id="formAdicionarManual">
+                        <div class="row g-3">
+                            <!-- Linha 1 -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Número do Termo <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="numero_termo" required 
+                                       placeholder="Ex: TCL/018/2024/SMDHC/CPPI">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Aditivo</label>
+                                <input type="text" class="form-control" id="aditivo" 
+                                       placeholder="Ex: 1º Aditivo ou deixe vazio">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Parcela (Número) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="numero" required min="1"
+                                       placeholder="Ex: 1, 2, 3...">
+                                <small class="text-muted">Número sequencial da parcela</small>
+                            </div>
+                            
+                            <!-- Linha 2 -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Responsável <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="responsavel" required
+                                       placeholder="Nome do responsável">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
+                                <select class="form-select" id="status" required>
+                                    <option value="">-- Selecione --</option>
+                                    <option value="DEOF: Enviado para empenho">DEOF: Enviado para empenho</option>
+                                    <option value="Empenhado">Empenhado</option>
+                                    <option value="Empenhado Parcialmente">Empenhado Parcialmente</option>
+                                    <option value="Enviado, mas não empenhado">Enviado, mas não empenhado</option>
+                                    <option value="Aguardando envio">Aguardando envio</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Linha 3: Elemento 23 -->
+                            <div class="col-12">
+                                <h6 class="border-bottom pb-2 mt-2"><i class="bi bi-file-earmark-text me-2"></i>Elemento 23 (Outras Despesas)</h6>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Nota de Empenho 2023</label>
+                                <input type="text" class="form-control" id="nota_empenho_23"
+                                       placeholder="Ex: 2303">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">SEI NE 2023</label>
+                                <input type="text" class="form-control" id="sei_nota_empenho_23"
+                                       placeholder="Ex: 6074.2023/0001234-5">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Total Empenhado 23</label>
+                                <input type="number" class="form-control" id="total_empenhado_23" 
+                                       step="0.01" min="0" placeholder="0,00">
+                            </div>
+                            
+                            <!-- Linha 4: Elemento 24 -->
+                            <div class="col-12">
+                                <h6 class="border-bottom pb-2 mt-2"><i class="bi bi-file-earmark-text me-2"></i>Elemento 24 (Pessoal/RH)</h6>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Nota de Empenho 2024</label>
+                                <input type="text" class="form-control" id="nota_empenho_24"
+                                       placeholder="Ex: 2440">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">SEI NE 2024</label>
+                                <input type="text" class="form-control" id="sei_nota_empenho_24"
+                                       placeholder="Ex: 6074.2024/0005678-9">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Total Empenhado 24</label>
+                                <input type="number" class="form-control" id="total_empenhado_24" 
+                                       step="0.01" min="0" placeholder="0,00">
+                            </div>
+                            
+                            <!-- Linha 5: Observações -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold">Observações</label>
+                                <textarea class="form-control" id="observacoes" rows="3"
+                                          placeholder="Observações adicionais sobre o encaminhamento..."></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="salvarRegistroManual()">
+                        <i class="bi bi-check-circle"></i> Salvar Registro
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        function salvarRegistroManual() {
+            const form = document.getElementById('formAdicionarManual');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            const dados = {
+                numero_termo: document.getElementById('numero_termo').value.trim(),
+                aditivo: document.getElementById('aditivo').value.trim() || null,
+                numero: parseInt(document.getElementById('numero').value),
+                responsavel: document.getElementById('responsavel').value.trim(),
+                status: document.getElementById('status').value,
+                nota_empenho_23: document.getElementById('nota_empenho_23').value.trim() || null,
+                sei_nota_empenho_23: document.getElementById('sei_nota_empenho_23').value.trim() || null,
+                nota_empenho_24: document.getElementById('nota_empenho_24').value.trim() || null,
+                sei_nota_empenho_24: document.getElementById('sei_nota_empenho_24').value.trim() || null,
+                total_empenhado_23: parseFloat(document.getElementById('total_empenhado_23').value) || 0,
+                total_empenhado_24: parseFloat(document.getElementById('total_empenhado_24').value) || 0,
+                observacoes: document.getElementById('observacoes').value.trim() || null
+            };
+            
+            $.ajax({
+                url: '/gestao_financeira/api/adicionar-encaminhamento',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(dados),
+                success: function(response) {
+                    if (response.success) {
+                        alert('✅ Registro adicionado com sucesso!');
+                        
+                        // Fechar modal
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('modalAdicionarManual'));
+                        modal.hide();
+                        
+                        // Recarregar página
+                        window.location.reload();
+                    } else {
+                        alert('❌ Erro: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    const response = xhr.responseJSON;
+                    alert('❌ Erro ao salvar: ' + (response?.error || 'Erro desconhecido'));
+                }
+            });
+        }
+    </script>
 </body>
 </html>

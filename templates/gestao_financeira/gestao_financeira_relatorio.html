@@ -17,7 +17,7 @@
             padding: 20px; 
         }
         .main-container { 
-            max-width: 1800px; 
+            max-width: 2400px; 
             margin: 0 auto; 
             background: white; 
             border-radius: 15px; 
@@ -229,9 +229,70 @@
                 <a href="{{ url_for('gestao_financeira.encaminhamento') }}" class="btn btn-novo">
                     <i class="bi bi-plus-circle me-2"></i>Novo Encaminhamento
                 </a>
+                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#modalAdicionarManual">
+                    <i class="bi bi-pencil-square me-2"></i>Adicionar Manualmente
+                </button>
                 <a href="{{ url_for('gestao_financeira.index') }}" class="btn btn-voltar">
                     <i class="bi bi-arrow-left me-2"></i>Voltar
                 </a>
+            </div>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card border-primary">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary">
+                            <i class="bi bi-clipboard-data me-2"></i>Parcelas Enviadas
+                        </h5>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ parcelas_enviadas }} / {{ parcelas_total }}</h2>
+                                <p class="text-muted mb-0">Total de parcelas</p>
+                            </div>
+                            <div class="text-end">
+                                <h3 class="mb-0 text-primary">{{ "%.1f"|format(percentual_parcelas) }}%</h3>
+                                <small class="text-muted">Concluído</small>
+                            </div>
+                        </div>
+                        <div class="progress mt-2" style="height: 8px;">
+                            <div class="progress-bar bg-primary" role="progressbar" 
+                                 style="width: {{ percentual_parcelas }}%" 
+                                 aria-valuenow="{{ percentual_parcelas }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-success">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">
+                            <i class="bi bi-file-earmark-text me-2"></i>Termos Enviados
+                        </h5>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ termos_enviados }} / {{ termos_total }}</h2>
+                                <p class="text-muted mb-0">Termos únicos</p>
+                            </div>
+                            <div class="text-end">
+                                <h3 class="mb-0 text-success">{{ "%.1f"|format(percentual_termos) }}%</h3>
+                                <small class="text-muted">Concluído</small>
+                            </div>
+                        </div>
+                        <div class="progress mt-2" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {{ percentual_termos }}%" 
+                                 aria-valuenow="{{ percentual_termos }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -242,7 +303,8 @@
                     <label class="form-label fw-bold">
                         <i class="bi bi-search me-2"></i>Filtrar por Termo
                     </label>
-                    <input type="text" class="form-control" id="filtroTermo" placeholder="Digite o número do termo...">
+                    <input type="text" class="form-control" id="filtroTermo" list="listaTermos" placeholder="Digite ou selecione o número do termo...">
+                    <datalist id="listaTermos"></datalist>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-bold">
@@ -283,15 +345,16 @@
                         <th style="width: 50px;">#</th>
                         <th style="width: 60px;">Adit.</th>
                         <th style="width: 100px;">Parcela</th>
-                        <th style="width: 250px;">Número do Termo</th>
+                        <th style="width: 220px;">Número do Termo</th>
+                        <th style="width: 150px;">Processo Celebração</th>
                         <th style="width: 180px;">Responsável</th>
                         <th style="width: 260px;">Status</th>
-                        <th style="width: 100px;">NE 2023</th>
-                        <th style="width: 120px;">SEI NE 2023</th>
-                        <th style="width: 100px;">NE 2024</th>
-                        <th style="width: 120px;">SEI NE 2024</th>
-                        <th style="width: 120px;">Total Emp. 23</th>
-                        <th style="width: 120px;">Total Emp. 24</th>
+                        <th style="width: 280px;">NE 23</th>
+                        <th style="width: 90px;">SEI NE 23</th>
+                        <th style="width: 280px;">NE 24</th>
+                        <th style="width: 90px;">SEI NE 24</th>
+                        <th style="width: 150px;">Total Emp. 23</th>
+                        <th style="width: 150px;">Total Emp. 24</th>
                         <th style="width: 250px;">Observações</th>
                         <th style="width: 120px;">Ações</th>
                     </tr>
@@ -335,8 +398,29 @@
 
         // Carregar dados ao iniciar página
         $(document).ready(function() {
+            carregarTermos();
             carregarDados();
         });
+        
+        // Carregar lista de termos para autocomplete
+        function carregarTermos() {
+            $.ajax({
+                url: '{{ url_for("gestao_financeira.api_relatorio_empenhos_termos") }}',
+                method: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        const datalist = $('#listaTermos');
+                        datalist.empty();
+                        response.termos.forEach(function(termo) {
+                            datalist.append($('<option>').val(termo));
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erro ao carregar termos:', error);
+                }
+            });
+        }
 
         // Função para carregar dados da API
         function carregarDados() {
@@ -376,6 +460,9 @@
         function renderizarTabela(dados) {
             const tbody = $('#corpoTabela');
             tbody.empty();
+            
+            console.log('DEBUG - Renderizando', dados.length, 'registros');
+            console.log('DEBUG - Primeiro registro:', dados[0]);
 
             dados.forEach(function(registro) {
                 const tr = $('<tr>').attr('data-id', registro.id);
@@ -394,6 +481,9 @@
 
                 // Número do Termo
                 tr.append($('<td>').text(registro.numero_termo));
+
+                // Processo de Celebração
+                tr.append($('<td>').addClass('text-center-cell').text(registro.processo_celebracao || '-'));
 
                 // Responsável
                 tr.append($('<td>').html(
@@ -459,29 +549,21 @@
                     });
                 tr.append($('<td>').append(inputSEI24));
 
-                // Total Empenhado 23 (number com decimais)
-                const inputTotal23 = $('<input>')
-                    .attr('type', 'number')
-                    .attr('step', '0.01')
-                    .addClass('campo-numero')
-                    .attr('data-campo', 'total_empenhado_23')
-                    .val(registro.total_empenhado_23 || '')
-                    .on('blur', function() {
-                        salvarCampo(registro.id, 'total_empenhado_23', $(this).val());
-                    });
-                tr.append($('<td>').append(inputTotal23));
+                // Total Empenhado 23 (formatado como moeda)
+                const valorTotal23 = parseFloat(registro.total_empenhado_23) || 0;
+                const spanTotal23 = $('<span>')
+                    .addClass('text-end d-block')
+                    .css('font-weight', '600')
+                    .text('R$ ' + valorTotal23.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                tr.append($('<td>').append(spanTotal23));
 
-                // Total Empenhado 24 (number com decimais)
-                const inputTotal24 = $('<input>')
-                    .attr('type', 'number')
-                    .attr('step', '0.01')
-                    .addClass('campo-numero')
-                    .attr('data-campo', 'total_empenhado_24')
-                    .val(registro.total_empenhado_24 || '')
-                    .on('blur', function() {
-                        salvarCampo(registro.id, 'total_empenhado_24', $(this).val());
-                    });
-                tr.append($('<td>').append(inputTotal24));
+                // Total Empenhado 24 (formatado como moeda)
+                const valorTotal24 = parseFloat(registro.total_empenhado_24) || 0;
+                const spanTotal24 = $('<span>')
+                    .addClass('text-end d-block')
+                    .css('font-weight', '600')
+                    .text('R$ ' + valorTotal24.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                tr.append($('<td>').append(spanTotal24));
 
                 // Observações (textarea)
                 const textareaObs = $('<textarea>')
@@ -575,6 +657,11 @@
                 carregarDados();
             }
         });
+        
+        // Mudança no select de status carrega dados
+        $('#filtroStatus').on('change', function() {
+            carregarDados();
+        });
 
         // Ver Encaminhamento
         function verEncaminhamento(numeroTermo, numeroSeq) {
@@ -625,6 +712,168 @@
             setTimeout(function() {
                 feedback.fadeOut(300);
             }, 2000);
+        }
+    </script>
+
+    <!-- Modal Adicionar Manualmente -->
+    <div class="modal fade" id="modalAdicionarManual" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-pencil-square me-2"></i>Adicionar Registro de Acompanhamento Manualmente
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formAdicionarManual">
+                        <div class="row g-3">
+                            <!-- Dados Básicos -->
+                            <div class="col-md-6">
+                                <label for="numero_termo" class="form-label">Número do Termo *</label>
+                                <input type="text" class="form-control" id="numero_termo" required 
+                                       placeholder="Ex: TCL/018/2024/SMDHC/CPPI">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="aditivo" class="form-label">Aditivo</label>
+                                <input type="text" class="form-control" id="aditivo" 
+                                       placeholder="Ex: 1º Aditivo">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="numero" class="form-label">Número da Parcela *</label>
+                                <input type="number" class="form-control" id="numero" required 
+                                       placeholder="1, 2, 3..." min="1">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="responsavel" class="form-label">Responsável *</label>
+                                <input type="text" class="form-control" id="responsavel" required 
+                                       placeholder="Nome do responsável">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="status" class="form-label">Status *</label>
+                                <select class="form-select" id="status" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="DEOF: Enviado para empenho">DEOF: Enviado para empenho</option>
+                                    <option value="Empenhado">Empenhado</option>
+                                    <option value="Empenhado Parcialmente">Empenhado Parcialmente</option>
+                                    <option value="Enviado, mas não empenhado">Enviado, mas não empenhado</option>
+                                </select>
+                            </div>
+
+                            <!-- Elemento 23 -->
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mt-2">
+                                    <i class="bi bi-file-earmark-text me-2"></i>Elemento de Despesa 23
+                                </h6>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="nota_empenho_23" class="form-label">Nota de Empenho</label>
+                                <input type="text" class="form-control" id="nota_empenho_23" 
+                                       placeholder="Ex: 2303">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sei_nota_empenho_23" class="form-label">SEI Nota Empenho</label>
+                                <input type="text" class="form-control" id="sei_nota_empenho_23" 
+                                       placeholder="Ex: 6074.2023/0001234-5">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="total_empenhado_23" class="form-label">Total Empenhado (R$)</label>
+                                <input type="number" step="0.01" class="form-control" id="total_empenhado_23" 
+                                       placeholder="0.00" min="0">
+                            </div>
+
+                            <!-- Elemento 24 -->
+                            <div class="col-12">
+                                <h6 class="text-success border-bottom pb-2 mt-2">
+                                    <i class="bi bi-file-earmark-text me-2"></i>Elemento de Despesa 24
+                                </h6>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="nota_empenho_24" class="form-label">Nota de Empenho</label>
+                                <input type="text" class="form-control" id="nota_empenho_24" 
+                                       placeholder="Ex: 2440">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sei_nota_empenho_24" class="form-label">SEI Nota Empenho</label>
+                                <input type="text" class="form-control" id="sei_nota_empenho_24" 
+                                       placeholder="Ex: 6074.2024/0005678-9">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="total_empenhado_24" class="form-label">Total Empenhado (R$)</label>
+                                <input type="number" step="0.01" class="form-control" id="total_empenhado_24" 
+                                       placeholder="0.00" min="0">
+                            </div>
+
+                            <!-- Observações -->
+                            <div class="col-12">
+                                <label for="observacoes" class="form-label">Observações</label>
+                                <textarea class="form-control" id="observacoes" rows="3" 
+                                          placeholder="Observações adicionais..."></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="salvarRegistroManual()">
+                        <i class="bi bi-check-circle me-2"></i>Salvar Registro
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function salvarRegistroManual() {
+            // Validar campos obrigatórios
+            const numero_termo = $('#numero_termo').val().trim();
+            const numero = $('#numero').val();
+            const responsavel = $('#responsavel').val().trim();
+            const status = $('#status').val();
+
+            if (!numero_termo || !numero || !responsavel || !status) {
+                alert('⚠️ Preencha todos os campos obrigatórios marcados com *');
+                return;
+            }
+
+            const dados = {
+                numero_termo: numero_termo,
+                aditivo: $('#aditivo').val().trim() || null,
+                numero: parseInt(numero),
+                responsavel: responsavel,
+                status: status,
+                nota_empenho_23: $('#nota_empenho_23').val().trim() || null,
+                sei_nota_empenho_23: $('#sei_nota_empenho_23').val().trim() || null,
+                nota_empenho_24: $('#nota_empenho_24').val().trim() || null,
+                sei_nota_empenho_24: $('#sei_nota_empenho_24').val().trim() || null,
+                total_empenhado_23: parseFloat($('#total_empenhado_23').val()) || 0,
+                total_empenhado_24: parseFloat($('#total_empenhado_24').val()) || 0,
+                observacoes: $('#observacoes').val().trim() || null
+            };
+
+            $.ajax({
+                url: '/gestao_financeira/api/adicionar-encaminhamento',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(dados),
+                success: function(response) {
+                    if (response.success) {
+                        alert('✅ Registro adicionado com sucesso!');
+                        $('#modalAdicionarManual').modal('hide');
+                        $('#formAdicionarManual')[0].reset();
+                        carregarDados();  // Recarregar tabela
+                    } else {
+                        alert('❌ Erro: ' + response.error);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    const msg = xhr.responseJSON?.error || error;
+                    alert('❌ Erro ao adicionar registro: ' + msg);
+                }
+            });
         }
     </script>
 </body>

@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultra Liquidações - Gestão Financeira</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <style>
+    body {
+        background: linear-gradient(135deg, #20c997 0%, #198754 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+    .main-container {
+        max-width: 2400px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    /* Tabs de seção */
+    .secao-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .secao-tab {
+        padding: 12px 24px;
+        background: #f8f9fa;
+        border: none;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .secao-tab:hover {
+        background: #e9ecef;
+    }
+    .secao-tab.active {
+        background: white;
+        border-bottom: 3px solid #198754;
+        color: #198754;
+    }
+    
+    /* Filtros colapsáveis */
+    .filtros-container {
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+    .filtros-header {
+        padding: 15px 20px;
+        background: #e9ecef;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+    }
+    .filtros-header:hover {
+        background: #dee2e6;
+    }
+    .filtros-body {
+        padding: 20px;
+        display: none;
+    }
+    .filtros-body.show {
+        display: block;
+    }
+    
+    /* Checkbox colunas expandidas */
+    .colunas-expandidas {
+        background: #fff3cd;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .colunas-expandidas label {
+        margin-right: 20px;
+        cursor: pointer;
+    }
+    
+    /* Tabela */
+    .table-responsive {
+        max-height: 600px;
+        overflow: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background: #198754;
+        color: white;
+        z-index: 10;
+        text-align: center;
+        font-size: 0.9rem;
+        padding: 12px 8px;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+    
+    /* Valores moeda */
+    .valor-moeda {
+        text-align: right;
+        font-weight: 600;
+        color: #198754;
+    }
+    
+    /* Linha com pendência */
+    .table tbody tr.linha-pendencia {
+        background-color: #fff3cd !important;
+    }
+    .table tbody tr.linha-pendencia:hover {
+        background-color: #ffe69c !important;
+    }
+    .table tbody tr.linha-pendencia td {
+        background-color: inherit !important;
+    }
+    
+    /* Badge de pendências nas tabs */
+    .badge-pendencias {
+        background-color: #ffc107;
+        color: #000;
+        font-size: 0.75rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-left: 8px;
+    }
+    
+    /* Validação de campos */
+    .campo-erro {
+        background-color: #fff5f5 !important;
+        border-color: #e53e3e !important;
+    }
+    .campo-aviso {
+        background-color: #fffbeb !important;
+        border-color: #f59e0b !important;
+    }
+    
+    /* Paginação */
+    .paginacao {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .btn-pagina {
+        padding: 8px 12px;
+        border: 1px solid #dee2e6;
+        background: white;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+    .btn-pagina:hover:not(:disabled) {
+        background: #f8f9fa;
+    }
+    .btn-pagina:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .btn-pagina.active {
+        background: #198754;
+        color: white;
+        border-color: #198754;
+    }
+    
+    /* Botões de ação */
+    .btn-acao {
+        padding: 4px 8px;
+        font-size: 0.85rem;
+        margin: 0 2px;
+    }
+    
+    /* Modal */
+    .modal-xl {
+        max-width: 1400px;
+    }
+    
+    /* Tooltip info */
+    .info-icon {
+        cursor: help;
+        color: #0dcaf0;
+        margin-left: 5px;
+    }
+</style>
+</head>
+<body>
+
+<div class="main-container">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="bi bi-cash-coin me-2"></i>Ultra Liquidações
+        </h2>
+        <div class="d-flex gap-2">
+            <div class="btn-group">
+                <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-download me-2"></i>Exportar CSV
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="exportarCSV('tudo')">Exportar TUDO</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportarCSV('secao')">Exportar Seção Atual</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportarCSV('filtrado')">Exportar com Filtros</a></li>
+                </ul>
+            </div>
+            <button type="button" class="btn btn-primary" disabled>
+                <i class="bi bi-plus-circle me-2"></i>Adicionar Parcelas
+                <small class="ms-2">(em breve)</small>
+            </button>
+            <a href="{{ url_for('gestao_financeira.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+    </div>
+    
+    <!-- Tabs de Seção -->
+    <div class="secao-tabs">
+        <button class="secao-tab active" data-secao="nao_pago" onclick="trocarSecao('nao_pago')">
+            <i class="bi bi-x-circle me-2"></i>Não Pago
+            <span class="badge-pendencias" id="badge-nao-pago" style="display: none;">0</span>
+        </button>
+        <button class="secao-tab" data-secao="encaminhado" onclick="trocarSecao('encaminhado')">
+            <i class="bi bi-arrow-right-circle me-2"></i>Encaminhado para Pagamento
+            <span class="badge-pendencias" id="badge-encaminhado" style="display: none;">0</span>
+        </button>
+        <button class="secao-tab" data-secao="pago" onclick="trocarSecao('pago')">
+            <i class="bi bi-check-circle me-2"></i>Pago
+        </button>
+    </div>
+    
+    <!-- Colunas Expandidas -->
+    <div class="colunas-expandidas">
+        <strong><i class="bi bi-eye me-2"></i>Colunas Adicionais:</strong>
+        <label><input type="checkbox" id="chk_osc" onchange="atualizarColunas()"> OSC</label>
+        <label><input type="checkbox" id="chk_cnpj" onchange="atualizarColunas()"> CNPJ</label>
+        <label><input type="checkbox" id="chk_sei_celeb" onchange="atualizarColunas()"> Processo Celebração</label>
+        <label><input type="checkbox" id="chk_sei_pc" onchange="atualizarColunas()"> Processo PGTO/PC</label>
+    </div>
+    
+    <!-- Filtros Colapsáveis -->
+    <div class="filtros-container">
+        <div class="filtros-header" onclick="toggleFiltros()">
+            <span><i class="bi bi-funnel me-2"></i>Filtros Avançados</span>
+            <i class="bi bi-chevron-down" id="icone-filtros"></i>
+        </div>
+        <div class="filtros-body" id="filtros-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Número do Termo</label>
+                    <input type="text" class="form-control" id="filtro_numero_termo" list="lista_termos" placeholder="Digite ou selecione...">
+                    <datalist id="lista_termos"></datalist>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tipo de Parcela</label>
+                    <select class="form-select" id="filtro_parcela_tipo">
+                        <option value="Programada" selected>Programada (padrão)</option>
+                        <option value="">Todos</option>
+                        {% for tipo in tipos_parcela %}
+                        {% if tipo != 'Programada' %}
+                        <option value="{{ tipo }}">{{ tipo }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Número da Parcela</label>
+                    <input type="text" class="form-control" id="filtro_parcela_numero" placeholder="Digite...">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Vigência Inicial</label>
+                    <input type="date" class="form-control" id="filtro_vigencia_inicial">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Vigência Final</label>
+                    <input type="date" class="form-control" id="filtro_vigencia_final">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Data Pagamento</label>
+                    <input type="date" class="form-control" id="filtro_data_pagamento">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Observações</label>
+                    <input type="text" class="form-control" id="filtro_observacoes" placeholder="Digite...">
+                </div>
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <label class="form-label fw-bold">Status Secundário</label>
+                    <div class="d-flex flex-wrap gap-3">
+                        <label><input type="checkbox" class="filtro-status-sec" value="Parcial" checked> Parcial</label>
+                        <label><input type="checkbox" class="filtro-status-sec" value="Integral" checked> Integral</label>
+                        <label><input type="checkbox" class="filtro-status-sec" value="Glosa" checked> Glosa</label>
+                        <label><input type="checkbox" class="filtro-status-sec" value="Falta Certidão" checked> Falta Certidão</label>
+                        <label><input type="checkbox" class="filtro-status-sec" value="Falta encarte de Prestações" checked> Falta encarte de Prestações</label>
+                        <label><input type="checkbox" class="filtro-status-sec" value="Aguardando Alteração" checked> Aguardando Alteração</label>
+                        <label><input type="checkbox" class="filtro-status-sec" value="-" checked> - (vazio)</label>
+                        <label><input type="checkbox" class="filtro-status-sec" value="Antigos"> Antigos</label>
+                        <label><input type="checkbox" class="filtro-status-sec" value="Rescisão"> Rescisão</label>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <label class="form-label">OSC</label>
+                    <input type="text" class="form-control" id="filtro_osc" list="lista_oscs" placeholder="Digite ou selecione...">
+                    <datalist id="lista_oscs"></datalist>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">CNPJ</label>
+                    <input type="text" class="form-control" id="filtro_cnpj" list="lista_cnpjs" placeholder="Digite ou selecione...">
+                    <datalist id="lista_cnpjs"></datalist>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Processo Celebração</label>
+                    <input type="text" class="form-control" id="filtro_sei_celeb" list="lista_seis_celeb" placeholder="Digite ou selecione...">
+                    <datalist id="lista_seis_celeb"></datalist>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Processo PGTO/PC</label>
+                    <input type="text" class="form-control" id="filtro_sei_pc" list="lista_seis_pc" placeholder="Digite ou selecione...">
+                    <datalist id="lista_seis_pc"></datalist>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <button class="btn btn-primary" onclick="aplicarFiltros()">
+                        <i class="bi bi-search me-2"></i>Aplicar Filtros
+                    </button>
+                    <button class="btn btn-secondary ms-2" onclick="limparFiltros()">
+                        <i class="bi bi-x-circle me-2"></i>Limpar Filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabela -->
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered" id="tabelaParcelas">
+            <thead>
+                <tr>
+                    <th>Vigência Inicial</th>
+                    <th>Vigência Final</th>
+                    <th>Número do Termo</th>
+                    <th>Tipo Parcela</th>
+                    <th>Nº Parcela</th>
+                    <th>Valor 53/23</th>
+                    <th>Valor 53/24</th>
+                    <th>Valor Previsto</th>
+                    <th>Subtraído / Glosado</th>
+                    <th>Encaminhado</th>
+                    <th>Pago</th>
+                    <th>Status</th>
+                    <th>Status Sec.</th>
+                    <th>Data Pgto</th>
+                    <th>Observações</th>
+                    <th class="col-osc" style="display: none;">OSC</th>
+                    <th class="col-cnpj" style="display: none;">CNPJ</th>
+                    <th class="col-sei-celeb" style="display: none;">Proc. Celeb.</th>
+                    <th class="col-sei-pc" style="display: none;">Proc. PGTO/PC</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="corpo-tabela">
+                <!-- Preenchido via JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginação -->
+    <div class="paginacao" id="paginacao">
+        <!-- Preenchido via JavaScript -->
+    </div>
+    
+    <!-- Loading -->
+    <div class="text-center py-5" id="loading" style="display: none;">
+        <div class="spinner-border text-success"></div>
+        <p class="mt-2">Carregando...</p>
+    </div>
+    
+    <!-- Sem dados -->
+    <div class="text-center py-5" id="sem-dados" style="display: none;">
+        <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+        <p class="mt-3 text-muted">Nenhuma parcela encontrada</p>
+    </div>
+</div>
+
+<!-- Modal Editar Parcela -->
+<div class="modal fade" id="modalEditarParcela" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Parcela</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarParcela">
+                    <input type="hidden" id="edit_id">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">Informações da Parceria</label>
+                            <div class="alert alert-info">
+                                <strong>Termo:</strong> <span id="info_numero_termo"></span><br>
+                                <strong>OSC:</strong> <span id="info_osc"></span><br>
+                                <strong>CNPJ:</strong> <span id="info_cnpj"></span><br>
+                                <strong>Vigência da Parceria:</strong> <span id="info_vigencia_parceria"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Vigência Inicial *</label>
+                            <input type="date" class="form-control" id="edit_vigencia_inicial" required>
+                            <small class="text-muted">Limitado ao mês de início da parceria</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Vigência Final *</label>
+                            <input type="date" class="form-control" id="edit_vigencia_final" required>
+                            <small class="text-muted">Limitado ao mês de término da parceria</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Parcela</label>
+                            <select class="form-select" id="edit_parcela_tipo">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Número da Parcela</label>
+                            <input type="text" class="form-control" id="edit_parcela_numero">
+                            <small class="text-muted">Edite conforme necessário (ex: Parcial, Complementar)</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Valor Elemento 53/23</label>
+                            <input type="number" step="0.01" class="form-control" id="edit_valor_elemento_53_23" onchange="validarValores()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Valor Elemento 53/24</label>
+                            <input type="number" step="0.01" class="form-control" id="edit_valor_elemento_53_24" onchange="validarValores()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Valor Previsto *</label>
+                            <input type="number" step="0.01" class="form-control" id="edit_valor_previsto" required onchange="validarValores()">
+                            <small class="text-danger" id="erro_valor_previsto" style="display: none;">
+                                ⚠️ Deve ser igual à soma dos elementos 23 + 24
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Valor Subtraído</label>
+                            <input type="number" step="0.01" class="form-control" id="edit_valor_subtraido" onchange="validarValores()">
+                            <small class="text-danger" id="erro_valor_subtraido" style="display: none;">
+                                ⚠️ Não pode superar o valor previsto
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Valor Encaminhado</label>
+                            <input type="number" step="0.01" class="form-control" id="edit_valor_encaminhado" onchange="validarValores()">
+                            <small class="text-danger" id="erro_valor_encaminhado" style="display: none;">
+                                ⚠️ Não pode superar previsto - subtraído
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Valor Pago
+                                <i class="bi bi-info-circle info-icon" data-bs-toggle="tooltip" 
+                                   title="Marque 'Pagamento inconsistente' se o valor pago supera o previsto de forma irrecuperável"></i>
+                            </label>
+                            <input type="number" step="0.01" class="form-control" id="edit_valor_pago" onchange="validarValores()">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="edit_pagamento_inconsistente" onchange="validarValores()">
+                                <label class="form-check-label" for="edit_pagamento_inconsistente">
+                                    Pagamento inconsistente
+                                    <i class="bi bi-info-circle info-icon" data-bs-toggle="tooltip" 
+                                       title="Marca o pagamento como inconsistente e adiciona observação. Use apenas se não há como corrigir."></i>
+                                </label>
+                            </div>
+                            <small class="text-danger" id="erro_valor_pago" style="display: none;">
+                                ⚠️ Valor pago supera o permitido
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Status *</label>
+                            <select class="form-select" id="edit_parcela_status" required>
+                                <option value="">Selecione...</option>
+                                <option value="Não Pago">Não Pago</option>
+                                <option value="Encaminhado para Pagamento">Encaminhado para Pagamento</option>
+                                <option value="Pago">Pago</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status Secundário</label>
+                            <select class="form-select" id="edit_parcela_status_secundario">
+                                <option value="">-</option>
+                                <option value="Parcial">Parcial</option>
+                                <option value="Integral">Integral</option>
+                                <option value="Glosa">Glosa</option>
+                                <option value="Falta Certidão">Falta Certidão</option>
+                                <option value="Falta encarte de Prestações">Falta encarte de Prestações</option>
+                                <option value="Aguardando Alteração">Aguardando Alteração</option>
+                                <option value="Antigos">Antigos</option>
+                                <option value="Rescisão">Rescisão</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Data de Pagamento</label>
+                            <input type="date" class="form-control" id="edit_data_pagamento">
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control" id="edit_observacoes" rows="3"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success" onclick="salvarParcela()">
+                    <i class="bi bi-check-circle me-2"></i>Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    let secaoAtual = 'nao_pago';
+    let paginaAtual = 1;
+    let dadosAtuais = [];
+    
+    // Inicializar
+    $(document).ready(function() {
+        carregarDadosFiltros();
+        carregarDados();
+        
+        // Inicializar tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+    
+    // Carregar dados para autocomplete dos filtros
+    function carregarDadosFiltros() {
+        $.ajax({
+            url: '/gestao_financeira/ultra-liquidacoes/api/filtros-dados',
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    // Preencher datalists
+                    $('#lista_termos').empty();
+                    response.termos.forEach(function(termo) {
+                        $('#lista_termos').append($('<option>').val(termo));
+                    });
+                    
+                    $('#lista_oscs').empty();
+                    response.oscs.forEach(function(osc) {
+                        $('#lista_oscs').append($('<option>').val(osc));
+                    });
+                    
+                    $('#lista_cnpjs').empty();
+                    response.cnpjs.forEach(function(cnpj) {
+                        $('#lista_cnpjs').append($('<option>').val(cnpj));
+                    });
+                    
+                    $('#lista_seis_celeb').empty();
+                    response.seis_celeb.forEach(function(sei) {
+                        $('#lista_seis_celeb').append($('<option>').val(sei));
+                    });
+                    
+                    $('#lista_seis_pc').empty();
+                    response.seis_pc.forEach(function(sei) {
+                        $('#lista_seis_pc').append($('<option>').val(sei));
+                    });
+                }
+            },
+            error: function(xhr) {
+                console.error('Erro ao carregar dados de filtros:', xhr.responseJSON?.error || 'Erro desconhecido');
+            }
+        });
+    }
+    
+    // Alternar filtros
+    function toggleFiltros() {
+        const body = document.getElementById('filtros-body');
+        const icone = document.getElementById('icone-filtros');
+        
+        if (body.classList.contains('show')) {
+            body.classList.remove('show');
+            icone.classList.remove('bi-chevron-up');
+            icone.classList.add('bi-chevron-down');
+        } else {
+            body.classList.add('show');
+            icone.classList.remove('bi-chevron-down');
+            icone.classList.add('bi-chevron-up');
+        }
+    }
+    
+    // Trocar seção
+    function trocarSecao(secao) {
+        secaoAtual = secao;
+        paginaAtual = 1;
+        
+        // Atualizar tabs
+        document.querySelectorAll('.secao-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelector(`[data-secao="${secao}"]`).classList.add('active');
+        
+        carregarDados();
+    }
+    
+    // Atualizar colunas expandidas
+    function atualizarColunas() {
+        const mostrarOsc = document.getElementById('chk_osc').checked;
+        const mostrarCnpj = document.getElementById('chk_cnpj').checked;
+        const mostrarSeiCeleb = document.getElementById('chk_sei_celeb').checked;
+        const mostrarSeiPc = document.getElementById('chk_sei_pc').checked;
+        
+        document.querySelectorAll('.col-osc').forEach(el => {
+            el.style.display = mostrarOsc ? '' : 'none';
+        });
+        document.querySelectorAll('.col-cnpj').forEach(el => {
+            el.style.display = mostrarCnpj ? '' : 'none';
+        });
+        document.querySelectorAll('.col-sei-celeb').forEach(el => {
+            el.style.display = mostrarSeiCeleb ? '' : 'none';
+        });
+        document.querySelectorAll('.col-sei-pc').forEach(el => {
+            el.style.display = mostrarSeiPc ? '' : 'none';
+        });
+        
+        carregarDados();
+    }
+    
+    // Carregar dados
+    function carregarDados() {
+        $('#loading').show();
+        $('#sem-dados').hide();
+        $('#corpo-tabela').empty();
+        
+        // Coletar status secundários selecionados
+        const statusSecSelecionados = [];
+        $('.filtro-status-sec:checked').each(function() {
+            statusSecSelecionados.push($(this).val());
+        });
+        
+        const params = new URLSearchParams({
+            secao: secaoAtual,
+            pagina: paginaAtual,
+            mostrar_osc: document.getElementById('chk_osc').checked,
+            mostrar_cnpj: document.getElementById('chk_cnpj').checked,
+            mostrar_sei_celeb: document.getElementById('chk_sei_celeb').checked,
+            mostrar_sei_pc: document.getElementById('chk_sei_pc').checked,
+            numero_termo: $('#filtro_numero_termo').val() || '',
+            parcela_tipo: $('#filtro_parcela_tipo').val() || '',
+            parcela_numero: $('#filtro_parcela_numero').val() || '',
+            vigencia_inicial: $('#filtro_vigencia_inicial').val() || '',
+            vigencia_final: $('#filtro_vigencia_final').val() || '',
+            data_pagamento: $('#filtro_data_pagamento').val() || '',
+            observacoes: $('#filtro_observacoes').val() || '',
+            status_secundarios: statusSecSelecionados.join(','),
+            osc: $('#filtro_osc').val() || '',
+            cnpj: $('#filtro_cnpj').val() || '',
+            sei_celeb: $('#filtro_sei_celeb').val() || '',
+            sei_pc: $('#filtro_sei_pc').val() || ''
+        });
+        
+        $.ajax({
+            url: '/gestao_financeira/ultra-liquidacoes/api/parcelas?' + params.toString(),
+            method: 'GET',
+            success: function(response) {
+                $('#loading').hide();
+                
+                if (response.success && response.data.length > 0) {
+                    dadosAtuais = response.data;
+                    renderizarTabela(response.data);
+                    renderizarPaginacao(response.pagina, response.total_paginas);
+                    
+                    // Atualizar badge de pendências
+                    if (secaoAtual === 'nao_pago' || secaoAtual === 'encaminhado') {
+                        const badgeId = secaoAtual === 'nao_pago' ? 'badge-nao-pago' : 'badge-encaminhado';
+                        if (response.total_pendencias > 0) {
+                            $('#' + badgeId).text(response.total_pendencias).show();
+                        } else {
+                            $('#' + badgeId).hide();
+                        }
+                    }
+                } else {
+                    $('#sem-dados').show();
+                }
+            },
+            error: function(xhr) {
+                $('#loading').hide();
+                alert('Erro ao carregar dados: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Renderizar tabela
+    function renderizarTabela(dados) {
+        const tbody = $('#corpo-tabela');
+        tbody.empty();
+        
+        dados.forEach(function(parcela) {
+            const tr = $('<tr>');
+            
+            // Debug: verificar pendências
+            console.log('Parcela:', parcela.numero_termo, parcela.parcela_numero, 
+                       'tem_pendencia:', parcela.tem_pendencia, 
+                       'pendencias:', parcela.pendencias);
+            
+            // Destacar linha se tiver pendência
+            if (parcela.tem_pendencia === true || parcela.tem_pendencia === 'true' || 
+                (parcela.pendencias && parcela.pendencias.length > 0)) {
+                
+                console.log('>>> APLICANDO AMARELO para:', parcela.numero_termo, parcela.parcela_numero);
+                
+                tr.addClass('linha-pendencia');
+                tr.attr('title', '⚠️ Pendência: ' + (parcela.pendencias_descricao || 'Verificar'));
+                tr.css({
+                    'cursor': 'help',
+                    'background-color': '#fff3cd !important'
+                });
+                
+                // Adicionar evento de clique para mostrar popup
+                tr.on('click', function(e) {
+                    if (parcela.pendencias && parcela.pendencias.length > 0) {
+                        alert('⚠️ PENDÊNCIAS ENCONTRADAS:\n\n' + parcela.pendencias.join('\n\n') + '\n\nCorrija estas inconsistências.');
+                    }
+                });
+            }
+            
+            tr.append($('<td>').text(parcela.vigencia_inicial));
+            tr.append($('<td>').text(parcela.vigencia_final));
+            tr.append($('<td>').text(parcela.numero_termo));
+            tr.append($('<td>').text(parcela.parcela_tipo));
+            tr.append($('<td>').text(parcela.parcela_numero));
+            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_elemento_53_23)));
+            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_elemento_53_24)));
+            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_previsto)));
+            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_subtraido)));
+            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_encaminhado)));
+            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_pago)));
+            tr.append($('<td>').text(parcela.parcela_status));
+            tr.append($('<td>').text(parcela.parcela_status_secundario || '-'));
+            tr.append($('<td>').text(parcela.data_pagamento || '-'));
+            tr.append($('<td>').text(truncarTexto(parcela.observacoes, 50)));
+            
+            // Colunas expandidas
+            if (parcela.osc !== null) {
+                tr.append($('<td>').addClass('col-osc').css('display', document.getElementById('chk_osc').checked ? '' : 'none').text(parcela.osc));
+            }
+            if (parcela.cnpj !== null) {
+                tr.append($('<td>').addClass('col-cnpj').css('display', document.getElementById('chk_cnpj').checked ? '' : 'none').text(parcela.cnpj));
+            }
+            if (parcela.sei_celeb !== null) {
+                tr.append($('<td>').addClass('col-sei-celeb').css('display', document.getElementById('chk_sei_celeb').checked ? '' : 'none').text(parcela.sei_celeb));
+            }
+            if (parcela.sei_pc !== null) {
+                tr.append($('<td>').addClass('col-sei-pc').css('display', document.getElementById('chk_sei_pc').checked ? '' : 'none').text(parcela.sei_pc));
+            }
+            
+            // Ações
+            const tdAcoes = $('<td>');
+            const btnEditar = $('<button>').addClass('btn btn-sm btn-primary btn-acao')
+                .html('<i class="bi bi-pencil"></i>')
+                .attr('title', 'Editar')
+                .on('click', function() { editarParcela(parcela.id); });
+            
+            const btnExcluir = $('<button>').addClass('btn btn-sm btn-danger btn-acao')
+                .html('<i class="bi bi-trash"></i>')
+                .attr('title', 'Excluir')
+                .on('click', function() { excluirParcela(parcela.id); });
+            
+            tdAcoes.append(btnEditar).append(btnExcluir);
+            tr.append(tdAcoes);
+            
+            tbody.append(tr);
+        });
+    }
+    
+    // Renderizar paginação
+    function renderizarPaginacao(pagina, totalPaginas) {
+        const div = $('#paginacao');
+        div.empty();
+        
+        const btnAnterior = $('<button>').addClass('btn-pagina').text('« Anterior')
+            .prop('disabled', pagina <= 1)
+            .on('click', function() {
+                if (pagina > 1) {
+                    paginaAtual = pagina - 1;
+                    carregarDados();
+                }
+            });
+        
+        div.append(btnAnterior);
+        div.append($('<span>').text(`Página ${pagina} de ${totalPaginas}`).css('margin', '0 15px'));
+        
+        const btnProximo = $('<button>').addClass('btn-pagina').text('Próxima »')
+            .prop('disabled', pagina >= totalPaginas)
+            .on('click', function() {
+                if (pagina < totalPaginas) {
+                    paginaAtual = pagina + 1;
+                    carregarDados();
+                }
+            });
+        
+        div.append(btnProximo);
+    }
+    
+    // Aplicar filtros
+    function aplicarFiltros() {
+        paginaAtual = 1;
+        carregarDados();
+    }
+    
+    // Limpar filtros
+    function limparFiltros() {
+        $('#filtro_numero_termo, #filtro_parcela_tipo, #filtro_parcela_numero, #filtro_vigencia_inicial, #filtro_vigencia_final, #filtro_data_pagamento, #filtro_observacoes, #filtro_osc, #filtro_cnpj, #filtro_sei_celeb, #filtro_sei_pc').val('');
+        aplicarFiltros();
+    }
+    
+    // Editar parcela
+    function editarParcela(id) {
+        $.ajax({
+            url: `/gestao_financeira/ultra-liquidacoes/api/parcela/${id}`,
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    const dados = response.data;
+                    
+                    $('#edit_id').val(dados.id);
+                    $('#info_numero_termo').text(dados.numero_termo);
+                    $('#info_osc').text(dados.osc || '-');
+                    $('#info_cnpj').text(dados.cnpj || '-');
+                    $('#info_vigencia_parceria').text(`${dados.inicio_parceria} a ${dados.final_parceria}`);
+                    
+                    $('#edit_vigencia_inicial').val(converterDataParaInput(dados.vigencia_inicial));
+                    $('#edit_vigencia_final').val(converterDataParaInput(dados.vigencia_final));
+                    $('#edit_parcela_numero').val(dados.parcela_numero);
+                    $('#edit_valor_elemento_53_23').val(dados.valor_elemento_53_23);
+                    $('#edit_valor_elemento_53_24').val(dados.valor_elemento_53_24);
+                    $('#edit_valor_previsto').val(dados.valor_previsto);
+                    $('#edit_valor_subtraido').val(dados.valor_subtraido);
+                    $('#edit_valor_encaminhado').val(dados.valor_encaminhado);
+                    $('#edit_valor_pago').val(dados.valor_pago);
+                    $('#edit_parcela_status').val(dados.parcela_status);
+                    $('#edit_parcela_status_secundario').val(dados.parcela_status_secundario);
+                    $('#edit_data_pagamento').val(converterDataParaInput(dados.data_pagamento));
+                    $('#edit_observacoes').val(dados.observacoes);
+                    
+                    // Preencher select de tipos
+                    const selectTipo = $('#edit_parcela_tipo');
+                    selectTipo.empty().append('<option value="">Selecione...</option>');
+                    dados.tipos_parcela_disponiveis.forEach(function(tipo) {
+                        selectTipo.append($('<option>').val(tipo).text(tipo));
+                    });
+                    selectTipo.val(dados.parcela_tipo);
+                    
+                    // Verificar pagamento inconsistente
+                    $('#edit_pagamento_inconsistente').prop('checked', dados.observacoes && dados.observacoes.includes('Pagamento inconsistente'));
+                    
+                    $('#modalEditarParcela').modal('show');
+                }
+            },
+            error: function(xhr) {
+                alert('Erro ao carregar parcela: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Validar valores
+    function validarValores() {
+        const valor23 = parseFloat($('#edit_valor_elemento_53_23').val()) || 0;
+        const valor24 = parseFloat($('#edit_valor_elemento_53_24').val()) || 0;
+        const previsto = parseFloat($('#edit_valor_previsto').val()) || 0;
+        const subtraido = parseFloat($('#edit_valor_subtraido').val()) || 0;
+        const encaminhado = parseFloat($('#edit_valor_encaminhado').val()) || 0;
+        const pago = parseFloat($('#edit_valor_pago').val()) || 0;
+        const inconsistente = $('#edit_pagamento_inconsistente').is(':checked');
+        
+        let temErro = false;
+        
+        // Validação: 23 + 24 = Previsto
+        if (Math.abs((valor23 + valor24) - previsto) > 0.01) {
+            $('#edit_valor_previsto').addClass('campo-erro');
+            $('#erro_valor_previsto').show();
+            temErro = true;
+        } else {
+            $('#edit_valor_previsto').removeClass('campo-erro');
+            $('#erro_valor_previsto').hide();
+        }
+        
+        // Validação: Subtraído <= Previsto
+        if (subtraido > previsto) {
+            $('#edit_valor_subtraido').addClass('campo-erro');
+            $('#erro_valor_subtraido').show();
+            temErro = true;
+        } else {
+            $('#edit_valor_subtraido').removeClass('campo-erro');
+            $('#erro_valor_subtraido').hide();
+        }
+        
+        // Validação: Encaminhado <= (Previsto - Subtraído)
+        if (encaminhado > (previsto - subtraido)) {
+            $('#edit_valor_encaminhado').addClass('campo-erro');
+            $('#erro_valor_encaminhado').show();
+            temErro = true;
+        } else {
+            $('#edit_valor_encaminhado').removeClass('campo-erro');
+            $('#erro_valor_encaminhado').hide();
+        }
+        
+        // Validação: Pago (com checkbox inconsistente)
+        if (!inconsistente && pago > previsto) {
+            $('#edit_valor_pago').addClass('campo-erro');
+            $('#erro_valor_pago').show();
+            temErro = true;
+        } else if (inconsistente && pago > previsto) {
+            $('#edit_valor_pago').removeClass('campo-erro').addClass('campo-aviso');
+            $('#erro_valor_pago').hide();
+        } else {
+            $('#edit_valor_pago').removeClass('campo-erro campo-aviso');
+            $('#erro_valor_pago').hide();
+        }
+        
+        return !temErro;
+    }
+    
+    // Salvar parcela
+    function salvarParcela() {
+        if (!validarValores()) {
+            if (!confirm('Há erros de validação. Deseja salvar mesmo assim?')) {
+                return;
+            }
+        }
+        
+        const id = $('#edit_id').val();
+        const inconsistente = $('#edit_pagamento_inconsistente').is(':checked');
+        let observacoes = $('#edit_observacoes').val();
+        
+        // Adicionar texto se marcou inconsistente e ainda não tem
+        if (inconsistente && !observacoes.includes('Pagamento inconsistente')) {
+            observacoes += (observacoes ? '\n' : '') + 'Pagamento inconsistente';
+        }
+        
+        const dados = {
+            vigencia_inicial: converterInputParaData($('#edit_vigencia_inicial').val()),
+            vigencia_final: converterInputParaData($('#edit_vigencia_final').val()),
+            parcela_tipo: $('#edit_parcela_tipo').val(),
+            parcela_numero: $('#edit_parcela_numero').val(),
+            valor_elemento_53_23: $('#edit_valor_elemento_53_23').val(),
+            valor_elemento_53_24: $('#edit_valor_elemento_53_24').val(),
+            valor_previsto: $('#edit_valor_previsto').val(),
+            valor_subtraido: $('#edit_valor_subtraido').val(),
+            valor_encaminhado: $('#edit_valor_encaminhado').val(),
+            valor_pago: $('#edit_valor_pago').val(),
+            parcela_status: $('#edit_parcela_status').val(),
+            parcela_status_secundario: $('#edit_parcela_status_secundario').val(),
+            data_pagamento: converterInputParaData($('#edit_data_pagamento').val()),
+            observacoes: observacoes
+        };
+        
+        $.ajax({
+            url: `/gestao_financeira/ultra-liquidacoes/api/parcela/${id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(dados),
+            success: function(response) {
+                if (response.success) {
+                    $('#modalEditarParcela').modal('hide');
+                    carregarDados();
+                    alert('✅ Parcela atualizada com sucesso!');
+                }
+            },
+            error: function(xhr) {
+                alert('Erro ao salvar: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Excluir parcela
+    function excluirParcela(id) {
+        if (!confirm('⚠️ Tem certeza que deseja excluir esta parcela?\n\nEsta ação não pode ser desfeita.')) {
+            return;
+        }
+        
+        $.ajax({
+            url: `/gestao_financeira/ultra-liquidacoes/api/parcela/${id}`,
+            method: 'DELETE',
+            success: function(response) {
+                if (response.success) {
+                    carregarDados();
+                    alert('✅ Parcela excluída com sucesso!');
+                }
+            },
+            error: function(xhr) {
+                alert('Erro ao excluir: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Exportar CSV
+    function exportarCSV(modo) {
+        const url = `/gestao_financeira/ultra-liquidacoes/api/exportar-csv?modo=${modo}&secao=${secaoAtual}`;
+        window.location.href = url;
+    }
+    
+    // Helpers
+    function formatarMoeda(valor) {
+        return 'R$ ' + parseFloat(valor).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+    
+    function truncarTexto(texto, tamanho) {
+        if (!texto) return '-';
+        return texto.length > tamanho ? texto.substring(0, tamanho) + '...' : texto;
+    }
+    
+    function converterDataParaInput(dataBr) {
+        if (!dataBr) return '';
+        const partes = dataBr.split('/');
+        if (partes.length !== 3) return '';
+        return `${partes[2]}-${partes[1]}-${partes[0]}`;
+    }
+    
+    function converterInputParaData(dataInput) {
+        if (!dataInput) return '';
+        const partes = dataInput.split('-');
+        if (partes.length !== 3) return '';
+        return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+</script>
+
+</body>
+</html>
