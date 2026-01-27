@@ -30,6 +30,7 @@ from routes.conc_demonstrativo import bp as conc_demonstrativo_bp
 from routes.ocr_testes import bp as ocr_testes_bp
 from routes.gestao_financeira import gestao_financeira_bp
 from routes.gestao_financeira_ultra_liquidacoes import ultra_liquidacoes_bp
+from routes.gestao_orcamentaria import gestao_orcamentaria_bp
 from routes.ferias import ferias_bp
 from routes.editais import editais_bp
 
@@ -88,6 +89,7 @@ def create_app():
     app.register_blueprint(ocr_testes_bp)
     app.register_blueprint(gestao_financeira_bp)
     app.register_blueprint(ultra_liquidacoes_bp)
+    app.register_blueprint(gestao_orcamentaria_bp)
     app.register_blueprint(ferias_bp)
     app.register_blueprint(editais_bp)
     

@@ -172,11 +172,18 @@
           <div id="collapseDP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
             <div class="accordion-body">
               <div class="row g-2">
-                <div class="col-12">
+                <div class="col-md-6">
                   <a href="{{ url_for('editais.listar') }}" class="btn btn-module" style="background-color:#0dcaf0; color:#000;">
                     <i class="bi bi-megaphone"></i> Edital
                   </a>
                 </div>
+                {% if is_admin or 'gestao_orcamentaria' in user_acessos %}
+                <div class="col-md-6">
+                  <a href="{{ url_for('gestao_orcamentaria.index') }}" class="btn btn-module" style="background-color:#764ba2; color:#fff;">
+                    <i class="bi bi-calculator"></i> Gestão Orçamentária
+                  </a>
+                </div>
+                {% endif %}
               </div>
             </div>
           </div>
@@ -676,6 +683,7 @@
         
         // Departamento de Parcerias
         { id: 'editais', nome: 'Edital', grupo: 'Departamento de Parcerias' },
+        { id: 'gestao_orcamentaria', nome: 'Gestão Orçamentária', grupo: 'Departamento de Parcerias' },
         
         // Gestão de Dados
         { id: 'listas', nome: 'Listas Suspensas', grupo: 'Gestão de Dados' },

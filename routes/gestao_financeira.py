@@ -620,15 +620,15 @@ def api_relatorio_empenhos():
         
         # Aplicar filtros
         if termo:
-            query += " AND numero_termo ILIKE %s"
+            query += " AND t.numero_termo ILIKE %s"
             params.append(f'%{termo}%')
         
         if responsavel:
-            query += " AND responsavel ILIKE %s"
+            query += " AND t.responsavel ILIKE %s"
             params.append(f'%{responsavel}%')
         
         if status:
-            query += " AND status = %s"
+            query += " AND t.status = %s"
             params.append(status)
         
         query += " ORDER BY criado_em DESC, numero_termo, numero"

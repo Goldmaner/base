@@ -333,9 +333,11 @@ def main():
                 (info_alteracao, numero_termo, nome_mes, valor_mes, parcela_numero,
                  created_por, created_em, atualizado_por, atualizado_em)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (numero_termo, info_alteracao, nome_mes) DO NOTHING
             """
             
             registros_inseridos = 0
+            registros_ignorados = 0
             
             for registro in todos_registros:
                 cur.execute(query_insert, (
@@ -349,12 +351,18 @@ def main():
                     registro['atualizado_por'],
                     registro['atualizado_em']
                 ))
-                registros_inseridos += 1
+                
+                if cur.rowcount == 1:
+                    registros_inseridos += 1
+                else:
+                    registros_ignorados += 1
             
             # Commit
             conn.commit()
             
             log(f"✅ {registros_inseridos} registros inseridos com sucesso!")
+            if registros_ignorados > 0:
+                log(f"⏭️  {registros_ignorados} registros já existiam (mantidos sem alteração)")
             log("")
             log("=" * 80)
             log("IMPORTAÇÃO CONCLUÍDA COM SUCESSO!")

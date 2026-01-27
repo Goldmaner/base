@@ -34,7 +34,9 @@
 - Incluir modelos e automação para documentos de DGP e DP.
 
 ## 7. Gestão Financeira
-- Implementar importação de hiper_liquidações e ampliar funções de conciliação.
+- Implementar importação de hiper_liquidações e ampliar funções de conciliação. ✅
+- Adicionar automação no encaminhamento para pagamento. 
+- Melhorar filtros de pendências da Ultra.
 - Adicionar novos relatórios orçamentários e financeiros.
 - Criar pasta dedicada para certidões e atualizações financeiras.
 

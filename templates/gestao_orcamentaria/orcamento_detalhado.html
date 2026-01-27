@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orçamento Detalhado - Gestão Orçamentária</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    
+    <style>
+        body {
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .main-container {
+            max-width: 98%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #764ba2;
+        }
+        
+        .page-title {
+            color: #667eea;
+            font-weight: 700;
+            font-size: 2rem;
+        }
+        
+        .ano-referencia-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .ano-referencia-container label {
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .ano-referencia-container input {
+            width: 100px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 700;
+            border: 2px solid white;
+        }
+        
+        .filtros-container {
+            background: #fff;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .table-responsive {
+            max-height: 70vh;
+            overflow: auto;
+        }
+        
+        .table thead th {
+            position: sticky;
+            top: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            z-index: 10;
+            text-align: center;
+            font-size: 0.9rem;
+            padding: 12px 8px;
+        }
+        
+        .table tbody td {
+            vertical-align: middle;
+            padding: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .valor-moeda {
+            text-align: right;
+            font-weight: 600;
+            color: #198754;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .loading-spinner {
+            text-align: center;
+            padding: 50px;
+        }
+        
+        .sem-dados {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+        }
+        
+        .btn-voltar {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        
+        .btn-exportar {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        
+        .btn-limpar-filtros {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+        <div>
+            <h2 class="page-title">
+                <i class="bi bi-file-earmark-text me-3"></i>
+                Orçamento Detalhado
+            </h2>
+            <p class="text-muted mb-0">Relatório consolidado de dotações orçamentárias e valores programados</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <div class="ano-referencia-container">
+                <label for="ano_referencia">Ano de Referência:</label>
+                <input type="number" class="form-control" id="ano_referencia" min="2015" max="2030" value="">
+            </div>
+            <button class="btn btn-exportar" onclick="exportarCSV()">
+                <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
+            </button>
+            <button class="btn btn-limpar-filtros" onclick="limparFiltros()">
+                <i class="bi bi-eraser me-2"></i>Limpar Filtros
+            </button>
+            <a href="/gestao_orcamentaria" class="btn btn-voltar">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+    </div>
+    
+    <!-- Seção de Filtros -->
+    <div class="filtros-container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">
+                <i class="bi bi-funnel me-2"></i>Filtros
+            </h5>
+            <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false">
+                <i class="bi bi-chevron-down" id="iconFiltros"></i> Mostrar/Ocultar Filtros
+            </button>
+        </div>
+        
+        <div class="collapse" id="filtrosCollapse">
+            <!-- FILTROS PRINCIPAIS -->
+            <div class="mb-3">
+                <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoPrincipais" aria-expanded="true">
+                    <span><i class="bi bi-file-text"></i> <strong>Filtros Principais</strong></span>
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+                <div class="collapse show" id="secaoPrincipais">
+                    <div class="card card-body mt-2">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="filtro_numero_termo" class="form-label">Número do Termo</label>
+                                <input type="text" class="form-control" id="filtro_numero_termo" placeholder="Ex: TCL/001/2024">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtro_dotacao" class="form-label">Dotação Orçamentária</label>
+                                <input type="text" class="form-control" id="filtro_dotacao" placeholder="Ex: 335000000">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtro_projeto_atividade" class="form-label">Projeto-Atividade</label>
+                                <input type="text" class="form-control" id="filtro_projeto_atividade" placeholder="Ex: 2030">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtro_programatica" class="form-label">Programática</label>
+                                <input type="text" class="form-control" id="filtro_programatica" placeholder="Ex: 02.08.14.422.0009.2030">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- FILTROS ADICIONAIS (COLUNAS OPCIONAIS) -->
+            <div class="mb-3">
+                <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoAdicionais" aria-expanded="false">
+                    <span><i class="bi bi-sliders"></i> <strong>Filtros Adicionais</strong></span>
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+                <div class="collapse" id="secaoAdicionais">
+                    <div class="card card-body mt-2">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="filtro_tipo_contrato" class="form-label">Tipo de Contrato</label>
+                                <input type="text" class="form-control" id="filtro_tipo_contrato" placeholder="Ex: TCL">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Data de Término</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <select class="form-select form-select-sm" id="filtro_mes_termino">
+                                            <option value="">Mês</option>
+                                            <option value="01">Janeiro</option>
+                                            <option value="02">Fevereiro</option>
+                                            <option value="03">Março</option>
+                                            <option value="04">Abril</option>
+                                            <option value="05">Maio</option>
+                                            <option value="06">Junho</option>
+                                            <option value="07">Julho</option>
+                                            <option value="08">Agosto</option>
+                                            <option value="09">Setembro</option>
+                                            <option value="10">Outubro</option>
+                                            <option value="11">Novembro</option>
+                                            <option value="12">Dezembro</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_ano_termino" placeholder="Ano" min="2000" max="2099">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtro_cnpj" class="form-label">CNPJ</label>
+                                <input type="text" class="form-control" id="filtro_cnpj" placeholder="Ex: 12.345.678/0001-99">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtro_sei_pc" class="form-label">SEI de Pgto./PC</label>
+                                <input type="text" class="form-control" id="filtro_sei_pc" placeholder="Ex: 6074.2024/0001234-5">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtro_osc" class="form-label">OSC</label>
+                                <input type="text" class="form-control" id="filtro_osc" placeholder="Nome da OSC">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtro_projeto" class="form-label">Projeto</label>
+                                <input type="text" class="form-control" id="filtro_projeto" placeholder="Nome do projeto">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtro_sei_celeb" class="form-label">SEI de Celebração</label>
+                                <input type="text" class="form-control" id="filtro_sei_celeb" placeholder="Ex: 6074.2024/0005678-9">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Botões de ação -->
+            <div class="row">
+                <div class="col-md-12 d-flex gap-2">
+                    <button type="button" class="btn btn-primary" onclick="aplicarFiltros()">
+                        <i class="bi bi-search"></i> Aplicar Filtros
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="limparFiltros()">
+                        <i class="bi bi-x-circle"></i> Limpar Filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Colunas Opcionais -->
+    <div class="alert alert-light border mb-3">
+        <strong><i class="bi bi-eye me-2"></i>Colunas Opcionais:</strong>
+        <label class="ms-3"><input type="checkbox" id="chk_tipo_contrato" onchange="atualizarColunasVisiveis()"> Tipo de Contrato</label>
+        <label class="ms-3"><input type="checkbox" id="chk_data_termino" onchange="atualizarColunasVisiveis()"> Data de Término</label>
+        <label class="ms-3"><input type="checkbox" id="chk_cnpj" onchange="atualizarColunasVisiveis()"> CNPJ</label>
+        <label class="ms-3"><input type="checkbox" id="chk_sei_pc" onchange="atualizarColunasVisiveis()"> SEI de Pgto. / PC</label>
+        <label class="ms-3"><input type="checkbox" id="chk_osc" onchange="atualizarColunasVisiveis()"> OSC</label>
+        <label class="ms-3"><input type="checkbox" id="chk_projeto" onchange="atualizarColunasVisiveis()"> Projeto</label>
+        <label class="ms-3"><input type="checkbox" id="chk_sei_celeb" onchange="atualizarColunasVisiveis()"> SEI de Celebração</label>
+    </div>
+    
+    <!-- Totais do Orçamento -->
+    <div class="alert alert-success border mb-3">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <strong><i class="bi bi-cash-stack me-2"></i>Total Programado:</strong>
+                <span class="h5 ms-2" id="total_programado_header">R$ 0,00</span>
+            </div>
+            <div class="col-md-3">
+                <strong><i class="bi bi-graph-up me-2"></i>Total Projetado:</strong>
+                <span class="h5 ms-2" id="total_projetado_header">R$ 0,00</span>
+            </div>
+            <div class="col-md-3">
+                <strong><i class="bi bi-calculator-fill me-2"></i>Total Global:</strong>
+                <span class="h5 ms-2 text-success" id="total_global_header">R$ 0,00</span>
+            </div>
+            <div class="col-md-3">
+                <strong><i class="bi bi-list-check me-2"></i>Termos:</strong>
+                <span class="h5 ms-2" id="total_termos_header">0</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabela -->
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered" id="tabelaOrcamento">
+            <thead>
+                <tr>
+                    <th>Dotação Orçamentária</th>
+                    <th>Projeto-Atividade</th>
+                    <th>Programática</th>
+                    <th>Número do Termo</th>
+                    <th class="col-tipo-contrato" style="display: none;">Tipo de Contrato</th>
+                    <th class="col-data-termino" style="display: none;">Data de Término</th>
+                    <th class="col-cnpj" style="display: none;">CNPJ</th>
+                    <th class="col-sei-pc" style="display: none;">SEI de Pgto. / PC</th>
+                    <th class="col-osc" style="display: none;">OSC</th>
+                    <th class="col-projeto" style="display: none;">Projeto</th>
+                    <th class="col-sei-celeb" style="display: none;">SEI de Celebração</th>
+                    <th onclick="toggleCronogramaMensal()" style="cursor: pointer; background: linear-gradient(135deg, #28a745 0%, #20c997 100%);" title="Clique para expandir cronograma mensal">
+                        Total Programado
+                        <i class="bi bi-calendar3" id="icone-cronograma"></i>
+                    </th>
+                    <th>Total Projetado</th>
+                    <th class="bg-success bg-opacity-50">Total Global</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabela">
+                <!-- Preenchido via JavaScript -->
+            </tbody>
+            <tfoot class="table-secondary">
+                <tr>
+                    <th colspan="4" class="text-end">TOTAL GERAL:</th>
+                    <th class="col-tipo-contrato" style="display: none;"></th>
+                    <th class="col-data-termino" style="display: none;"></th>
+                    <th class="col-cnpj" style="display: none;"></th>
+                    <th class="col-sei-pc" style="display: none;"></th>
+                    <th class="col-osc" style="display: none;"></th>
+                    <th class="col-projeto" style="display: none;"></th>
+                    <th class="col-sei-celeb" style="display: none;"></th>
+                    <th class="valor-moeda" id="total_programado_footer">R$ 0,00</th>
+                    <th class="valor-moeda" id="total_projetado_footer">R$ 0,00</th>                    <th class="valor-moeda bg-success bg-opacity-50" id="total_global_footer">R$ 0,00</th>                </tr>
+            </tfoot>
+        </table>
+    </div>
+    
+    <!-- Loading -->
+    <div class="loading-spinner" id="loading" style="display: none;">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+        <p class="mt-3">Carregando dados...</p>
+    </div>
+    
+    <!-- Sem dados -->
+    <div class="sem-dados" id="sem-dados" style="display: none;">
+        <i class="bi bi-inbox" style="font-size: 4rem;"></i>
+        <p class="mt-3">Nenhum termo encontrado para o ano selecionado</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+<script>
+    let dadosCompletos = [];
+    let dadosFiltrados = [];
+    let cronogramaExpandido = false;
+    let dadosCronograma = {};
+    
+    // Configurar toastr
+    toastr.options = {
+        "closeButton": true,
+        "progressBar": true,
+        "positionClass": "toast-top-right",
+        "timeOut": "3000"
+    };
+    
+    // Inicializar
+    $(document).ready(function() {
+        // Setar ano atual
+        const anoAtual = new Date().getFullYear();
+        $('#ano_referencia').val(anoAtual);
+        
+        // Carregar dados
+        carregarDados();
+        
+        // Event listener para mudança de ano
+        $('#ano_referencia').on('change', function() {
+            carregarDados();
+        });
+    });
+    
+    // ==================== EXPANSÃO DO CRONOGRAMA MENSAL ====================
+    // Quando o usuário clica no cabeçalho "Total Programado", a tabela se expande
+    // mostrando 12 colunas adicionais (Jan-Dez) com os valores distribuídos por mês.
+    // Cada valor mensal é calculado baseado na vigência da parcela:
+    //   - Se uma parcela tem vigencia_inicial = 2026-01-01 e vigencia_final = 2026-03-01
+    //   - E valor_previsto = R$ 102.048,66
+    //   - Então: Jan=R$34.016,22, Fev=R$34.016,22, Mar=R$34.016,22, demais=R$0,00
+    // A coluna "Total Global" mostra a soma de Programado + Projetado
+    // Passando o mouse sobre os valores mensais, mostra o detalhamento
+    
+    // Toggle do cronograma mensal
+    function toggleCronogramaMensal() {
+        cronogramaExpandido = !cronogramaExpandido;
+        
+        if (cronogramaExpandido) {
+            $('#icone-cronograma').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
+            carregarCronogramaMensal();
+        } else {
+            $('#icone-cronograma').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
+            renderizarTabela();
+        }
+    }
+    
+    // Carregar dados do cronograma mensal
+    function carregarCronogramaMensal() {
+        const ano = $('#ano_referencia').val();
+        
+        if (!ano) {
+            toastr.error('Por favor, selecione um ano de referência');
+            return;
+        }
+        
+        $.ajax({
+            url: '/gestao_orcamentaria/api/cronograma-mensal',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                if (response.success) {
+                    console.log('[DEBUG CRONOGRAMA] Dados recebidos:', response);
+                    dadosCronograma = {
+                        programados: response.dados_programados || {},
+                        projetados: response.dados_projetados || {}
+                    };
+                    renderizarTabela();
+                    toastr.success('Cronograma mensal carregado!');
+                } else {
+                    toastr.error('Erro ao carregar cronograma: ' + response.error);
+                }
+            },
+            error: function(xhr) {
+                toastr.error('Erro ao carregar cronograma: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Carregar dados do servidor
+    function carregarDados() {
+        const ano = $('#ano_referencia').val();
+        
+        if (!ano) {
+            toastr.error('Por favor, selecione um ano de referência');
+            return;
+        }
+        
+        $('#loading').show();
+        $('#sem-dados').hide();
+        $('#corpoTabela').empty();
+        
+        $.ajax({
+            url: '/gestao_orcamentaria/api/orcamento-detalhado',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                $('#loading').hide();
+                
+                if (response.success) {
+                    dadosCompletos = response.dados;
+                    dadosFiltrados = [...dadosCompletos];
+                    
+                    if (dadosCompletos.length === 0) {
+                        $('#sem-dados').show();
+                    } else {
+                        aplicarFiltros();
+                        renderizarTabela();
+                        atualizarResumo();
+                    }
+                } else {
+                    toastr.error('Erro ao carregar dados: ' + response.error);
+                    $('#sem-dados').show();
+                }
+            },
+            error: function(xhr) {
+                $('#loading').hide();
+                $('#sem-dados').show();
+                toastr.error('Erro ao carregar dados: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Atualizar visibilidade das colunas opcionais
+    function atualizarColunasVisiveis() {
+        const mostrarTipoContrato = $('#chk_tipo_contrato').is(':checked');
+        const mostrarDataTermino = $('#chk_data_termino').is(':checked');
+        const mostrarCnpj = $('#chk_cnpj').is(':checked');
+        const mostrarSeiPc = $('#chk_sei_pc').is(':checked');
+        const mostrarOsc = $('#chk_osc').is(':checked');
+        const mostrarProjeto = $('#chk_projeto').is(':checked');
+        const mostrarSeiCeleb = $('#chk_sei_celeb').is(':checked');
+        
+        $('.col-tipo-contrato').toggle(mostrarTipoContrato);
+        $('.col-data-termino').toggle(mostrarDataTermino);
+        $('.col-cnpj').toggle(mostrarCnpj);
+        $('.col-sei-pc').toggle(mostrarSeiPc);
+        $('.col-osc').toggle(mostrarOsc);
+        $('.col-projeto').toggle(mostrarProjeto);
+        $('.col-sei-celeb').toggle(mostrarSeiCeleb);
+    }
+    
+    // Renderizar tabela
+    function renderizarTabela() {
+        const tbody = $('#corpoTabela');
+        tbody.empty();
+        
+        if (dadosFiltrados.length === 0) {
+            $('#sem-dados').show();
+            return;
+        }
+        
+        $('#sem-dados').hide();
+        
+        // Se cronograma expandido, adicionar colunas de meses no header
+        if (cronogramaExpandido) {
+            const thead = $('#tabelaOrcamento thead tr');
+            const thProgramado = thead.find('th:contains("Total Programado")');
+            
+            // Remover colunas de meses anteriores se existirem
+            thead.find('.col-mes').remove();
+            
+            // Adicionar 12 colunas de meses antes do Total Programado
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            meses.forEach(function(mes, index) {
+                const thMes = $('<th>').addClass('col-mes').text(mes).css({
+                    'min-width': '100px',
+                    'background': 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)'
+                });
+                thMes.insertBefore(thProgramado);
+            });
+            
+            // Habilitar scroll horizontal
+            $('.table-responsive').css('overflow-x', 'auto');
+        } else {
+            // Remover colunas de meses
+            $('#tabelaOrcamento thead tr .col-mes').remove();
+            $('#tabelaOrcamento tfoot tr .col-mes').remove();
+        }
+        
+        dadosFiltrados.forEach(function(item) {
+            const tr = $('<tr>');
+            
+            tr.append($('<td>').text(item.dotacao_orcamentaria || '-'));
+            tr.append($('<td>').addClass('text-center').text(item.projeto_atividade || '-'));
+            tr.append($('<td>').text(item.programatica || '-'));
+            tr.append($('<td>').text(item.numero_termo || '-'));
+            
+            // Colunas opcionais
+            tr.append($('<td>').addClass('col-tipo-contrato').css('display', $('#chk_tipo_contrato').is(':checked') ? '' : 'none').text(item.tipo_contrato || '-'));
+            tr.append($('<td>').addClass('col-data-termino').css('display', $('#chk_data_termino').is(':checked') ? '' : 'none').text(item.data_termino || '-'));
+            tr.append($('<td>').addClass('col-cnpj').css('display', $('#chk_cnpj').is(':checked') ? '' : 'none').text(item.cnpj || '-'));
+            tr.append($('<td>').addClass('col-sei-pc').css('display', $('#chk_sei_pc').is(':checked') ? '' : 'none').text(item.sei_pc || '-'));
+            tr.append($('<td>').addClass('col-osc').css('display', $('#chk_osc').is(':checked') ? '' : 'none').text(item.osc || '-'));
+            tr.append($('<td>').addClass('col-projeto').css('display', $('#chk_projeto').is(':checked') ? '' : 'none').text(item.projeto || '-'));
+            tr.append($('<td>').addClass('col-sei-celeb').css('display', $('#chk_sei_celeb').is(':checked') ? '' : 'none').text(item.sei_celeb || '-'));
+            
+            // Se cronograma expandido, adicionar colunas de valores mensais
+            if (cronogramaExpandido) {
+                const cronogramaProgramado = dadosCronograma.programados?.[item.numero_termo] || {};
+                const cronogramaProjetado = dadosCronograma.projetados?.[item.numero_termo] || {};
+                
+                for (let mes = 1; mes <= 12; mes++) {
+                    const valorProgramado = cronogramaProgramado[mes] || 0;
+                    const valorProjetado = cronogramaProjetado[mes] || 0;
+                    const valorGlobal = valorProgramado + valorProjetado;
+                    
+                    // Mostrar valor global (soma de programado + projetado)
+                    tr.append($('<td>').addClass('valor-moeda col-mes').text(formatarMoeda(valorGlobal))
+                        .attr('title', `Programado: ${formatarMoeda(valorProgramado)}\nProjetado: ${formatarMoeda(valorProjetado)}`)
+                        .css('cursor', 'help'));
+                }
+            }
+            
+            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(item.total_programado)));
+            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(item.total_projetado)));
+            
+            // Adicionar Total Global
+            const totalGlobal = (item.total_programado || 0) + (item.total_projetado || 0);
+            tr.append($('<td>').addClass('valor-moeda bg-success bg-opacity-10').text(formatarMoeda(totalGlobal)));
+            
+            tbody.append(tr);
+        });
+        
+        // Atualizar totais do footer
+        const totalProgramado = dadosFiltrados.reduce((sum, item) => sum + (item.total_programado || 0), 0);
+        const totalProjetado = dadosFiltrados.reduce((sum, item) => sum + (item.total_projetado || 0), 0);
+        const totalGlobal = totalProgramado + totalProjetado;
+        $('#total_programado_footer').text(formatarMoeda(totalProgramado));
+        $('#total_projetado_footer').text(formatarMoeda(totalProjetado));
+        $('#total_global_footer').text(formatarMoeda(totalGlobal));
+        
+        // Se cronograma expandido, adicionar totais mensais no footer
+        if (cronogramaExpandido) {
+            const footerRow = $('#tabelaOrcamento tfoot tr');
+            footerRow.find('.col-mes').remove();
+            
+            const thProgramado = footerRow.find('th:contains("R$")').first();
+            
+            // Calcular totais por mês (soma de programado + projetado)
+            for (let mes = 1; mes <= 12; mes++) {
+                let totalMesProgramado = 0;
+                let totalMesProjetado = 0;
+                
+                dadosFiltrados.forEach(function(item) {
+                    const cronogramaProg = dadosCronograma.programados?.[item.numero_termo] || {};
+                    const cronogramaProj = dadosCronograma.projetados?.[item.numero_termo] || {};
+                    
+                    totalMesProgramado += cronogramaProg[mes] || 0;
+                    totalMesProjetado += cronogramaProj[mes] || 0;
+                });
+                
+                const totalMesGlobal = totalMesProgramado + totalMesProjetado;
+                const thMes = $('<th>').addClass('valor-moeda col-mes').text(formatarMoeda(totalMesGlobal))
+                    .attr('title', `Programado: ${formatarMoeda(totalMesProgramado)}\nProjetado: ${formatarMoeda(totalMesProjetado)}`)
+                    .css('cursor', 'help');
+                thMes.insertBefore(thProgramado);
+            }
+        }
+    }
+    
+    // Atualizar cards de resumo
+    function atualizarResumo() {
+        // Atualizar apenas o banner verde (header)
+        $('#total_termos_header').text(dadosFiltrados.length);
+        
+        const totalProgramado = dadosFiltrados.reduce((sum, item) => sum + (item.total_programado || 0), 0);
+        $('#total_programado_header').text(formatarMoeda(totalProgramado));
+        
+        const totalProjetado = dadosFiltrados.reduce((sum, item) => sum + (item.total_projetado || 0), 0);
+        $('#total_projetado_header').text(formatarMoeda(totalProjetado));
+        
+        const totalGlobal = totalProgramado + totalProjetado;
+        $('#total_global_header').text(formatarMoeda(totalGlobal));
+    }
+    // ==================== FILTROS SIMPLIFICADOS ====================
+    
+    function aplicarFiltros() {
+        // Coletar valores dos filtros
+        const filtros = {
+            numero_termo: $('#filtro_numero_termo').val().toLowerCase(),
+            dotacao: $('#filtro_dotacao').val().toLowerCase(),
+            projeto_atividade: $('#filtro_projeto_atividade').val().toLowerCase(),
+            programatica: $('#filtro_programatica').val().toLowerCase(),
+            tipo_contrato: $('#filtro_tipo_contrato').val().toLowerCase(),
+            mes_termino: $('#filtro_mes_termino').val(),
+            ano_termino: $('#filtro_ano_termino').val(),
+            cnpj: $('#filtro_cnpj').val().toLowerCase(),
+            sei_pc: $('#filtro_sei_pc').val().toLowerCase(),
+            osc: $('#filtro_osc').val().toLowerCase(),
+            projeto: $('#filtro_projeto').val().toLowerCase(),
+            sei_celeb: $('#filtro_sei_celeb').val().toLowerCase()
+        };
+        
+        // Filtrar dados
+        dadosFiltrados = dadosCompletos.filter(item => {
+            // Verificar cada filtro
+            if (filtros.numero_termo && !item.numero_termo.toLowerCase().includes(filtros.numero_termo)) return false;
+            if (filtros.dotacao && !item.dotacao_orcamentaria.toLowerCase().includes(filtros.dotacao)) return false;
+            if (filtros.projeto_atividade && !item.projeto_atividade.toLowerCase().includes(filtros.projeto_atividade)) return false;
+            if (filtros.programatica && !item.programatica.toLowerCase().includes(filtros.programatica)) return false;
+            if (filtros.tipo_contrato && !item.tipo_contrato.toLowerCase().includes(filtros.tipo_contrato)) return false;
+            
+            // Filtro de data de término (suporta mês/ano separados)
+            if (filtros.mes_termino || filtros.ano_termino) {
+                if (item.data_termino) {
+                    // Formato vindo do backend: dd/mm/YYYY
+                    const partes = item.data_termino.split('/');
+                    const ano = partes[2]; // Ano está na posição 2
+                    const mes = partes[1]; // Mês está na posição 1
+                    
+                    if (filtros.ano_termino && ano !== String(filtros.ano_termino).trim()) return false;
+                    if (filtros.mes_termino && mes !== filtros.mes_termino) return false;
+                } else {
+                    return false; // Se filtro está ativo mas item não tem data
+                }
+            }
+            
+            if (filtros.cnpj && !item.cnpj.toLowerCase().includes(filtros.cnpj)) return false;
+            if (filtros.sei_pc && !item.sei_pc.toLowerCase().includes(filtros.sei_pc)) return false;
+            if (filtros.osc && !item.osc.toLowerCase().includes(filtros.osc)) return false;
+            if (filtros.projeto && !item.projeto.toLowerCase().includes(filtros.projeto)) return false;
+            if (filtros.sei_celeb && !item.sei_celeb.toLowerCase().includes(filtros.sei_celeb)) return false;
+            
+            return true;
+        });
+        
+        renderizarTabela();
+        atualizarResumo();
+        toastr.success(`${dadosFiltrados.length} termos encontrados`);
+    }
+    
+    function limparFiltros() {
+        // Limpar campos
+        $('#filtro_numero_termo, #filtro_dotacao, #filtro_projeto_atividade, #filtro_programatica').val('');
+        $('#filtro_tipo_contrato, #filtro_cnpj, #filtro_sei_pc').val('');
+        $('#filtro_osc, #filtro_projeto, #filtro_sei_celeb').val('');
+        $('#filtro_mes_termino').val('');
+        $('#filtro_ano_termino').val('');
+        
+        // Resetar dados filtrados
+        dadosFiltrados = [...dadosCompletos];
+        renderizarTabela();
+        atualizarResumo();
+        toastr.info('Filtros limpos');
+    }
+    
+    // Toggle ícone do collapse
+    $('#filtrosCollapse').on('show.bs.collapse', function() {
+        $('#iconFiltros').removeClass('bi-chevron-down').addClass('bi-chevron-up');
+    }).on('hide.bs.collapse', function() {
+        $('#iconFiltros').removeClass('bi-chevron-up').addClass('bi-chevron-down');
+    });
+    
+    // Exportar para CSV
+    function exportarCSV() {
+        const ano = $('#ano_referencia').val();
+        
+        if (!ano) {
+            toastr.error('Por favor, selecione um ano de referência');
+            return;
+        }
+        
+        if (dadosFiltrados.length === 0) {
+            toastr.warning('Nenhum dado para exportar');
+            return;
+        }
+        
+        // Criar CSV
+        const BOM = '\uFEFF';
+        const cabecalho = ['Dotação Orçamentária', 'Projeto-Atividade', 'Programática', 'Número do Termo'];
+        
+        // Adicionar colunas opcionais ao cabeçalho se estiverem visíveis
+        if ($('#chk_tipo_contrato').is(':checked')) cabecalho.push('Tipo de Contrato');
+        if ($('#chk_data_termino').is(':checked')) cabecalho.push('Data de Término');
+        if ($('#chk_cnpj').is(':checked')) cabecalho.push('CNPJ');
+        if ($('#chk_sei_pc').is(':checked')) cabecalho.push('SEI de Pgto. / PC');
+        if ($('#chk_osc').is(':checked')) cabecalho.push('OSC');
+        if ($('#chk_projeto').is(':checked')) cabecalho.push('Projeto');
+        if ($('#chk_sei_celeb').is(':checked')) cabecalho.push('SEI de Celebração');
+        
+        // Se cronograma expandido, adicionar colunas de meses
+        if (cronogramaExpandido) {
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            meses.forEach(mes => cabecalho.push(mes));
+        }
+        
+        cabecalho.push('Total Programado');
+        cabecalho.push('Total Projetado');
+        
+        const linhas = [cabecalho.join(';')];
+        
+        dadosFiltrados.forEach(function(item) {
+            const linha = [
+                item.dotacao_orcamentaria || '',
+                item.projeto_atividade || '',
+                item.programatica || '',
+                item.numero_termo || ''
+            ];
+            
+            // Adicionar colunas opcionais se estiverem visíveis
+            if ($('#chk_tipo_contrato').is(':checked')) linha.push(item.tipo_contrato || '');
+            if ($('#chk_data_termino').is(':checked')) linha.push(item.data_termino || '');
+            if ($('#chk_cnpj').is(':checked')) linha.push(item.cnpj || '');
+            if ($('#chk_sei_pc').is(':checked')) linha.push(item.sei_pc || '');
+            if ($('#chk_osc').is(':checked')) linha.push(item.osc || '');
+            if ($('#chk_projeto').is(':checked')) linha.push(item.projeto || '');
+            if ($('#chk_sei_celeb').is(':checked')) linha.push(item.sei_celeb || '');
+            
+            // Se cronograma expandido, adicionar valores mensais
+            if (cronogramaExpandido) {
+                const cronogramaTermo = dadosCronograma[item.numero_termo] || {};
+                for (let mes = 1; mes <= 12; mes++) {
+                    const valorMes = cronogramaTermo[mes] || 0;
+                    linha.push(formatarMoedaExcel(valorMes));
+                }
+            }
+            
+            linha.push(formatarMoedaExcel(item.total_programado));
+            linha.push(formatarMoedaExcel(item.total_projetado));
+            
+            linhas.push(linha.join(';'));
+        });
+        
+        const csvContent = BOM + linhas.join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `orcamento_detalhado_${ano}_${new Date().getTime()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toastr.success('CSV exportado com sucesso!');
+    }
+    
+    // Formatar moeda para exibição
+    function formatarMoeda(valor) {
+        if (!valor) return 'R$ 0,00';
+        return 'R$ ' + parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    
+    // Formatar moeda para Excel (formato BR com vírgula)
+    function formatarMoedaExcel(valor) {
+        if (!valor) return '0,00';
+        return parseFloat(valor).toFixed(2).replace('.', ',');
+    }
+</script>
+
+</body>
+</html>

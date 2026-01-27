@@ -534,18 +534,20 @@
         
         <!-- Paginação -->
         {% if total_pages > 1 %}
+        {% set args_without_page = request.args.copy() %}
+        {% set _ = args_without_page.pop('page', None) %}
         <nav aria-label="Navegação de páginas" class="mt-4">
           <ul class="pagination justify-content-center">
             <!-- Botão Primeira Página -->
             <li class="page-item {{ 'disabled' if page == 1 else '' }}">
-              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=1, **request.args) }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=1, **args_without_page) }}">
                 <i class="bi bi-chevron-double-left"></i>
               </a>
             </li>
             
             <!-- Botão Anterior -->
             <li class="page-item {{ 'disabled' if page == 1 else '' }}">
-              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=page-1, **request.args) }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=page-1, **args_without_page) }}">
                 <i class="bi bi-chevron-left"></i>
               </a>
             </li>
@@ -560,7 +562,7 @@
             
             {% for p in range(start_page, end_page + 1) %}
               <li class="page-item {{ 'active' if p == page else '' }}">
-                <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=p, **request.args) }}">{{ p }}</a>
+                <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=p, **args_without_page) }}">{{ p }}</a>
               </li>
             {% endfor %}
             
@@ -570,14 +572,14 @@
             
             <!-- Botão Próximo -->
             <li class="page-item {{ 'disabled' if page == total_pages else '' }}">
-              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=page+1, **request.args) }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=page+1, **args_without_page) }}">
                 <i class="bi bi-chevron-right"></i>
               </a>
             </li>
             
             <!-- Botão Última Página -->
             <li class="page-item {{ 'disabled' if page == total_pages else '' }}">
-              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=total_pages, **request.args) }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=total_pages, **args_without_page) }}">
                 <i class="bi bi-chevron-double-right"></i>
               </a>
             </li>
