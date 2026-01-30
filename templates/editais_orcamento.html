@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Orçamento de Editais - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      padding: 20px; 
+    }
+    .header-section { 
+      background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+      color: white;
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .table-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table th { 
+      background-color: #6f42c1; 
+      color: white; 
+      white-space: nowrap; 
+    }
+    .badge-etapa {
+      font-size: 0.85rem;
+      padding: 5px 10px;
+    }
+    .btn-action {
+      padding: 2px 6px;
+      font-size: 0.85rem;
+    }
+    .cronograma-table {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 10px;
+    }
+    .cronograma-row {
+      background: #f8f9fa;
+      padding: 8px;
+      margin-bottom: 5px;
+      border-radius: 4px;
+      border: 1px solid #dee2e6;
+    }
+    .valor-total {
+      font-weight: 700;
+      color: #198754;
+      font-family: 'Courier New', monospace;
+    }
+    .input-moeda {
+      text-align: right;
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+    }
+    .cronograma-row strong {
+      display: block;
+      color: #6f42c1;
+      font-size: 0.9rem;
+      text-transform: capitalize;
+      margin-bottom: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="bi bi-cash-stack"></i> Orçamento de Editais</h2>
+          <p class="mb-0">Gestão de cronograma orçamentário por edital</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-success" onclick="abrirModalCriar()">
+            <i class="bi bi-plus-circle"></i> Cadastrar Orçamento
+          </button>
+          <a href="{{ url_for('editais.listar') }}" class="btn btn-light">
+            <i class="bi bi-arrow-left"></i> Voltar para Editais
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensagens Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Tabela -->
+    <div class="table-section">
+      <h5 class="mb-3">
+        <i class="bi bi-list-ul"></i> Lista de Orçamentos 
+        <span class="badge bg-secondary">{{ total_count }} registros</span>
+      </h5>
+      
+      <div class="table-responsive">
+        <table class="table table-hover table-bordered">
+          <thead>
+            <tr>
+              <th>Nome do Edital</th>
+              <th>Tipo</th>
+              <th>Unidade</th>
+              <th>Dotação Orçamentária</th>
+              <th>Projeto-Atividade</th>
+              <th>Valor Total</th>
+              <th>Vigência</th>
+              <th>Etapa</th>
+              <th>Observações</th>
+              <th>Criado por</th>
+              <th style="width: 100px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if editais %}
+              {% for edital in editais %}
+                <tr>
+                  <td><strong>{{ edital.edital_nome }}</strong></td>
+                  <td>{{ edital.edital_tipo }}</td>
+                  <td>{{ edital.edital_unidade }}</td>
+                  <td><small>{{ edital.dotacao_formatada }}</small></td>
+                  <td class="text-center">{{ edital.projeto_atividade }}</td>
+                  <td class="text-end valor-total">R$ {{ "{:,.2f}".format(edital.valor_total).replace(',', '_').replace('.', ',').replace('_', '.') }}</td>
+                  <td class="text-center">{{ edital.vigencia }}</td>
+                  <td>
+                    {% if edital.etapa == 'Em estudo preliminar' %}
+                      <span class="badge bg-warning text-dark badge-etapa">{{ edital.etapa }}</span>
+                    {% elif edital.etapa == 'Iniciado' %}
+                      <span class="badge bg-success badge-etapa">{{ edital.etapa }}</span>
+                    {% elif edital.etapa == 'Cancelado' %}
+                      <span class="badge bg-danger badge-etapa">{{ edital.etapa }}</span>
+                    {% else %}
+                      <span class="badge bg-secondary badge-etapa">{{ edital.etapa }}</span>
+                    {% endif %}
+                  </td>
+                  <td><small>{{ edital.observacoes[:50] }}{% if edital.observacoes|length > 50 %}...{% endif %}</small></td>
+                  <td>{{ edital.created_por }}</td>
+                  <td class="text-center">
+                    <button class="btn btn-warning btn-action" 
+                            onclick="abrirModalEditar('{{ edital.edital_nome }}')"
+                            title="Editar">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-danger btn-action" 
+                            onclick="confirmarDelete('{{ edital.edital_nome }}')"
+                            title="Excluir">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="11" class="text-center">Nenhum orçamento cadastrado.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Criar -->
+  <div class="modal fade" id="modalCriar" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <form method="POST" action="{{ url_for('editais.orcamento_criar') }}" id="formCriar">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Cadastrar Orçamento de Edital</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <!-- Nome do Edital -->
+              <div class="col-12">
+                <label class="form-label">Nome do Edital <span class="text-danger">*</span></label>
+                <input type="text" name="edital_nome" id="criar_edital_nome" class="form-control" required>
+              </div>
+              
+              <!-- Tipo de Edital -->
+              <div class="col-md-4">
+                <label class="form-label">Tipo de Edital</label>
+                <select name="edital_tipo" id="criar_edital_tipo" class="form-select">
+                  <option value="-">-</option>
+                  <option value="Chamamento Público">Chamamento Público</option>
+                  <option value="Credenciamento">Credenciamento</option>
+                  <option value="Dispensa de Chamamento Público">Dispensa de Chamamento Público</option>
+                </select>
+              </div>
+              
+              <!-- Unidade -->
+              <div class="col-md-4">
+                <label class="form-label">Unidade <span class="text-danger">*</span></label>
+                <select name="edital_unidade" id="criar_edital_unidade" class="form-select" required onchange="carregarDotacoes('criar')">
+                  <option value="">Selecione a unidade</option>
+                  {% for unidade in unidades_disponiveis %}
+                    <option value="{{ unidade }}">{{ unidade }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <!-- Etapa -->
+              <div class="col-md-4">
+                <label class="form-label">Etapa</label>
+                <select name="etapa" id="criar_etapa" class="form-select">
+                  <option value="Em estudo preliminar">Em estudo preliminar</option>
+                  <option value="Iniciado">Iniciado</option>
+                  <option value="Cancelado">Cancelado</option>
+                </select>
+              </div>
+              
+              <!-- Dotação Orçamentária -->
+              <div class="col-md-10">
+                <label class="form-label">Dotação Orçamentária <span class="text-danger">*</span></label>
+                <select name="dotacao_formatada" id="criar_dotacao_formatada" class="form-select" required onchange="calcularProjetoAtividade('criar')">
+                  <option value="">Selecione a unidade primeiro</option>
+                </select>
+              </div>
+              
+              <!-- Projeto-Atividade (auto-preenchido) -->
+              <div class="col-md-2">
+                <label class="form-label">Proj-Ativ</label>
+                <input type="text" name="projeto_atividade" id="criar_projeto_atividade" class="form-control" readonly style="background-color: #e9ecef;">
+              </div>
+              
+              <!-- Observações -->
+              <div class="col-12">
+                <label class="form-label">Observações</label>
+                <textarea name="observacoes" id="criar_observacoes" class="form-control" rows="2"></textarea>
+              </div>
+              
+              <!-- Cronograma Mensal -->
+              <div class="col-12">
+                <hr>
+                <h6><i class="bi bi-calendar3"></i> Cronograma de Repasses Mensais</h6>
+                <div class="d-flex gap-2 mb-2">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="adicionarMes('criar')">
+                    <i class="bi bi-plus"></i> Adicionar Mês
+                  </button>
+                </div>
+                
+                <div class="cronograma-table" id="criar_cronograma_container">
+                  <!-- Meses adicionados dinamicamente -->
+                </div>
+                
+                <div class="mt-2">
+                  <strong>Total:</strong> <span class="valor-total" id="criar_total_cronograma">R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <input type="hidden" name="meses_data" id="criar_meses_data">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-success" onclick="prepararSubmissao('criar')">
+              <i class="bi bi-check-circle"></i> Cadastrar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editar -->
+  <div class="modal fade" id="modalEditar" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <form method="POST" id="formEditar">
+          <div class="modal-header bg-warning">
+            <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Orçamento de Edital</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <!-- Nome do Edital -->
+              <div class="col-12">
+                <label class="form-label">Nome do Edital <span class="text-danger">*</span></label>
+                <input type="text" name="edital_nome" id="editar_edital_nome" class="form-control" required>
+              </div>
+              
+              <!-- Tipo de Edital -->
+              <div class="col-md-4">
+                <label class="form-label">Tipo de Edital</label>
+                <select name="edital_tipo" id="editar_edital_tipo" class="form-select">
+                  <option value="-">-</option>
+                  <option value="Chamamento Público">Chamamento Público</option>
+                  <option value="Credenciamento">Credenciamento</option>
+                  <option value="Dispensa de Chamamento Público">Dispensa de Chamamento Público</option>
+                </select>
+              </div>
+              
+              <!-- Unidade -->
+              <div class="col-md-4">
+                <label class="form-label">Unidade <span class="text-danger">*</span></label>
+                <select name="edital_unidade" id="editar_edital_unidade" class="form-select" required onchange="carregarDotacoes('editar')">
+                  <option value="">Selecione a unidade</option>
+                  {% for unidade in unidades_disponiveis %}
+                    <option value="{{ unidade }}">{{ unidade }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <!-- Etapa -->
+              <div class="col-md-4">
+                <label class="form-label">Etapa</label>
+                <select name="etapa" id="editar_etapa" class="form-select">
+                  <option value="Em estudo preliminar">Em estudo preliminar</option>
+                  <option value="Iniciado">Iniciado</option>
+                  <option value="Cancelado">Cancelado</option>
+                </select>
+              </div>
+              
+              <!-- Dotação Orçamentária -->
+              <div class="col-md-10">
+                <label class="form-label">Dotação Orçamentária <span class="text-danger">*</span></label>
+                <select name="dotacao_formatada" id="editar_dotacao_formatada" class="form-select" required onchange="calcularProjetoAtividade('editar')">
+                  <option value="">Selecione a unidade primeiro</option>
+                </select>
+              </div>
+              
+              <!-- Projeto-Atividade (auto-preenchido) -->
+              <div class="col-md-2">
+                <label class="form-label">Proj-Ativ</label>
+                <input type="text" name="projeto_atividade" id="editar_projeto_atividade" class="form-control" readonly style="background-color: #e9ecef;">
+              </div>
+              
+              <!-- Observações -->
+              <div class="col-12">
+                <label class="form-label">Observações</label>
+                <textarea name="observacoes" id="editar_observacoes" class="form-control" rows="2"></textarea>
+              </div>
+              
+              <!-- Cronograma Mensal -->
+              <div class="col-12">
+                <hr>
+                <h6><i class="bi bi-calendar3"></i> Cronograma de Repasses Mensais</h6>
+                <div class="d-flex gap-2 mb-2">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="adicionarMes('editar')">
+                    <i class="bi bi-plus"></i> Adicionar Mês
+                  </button>
+                </div>
+                
+                <div class="cronograma-table" id="editar_cronograma_container">
+                  <!-- Meses adicionados dinamicamente -->
+                </div>
+                
+                <div class="mt-2">
+                  <strong>Total:</strong> <span class="valor-total" id="editar_total_cronograma">R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <input type="hidden" name="meses_data" id="editar_meses_data">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-warning" onclick="prepararSubmissao('editar')">
+              <i class="bi bi-check-circle"></i> Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Delete (oculto) -->
+  <form method="POST" id="formDelete" style="display:none;"></form>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Arrays para armazenar os meses do cronograma
+    let mesesCriar = [];
+    let mesesEditar = [];
+    
+    // ==================== FORMATAÇÃO DE MOEDA ====================
+    
+    // Formatar valor para moeda brasileira (R$ 1.234,56)
+    function formatarMoeda(valor) {
+      if (!valor && valor !== 0) return '';
+      const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
+      return numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    
+    // Desformatar moeda brasileira para número (R$ 1.234,56 → 1234.56)
+    function desformatarMoeda(valorFormatado) {
+      if (!valorFormatado) return 0;
+      // Remove R$, espaços e pontos, depois substitui vírgula por ponto
+      const numero = String(valorFormatado)
+        .replace(/[R$\s]/g, '')
+        .replace(/\./g, '')
+        .replace(',', '.');
+      return parseFloat(numero) || 0;
+    }
+    
+    // Aplicar máscara de moeda em input
+    function aplicarMascaraMoeda(input) {
+      let valor = input.value;
+      
+      // Remove tudo exceto números e vírgula
+      valor = valor.replace(/[^\d,]/g, '');
+      
+      // Remove vírgulas extras (mantém apenas a primeira)
+      const partes = valor.split(',');
+      if (partes.length > 2) {
+        valor = partes[0] + ',' + partes.slice(1).join('');
+      }
+      
+      // Limita a 2 casas decimais após a vírgula
+      if (partes.length === 2 && partes[1].length > 2) {
+        valor = partes[0] + ',' + partes[1].substring(0, 2);
+      }
+      
+      // Aplica formatação de milhares
+      if (partes[0]) {
+        const inteiro = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        valor = partes.length === 2 ? inteiro + ',' + partes[1] : inteiro;
+      }
+      
+      input.value = valor;
+    }
+    
+    // Processar valor colado do Excel
+    function processarColarExcel(event, input) {
+      event.preventDefault();
+      
+      // Obter valor colado
+      const valorColado = (event.clipboardData || window.clipboardData).getData('text');
+      
+      console.log('[DEBUG] Valor colado:', valorColado);
+      
+      // Verificar se tem múltiplas linhas (Excel copiado em múltiplas células)
+      const linhas = valorColado.split(/\r?\n/).filter(l => l.trim());
+      
+      if (linhas.length > 1) {
+        // Múltiplas células coladas - processar cada uma
+        console.log(`[DEBUG] Detectadas ${linhas.length} linhas`);
+        processarColaMassaExcel(event, linhas);
+        return;
+      }
+      
+      // Remover formatações diversas (espaços, R$, pontos, etc)
+      let valorLimpo = valorColado.trim();
+      
+      // Detectar formato: pode ser "1.234,56" (BR) ou "1,234.56" (US) ou "1234.56" ou "1234,56"
+      // Contar pontos e vírgulas
+      const pontos = (valorLimpo.match(/\./g) || []).length;
+      const virgulas = (valorLimpo.match(/,/g) || []).length;
+      
+      // Remove caracteres não numéricos exceto . e ,
+      valorLimpo = valorLimpo.replace(/[^\d.,]/g, '');
+      
+      let numeroFinal;
+      
+      if (pontos > 0 && virgulas > 0) {
+        // Formato misto: identificar qual é separador decimal
+        const posUltimoPonto = valorLimpo.lastIndexOf('.');
+        const posUltimaVirgula = valorLimpo.lastIndexOf(',');
+        
+        if (posUltimoPonto > posUltimaVirgula) {
+          // Formato US: 1,234.56
+          numeroFinal = parseFloat(valorLimpo.replace(/,/g, ''));
+        } else {
+          // Formato BR: 1.234,56
+          numeroFinal = parseFloat(valorLimpo.replace(/\./g, '').replace(',', '.'));
+        }
+      } else if (pontos > 1) {
+        // Múltiplos pontos = separador de milhar BR: 1.234.567
+        numeroFinal = parseFloat(valorLimpo.replace(/\./g, ''));
+      } else if (virgulas > 1) {
+        // Múltiplas vírgulas = separador de milhar US: 1,234,567
+        numeroFinal = parseFloat(valorLimpo.replace(/,/g, ''));
+      } else if (pontos === 1) {
+        // Um ponto: pode ser decimal US ou milhar BR
+        // Se tem 3 dígitos após o ponto, é milhar; senão é decimal
+        const partes = valorLimpo.split('.');
+        if (partes[1] && partes[1].length === 3 && partes[0].length <= 3) {
+          // Provavelmente formato BR de milhar: 123.456
+          numeroFinal = parseFloat(valorLimpo.replace('.', ''));
+        } else {
+          // Formato US decimal: 123.45
+          numeroFinal = parseFloat(valorLimpo);
+        }
+      } else if (virgulas === 1) {
+        // Uma vírgula = decimal BR
+        numeroFinal = parseFloat(valorLimpo.replace(',', '.'));
+      } else {
+        // Apenas números
+        numeroFinal = parseFloat(valorLimpo);
+      }
+      
+      console.log('[DEBUG] Número interpretado:', numeroFinal);
+      
+      if (!isNaN(numeroFinal)) {
+        // Formatar no padrão BR
+        input.value = formatarMoeda(numeroFinal);
+      } else {
+        console.warn('[DEBUG] Não foi possível interpretar o valor colado');
+      }
+    }
+    
+    // Processar colagem em massa de múltiplas células do Excel
+    function processarColaMassaExcel(event, linhas) {
+      // Detectar qual modo (criar ou editar) e qual índice
+      const container = event.target.closest('.cronograma-table');
+      const modo = container.id.includes('criar') ? 'criar' : 'editar';
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      
+      // Encontrar índice do input atual
+      const row = event.target.closest('.cronograma-row');
+      const allRows = container.querySelectorAll('.cronograma-row');
+      const indiceInicial = Array.from(allRows).indexOf(row);
+      
+      console.log(`[DEBUG] Modo: ${modo}, Índice inicial: ${indiceInicial}, Linhas: ${linhas.length}`);
+      
+      // Processar cada linha
+      linhas.forEach((linha, offset) => {
+        const indice = indiceInicial + offset;
+        
+        // Se não existe esse índice, adicionar novo mês
+        if (indice >= meses.length) {
+          adicionarMes(modo);
+        }
+        
+        // Interpretar valor
+        let valorLimpo = linha.trim();
+        const pontos = (valorLimpo.match(/\./g) || []).length;
+        const virgulas = (valorLimpo.match(/,/g) || []).length;
+        valorLimpo = valorLimpo.replace(/[^\d.,]/g, '');
+        
+        let numeroFinal;
+        if (pontos > 0 && virgulas > 0) {
+          const posUltimoPonto = valorLimpo.lastIndexOf('.');
+          const posUltimaVirgula = valorLimpo.lastIndexOf(',');
+          numeroFinal = posUltimoPonto > posUltimaVirgula 
+            ? parseFloat(valorLimpo.replace(/,/g, '')) 
+            : parseFloat(valorLimpo.replace(/\./g, '').replace(',', '.'));
+        } else if (pontos > 1) {
+          numeroFinal = parseFloat(valorLimpo.replace(/\./g, ''));
+        } else if (virgulas > 1) {
+          numeroFinal = parseFloat(valorLimpo.replace(/,/g, ''));
+        } else if (pontos === 1) {
+          const partes = valorLimpo.split('.');
+          numeroFinal = (partes[1] && partes[1].length === 3 && partes[0].length <= 3)
+            ? parseFloat(valorLimpo.replace('.', ''))
+            : parseFloat(valorLimpo);
+        } else if (virgulas === 1) {
+          numeroFinal = parseFloat(valorLimpo.replace(',', '.'));
+        } else {
+          numeroFinal = parseFloat(valorLimpo);
+        }
+        
+        if (!isNaN(numeroFinal)) {
+          meses[indice].valor = numeroFinal;
+          console.log(`[DEBUG] Linha ${offset}: ${linha} → ${numeroFinal}`);
+        }
+      });
+      
+      renderizarCronograma(modo);
+    }
+    
+    // Abrir modal de criação
+    function abrirModalCriar() {
+      // Limpar campos
+      document.getElementById('criar_edital_nome').value = '';
+      document.getElementById('criar_edital_tipo').value = '-';
+      document.getElementById('criar_edital_unidade').value = '';
+      document.getElementById('criar_etapa').value = 'Em estudo preliminar';
+      document.getElementById('criar_dotacao_formatada').innerHTML = '<option value="">Selecione a unidade primeiro</option>';
+      document.getElementById('criar_projeto_atividade').value = '';
+      document.getElementById('criar_observacoes').value = '';
+      
+      // Limpar cronograma
+      mesesCriar = [];
+      renderizarCronograma('criar');
+      
+      // Adicionar primeiro mês (mês atual)
+      adicionarMes('criar');
+      
+      new bootstrap.Modal(document.getElementById('modalCriar')).show();
+    }
+    
+    // Abrir modal de edição
+    async function abrirModalEditar(editalNome) {
+      try {
+        // Buscar dados do edital
+        const response = await fetch(`/editais/orcamento/api/edital/${encodeURIComponent(editalNome)}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          alert('Erro ao carregar dados do edital: ' + data.error);
+          return;
+        }
+        
+        const edital = data.edital;
+        const meses = data.meses;
+        
+        // Preencher campos
+        document.getElementById('formEditar').action = `/editais/orcamento/editar/${encodeURIComponent(editalNome)}`;
+        document.getElementById('editar_edital_nome').value = edital.edital_nome || '';
+        document.getElementById('editar_edital_tipo').value = edital.edital_tipo || '-';
+        document.getElementById('editar_edital_unidade').value = edital.edital_unidade || '';
+        document.getElementById('editar_etapa').value = edital.etapa || 'Em estudo preliminar';
+        document.getElementById('editar_observacoes').value = edital.observacoes || '';
+        
+        // Carregar dotações da unidade
+        await carregarDotacoes('editar');
+        
+        // Selecionar dotação
+        document.getElementById('editar_dotacao_formatada').value = edital.dotacao_formatada || '';
+        
+        // Calcular projeto-atividade
+        calcularProjetoAtividade('editar');
+        
+        // Carregar cronograma
+        mesesEditar = meses.map(m => ({
+          mes: m.nome_mes.substring(0, 7),  // Garantir formato YYYY-MM (remove o dia se vier)
+          valor: m.valor_mes
+        }));
+        renderizarCronograma('editar');
+        
+        new bootstrap.Modal(document.getElementById('modalEditar')).show();
+        
+      } catch (error) {
+        console.error('Erro ao abrir modal de edição:', error);
+        alert('Erro ao carregar dados do edital');
+      }
+    }
+    
+    // Carregar dotações por unidade
+    async function carregarDotacoes(modo) {
+      const unidade = document.getElementById(`${modo}_edital_unidade`).value;
+      const selectDotacao = document.getElementById(`${modo}_dotacao_formatada`);
+      
+      if (!unidade) {
+        selectDotacao.innerHTML = '<option value="">Selecione a unidade primeiro</option>';
+        return;
+      }
+      
+      console.log(`[DEBUG] Carregando dotações para unidade: "${unidade}"`);
+      
+      try {
+        const response = await fetch(`/editais/orcamento/api/dotacoes?unidade=${encodeURIComponent(unidade)}`);
+        const data = await response.json();
+        
+        console.log('[DEBUG] Resposta da API:', data);
+        
+        if (!data.success) {
+          alert('Erro ao carregar dotações: ' + data.error);
+          return;
+        }
+        
+        console.log(`[DEBUG] Total de dotações recebidas: ${data.dotacoes.length}`);
+        
+        selectDotacao.innerHTML = '<option value="">Selecione a dotação</option>';
+        data.dotacoes.forEach(dotacao => {
+          const option = document.createElement('option');
+          option.value = dotacao;
+          option.textContent = dotacao;
+          selectDotacao.appendChild(option);
+        });
+        
+        console.log(`[DEBUG] Dotações adicionadas ao select: ${data.dotacoes.length}`);
+        
+      } catch (error) {
+        console.error('Erro ao carregar dotações:', error);
+        alert('Erro ao carregar dotações');
+      }
+    }
+    
+    // Calcular projeto-atividade a partir da dotação
+    function calcularProjetoAtividade(modo) {
+      const dotacao = document.getElementById(`${modo}_dotacao_formatada`).value;
+      const inputProjetoAtividade = document.getElementById(`${modo}_projeto_atividade`);
+      
+      if (!dotacao) {
+        inputProjetoAtividade.value = '';
+        return;
+      }
+      
+      // Formato: 78.10.08.605.3016.4.302.33503900.00.1.500.9001.1
+      // Projeto-Atividade: posição 5 + '.' + posição 6 = 4.302
+      const partes = dotacao.split('.');
+      
+      if (partes.length >= 7) {
+        inputProjetoAtividade.value = partes[5] + '.' + partes[6];
+      } else {
+        inputProjetoAtividade.value = '-';
+      }
+    }
+    
+    // Adicionar mês no cronograma
+    function adicionarMes(modo) {
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      
+      let mesFormatado;
+      if (meses.length === 0) {
+        // Primeiro mês: próximo mês do atual
+        const hoje = new Date();
+        const ano = hoje.getFullYear();
+        const mes = hoje.getMonth() + 1; // +1 para próximo mês (0-11 -> 1-12)
+        
+        if (mes > 12) {
+          mesFormatado = `${ano + 1}-01`;
+        } else {
+          mesFormatado = `${ano}-${String(mes).padStart(2, '0')}`;
+        }
+      } else {
+        // Próximo mês baseado no último
+        const ultimoMesStr = meses[meses.length - 1].mes; // Formato YYYY-MM
+        const [ano, mes] = ultimoMesStr.split('-').map(Number);
+        
+        let novoAno = ano;
+        let novoMes = mes + 1;
+        
+        if (novoMes > 12) {
+          novoMes = 1;
+          novoAno += 1;
+        }
+        
+        mesFormatado = `${novoAno}-${String(novoMes).padStart(2, '0')}`;
+      }
+      
+      console.log(`[DEBUG] Adicionando mês: ${mesFormatado}`);
+      
+      meses.push({
+        mes: mesFormatado,
+        valor: 0
+      });
+      
+      renderizarCronograma(modo);
+    }
+    
+    // Remover mês do cronograma
+    function removerMes(modo, index) {
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      meses.splice(index, 1);
+      renderizarCronograma(modo);
+    }
+    
+    // Renderizar cronograma
+    function renderizarCronograma(modo) {
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      const container = document.getElementById(`${modo}_cronograma_container`);
+      const totalSpan = document.getElementById(`${modo}_total_cronograma`);
+      
+      container.innerHTML = '';
+      let total = 0;
+      
+      if (meses.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">Nenhum mês adicionado. Clique em "Adicionar Mês" para começar.</p>';
+        totalSpan.textContent = 'R$ 0,00';
+        return;
+      }
+      
+      meses.forEach((mes, index) => {
+        const row = document.createElement('div');
+        row.className = 'cronograma-row d-flex align-items-center gap-2';
+        
+        // Formatar valor para exibição
+        const valorFormatado = formatarMoeda(mes.valor);
+        
+        // Garantir formato YYYY-MM
+        const mesFormatado = mes.mes.length === 10 ? mes.mes.substring(0, 7) : mes.mes;
+        
+        row.innerHTML = `
+          <div style="flex: 0 0 150px;">
+            <input type="month" class="form-control form-control-sm" 
+                   value="${mesFormatado}" 
+                   onchange="atualizarMes('${modo}', ${index}, this.value)">
+          </div>
+          <div style="flex: 1;">
+            <input type="text" class="form-control form-control-sm input-moeda" 
+                   placeholder="R$ 0,00" 
+                   value="${valorFormatado}"
+                   oninput="aplicarMascaraMoeda(this)"
+                   onpaste="processarColarExcel(event, this)"
+                   onblur="atualizarValorMoeda('${modo}', ${index}, this.value)">
+          </div>
+          <div style="flex: 0 0 40px;">
+            <button type="button" class="btn btn-danger btn-sm" onclick="removerMes('${modo}', ${index})" title="Remover">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        `;
+        
+        container.appendChild(row);
+        
+        total += parseFloat(mes.valor) || 0;
+      });
+      
+      totalSpan.textContent = 'R$ ' + formatarMoeda(total);
+    }
+    
+    // Atualizar mês no array
+    function atualizarMes(modo, index, novoMes) {
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      
+      // Armazenar no formato YYYY-MM
+      meses[index].mes = novoMes;
+      renderizarCronograma(modo);
+    }
+    
+    // Atualizar valor monetário no array (desformata antes de salvar)
+    function atualizarValorMoeda(modo, index, valorFormatado) {
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      const valorNumerico = desformatarMoeda(valorFormatado);
+      
+      console.log(`[DEBUG] Atualizando valor: "${valorFormatado}" → ${valorNumerico}`);
+      
+      meses[index].valor = valorNumerico;
+      renderizarCronograma(modo);
+    }
+    
+    // Preparar submissão do formulário
+    function prepararSubmissao(modo) {
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      const inputHidden = document.getElementById(`${modo}_meses_data`);
+      
+      if (meses.length === 0) {
+        alert('Adicione pelo menos um mês no cronograma!');
+        event.preventDefault();
+        return false;
+      }
+      
+      // Converter formato YYYY-MM para YYYY-MM-01 (adicionar dia para DATE do PostgreSQL)
+      const mesesParaEnviar = meses.map(m => {
+        let mesFormatado = m.mes;
+        
+        // Se já está no formato YYYY-MM-DD (10 caracteres), não adicionar '-01'
+        // Se está no formato YYYY-MM (7 caracteres), adicionar '-01'
+        if (mesFormatado.length === 7) {
+          mesFormatado = mesFormatado + '-01';
+        } else if (mesFormatado.length === 10) {
+          // Já está completo, manter como está
+          mesFormatado = mesFormatado;
+        } else {
+          // Formato desconhecido, tentar adicionar '-01'
+          console.warn('[DEBUG] Formato de mês inesperado:', mesFormatado);
+          mesFormatado = mesFormatado + '-01';
+        }
+        
+        return {
+          mes: mesFormatado,
+          valor: parseFloat(m.valor) || 0
+        };
+      });
+      
+      console.log('[DEBUG] Meses formatados para envio:', mesesParaEnviar);
+      
+      inputHidden.value = JSON.stringify(mesesParaEnviar);
+      return true;
+    }
+    
+    // Confirmar exclusão
+    function confirmarDelete(editalNome) {
+      if (confirm(`Confirma a exclusão do orçamento do edital "${editalNome}"?\n\nTodas as linhas do cronograma serão excluídas. Esta ação não pode ser desfeita.`)) {
+        const form = document.getElementById('formDelete');
+        form.action = `/editais/orcamento/deletar/${encodeURIComponent(editalNome)}`;
+        form.submit();
+      }
+    }
+  </script>
+</body>
+</html>

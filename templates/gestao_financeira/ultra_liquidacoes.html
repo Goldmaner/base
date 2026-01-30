@@ -379,7 +379,6 @@
                         <option value="sem_cor">⚪ Sem Cor (Regularizados)</option>
                         <option value="amarelo">🟡 Amarelo (Inconsistências)</option>
                         <option value="verde_claro">🟢 Verde Claro (Necessita Pagamento)</option>
-                        <option value="verde_escuro">🟢 Verde Escuro (Empenho Cobre)</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -815,11 +814,14 @@
                     Clique em "Salvar Alterações Coletivas" para aplicar todas as mudanças.
                 </div>
                 
-                <div class="mb-3">
-                    <button type="button" class="btn btn-success" id="btnExportarCSVColetivo">
-                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar para CSV (UTF-8 BOM)
+                <div class="mb-3 d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-primary" id="btnAdicionarLinhaColetiva">
+                        <i class="bi bi-plus-circle me-2"></i>Adicionar Parcela
                     </button>
-                    <small class="text-muted ms-2">Separador: ponto e vírgula (;)</small>
+                    <button type="button" class="btn btn-success" id="btnExportarCSVColetivo">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
+                    </button>
+                    <small class="text-muted">Separador: ponto e vírgula (;)</small>
                 </div>
                 
                 <input type="hidden" id="coletivo_numero_termo_hidden">
@@ -829,6 +831,7 @@
                     <table class="table table-bordered table-sm" id="tabelaEdicaoColetiva">
                         <thead class="table-success">
                             <tr>
+                                <th style="width: 60px;">Ações</th>
                                 <th style="min-width: 120px;">Vigência Inicial</th>
                                 <th style="min-width: 120px;">Vigência Final</th>
                                 <th style="min-width: 150px;">Tipo Parcela</th>
@@ -849,7 +852,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="linha-subtotal">
-                                <td colspan="4" class="text-end"><strong>SUBTOTAIS:</strong></td>
+                                <td colspan="5" class="text-end"><strong>SUBTOTAIS:</strong></td>
                                 <td class="text-end" id="subtotal-val-23">R$ 0,00</td>
                                 <td class="text-end" id="subtotal-val-24">R$ 0,00</td>
                                 <td class="text-end" id="subtotal-val-previsto">R$ 0,00</td>
@@ -882,11 +885,13 @@
                     <table class="table table-sm table-bordered">
                         <thead class="table-info">
                             <tr>
-                                <th style="width: 15%;">Mês/Ano</th>
-                                <th style="width: 20%;">Valor 53-23</th>
-                                <th style="width: 20%;">Valor 53-24</th>
-                                <th style="width: 20%;">Total Mês</th>
-                                <th style="width: 25%;">Nº Parcela</th>
+                                <th style="width: 12%;">Info Alteração<br><small class="text-muted" style="font-weight: normal;">"-" = Base | 1, 2, 3... = Aditivo</small></th>
+                                <th style="width: 12%;">Mês/Ano</th>
+                                <th style="width: 14%;">Valor 53-23</th>
+                                <th style="width: 14%;">Valor 53-24</th>
+                                <th style="width: 14%;">Total Mês</th>
+                                <th style="width: 14%;">Nº Parcela</th>
+                                <th style="width: 10%;">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="corpoTabelaCronogramaEdicao">
@@ -894,11 +899,11 @@
                         </tbody>
                         <tfoot class="table-secondary">
                             <tr>
-                                <th>TOTAIS:</th>
-                                <th id="total_23_cronograma_edicao">R$ 0,00</th>
-                                <th id="total_24_cronograma_edicao">R$ 0,00</th>
-                                <th id="total_geral_cronograma_edicao">R$ 0,00</th>
-                                <th></th>
+                                <td colspan="2" class="text-end fw-bold">TOTAIS:</td>
+                                <td id="total_23_cronograma_edicao" class="fw-bold">R$ 0,00</td>
+                                <td id="total_24_cronograma_edicao" class="fw-bold">R$ 0,00</td>
+                                <td id="total_geral_cronograma_edicao" class="fw-bold">R$ 0,00</td>
+                                <td colspan="2"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -912,6 +917,21 @@
                 <div class="text-center mt-3" id="semCronogramaEdicao" style="display: none;">
                     <i class="bi bi-calendar-x" style="font-size: 2rem; color: #ccc;"></i>
                     <p class="text-muted">Nenhum cronograma encontrado para este termo.</p>
+                </div>
+                
+                <div class="mb-3">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="adicionarMesInicioCronogramaEdicao()">
+                        <i class="bi bi-arrow-up-circle me-1"></i>Adicionar Mês no Início
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success" onclick="adicionarMesFinalCronogramaEdicao()">
+                        <i class="bi bi-arrow-down-circle me-1"></i>Adicionar Mês no Final
+                    </button>
+                    <button type="button" class="btn btn-sm btn-info" onclick="gerarTodosMesesPorVigencia()">
+                        <i class="bi bi-calendar-range me-1"></i>Adicionar Meses de acordo com Parcelas
+                    </button>
+                    <button type="button" class="btn btn-sm btn-warning" onclick="limparLinhasDuplicadasCronogramaEdicao()">
+                        <i class="bi bi-trash me-1"></i>Limpar Duplicadas (Valor 0)
+                    </button>
                 </div>
                 
                 <div class="mt-3">
@@ -1065,7 +1085,7 @@
                             <thead class="table-primary">
                                 <tr>
                                     <th style="width: 8%;">Salvar?</th>
-                                    <th style="width: 10%;">Info Alteração</th>
+                                    <th style="width: 10%;">Info Alteração<br><small class="text-muted" style="font-weight: normal;">"-" = Base | 1, 2... = Aditivo</small></th>
                                     <th style="width: 12%;">Mês/Ano</th>
                                     <th style="width: 16%;">Valor 53-23</th>
                                     <th style="width: 16%;">Valor 53-24</th>
@@ -1107,7 +1127,7 @@
                                     <th>Vig. Final</th>
                                     <th>Nº Parcela</th>
                                     <th>Tipo Parcela</th>
-                                    <th>Info Alteração</th>
+                                    <th>Info Alteração<br><small class="text-muted" style="font-weight: normal;">"-" = Base | 1, 2, 3... = Aditivo</small></th>
                                     <th>Valor 53-23</th>
                                     <th>Valor 53-24</th>
                                     <th>Valor Previsto</th>
@@ -1152,6 +1172,11 @@
     let dadosAtuais = [];
     let modoParcelasProjetadas = false;  // Flag para controlar se está adicionando projetadas
     let totalMesesOriginais = 0;  // Quantos meses já existiam no cronograma original
+    let ultimoInfoAlteracaoSalvo = 'Base';  // ⚡ NOVO: Armazena o último info_alteracao SALVO no banco
+    
+    // ⚡ NOVO: Cache global de status para evitar múltiplas requisições
+    let cacheStatusPagamento = null;
+    let cacheStatusCarregando = false;
     
     // Função auxiliar para formatar centavos em moeda
     function formatarCentavosParaMoeda(centavos) {
@@ -1169,11 +1194,56 @@
         return Math.round(numero * 100);
     }
     
+    // ==================== NAVEGAÇÃO COM ENTER ====================
+    // Função genérica para navegar com Enter em tabelas editáveis
+    function habilitarNavegacaoEnter(seletorTabela, seletorCampos) {
+        $(document).on('keydown', `${seletorTabela} ${seletorCampos}`, function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                
+                const $campo = $(this);
+                const $tr = $campo.closest('tr');
+                const $tbody = $tr.closest('tbody');
+                const colIndex = $campo.closest('td').index();
+                const $proximaTr = $tr.next('tr');
+                
+                if ($proximaTr.length > 0) {
+                    // Encontrar campo editável na mesma coluna da próxima linha
+                    const $proximoCampo = $proximaTr.find('td').eq(colIndex).find(seletorCampos);
+                    
+                    if ($proximoCampo.length > 0) {
+                        $proximoCampo.focus().select();
+                    }
+                } else {
+                    // Se estiver na última linha, voltar para primeira linha (opcional)
+                    const $primeiraTr = $tbody.find('tr:first');
+                    const $primeiroCampo = $primeiraTr.find('td').eq(colIndex).find(seletorCampos);
+                    
+                    if ($primeiroCampo.length > 0) {
+                        $primeiroCampo.focus().select();
+                    }
+                }
+            }
+        });
+    }
+    
     // Inicializar
     $(document).ready(function() {
         carregarDadosFiltros();
+        
+        // ⚡ NOVO: Restaurar filtros salvos antes de carregar dados
+        restaurarFiltros();
+        
         carregarDados();
         popularAnosVigencia();
+        
+        // ⚡ NOVO: Habilitar navegação com Enter nas tabelas editáveis
+        // Edição Coletiva
+        habilitarNavegacaoEnter('#corpoTabelaColetiva', 'input, select, textarea');
+        // Cronograma Mensal (Adicionar Parcelas)
+        habilitarNavegacaoEnter('#corpo_cronograma', 'input, select');
+        // Cronograma de Edição (Editar Termo)
+        habilitarNavegacaoEnter('#corpoTabelaCronogramaEdicao', 'input, select');
         
         // Inicializar tooltips
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -1214,7 +1284,62 @@
                 btnSalvar.html('<i class="bi bi-check-circle me-2"></i>Salvar Alterações').show();
             }
         });
+        
+        // ✨ LISTENER: Resetar modal de adicionar parcelas ao fechar
+        $('#modalAdicionarParcelas').on('hidden.bs.modal', function () {
+            console.log('🗑️ Modal fechado - estado será resetado ao reabrir');
+            // O reset completo é feito na função abrirModalAdicionarParcelas()
+        });
+        
+        // ✨ LISTENER: Adicionar nova linha na edição coletiva
+        $('#btnAdicionarLinhaColetiva').on('click', function() {
+            adicionarNovaLinhaColetiva();
+        });
     });
+    
+    // ⚡ NOVA FUNÇÃO: Carregar status de pagamento uma única vez e cachear
+    function carregarStatusPagamento() {
+        return new Promise((resolve, reject) => {
+            // Se já tem cache, retornar imediatamente
+            if (cacheStatusPagamento) {
+                resolve(cacheStatusPagamento);
+                return;
+            }
+            
+            // Se já está carregando, aguardar
+            if (cacheStatusCarregando) {
+                const interval = setInterval(() => {
+                    if (cacheStatusPagamento) {
+                        clearInterval(interval);
+                        resolve(cacheStatusPagamento);
+                    }
+                }, 100);
+                return;
+            }
+            
+            // Fazer requisição
+            cacheStatusCarregando = true;
+            $.ajax({
+                url: '/gestao_financeira/ultra-liquidacoes/api/status-pagamento',
+                method: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        cacheStatusPagamento = response.status;
+                        cacheStatusCarregando = false;
+                        resolve(cacheStatusPagamento);
+                    } else {
+                        cacheStatusCarregando = false;
+                        reject('Erro ao carregar status');
+                    }
+                },
+                error: function(xhr) {
+                    console.error('❌ Erro ao carregar status de pagamento:', xhr);
+                    cacheStatusCarregando = false;
+                    reject('Erro de rede ao carregar status');
+                }
+            });
+        });
+    }
     
     // Carregar dados para autocomplete dos filtros
     function carregarDadosFiltros() {
@@ -1310,6 +1435,7 @@
             thDataPgto.text('Data Pgto');
         }
         
+        salvarFiltros(); // ⚡ NOVO: Salvar seção ativa
         carregarDados();
     }
     
@@ -1337,6 +1463,7 @@
             el.style.display = mostrarSeiPc ? '' : 'none';
         });
         
+        salvarFiltros(); // ⚡ NOVO: Salvar estado das colunas
         carregarDados();
     }
     
@@ -1380,6 +1507,10 @@
             sei_celeb: $('#filtro_sei_celeb').val() || '',
             sei_pc: $('#filtro_sei_pc').val() || ''
         });
+        
+        // DEBUG: Log do filtro de pendência sendo enviado
+        console.log('🔍 DEBUG FRONTEND: filtro_tipo_pendencia =', $('#filtro_tipo_pendencia').val());
+        console.log('🔍 DEBUG FRONTEND: params =', Object.fromEntries(params.entries()));
         
         $.ajax({
             url: '/gestao_financeira/ultra-liquidacoes/api/parcelas?' + params.toString(),
@@ -1663,7 +1794,14 @@
                 .attr('title', 'Excluir')
                 .on('click', function() { excluirParcela(parcela.id); });
             
-            tdAcoes.append(btnEditar).append(btnExcluir);
+            const btnEncaminhamento = $('<button>').addClass('btn btn-sm btn-success btn-acao')
+                .html('<i class="bi bi-file-earmark-text"></i>')
+                .attr('title', 'Encaminhamento de Pagamento')
+                .on('click', function() { 
+                    window.location.href = `/gestao_financeira/ultra-liquidacoes/encaminhamento-pagamento/${encodeURIComponent(parcela.numero_termo)}`; 
+                });
+            
+            tdAcoes.append(btnEditar).append(btnExcluir).append(btnEncaminhamento);
             tr.append(tdAcoes);
             
             tbody.append(tr);
@@ -1694,6 +1832,7 @@
     // Aplicar filtros
     function aplicarFiltros() {
         paginaAtual = 1;
+        salvarFiltros(); // ⚡ NOVO: Salvar filtros no localStorage
         carregarDados();
     }
     
@@ -1701,6 +1840,7 @@
     function limparFiltros() {
         $('#filtro_numero_termo, #filtro_parcela_numero, #filtro_tipo_termo, #filtro_tipo_pendencia, #filtro_data_pagamento, #filtro_observacoes, #filtro_osc, #filtro_cnpj, #filtro_sei_celeb, #filtro_sei_pc').val('');
         $('#filtro_parcela_tipo').val('Programada');
+        localStorage.removeItem('ultra_liquidacoes_filtros'); // ⚡ NOVO: Limpar filtros salvos
         $('#filtro_vig_inicial_mes, #filtro_vig_inicial_ano, #filtro_vig_final_mes, #filtro_vig_final_ano').val('');
         aplicarFiltros();
     }
@@ -1734,9 +1874,17 @@
                 
                 if (response.success && response.parcelas.length > 0) {
                     $('#coletivo_total_parcelas').text(response.parcelas.length);
+                    
+                    // Rastrear IDs originais para detectar exclusões
+                    parcelasOriginaisIds = response.parcelas.map(p => p.id);
+                    
+                    // Armazenar tipos disponíveis globalmente
+                    window.tiposParcelaDisponiveis = response.tipos_parcela || [];
+                    
                     renderizarTabelaColetiva(response.parcelas, response.tipos_parcela);
                 } else {
-                    $('#corpoTabelaColetiva').html('<tr><td colspan="13" class="text-center">Nenhuma parcela encontrada</td></tr>');
+                    $('#corpoTabelaColetiva').html('<tr><td colspan="14" class="text-center">Nenhuma parcela encontrada</td></tr>');
+                    parcelasOriginaisIds = [];
                 }
             },
             error: function(xhr) {
@@ -1753,6 +1901,19 @@
         
         parcelas.forEach(function(p) {
             const tr = $('<tr>').data('parcela-id', p.id);
+            
+            // Coluna de ações (botão excluir)
+            const btnExcluir = $('<button>').
+                addClass('btn btn-danger btn-sm').
+                attr('type', 'button').
+                html('<i class="bi bi-trash"></i>').
+                on('click', function() {
+                    if (confirm('⚠️ Excluir esta parcela?')) {
+                        tr.remove();
+                        recalcularSubtotaisColetivos();
+                    }
+                });
+            tr.append($('<td>').append(btnExcluir));
             
             // Vigência Inicial - formato mês/ano
             const vigInicialMesAno = p.vigencia_inicial ? converterDataParaMesAno(p.vigencia_inicial) : '';
@@ -1833,6 +1994,99 @@
         
         // Calcular subtotais iniciais
         calcularSubtotais();
+    }
+    
+    // Adicionar nova linha vazia na tabela coletiva
+    function adicionarNovaLinhaColetiva() {
+        const tbody = $('#corpoTabelaColetiva');
+        const tiposDisponiveis = window.tiposParcelaDisponiveis || ['Programada', 'Reprogramada', 'Devolvida'];
+        
+        // Criar nova linha SEM ID (será INSERT)
+        const tr = $('<tr>'); // Sem data-parcela-id = nova parcela
+        
+        // Coluna de ações (botão excluir)
+        const btnExcluir = $('<button>').
+            addClass('btn btn-danger btn-sm').
+            attr('type', 'button').
+            html('<i class="bi bi-trash"></i>').
+            on('click', function() {
+                if (confirm('⚠️ Excluir esta parcela?')) {
+                    tr.remove();
+                    recalcularSubtotaisColetivos();
+                }
+            });
+        tr.append($('<td>').append(btnExcluir));
+        
+        // Vigência Inicial - vazio
+        tr.append($('<td>').html('<input type="month" class="form-control form-control-sm edit-vig-inicial" value="">'));
+        
+        // Vigência Final - vazio
+        tr.append($('<td>').html('<input type="month" class="form-control form-control-sm edit-vig-final" value="">'));
+        
+        // Tipo Parcela - select
+        let selectTipo = '<select class="form-select form-select-sm edit-tipo">';
+        tiposDisponiveis.forEach(function(tipo) {
+            selectTipo += `<option value="${tipo}">${tipo}</option>`;
+        });
+        selectTipo += '</select>';
+        tr.append($('<td>').html(selectTipo));
+        
+        // Nº Parcela - vazio
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm edit-numero" value="">'));
+        
+        // Valores monetários - vazios
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm campo-moeda edit-val-23" value="">'));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm campo-moeda edit-val-24" value="">'));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm campo-moeda edit-val-previsto" value="">'));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm campo-moeda edit-val-subtraido" value="">'));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm campo-moeda edit-val-encaminhado" value="">'));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm campo-moeda edit-val-pago" value="">'));
+        
+        // Status
+        const selectStatus = `
+            <select class="form-select form-select-sm edit-status">
+                <option value="Não Pago" selected>Não Pago</option>
+                <option value="Encaminhado para Pagamento">Encaminhado</option>
+                <option value="Pago">Pago</option>
+            </select>`;
+        tr.append($('<td>').html(selectStatus));
+        
+        // Status Secundário
+        const selectStatusSec = `
+            <select class="form-select form-select-sm edit-status-sec">
+                <option value="" selected>-</option>
+                <option value="Parcial">Parcial</option>
+                <option value="Integral">Integral</option>
+                <option value="Glosa">Glosa</option>
+                <option value="Falta Certidão">Falta Certidão</option>
+                <option value="Falta encarte de Prestações">Falta encarte</option>
+                <option value="Aguardando Alteração">Aguardando Alteração</option>
+                <option value="Antigos">Antigos</option>
+                <option value="Rescisão">Rescisão</option>
+            </select>`;
+        tr.append($('<td>').html(selectStatusSec));
+        
+        // Data Pagamento - vazio
+        tr.append($('<td>').html('<input type="date" class="form-control form-control-sm edit-data-pgto" value="">'));
+        
+        tbody.append(tr);
+        
+        // Aplicar máscaras monetárias
+        tr.find('.campo-moeda').each(function() {
+            aplicarMascaraMonetaria(this);
+        });
+        
+        // Recalcular subtotais
+        calcularSubtotais();
+        
+        // Atualizar contador
+        $('#coletivo_total_parcelas').text($('#corpoTabelaColetiva tr').length);
+    }
+    
+    // Alias para recalcular subtotais
+    function recalcularSubtotaisColetivos() {
+        calcularSubtotais();
+        $('#coletivo_total_parcelas').text($('#corpoTabelaColetiva tr').length);
     }
     
     // Editar parcela
@@ -2024,20 +2278,46 @@
         });
     }
     
+    // Array global para rastrear IDs originais (carregados do servidor)
+    let parcelasOriginaisIds = [];
+    
     // Salvar edição coletiva
     function salvarEdicaoColetiva() {
         const numeroTermo = $('#coletivo_numero_termo_hidden').val();
         
-        // Coletar todas as linhas editadas da tabela
+        // Coletar IDs das parcelas atualmente na tabela
+        const idsAtual = [];
         const parcelas = [];
+        
         $('#corpoTabelaColetiva tr').each(function() {
             const tr = $(this);
             const id = tr.data('parcela-id');
             
+            // Se tem ID, adicionar à lista de IDs atuais
+            if (id) {
+                idsAtual.push(id);
+            }
+            
+            // Pegar valores dos inputs
+            const vigInicialInput = tr.find('.edit-vig-inicial').val();
+            const vigFinalInput = tr.find('.edit-vig-final').val();
+            
+            // Converter datas
+            const vigInicialConvertida = converterInputParaData(vigInicialInput);
+            const vigFinalConvertida = converterInputParaData(vigFinalInput);
+            
+            // Debug: Log da conversão
+            if (vigInicialInput) {
+                console.log(`Vig Inicial: ${vigInicialInput} → ${vigInicialConvertida}`);
+            }
+            if (vigFinalInput) {
+                console.log(`Vig Final: ${vigFinalInput} → ${vigFinalConvertida}`);
+            }
+            
             parcelas.push({
-                id: id,
-                vigencia_inicial: converterInputParaData(tr.find('.edit-vig-inicial').val()),
-                vigencia_final: converterInputParaData(tr.find('.edit-vig-final').val()),
+                id: id || null,  // null = nova parcela (INSERT)
+                vigencia_inicial: vigInicialConvertida,
+                vigencia_final: vigFinalConvertida,
                 parcela_tipo: tr.find('.edit-tipo').val(),
                 parcela_numero: tr.find('.edit-numero').val(),
                 valor_elemento_53_23: desformatarValorMonetario(tr.find('.edit-val-23').val()),
@@ -2052,31 +2332,41 @@
             });
         });
         
-        if (parcelas.length === 0) {
-            alert('⚠️ Nenhuma parcela para atualizar.');
-            return;
-        }
+        // Identificar parcelas excluídas (estavam em parcelasOriginaisIds mas não estão em idsAtual)
+        const idsExcluir = parcelasOriginaisIds.filter(id => !idsAtual.includes(id));
         
         // Confirmação
-        if (!confirm(`⚠️ Confirma a atualização de ${parcelas.length} parcelas do termo ${numeroTermo}?`)) {
+        const novas = parcelas.filter(p => !p.id).length;
+        const editadas = parcelas.filter(p => p.id).length;
+        const excluidas = idsExcluir.length;
+        
+        let mensagem = `⚠️ Confirma as alterações do termo ${numeroTermo}?\n\n`;
+        if (novas > 0) mensagem += `• ${novas} parcela(s) nova(s)\n`;
+        if (editadas > 0) mensagem += `• ${editadas} parcela(s) editada(s)\n`;
+        if (excluidas > 0) mensagem += `• ${excluidas} parcela(s) excluída(s)\n`;
+        
+        if (!confirm(mensagem)) {
             return;
         }
         
         console.log('Salvando edição coletiva - Termo:', numeroTermo);
-        console.log('Total de parcelas:', parcelas.length);
-        console.log('Parcelas:', parcelas);
+        console.log('Parcelas (total):', parcelas.length);
+        console.log('IDs para excluir:', idsExcluir);
         
         $.ajax({
             url: `/gestao_financeira/ultra-liquidacoes/api/termo/${encodeURIComponent(numeroTermo)}/atualizar-multiplas`,
             method: 'PUT',
             contentType: 'application/json',
-            data: JSON.stringify({ parcelas: parcelas }),
+            data: JSON.stringify({ 
+                parcelas: parcelas,
+                ids_excluir: idsExcluir
+            }),
             success: function(response) {
                 console.log('Resposta edição coletiva:', response);
                 if (response.success) {
                     $('#modalEditarParcela').modal('hide');
                     carregarDados();
-                    alert(`✅ ${response.parcelas_atualizadas} parcelas atualizadas com sucesso!`);
+                    alert(`✅ ${response.message}`);
                 } else {
                     alert('⚠️ Erro: ' + (response.error || 'Resposta sem sucesso'));
                 }
@@ -2111,7 +2401,43 @@
     
     // Exportar CSV
     function exportarCSV(modo) {
-        const url = `/gestao_financeira/ultra-liquidacoes/api/exportar-csv?modo=${modo}&secao=${secaoAtual}`;
+        let url = `/gestao_financeira/ultra-liquidacoes/api/exportar-csv?modo=${modo}&secao=${secaoAtual}`;
+        
+        // Se modo for 'filtrado', adicionar todos os filtros
+        if (modo === 'filtrado') {
+            // Filtros de texto
+            const numeroTermo = $('#filtro_numero_termo').val();
+            const osc = $('#filtro_osc').val();
+            const cnpj = $('#filtro_cnpj').val();
+            const parcelaTipo = $('#filtro_parcela_tipo').val();
+            const parcelaNumero = $('#filtro_parcela_numero').val();
+            const statusSecundario = $('#filtro_status_secundario').val();
+            
+            // Filtros de data
+            const vigenciaInicialDe = $('#filtro_vigencia_inicial_de').val();
+            const vigenciaInicialAte = $('#filtro_vigencia_inicial_ate').val();
+            const vigenciaFinalDe = $('#filtro_vigencia_final_de').val();
+            const vigenciaFinalAte = $('#filtro_vigencia_final_ate').val();
+            const dataPagamentoDe = $('#filtro_data_pagamento_de').val();
+            const dataPagamentoAte = $('#filtro_data_pagamento_ate').val();
+            const anoVigencia = $('#filtro_ano_vigencia').val();
+            
+            // Adicionar à URL
+            if (numeroTermo) url += `&numero_termo=${encodeURIComponent(numeroTermo)}`;
+            if (osc) url += `&osc=${encodeURIComponent(osc)}`;
+            if (cnpj) url += `&cnpj=${encodeURIComponent(cnpj)}`;
+            if (parcelaTipo) url += `&parcela_tipo=${encodeURIComponent(parcelaTipo)}`;
+            if (parcelaNumero) url += `&parcela_numero=${encodeURIComponent(parcelaNumero)}`;
+            if (statusSecundario) url += `&status_secundario=${encodeURIComponent(statusSecundario)}`;
+            if (vigenciaInicialDe) url += `&vigencia_inicial_de=${vigenciaInicialDe}`;
+            if (vigenciaInicialAte) url += `&vigencia_inicial_ate=${vigenciaInicialAte}`;
+            if (vigenciaFinalDe) url += `&vigencia_final_de=${vigenciaFinalDe}`;
+            if (vigenciaFinalAte) url += `&vigencia_final_ate=${vigenciaFinalAte}`;
+            if (dataPagamentoDe) url += `&data_pagamento_de=${dataPagamentoDe}`;
+            if (dataPagamentoAte) url += `&data_pagamento_ate=${dataPagamentoAte}`;
+            if (anoVigencia) url += `&ano_vigencia=${anoVigencia}`;
+        }
+        
         window.location.href = url;
     }
     
@@ -2369,17 +2695,66 @@
     
     let termoSelecionadoGlobal = null;
     
+    // Helper: Converter valor digitado em Info Alteração para formato do banco
+    function converterInfoAlteracao(valor) {
+        if (!valor || valor.trim() === '' || valor.trim() === '-') {
+            return 'Base';
+        }
+        
+        const numero = parseInt(valor.trim());
+        if (!isNaN(numero) && numero > 0) {
+            return `Aditivo ${numero}`;
+        }
+        
+        return 'Base'; // Fallback para valores inválidos
+    }
+    
     // Abrir modal de adicionar parcelas
     function abrirModalAdicionarParcelas() {
-        // Resetar modal
-        $('#fase1_selecao').show();
+        // RESET COMPLETO DO MODAL
+        console.log('🔄 Resetando modal completamente...');
+        
+        // Resetar variável global
+        termoSelecionadoGlobal = null;
+        modoParcelasProjetadas = false;
+        
+        // Resetar checkboxes
+        $('#chk_parcelas_projetadas').prop('checked', false);
+        
+        // Limpar campos
+        $('#novo_numero_termo').val('');
+        $('#input_termo_colaboracao').val('');
+        $('#info_termo_selecionado').hide();
+        
+        // Limpar tabelas
+        $('#corpo_cronograma').empty();
+        $('#corpo_parcelas_finais').empty();
+        
+        // ⚡ CRÍTICO: Resetar estado dos botões de salvar
+        $('#btnSalvarCronograma').prop('disabled', false).html('💾 Salvar Cronograma e Prosseguir');
+        $('#btnConfirmarParcelas').prop('disabled', false).html('✅ Confirmar e Salvar Parcelas');
+        console.log('🔘 Botões resetados: Salvar e Confirmar');
+        
+        // Esconder TODAS as fases e botões
+        $('#fase1_selecao').hide();
         $('#fase2_cronograma').hide();
+        $('#fase3_parcelas').hide();
         $('#btnAvancarCronograma').hide();
         $('#btnSalvarCronograma').hide();
         $('#btnVoltarFase1').hide();
+        $('#btnVoltarFase2').hide();
+        $('#btnConfirmarParcelas').hide();
         
+        // Mostrar apenas FASE 1
+        $('#fase1_selecao').show();
+        
+        // Abrir modal
         $('#modalAdicionarParcelas').modal('show');
+        
+        // Carregar termos disponíveis
         carregarTermosDisponiveis();
+        
+        console.log('✅ Modal resetado para FASE 1');
     }
     
     // Voltar para fase 1 (seleção do termo)
@@ -2570,6 +2945,11 @@
                 if (response.success && response.cronograma && response.cronograma.length > 0) {
                     console.log('📋 Cronograma existente encontrado:', response.cronograma.length, 'linhas');
                     console.log('🔍 DEBUG: Dados recebidos do servidor:', response.cronograma.slice(0, 2));
+                    
+                    // ⚡ NOVO: Armazenar o último info_alteracao SALVO no banco
+                    const ultimoRegistro = response.cronograma[response.cronograma.length - 1];
+                    ultimoInfoAlteracaoSalvo = ultimoRegistro.info_alteracao || 'Base';
+                    console.log('💾 Último info_alteracao SALVO no banco:', ultimoInfoAlteracaoSalvo);
                     
                     // CORREÇÃO: No modo parcelas projetadas, SEMPRE usar os dados salvos como referência
                     // para garantir que os meses batam exatamente com o que está no banco
@@ -2779,16 +3159,25 @@
             tdCheck.append(checkbox);
             tr.append(tdCheck);
             
-            // Info Alteração - dropdown editável
+            // Info Alteração - input editável com conversão automática
             const infoAlteracao = dado.info_alteracao || 'Base';
             const tdInfoAlteracao = $('<td>');
-            const selectInfoAlteracao = $('<select>').addClass('form-select form-select-sm cronograma-info-alteracao');
-            selectInfoAlteracao.append($('<option>').val('Base').text('Base').prop('selected', infoAlteracao === 'Base'));
-            for (let i = 1; i <= 20; i++) {
-                const val = `Aditivo ${i}`;
-                selectInfoAlteracao.append($('<option>').val(val).text(val).prop('selected', infoAlteracao === val));
+            
+            // Converter de "Base" ou "Aditivo X" para formato editável ("-" ou "X")
+            let valorDisplay = '-'; // Padrão para Base
+            if (infoAlteracao !== 'Base') {
+                const match = infoAlteracao.match(/Aditivo (\d+)/);
+                if (match) {
+                    valorDisplay = match[1];
+                }
             }
-            tdInfoAlteracao.append(selectInfoAlteracao);
+            
+            const inputInfoAlteracao = $('<input>').attr({
+                type: 'text',
+                maxlength: '2',
+                placeholder: '-'
+            }).addClass('form-control form-control-sm text-center cronograma-info-alteracao').val(valorDisplay);
+            tdInfoAlteracao.append(inputInfoAlteracao);
             tr.append(tdInfoAlteracao);
             
             tr.append($('<td>').addClass('fw-bold').text(mesNome));
@@ -2821,8 +3210,21 @@
             tr.append($('<td>').html(input23));
             tr.append($('<td>').html(input24));
             
-            const totalMes = (centavos23 + centavos24) / 100;
-            tr.append($('<td>').addClass('cronograma-total-mes fw-bold text-end').text('R$ ' + totalMes.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})));
+            // ⚡ CORREÇÃO: Calcular Total Mês a partir dos valores 53-23 e 53-24 (não usar valor_mes do banco)
+            // O valor_mes do banco pode estar desatualizado se o usuário editou manualmente
+            const totalMesCalculado = (centavos23 + centavos24) / 100;
+            // Adiciona atributo data-valor-mes-banco para uso na divergência
+            tr.attr('data-valor-mes-banco', dado.valor_mes !== null ? dado.valor_mes : '');
+            const tdTotalMes = $('<td>').addClass('cronograma-total-mes fw-bold text-end').text('R$ ' + totalMesCalculado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+            // Badge de divergência (apenas se houver)
+            const valorMesBanco = dado.valor_mes !== null ? parseFloat(dado.valor_mes) : 0;
+            const divergente = Math.abs(totalMesCalculado - valorMesBanco) > 0.01;
+            if (divergente) {
+                tdTotalMes.append(
+                    $('<span>').addClass('badge bg-danger ms-2 badge-divergencia').text('Divergência: ' + (totalMesCalculado > valorMesBanco ? '+' : '-') + 'R$ ' + Math.abs(totalMesCalculado - valorMesBanco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}))
+                );
+            }
+            tr.append(tdTotalMes);
             
             // Nº da Parcela - editável se linha nova no modo projetadas
             const tdParcela = $('<td>').addClass('text-muted');
@@ -2886,15 +3288,14 @@
             tdCheck.append(checkbox);
             tr.append(tdCheck);
             
-            // Info Alteração - dropdown editável (default Base)
+            // Info Alteração - input editável com conversão automática (padrão: Base = "-")
             const tdInfoAlteracao = $('<td>');
-            const selectInfoAlteracao = $('<select>').addClass('form-select form-select-sm cronograma-info-alteracao');
-            selectInfoAlteracao.append($('<option>').val('Base').text('Base').prop('selected', true));
-            for (let i = 1; i <= 20; i++) {
-                const val = `Aditivo ${i}`;
-                selectInfoAlteracao.append($('<option>').val(val).text(val));
-            }
-            tdInfoAlteracao.append(selectInfoAlteracao);
+            const inputInfoAlteracao = $('<input>').attr({
+                type: 'text',
+                maxlength: '2',
+                placeholder: '-'
+            }).addClass('form-control form-control-sm text-center cronograma-info-alteracao').val('-');
+            tdInfoAlteracao.append(inputInfoAlteracao);
             tr.append(tdInfoAlteracao);
             
             tr.append($('<td>').addClass('fw-bold').text(mesObj.mesNome));
@@ -3055,15 +3456,27 @@
             console.log('✅ Paste concluído!');
         });
         
+        // ⚡ NOVO: Adicionar evento de blur para recalcular quando usuário editar manualmente
+        $('.cronograma-val-23, .cronograma-val-24').off('blur').on('blur', function() {
+            // Recalcular ao sair do campo para garantir que Total Mês está atualizado
+            recalcularTotaisCronograma();
+        });
+        
         $('.cronograma-val-23, .cronograma-val-24').off('keydown').on('keydown', function(e) {
+            // Enter: deixar para navegação (não processar aqui)
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                // NÃO prevenir default - deixar o evento bubbling acontecer
+                return true; // Deixar para função de navegação capturar
+            }
+            
             // Permitir Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+A
             if (e.ctrlKey || e.metaKey) {
                 console.log('⌨️ Atalho detectado:', e.keyCode);
                 return true; // Permitir atalhos de teclado
             }
             
-            // Permitir apenas números, backspace, delete, tab, enter, setas
-            const allowed = [8, 9, 13, 37, 38, 39, 40, 46, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105];
+            // Permitir apenas números, backspace, delete, tab, setas (removido enter da lista)
+            const allowed = [8, 9, 37, 38, 39, 40, 46, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105];
             
             if (!allowed.includes(e.keyCode)) {
                 e.preventDefault();
@@ -3168,15 +3581,30 @@
         tdCheck.append(checkbox);
         tr.append(tdCheck);
         
-        // Info Alteração - dropdown editável (default Base)
+        // Info Alteração - input editável com conversão automática
         const tdInfoAlteracao = $('<td>');
-        const selectInfoAlteracao = $('<select>').addClass('form-select form-select-sm cronograma-info-alteracao');
-        selectInfoAlteracao.append($('<option>').val('Base').text('Base').prop('selected', true));
-        for (let i = 1; i <= 20; i++) {
-            const val = `Aditivo ${i}`;
-            selectInfoAlteracao.append($('<option>').val(val).text(val));
+        
+        // ⚡ CORRETO: Se modo projetadas, usar o último valor SALVO NO BANCO (não última linha da tabela)
+        let valorDisplay = '-';
+        if (modoParcelasProjetadas) {
+            console.log('🔍 Usando ultimoInfoAlteracaoSalvo do banco:', ultimoInfoAlteracaoSalvo);
+            if (ultimoInfoAlteracaoSalvo === 'Base') {
+                valorDisplay = '1'; // Primeiro aditivo
+            } else if (ultimoInfoAlteracaoSalvo && ultimoInfoAlteracaoSalvo.startsWith('Aditivo ')) {
+                const numeroAtual = parseInt(ultimoInfoAlteracaoSalvo.replace('Aditivo ', ''));
+                if (!isNaN(numeroAtual)) {
+                    valorDisplay = (numeroAtual + 1).toString();
+                }
+            }
+            console.log('📝 Valor display para nova linha:', valorDisplay);
         }
-        tdInfoAlteracao.append(selectInfoAlteracao);
+        
+        const inputInfoAlteracao = $('<input>').attr({
+            type: 'text',
+            maxlength: '2',
+            placeholder: '-'
+        }).addClass('form-control form-control-sm text-center cronograma-info-alteracao').val(valorDisplay);
+        tdInfoAlteracao.append(inputInfoAlteracao);
         tr.append(tdInfoAlteracao);
         
         tr.append($('<td>').addClass('fw-bold').text(mesNome));
@@ -3269,15 +3697,30 @@
         tdCheck.append(checkbox);
         tr.append(tdCheck);
         
-        // Info Alteração - dropdown editável (default Base)
+        // Info Alteração - input editável com conversão automática
         const tdInfoAlteracao = $('<td>');
-        const selectInfoAlteracao = $('<select>').addClass('form-select form-select-sm cronograma-info-alteracao');
-        selectInfoAlteracao.append($('<option>').val('Base').text('Base').prop('selected', true));
-        for (let i = 1; i <= 20; i++) {
-            const val = `Aditivo ${i}`;
-            selectInfoAlteracao.append($('<option>').val(val).text(val));
+        
+        // ⚡ CORRETO: Se modo projetadas, usar o último valor SALVO NO BANCO (não primeira linha da tabela)
+        let valorDisplay = '-';
+        if (modoParcelasProjetadas) {
+            console.log('🔍 Usando ultimoInfoAlteracaoSalvo do banco:', ultimoInfoAlteracaoSalvo);
+            if (ultimoInfoAlteracaoSalvo === 'Base') {
+                valorDisplay = '1'; // Primeiro aditivo
+            } else if (ultimoInfoAlteracaoSalvo && ultimoInfoAlteracaoSalvo.startsWith('Aditivo ')) {
+                const numeroAtual = parseInt(ultimoInfoAlteracaoSalvo.replace('Aditivo ', ''));
+                if (!isNaN(numeroAtual)) {
+                    valorDisplay = (numeroAtual + 1).toString();
+                }
+            }
+            console.log('📝 Valor display para nova linha (início):', valorDisplay);
         }
-        tdInfoAlteracao.append(selectInfoAlteracao);
+        
+        const inputInfoAlteracao = $('<input>').attr({
+            type: 'text',
+            maxlength: '2',
+            placeholder: '-'
+        }).addClass('form-control form-control-sm text-center cronograma-info-alteracao').val(valorDisplay);
+        tdInfoAlteracao.append(inputInfoAlteracao);
         tr.append(tdInfoAlteracao);
         
         tr.append($('<td>').addClass('fw-bold').text(mesNome));
@@ -3368,21 +3811,42 @@
     }
     
     // Recalcular totais do cronograma
+    // ⚡ IMPORTANTE: Total Mês é recalculado DINAMICAMENTE (soma de 53-23 + 53-24 na linha)
     function recalcularTotaisCronograma() {
         let total23Centavos = 0;
         let total24Centavos = 0;
         
         $('#corpo_cronograma tr').each(function() {
             const tr = $(this);
-            const centavos23 = parseInt(tr.find('.cronograma-val-23').data('centavos')) || 0;
-            const centavos24 = parseInt(tr.find('.cronograma-val-24').data('centavos')) || 0;
-            const totalMesCentavos = centavos23 + centavos24;
-            
-            const totalMes = totalMesCentavos / 100;
-            tr.find('.cronograma-total-mes').text('R$ ' + totalMes.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-            
-            total23Centavos += centavos23;
-            total24Centavos += centavos24;
+            // Pega valores dos inputs (em texto), converte para float
+            let val23 = (tr.find('.cronograma-val-23').val() || '0').replace(/\./g, '').replace(',', '.');
+            let val24 = (tr.find('.cronograma-val-24').val() || '0').replace(/\./g, '').replace(',', '.');
+            val23 = parseFloat(val23) || 0;
+            val24 = parseFloat(val24) || 0;
+            const totalMes = val23 + val24;
+            // Exibe exatamente o valor digitado, sem forçar casas decimais
+            tr.find('.cronograma-total-mes').text('R$ ' + totalMes.toLocaleString('pt-BR'));
+            // Badge de divergência (mantém lógica anterior)
+            const valorMesBanco = tr.attr('data-valor-mes-banco') !== undefined && tr.attr('data-valor-mes-banco') !== '' ? parseFloat(tr.attr('data-valor-mes-banco')) : null;
+            let badge = tr.find('.badge-divergencia');
+            if (valorMesBanco !== null) {
+                const divergente = Math.abs(totalMes - valorMesBanco) > 0.01;
+                if (badge.length) {
+                    if (!divergente) {
+                        badge.remove();
+                    } else {
+                        badge.text('Divergência: ' + (totalMes > valorMesBanco ? '+' : '-') + 'R$ ' + Math.abs(totalMes - valorMesBanco).toLocaleString('pt-BR'));
+                    }
+                } else if (divergente) {
+                    tr.find('.cronograma-total-mes').append(
+                        $('<span>').addClass('badge bg-danger ms-2 badge-divergencia').text('Divergência: ' + (totalMes > valorMesBanco ? '+' : '-') + 'R$ ' + Math.abs(totalMes - valorMesBanco).toLocaleString('pt-BR'))
+                    );
+                }
+            } else if (badge.length) {
+                badge.remove();
+            }
+            total23Centavos += Math.round(val23 * 100);
+            total24Centavos += Math.round(val24 * 100);
         });
         
         const total23 = total23Centavos / 100;
@@ -3441,8 +3905,9 @@
             const val23Input = tr.find('.cronograma-val-23');
             const val24Input = tr.find('.cronograma-val-24');
             
-            // Info Alteração - pegar do select
-            const infoAlteracao = tr.find('.cronograma-info-alteracao').val() || 'Base';
+            // Info Alteração - converter valor digitado para formato do banco (- → Base, 1 → Aditivo 1, etc.)
+            const valorDigitado = tr.find('.cronograma-info-alteracao').val();
+            const infoAlteracao = converterInfoAlteracao(valorDigitado);
             
             // Nº da Parcela - pegar do input se existir (modo projetadas), senão do texto
             const tdParcela = tr.find('td').eq(6); // Ajustado por causa das novas colunas (checkbox + info_alteracao)
@@ -3509,7 +3974,9 @@
                     const valor24 = converterMoedaParaCentavos(valorTexto24);
                     const valorMes = valor23 + valor24;
                     
-                    const infoAlteracao = tr.find('.cronograma-info-alteracao').val() || 'Base';
+                    // Converter valor digitado para formato do banco (- → Base, 1 → Aditivo 1, etc.)
+                    const valorDigitado = tr.find('.cronograma-info-alteracao').val();
+                    const infoAlteracao = converterInfoAlteracao(valorDigitado);
                     const parcelaNumero = tr.find('td').eq(6).attr('data-parcela-numero') || 
                                          tr.find('.cronograma-input-parcela').val() || '';
                     
@@ -3588,6 +4055,7 @@
             url: '/gestao_financeira/ultra-liquidacoes/api/salvar-cronograma',
             method: 'POST',
             contentType: 'application/json',
+            timeout: 30000, // ⚡ NOVO: Timeout de 30 segundos
             data: JSON.stringify({
                 numero_termo: termo.numero_termo,
                 cronograma: cronograma,
@@ -3599,6 +4067,11 @@
                 
                 if (response.success) {
                     console.log('✅ DEBUG: response.success = true, avançando para FASE 3...');
+                    // ⚡ NOVO: Atualizar ultimoInfoAlteracaoSalvo após salvar com sucesso
+                    if (cronograma.length > 0) {
+                        ultimoInfoAlteracaoSalvo = cronograma[cronograma.length - 1].info_alteracao || 'Base';
+                        console.log('💾 Atualizado ultimoInfoAlteracaoSalvo para:', ultimoInfoAlteracaoSalvo);
+                    }
                     // Avançar para FASE 3
                     avancarParaFase3(cronograma);
                 } else {
@@ -3610,6 +4083,7 @@
             },
             error: function(xhr, status, error) {
                 console.error('❌ DEBUG: AJAX error callback executado');
+                console.error('❌ Status:', status); // ⚡ NOVO: Log separado para status
                 console.error('❌ Erro AJAX completo:', {
                     status: status,
                     error: error,
@@ -3619,14 +4093,20 @@
                 });
                 
                 let mensagemErro = 'Erro desconhecido';
-                try {
-                    if (xhr.responseJSON && xhr.responseJSON.error) {
-                        mensagemErro = xhr.responseJSON.error;
-                    } else if (xhr.responseText) {
-                        mensagemErro = xhr.responseText.substring(0, 500); // Primeiros 500 caracteres
+                
+                // ⚡ NOVO: Tratamento especial para timeout
+                if (status === 'timeout') {
+                    mensagemErro = 'Operação demorou muito (timeout de 30s). Verifique sua conexão ou tente novamente.';
+                } else {
+                    try {
+                        if (xhr.responseJSON && xhr.responseJSON.error) {
+                            mensagemErro = xhr.responseJSON.error;
+                        } else if (xhr.responseText) {
+                            mensagemErro = xhr.responseText.substring(0, 500); // Primeiros 500 caracteres
+                        }
+                    } catch (e) {
+                        mensagemErro = `Status ${xhr.status}: ${error}`;
                     }
-                } catch (e) {
-                    mensagemErro = `Status ${xhr.status}: ${error}`;
                 }
                 
                 alert('❌ Erro ao salvar cronograma:\n\n' + mensagemErro);
@@ -3661,7 +4141,10 @@
             const mesNome = tr.find('td:eq(2)').text();
             const val23Input = tr.find('.cronograma-val-23');
             const val24Input = tr.find('.cronograma-val-24');
-            const infoAlteracao = tr.find('.cronograma-info-alteracao').val() || 'Base';
+            
+            // Converter valor digitado para formato do banco (- → Base, 1 → Aditivo 1, etc.)
+            const valorDigitado = tr.find('.cronograma-info-alteracao').val();
+            const infoAlteracao = converterInfoAlteracao(valorDigitado);
             
             const tdParcela = tr.find('td').eq(6);
             const inputParcela = tdParcela.find('.cronograma-input-parcela');
@@ -3824,23 +4307,22 @@
     // Helper: criar select de status
     function createSelectStatus(valorDefault) {
         const select = $('<select>').addClass('form-select form-select-sm parcela-status-select');
-        // Será preenchido via AJAX
+        // Opção temporária enquanto carrega
         select.append($('<option>').val(valorDefault).text(valorDefault).prop('selected', true));
         
-        // Carregar opções
-        $.ajax({
-            url: '/gestao_financeira/ultra-liquidacoes/api/status-pagamento',
-            method: 'GET',
-            success: function(response) {
-                if (response.success) {
-                    select.empty();
-                    response.status.forEach(st => {
-                        const option = $('<option>').val(st.parcela_status).text(st.parcela_status);
-                        if (st.parcela_status === valorDefault) option.prop('selected', true);
-                        select.append(option);
-                    });
-                }
-            }
+        // ⚡ CORRETO: Usar cache ao invés de fazer AJAX repetido
+        carregarStatusPagamento().then(statusList => {
+            select.empty();
+            // Remover duplicatas e ordenar
+            const statusUnicos = [...new Set(statusList.map(st => st.parcela_status))].sort();
+            statusUnicos.forEach(st => {
+                const option = $('<option>').val(st).text(st);
+                if (st === valorDefault) option.prop('selected', true);
+                select.append(option);
+            });
+        }).catch(err => {
+            console.error('❌ Erro ao popular status:', err);
+            // Manter valor default em caso de erro
         });
         
         return select;
@@ -3849,29 +4331,28 @@
     // Helper: criar select de status secundário
     function createSelectStatusSecundario(valorDefault) {
         const select = $('<select>').addClass('form-select form-select-sm parcela-status-sec-select');
+        // Opção temporária enquanto carrega
         select.append($('<option>').val(valorDefault).text(valorDefault).prop('selected', true));
         
-        // Carregar opções
-        $.ajax({
-            url: '/gestao_financeira/ultra-liquidacoes/api/status-pagamento',
-            method: 'GET',
-            success: function(response) {
-                if (response.success) {
-                    select.empty();
-                    // Extrair status secundários únicos
-                    const statusSec = new Set();
-                    response.status.forEach(st => {
-                        if (st.status_secundario) {
-                            statusSec.add(st.status_secundario);
-                        }
-                    });
-                    statusSec.forEach(sec => {
-                        const option = $('<option>').val(sec).text(sec);
-                        if (sec === valorDefault) option.prop('selected', true);
-                        select.append(option);
-                    });
+        // ⚡ CORRETO: Usar cache ao invés de fazer AJAX repetido
+        carregarStatusPagamento().then(statusList => {
+            select.empty();
+            // Extrair status secundários únicos
+            const statusSec = new Set();
+            statusList.forEach(st => {
+                if (st.status_secundario) {
+                    statusSec.add(st.status_secundario);
                 }
-            }
+            });
+            const statusSecArray = Array.from(statusSec).sort();
+            statusSecArray.forEach(sec => {
+                const option = $('<option>').val(sec).text(sec);
+                if (sec === valorDefault) option.prop('selected', true);
+                select.append(option);
+            });
+        }).catch(err => {
+            console.error('❌ Erro ao popular status secundário:', err);
+            // Manter valor default em caso de erro
         });
         
         return select;
@@ -4018,41 +4499,145 @@
         $('#semCronogramaEdicao').hide();
         $('#corpoTabelaCronogramaEdicao').empty();
         
-        const url = '/gestao_financeira/ultra-liquidacoes/api/cronograma';
-        console.log('📡 Fazendo requisição para:', url);
-        console.log('📦 Parâmetros:', { numero_termo: numeroTermo });
-        
+        // ⚡ PASSO 1: Buscar valores das parcelas em ultra_liquidacoes
         $.ajax({
-            url: url,
+            url: `/gestao_financeira/ultra-liquidacoes/api/termo/${numeroTermo}/parcelas`,
             method: 'GET',
-            data: { numero_termo: numeroTermo },
-            success: function(response) {
+            success: function(parcelasResponse) {
+                // ⚡ Criar mapa parcela_numero -> SOMA dos valores (para casos de parcelas duplicadas)
+                const valoresParcelas = {};
+                parcelasResponse.parcelas.forEach(p => {
+                    const parcela = p.parcela_numero;
+                    const valor = parseFloat(p.valor_previsto || 0);
+                    
+                    // Se já existe essa parcela, SOMAR os valores
+                    if (!valoresParcelas[parcela]) {
+                        valoresParcelas[parcela] = 0;
+                    }
+                    valoresParcelas[parcela] += valor;
+                });
+                console.log('📊 Valores das parcelas carregados (soma de duplicatas):', valoresParcelas);
+                
+                // ⚡ PASSO 2: Buscar cronograma
+                const url = '/gestao_financeira/ultra-liquidacoes/api/cronograma';
+                console.log('📡 Fazendo requisição para:', url);
+                console.log('📦 Parâmetros:', { numero_termo: numeroTermo });
+                
+                $.ajax({
+                    url: url,
+                    method: 'GET',
+                    data: { numero_termo: numeroTermo },
+                    success: function(response) {
                 console.log('✅ Resposta recebida:', response);
                 $('#loadingCronogramaEdicao').hide();
                 
-                if (response.success && response.cronograma && response.cronograma.length > 0) {
-                    console.log('📊 Renderizando', response.cronograma.length, 'registros');
-                    renderizarCronogramaEdicao(response.cronograma);
-                    
-                    // Verificar visibilidade após renderização
-                    setTimeout(function() {
-                        console.log('👁️ Verificando visibilidade da tabela...');
-                        console.log('- Tabela visível:', $('#corpoTabelaCronogramaEdicao').is(':visible'));
-                        console.log('- Parent visível:', $('#corpoTabelaCronogramaEdicao').parent().is(':visible'));
-                        console.log('- Aba ativa:', $('#tab-cronograma-edicao').hasClass('active'));
-                        console.log('- Content visible:', $('#content-cronograma-edicao').hasClass('active show'));
-                    }, 100);
-                } else {
-                    console.log('⚠️ Nenhum cronograma encontrado');
-                    $('#semCronogramaEdicao').show();
-                }
+                        if (response.success && response.cronograma && response.cronograma.length > 0) {
+                            console.log('📊 Renderizando', response.cronograma.length, 'registros');
+                            renderizarCronogramaEdicao(response.cronograma, valoresParcelas);
+                            
+                            // Verificar visibilidade após renderização
+                            setTimeout(function() {
+                                console.log('👁️ Verificando visibilidade da tabela...');
+                                console.log('- Tabela visível:', $('#corpoTabelaCronogramaEdicao').is(':visible'));
+                                console.log('- Parent visível:', $('#corpoTabelaCronogramaEdicao').parent().is(':visible'));
+                                console.log('- Aba ativa:', $('#tab-cronograma-edicao').hasClass('active'));
+                                console.log('- Content visible:', $('#content-cronograma-edicao').hasClass('active show'));
+                            }, 100);
+                        } else {
+                            console.log('⚠️ Nenhum cronograma encontrado - gerando linha inicial');
+                            
+                            // ⚡ CRIAR LINHA INICIAL baseada na vigência inicial mínima das parcelas
+                            if (parcelasResponse.parcelas && parcelasResponse.parcelas.length > 0) {
+                                // Buscar a vigência inicial mais antiga
+                                console.log('🔍 DEBUG: Total de parcelas recebidas:', parcelasResponse.parcelas.length);
+                                let vigenciaInicialMin = null;
+                                parcelasResponse.parcelas.forEach((p, index) => {
+                                    console.log(`🔍 DEBUG Parcela ${index + 1}:`, {
+                                        parcela_numero: p.parcela_numero,
+                                        vigencia_inicial: p.vigencia_inicial,
+                                        vigencia_inicial_parsed: p.vigencia_inicial ? new Date(p.vigencia_inicial) : null
+                                    });
+                                    
+                                    if (p.vigencia_inicial) {
+                                        const vigencia = new Date(p.vigencia_inicial);
+                                        if (!vigenciaInicialMin || vigencia < vigenciaInicialMin) {
+                                            console.log(`  ✅ Nova vigência mínima: ${vigencia.toISOString()} (anterior: ${vigenciaInicialMin ? vigenciaInicialMin.toISOString() : 'nenhuma'})`);
+                                            vigenciaInicialMin = vigencia;
+                                        }
+                                    }
+                                });
+                                
+                                if (vigenciaInicialMin) {
+                                    console.log('📅 Vigência inicial mínima encontrada:', vigenciaInicialMin);
+                                    console.log('📅 ISO String:', vigenciaInicialMin.toISOString());
+                                    
+                                    // Gerar linha inicial com este mês
+                                    const mes = vigenciaInicialMin.getMonth() + 1; // 1-12
+                                    const ano = vigenciaInicialMin.getFullYear();
+                                    console.log(`🔍 DEBUG: Extraído - Mês: ${mes}, Ano: ${ano}`);
+                                    
+                                    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+                                    const mesNome = `${meses[mes - 1]}/${String(ano).slice(-2)}`;
+                                    console.log(`🔍 DEBUG: mesNome gerado: ${mesNome}`);
+                                    
+                                    // Criar objeto de cronograma inicial
+                                    const cronogramaInicial = [{
+                                        id: null,
+                                        nome_mes: `${ano}-${String(mes).padStart(2, '0')}-01`,
+                                        valor_mes_23: 0,
+                                        valor_mes_24: 0,
+                                        valor_mes: 0,
+                                        parcela_numero: '',
+                                        info_alteracao: 'Base'
+                                    }];
+                                    
+                                    console.log('✨ Gerando linha inicial:', cronogramaInicial[0]);
+                                    console.log('✨ nome_mes formatado:', cronogramaInicial[0].nome_mes);
+                                    renderizarCronogramaEdicao(cronogramaInicial, valoresParcelas);
+                                    
+                                    // Mostrar mensagem informativa
+                                    $('#semCronogramaEdicao').html(`
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle me-2"></i>
+                                            <strong>Cronograma vazio!</strong> Foi criada uma linha inicial baseada na vigência do termo (${mesNome}).
+                                            Use os botões "Adicionar Mês no Início" ou "Adicionar Mês no Final" para construir o cronograma.
+                                        </div>
+                                    `).show();
+                                } else {
+                                    console.log('⚠️ Nenhuma vigência inicial encontrada');
+                                    $('#semCronogramaEdicao').html(`
+                                        <div class="alert alert-warning">
+                                            <i class="bi bi-exclamation-triangle me-2"></i>
+                                            <strong>Atenção!</strong> Não foi possível encontrar a vigência inicial das parcelas.
+                                            Por favor, verifique se existem parcelas cadastradas para este termo.
+                                        </div>
+                                    `).show();
+                                }
+                            } else {
+                                console.log('⚠️ Nenhuma parcela encontrada para gerar linha inicial');
+                                $('#semCronogramaEdicao').html(`
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        <strong>Atenção!</strong> Não existem parcelas cadastradas para este termo.
+                                        Adicione parcelas antes de criar o cronograma.
+                                    </div>
+                                `).show();
+                            }
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('❌ Erro ao carregar cronograma');
+                        console.error('Status:', status);
+                        console.error('Error:', error);
+                        console.error('Response:', xhr.responseText);
+                        console.error('XHR completo:', xhr);
+                        $('#loadingCronogramaEdicao').hide();
+                        $('#semCronogramaEdicao').show();
+                    }
+                });
             },
             error: function(xhr, status, error) {
-                console.error('❌ Erro ao carregar cronograma');
-                console.error('Status:', status);
-                console.error('Error:', error);
-                console.error('Response:', xhr.responseText);
-                console.error('XHR completo:', xhr);
+                console.error('❌ Erro ao carregar valores das parcelas');
                 $('#loadingCronogramaEdicao').hide();
                 $('#semCronogramaEdicao').show();
             }
@@ -4060,21 +4645,66 @@
     }
     
     // Renderizar cronograma na tabela de edição
-    function renderizarCronogramaEdicao(cronograma) {
+    function renderizarCronogramaEdicao(cronograma, valoresParcelas = {}) {
         console.log('🎨 Iniciando renderização do cronograma');
         console.log('📋 Total de registros:', cronograma.length);
         console.log('🔍 Primeiro registro:', cronograma[0]);
+        console.log('💰 Valores das parcelas recebidos:', valoresParcelas);
         
         const tbody = $('#corpoTabelaCronogramaEdicao');
         console.log('📍 tbody encontrado:', tbody.length > 0 ? 'SIM' : 'NÃO');
         tbody.empty();
         
+        // ⚡ AGRUPAR CRONOGRAMA POR PARCELA_NUMERO e calcular totais
+        const cronogramoPorParcela = {};
+        cronograma.forEach(mes => {
+            const parcela = mes.parcela_numero;
+            if (!cronogramoPorParcela[parcela]) {
+                cronogramoPorParcela[parcela] = {
+                    total: 0,
+                    meses: []
+                };
+            }
+            const valorMes = parseFloat(mes.valor_mes || 0);
+            cronogramoPorParcela[parcela].total += valorMes;
+            cronogramoPorParcela[parcela].meses.push(mes);
+        });
+        console.log('📊 Cronograma agrupado por parcela:', cronogramoPorParcela);
+        
+        // ⚡ IDENTIFICAR DIVERGÊNCIAS
+        const divergencias = {};
+        Object.keys(cronogramoPorParcela).forEach(parcela => {
+            const totalCronograma = cronogramoPorParcela[parcela].total;
+            const valorParcela = valoresParcelas[parcela] || 0;
+            const diferenca = Math.abs(totalCronograma - valorParcela);
+            
+            if (diferenca > 0.01) {
+                divergencias[parcela] = {
+                    cronograma: totalCronograma,
+                    parcela: valorParcela,
+                    diferenca: diferenca
+                };
+                console.log(`⚠️ DIVERGÊNCIA: ${parcela} - Cronograma: R$ ${totalCronograma.toFixed(2)}, Parcela: R$ ${valorParcela.toFixed(2)}`);
+            }
+        });
+        console.log('🚨 Total de divergências:', Object.keys(divergencias).length);
+        
         cronograma.forEach(function(mes, index) {
             try {
+                // 🔍 DEBUG: Mostrar dados brutos do mês
+                if (index === 0) {
+                    console.log('🔍 DEBUG PRIMEIRO MÊS - Dados brutos:', mes);
+                    console.log('🔍 DEBUG: nome_mes =', mes.nome_mes);
+                    console.log('🔍 DEBUG: tipo de nome_mes =', typeof mes.nome_mes);
+                }
+                
                 // Corrigir formato de data (yyyy-mm-dd vindo do backend)
                 const [ano, mesNum, dia] = mes.nome_mes.split('-');
+                console.log(`🔍 DEBUG Mês ${index + 1}: Split de '${mes.nome_mes}' = ano:${ano}, mesNum:${mesNum}, dia:${dia}`);
+                
                 const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
                 const mesNome = meses[parseInt(mesNum) - 1] + '/' + ano.substr(2);
+                console.log(`🔍 DEBUG: mesNum=${mesNum}, parseInt=${parseInt(mesNum)}, índice=${parseInt(mesNum) - 1}, mesNome final=${mesNome}`);
                 
                 // Valores atuais (podem ser 0 se não preenchidos)
                 const val23 = mes.valor_mes_23 !== null ? parseFloat(mes.valor_mes_23) : 0;
@@ -4091,8 +4721,17 @@
                 }
                 
                 const tr = $('<tr>');
-                if (divergente) {
+                
+                // ⚡ DESTACAR EM AMARELO SE HOUVER DIVERGÊNCIA POR PARCELA_NUMERO
+                const parcelaNumero = mes.parcela_numero;
+                if (divergencias[parcelaNumero]) {
                     tr.addClass('table-warning');
+                    const divInfo = divergencias[parcelaNumero];
+                    tr.attr('title', `⚠️ Divergência: Cronograma R$ ${divInfo.cronograma.toFixed(2)} ≠ Parcela R$ ${divInfo.parcela.toFixed(2)}`);
+                }
+                
+                // Manter validação antiga de divergência dentro da linha (23+24 vs valor_mes)
+                if (divergente) {
                     tr.attr('data-divergente', 'true');
                     tr.attr('data-diferenca', diferenca.toFixed(2));
                 }
@@ -4101,6 +4740,30 @@
                 tr.attr('data-valor-mes', valorMes.toFixed(2));
                 tr.attr('data-nome-mes', mes.nome_mes);
                 tr.attr('data-id', mes.id);
+                tr.attr('data-info-alteracao', mes.info_alteracao || 'Base');
+                
+                // Coluna Info Alteração - input editável com conversão automática
+                const tdInfoAlteracao = $('<td>');
+                const infoAlteracaoAtual = mes.info_alteracao || 'Base';
+                
+                // ⚡ CONVERTER de "Base" ou "Aditivo X" para formato editável ("-" ou "X")
+                let valorDisplay = '-'; // Padrão para Base
+                if (infoAlteracaoAtual && infoAlteracaoAtual !== 'Base') {
+                    // Extrair número do formato "Aditivo 1", "Aditivo 2", etc.
+                    const match = infoAlteracaoAtual.match(/Aditivo (\d+)/i);
+                    if (match) {
+                        valorDisplay = match[1]; // Exibir apenas o número (1, 2, 3...)
+                    }
+                }
+                console.log(`🔄 Conversão DB→Frontend: "${infoAlteracaoAtual}" → "${valorDisplay}"`);
+                
+                const inputInfoAlteracao = $('<input>').attr({
+                    type: 'text',
+                    maxlength: '2',
+                    placeholder: '-'
+                }).addClass('form-control form-control-sm text-center cronograma-edicao-info-alteracao').val(valorDisplay);
+                tdInfoAlteracao.append(inputInfoAlteracao);
+                tr.append(tdInfoAlteracao);
                 
                 tr.append($('<td>').addClass('fw-bold').text(mesNome));
                 tr.append($('<td>').html(`<input type="text" class="form-control form-control-sm cronograma-edicao-val-23" value="${val23.toFixed(2).replace('.', ',')}" data-original="${val23.toFixed(2)}">`));
@@ -4117,7 +4780,32 @@
                 }
                 
                 tr.append(tdTotal);
-                tr.append($('<td>').addClass('text-muted').text(mes.parcela_numero || ''));
+                
+                // Nº Parcela - EDITÁVEL
+                const tdParcela = $('<td>');
+                const inputParcela = $('<input>')
+                    .attr('type', 'text')
+                    .addClass('form-control form-control-sm cronograma-edicao-parcela-numero')
+                    .val(mes.parcela_numero || '')
+                    .attr('placeholder', 'Ex: 12ª Parcela')
+                    .attr('data-original', mes.parcela_numero || '');
+                tdParcela.append(inputParcela);
+                tr.append(tdParcela);
+                
+                // Coluna de ações (botão excluir)
+                const tdAcao = $('<td>').addClass('text-center');
+                const btnExcluir = $('<button>')
+                    .addClass('btn btn-sm btn-danger')
+                    .html('<i class="bi bi-trash"></i>')
+                    .attr('title', 'Excluir linha')
+                    .on('click', function() {
+                        if (confirm('Deseja realmente excluir este mês do cronograma?')) {
+                            tr.remove();
+                            recalcularTotaisCronogramaEdicao();
+                        }
+                    });
+                tdAcao.append(btnExcluir);
+                tr.append(tdAcao);
                 
                 tbody.append(tr);
                 
@@ -4133,6 +4821,19 @@
         console.log('✅ Renderização concluída');
         console.log('📊 Linhas no tbody:', $('#corpoTabelaCronogramaEdicao tr').length);
         
+        // ⚡ ADICIONAR ALERTA NO TOPO SE HOUVER DIVERGÊNCIAS
+        $('.alerta-divergencia-cronograma').remove(); // Limpar alertas anteriores
+        if (Object.keys(divergencias).length > 0) {
+            const alertDiv = $('<div>').addClass('alert alert-warning mb-3 alerta-divergencia-cronograma').html(
+                '<strong><i class="bi bi-exclamation-triangle me-2"></i>Divergências Detectadas entre Cronograma e Parcelas:</strong><br>' +
+                Object.keys(divergencias).map(parcela => {
+                    const div = divergencias[parcela];
+                    return `• <strong>${parcela}</strong>: Cronograma R$ ${div.cronograma.toLocaleString('pt-BR', {minimumFractionDigits: 2})} ≠ Parcela R$ ${div.parcela.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (Diferença: R$ ${div.diferenca.toLocaleString('pt-BR', {minimumFractionDigits: 2})})`;
+                }).join('<br>')
+            );
+            $('#corpoTabelaCronogramaEdicao').closest('.table-responsive').before(alertDiv);
+        }
+        
         // Garantir visibilidade da tabela
         $('#loadingCronogramaEdicao').hide();
         $('#semCronogramaEdicao').hide();
@@ -4144,23 +4845,58 @@
         
         // Aplicar eventos
         $('.cronograma-edicao-val-23, .cronograma-edicao-val-24').on('input', function() {
-            validarLinhaCronogramaEdicao($(this).closest('tr'));
+            const tr = $(this).closest('tr');
+            atualizarTotalMesLinhaEdicao(tr);
         });
         
-        // Adicionar suporte para colar do Excel
-        habilitarColarExcelCronograma();
+        $('.cronograma-edicao-val-23, .cronograma-edicao-val-24').on('blur', function() {
+            const tr = $(this).closest('tr');
+            atualizarTotalMesLinhaEdicao(tr);
+            recalcularTotaisCronogramaEdicao();
+        });
+        
+        // ⚡ NOVO: Habilitar colar do Excel no cronograma de edição
+        habilitarColarExcelCronogramaEdicao();
         
         recalcularTotaisCronogramaEdicao();
     }
     
+    // Função para atualizar o Total Mês de uma linha do cronograma de edição
+    function atualizarTotalMesLinhaEdicao(tr) {
+        // Pega os valores das colunas 53-23 e 53-24
+        let val23 = desformatarValorMonetario(tr.find('.cronograma-edicao-val-23').val() || '0,00');
+        let val24 = desformatarValorMonetario(tr.find('.cronograma-edicao-val-24').val() || '0,00');
+        val23 = val23 || 0;
+        val24 = val24 || 0;
+        let total = val23 + val24;
+        
+        // Atualiza a célula de Total Mês
+        const tdTotal = tr.find('.cronograma-edicao-total-mes');
+        tdTotal.html('R$ ' + formatarValorMonetario(total));
+        
+        // Remove qualquer badge de divergência antigo
+        tdTotal.find('.badge').remove();
+    }
+    
     // Validar linha individual do cronograma
     function validarLinhaCronogramaEdicao(tr) {
-        const val23 = parseFloat(tr.find('.cronograma-edicao-val-23').val().replace(',', '.')) || 0;
-        const val24 = parseFloat(tr.find('.cronograma-edicao-val-24').val().replace(',', '.')) || 0;
+        const val23Input = tr.find('.cronograma-edicao-val-23');
+        const val24Input = tr.find('.cronograma-edicao-val-24');
+        const val23 = parseFloat(val23Input.val().replace(',', '.')) || 0;
+        const val24 = parseFloat(val24Input.val().replace(',', '.')) || 0;
         const valorMesEsperado = parseFloat(tr.attr('data-valor-mes')) || 0;
         const somaAtual = val23 + val24;
         const diferenca = somaAtual - valorMesEsperado;
         const divergente = Math.abs(diferenca) > 0.01;
+        
+        // ⚡ MARCAÇÃO VISUAL: Adicionar/remover classe de erro nos campos
+        if (divergente) {
+            val23Input.addClass('campo-erro');
+            val24Input.addClass('campo-erro');
+        } else {
+            val23Input.removeClass('campo-erro');
+            val24Input.removeClass('campo-erro');
+        }
         
         // Remover classe de divergente se estiver OK
         if (!divergente) {
@@ -4210,9 +4946,581 @@
         $('#total_geral_cronograma_edicao').text('R$ ' + totalGeral.toLocaleString('pt-BR', {minimumFractionDigits: 2}));
     }
     
+    // Limpar linhas duplicadas com valor zero
+    function limparLinhasDuplicadasCronogramaEdicao() {
+        const totalLinhas = $('#corpoTabelaCronogramaEdicao tr').length;
+        
+        if (totalLinhas === 0) {
+            alert('⚠️ Nenhum cronograma carregado.');
+            return;
+        }
+        
+        // Mapear meses e identificar duplicatas com valor 0
+        const mesesMap = {};
+        const linhasParaRemover = [];
+        
+        $('#corpoTabelaCronogramaEdicao tr').each(function(index) {
+            const tr = $(this);
+            const mesNome = tr.find('td').eq(1).text().trim(); // Mês/Ano (ex: "jan/25")
+            const val23 = parseFloat(tr.find('.cronograma-edicao-val-23').val().replace(',', '.')) || 0;
+            const val24 = parseFloat(tr.find('.cronograma-edicao-val-24').val().replace(',', '.')) || 0;
+            const total = val23 + val24;
+            
+            // Se mês já existe no mapa
+            if (mesesMap[mesNome]) {
+                // Se a linha atual tem valor 0, marcar para remoção
+                if (total === 0) {
+                    linhasParaRemover.push({tr: tr, mes: mesNome, motivo: 'duplicada com valor 0'});
+                }
+                // Se a linha anterior tinha valor 0, marcar ela para remoção
+                else if (mesesMap[mesNome].total === 0) {
+                    linhasParaRemover.push({tr: mesesMap[mesNome].tr, mes: mesNome, motivo: 'duplicada com valor 0'});
+                    // Atualizar mapa com a linha atual
+                    mesesMap[mesNome] = {tr: tr, total: total};
+                }
+            } else {
+                // Primeira ocorrência deste mês
+                mesesMap[mesNome] = {tr: tr, total: total};
+            }
+        });
+        
+        if (linhasParaRemover.length === 0) {
+            alert('✅ Nenhuma linha duplicada com valor 0 encontrada.');
+            return;
+        }
+        
+        const mensagem = `🗑️ Encontradas ${linhasParaRemover.length} linha(s) duplicada(s) com valor 0.\n\nMeses: ${[...new Set(linhasParaRemover.map(l => l.mes))].join(', ')}\n\nDeseja remover?`;
+        
+        if (confirm(mensagem)) {
+            linhasParaRemover.forEach(item => {
+                console.log(`🗑️ Removendo linha duplicada: ${item.mes} (${item.motivo})`);
+                item.tr.remove();
+            });
+            
+            recalcularTotaisCronogramaEdicao();
+            alert(`✅ ${linhasParaRemover.length} linha(s) removida(s) com sucesso!`);
+        }
+    }
+    
+    // Adicionar mês no início do cronograma de edição
+    function adicionarMesInicioCronogramaEdicao() {
+        const totalLinhas = $('#corpoTabelaCronogramaEdicao tr').length;
+        
+        if (totalLinhas === 0) {
+            alert('⚠️ Nenhum cronograma carregado. Carregue um termo primeiro.');
+            return;
+        }
+        
+        // Pegar primeira linha para calcular mês anterior
+        const primeiraLinha = $('#corpoTabelaCronogramaEdicao tr:first');
+        const mesNomeAtual = primeiraLinha.find('td').eq(1).text().trim();
+        
+        // Extrair mês e ano do formato "jan/25"
+        const partes = mesNomeAtual.split('/');
+        const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        const mesIndex = meses.indexOf(partes[0]);
+        const ano = parseInt('20' + partes[1]);
+        
+        // Calcular mês anterior
+        let mesAnteriorIndex = mesIndex - 1;
+        let anoAnterior = ano;
+        if (mesAnteriorIndex < 0) {
+            mesAnteriorIndex = 11;
+            anoAnterior = ano - 1;
+        }
+        
+        const mesNomeNovo = `${meses[mesAnteriorIndex]}/${String(anoAnterior).slice(-2)}`;
+        const dataCompleta = `${anoAnterior}-${String(mesAnteriorIndex + 1).padStart(2, '0')}-01`;
+        
+        // Criar nova linha
+        const tr = $('<tr>');
+        tr.attr('data-nome-mes', dataCompleta);
+        tr.attr('data-valor-mes', '0.00');
+        tr.attr('data-info-alteracao', 'Base');
+        
+        // Info Alteração - input editável com conversão automática (padrão: Base = "-")
+        const tdInfoAlteracao = $('<td>');
+        const inputInfoAlteracao = $('<input>').attr({
+            type: 'text',
+            maxlength: '2',
+            placeholder: '-'
+        }).addClass('form-control form-control-sm text-center cronograma-edicao-info-alteracao').val('-');
+        tdInfoAlteracao.append(inputInfoAlteracao);
+        tr.append(tdInfoAlteracao);
+        
+        tr.append($('<td>').addClass('fw-bold').text(mesNomeNovo));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm cronograma-edicao-val-23" value="0,00" data-original="0">'));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm cronograma-edicao-val-24" value="0,00" data-original="0">'));
+        tr.append($('<td>').addClass('cronograma-edicao-total-mes fw-bold text-end').html('R$ 0,00'));
+        tr.append($('<td>').addClass('text-muted').text(''));
+        
+        // Botão excluir
+        const tdAcao = $('<td>').addClass('text-center');
+        const btnExcluir = $('<button>')
+            .addClass('btn btn-sm btn-danger')
+            .html('<i class="bi bi-trash"></i>')
+            .attr('title', 'Excluir linha')
+            .on('click', function() {
+                if (confirm('Deseja realmente excluir este mês?')) {
+                    tr.remove();
+                    recalcularTotaisCronogramaEdicao();
+                }
+            });
+        tdAcao.append(btnExcluir);
+        tr.append(tdAcao);
+        
+        $('#corpoTabelaCronogramaEdicao').prepend(tr);
+        
+        // Aplicar eventos
+        tr.find('.cronograma-edicao-val-23, .cronograma-edicao-val-24').on('input', function() {
+            validarLinhaCronogramaEdicao(tr);
+        });
+        
+        recalcularTotaisCronogramaEdicao();
+        
+        // Scroll para o topo
+        $('.table-responsive').scrollTop(0);
+    }
+    
+    // Adicionar mês no final do cronograma de edição
+    function adicionarMesFinalCronogramaEdicao() {
+        const totalLinhas = $('#corpoTabelaCronogramaEdicao tr').length;
+        
+        if (totalLinhas === 0) {
+            alert('⚠️ Nenhum cronograma carregado. Carregue um termo primeiro.');
+            return;
+        }
+        
+        // Pegar última linha para calcular próximo mês
+        const ultimaLinha = $('#corpoTabelaCronogramaEdicao tr:last');
+        const mesNomeAtual = ultimaLinha.find('td').eq(1).text().trim();
+        
+        // Extrair mês e ano do formato "jan/25"
+        const partes = mesNomeAtual.split('/');
+        const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        const mesIndex = meses.indexOf(partes[0]);
+        const ano = parseInt('20' + partes[1]);
+        
+        // Calcular próximo mês
+        let proximoMesIndex = mesIndex + 1;
+        let proximoAno = ano;
+        if (proximoMesIndex > 11) {
+            proximoMesIndex = 0;
+            proximoAno = ano + 1;
+        }
+        
+        const mesNomeNovo = `${meses[proximoMesIndex]}/${String(proximoAno).slice(-2)}`;
+        const dataCompleta = `${proximoAno}-${String(proximoMesIndex + 1).padStart(2, '0')}-01`;
+        
+        // Criar nova linha
+        const tr = $('<tr>');
+        tr.attr('data-nome-mes', dataCompleta);
+        tr.attr('data-valor-mes', '0.00');
+        tr.attr('data-info-alteracao', 'Base');
+        
+        // Info Alteração - input editável com conversão automática (padrão: Base = "-")
+        const tdInfoAlteracao = $('<td>');
+        const inputInfoAlteracao = $('<input>').attr({
+            type: 'text',
+            maxlength: '2',
+            placeholder: '-'
+        }).addClass('form-control form-control-sm text-center cronograma-edicao-info-alteracao').val('-');
+        tdInfoAlteracao.append(inputInfoAlteracao);
+        tr.append(tdInfoAlteracao);
+        
+        tr.append($('<td>').addClass('fw-bold').text(mesNomeNovo));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm cronograma-edicao-val-23" value="0,00" data-original="0">'));
+        tr.append($('<td>').html('<input type="text" class="form-control form-control-sm cronograma-edicao-val-24" value="0,00" data-original="0">'));
+        tr.append($('<td>').addClass('cronograma-edicao-total-mes fw-bold text-end').html('R$ 0,00'));
+        tr.append($('<td>').addClass('text-muted').text(''));
+        
+        // Botão excluir
+        const tdAcao = $('<td>').addClass('text-center');
+        const btnExcluir = $('<button>')
+            .addClass('btn btn-sm btn-danger')
+            .html('<i class="bi bi-trash"></i>')
+            .attr('title', 'Excluir linha')
+            .on('click', function() {
+                if (confirm('Deseja realmente excluir este mês?')) {
+                    tr.remove();
+                    recalcularTotaisCronogramaEdicao();
+                }
+            });
+        tdAcao.append(btnExcluir);
+        tr.append(tdAcao);
+        
+        $('#corpoTabelaCronogramaEdicao').append(tr);
+        
+        // Aplicar eventos
+        tr.find('.cronograma-edicao-val-23, .cronograma-edicao-val-24').on('input', function() {
+            validarLinhaCronogramaEdicao(tr);
+        });
+        
+        recalcularTotaisCronogramaEdicao();
+        
+        // Scroll para o final
+        const container = $('.table-responsive');
+        container.scrollTop(container[0].scrollHeight);
+    }
+    
+    // Limpar linhas duplicadas com valor zero
+    function limparLinhasDuplicadasCronogramaEdicao() {
+        const totalLinhas = $('#corpoTabelaCronogramaEdicao tr').length;
+        
+        if (totalLinhas === 0) {
+            alert('⚠️ Nenhum cronograma carregado.');
+            return;
+        }
+        
+        // Mapear combinações de parcela_numero + mes/ano + total para identificar duplicatas
+        const registrosMap = {};
+        const linhasParaRemover = [];
+        
+        $('#corpoTabelaCronogramaEdicao tr').each(function(index) {
+            const tr = $(this);
+            const mesNome = tr.find('td').eq(1).text().trim(); // Mês/Ano (ex: "jan/25")
+            const parcelaNumero = tr.find('.cronograma-edicao-parcela-numero').val().trim(); // Nº Parcela
+            const val23 = parseFloat(tr.find('.cronograma-edicao-val-23').val().replace(',', '.')) || 0;
+            const val24 = parseFloat(tr.find('.cronograma-edicao-val-24').val().replace(',', '.')) || 0;
+            const total = val23 + val24;
+            
+            // Criar chave única: parcela_numero + mes/ano + total
+            const chave = `${parcelaNumero}|${mesNome}|${total.toFixed(2)}`;
+            
+            // Verificar duplicatas
+            if (registrosMap[chave]) {
+                // Linha duplicada encontrada - marcar para remoção
+                linhasParaRemover.push({
+                    tr: tr, 
+                    parcela: parcelaNumero,
+                    mes: mesNome, 
+                    total: total,
+                    motivo: 'duplicada (mesmo parcela_numero, mês/ano e total)'
+                });
+            } else {
+                // Primeira ocorrência desta combinação
+                registrosMap[chave] = {tr: tr, parcela: parcelaNumero, mes: mesNome, total: total};
+            }
+            
+            // Também identificar linhas com valor 0 duplicadas (lógica original mantida)
+            const chaveMes = mesNome;
+            if (total === 0) {
+                const chaveZero = `zero|${chaveMes}`;
+                if (registrosMap[chaveZero]) {
+                    // Já existe uma linha com valor 0 para este mês
+                    const jaAdicionada = linhasParaRemover.find(l => l.tr.is(tr));
+                    if (!jaAdicionada) {
+                        linhasParaRemover.push({
+                            tr: tr,
+                            parcela: parcelaNumero,
+                            mes: mesNome,
+                            total: total,
+                            motivo: 'duplicada com valor 0'
+                        });
+                    }
+                } else {
+                    registrosMap[chaveZero] = {tr: tr, parcela: parcelaNumero, mes: mesNome, total: total};
+                }
+            }
+        });
+        
+        if (linhasParaRemover.length === 0) {
+            alert('✅ Nenhuma linha duplicada encontrada.');
+            return;
+        }
+        
+        // Montar mensagem detalhada
+        let mensagemDetalhes = linhasParaRemover.map(item => 
+            `• ${item.parcela} - ${item.mes} - R$ ${item.total.toFixed(2)}`
+        ).join('\n');
+        
+        const mensagem = `🗑️ Encontradas ${linhasParaRemover.length} linha(s) duplicada(s):\n\n${mensagemDetalhes}\n\nDeseja remover?`;
+        
+        if (confirm(mensagem)) {
+            linhasParaRemover.forEach(item => item.tr.remove());
+            recalcularTotaisCronogramaEdicao();
+            alert(`✅ ${linhasParaRemover.length} linha(s) removida(s) com sucesso!`);
+        }
+    }
+    
+    // ⚡ NOVA FUNÇÃO: Gerar todos os meses baseado nas vigências das parcelas
+    function gerarTodosMesesPorVigencia() {
+        const numeroTermo = $('#cronograma_numero_termo_hidden').val();
+        
+        if (!numeroTermo) {
+            alert('❌ Erro: Número do termo não identificado.');
+            return;
+        }
+        
+        console.log('🔍 Buscando vigências para termo:', numeroTermo);
+        
+        // Buscar parcelas para extrair vigências
+        $.ajax({
+            url: `/gestao_financeira/ultra-liquidacoes/api/termo/${numeroTermo}/parcelas`,
+            method: 'GET',
+            success: function(response) {
+                if (!response.parcelas || response.parcelas.length === 0) {
+                    alert('⚠️ Nenhuma parcela encontrada para este termo.');
+                    return;
+                }
+                
+                console.log('📊 Parcelas recebidas:', response.parcelas.length);
+                
+                // Encontrar vigência_inicial mínima e vigência_final máxima
+                let vigenciaMin = null;
+                let vigenciaMax = null;
+                
+                response.parcelas.forEach(p => {
+                    if (p.vigencia_inicial) {
+                        const dataInicio = new Date(p.vigencia_inicial);
+                        if (!vigenciaMin || dataInicio < vigenciaMin) {
+                            vigenciaMin = dataInicio;
+                        }
+                    }
+                    
+                    if (p.vigencia_final) {
+                        const dataFim = new Date(p.vigencia_final);
+                        if (!vigenciaMax || dataFim > vigenciaMax) {
+                            vigenciaMax = dataFim;
+                        }
+                    }
+                });
+                
+                if (!vigenciaMin || !vigenciaMax) {
+                    alert('⚠️ Não foi possível determinar o período de vigência das parcelas.');
+                    return;
+                }
+                
+                console.log('📅 Vigência mínima:', vigenciaMin.toISOString());
+                console.log('📅 Vigência máxima:', vigenciaMax.toISOString());
+                
+                // Formatar datas para exibição
+                const dataInicioFormatada = `${String(vigenciaMin.getMonth() + 1).padStart(2, '0')}/${vigenciaMin.getFullYear()}`;
+                const dataFimFormatada = `${String(vigenciaMax.getMonth() + 1).padStart(2, '0')}/${vigenciaMax.getFullYear()}`;
+                
+                // Calcular quantos meses serão gerados
+                const totalMeses = Math.ceil((vigenciaMax - vigenciaMin) / (1000 * 60 * 60 * 24 * 30)) + 1;
+                
+                const mensagem = `📅 Adicionar todos os meses entre:\n\n` +
+                    `Início: ${dataInicioFormatada}\n` +
+                    `Fim: ${dataFimFormatada}\n\n` +
+                    `Aproximadamente ${totalMeses} meses serão adicionados.\n\n` +
+                    `⚠️ ATENÇÃO: Isso irá LIMPAR o cronograma atual!\n\n` +
+                    `Deseja continuar?`;
+                
+                if (!confirm(mensagem)) {
+                    return;
+                }
+                
+                // Limpar cronograma atual
+                $('#corpoTabelaCronogramaEdicao').empty();
+                
+                // Gerar todos os meses
+                const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+                const dataAtual = new Date(vigenciaMin);
+                dataAtual.setDate(1); // Primeiro dia do mês
+                
+                let mesesGerados = 0;
+                
+                while (dataAtual <= vigenciaMax) {
+                    const mes = dataAtual.getMonth() + 1; // 1-12
+                    const ano = dataAtual.getFullYear();
+                    const mesNome = `${meses[mes - 1]}/${String(ano).slice(-2)}`;
+                    
+                    const tr = $('<tr>');
+                    
+                    // Info Alteração
+                    const tdInfoAlteracao = $('<td>');
+                    const inputInfoAlteracao = $('<input>').attr({
+                        type: 'text',
+                        maxlength: '2',
+                        placeholder: '-'
+                    }).addClass('form-control form-control-sm text-center cronograma-edicao-info-alteracao').val('-');
+                    tdInfoAlteracao.append(inputInfoAlteracao);
+                    tr.append(tdInfoAlteracao);
+                    
+                    // Mês/Ano
+                    tr.append($('<td>').addClass('fw-bold').text(mesNome));
+                    
+                    // Valor 53-23
+                    tr.append($('<td>').html(`<input type="text" class="form-control form-control-sm cronograma-edicao-val-23" value="0,00" data-original="0.00">`));
+                    
+                    // Valor 53-24
+                    tr.append($('<td>').html(`<input type="text" class="form-control form-control-sm cronograma-edicao-val-24" value="0,00" data-original="0.00">`));
+                    
+                    // Total Mês
+                    const tdTotal = $('<td>').addClass('cronograma-edicao-total-mes fw-bold text-end');
+                    tdTotal.html('R$ 0,00');
+                    tr.append(tdTotal);
+                    
+                    // Nº Parcela
+                    const tdParcela = $('<td>');
+                    const inputParcela = $('<input>')
+                        .attr('type', 'text')
+                        .addClass('form-control form-control-sm cronograma-edicao-parcela-numero')
+                        .val('')
+                        .attr('placeholder', 'Ex: 12ª Parcela')
+                        .attr('data-original', '');
+                    tdParcela.append(inputParcela);
+                    tr.append(tdParcela);
+                    
+                    // Ações
+                    const tdAcao = $('<td>').addClass('text-center');
+                    const btnExcluir = $('<button>')
+                        .addClass('btn btn-sm btn-danger')
+                        .html('<i class="bi bi-trash"></i>')
+                        .attr('title', 'Excluir linha')
+                        .on('click', function() {
+                            if (confirm('Deseja excluir esta linha do cronograma?')) {
+                                tr.remove();
+                                recalcularTotaisCronogramaEdicao();
+                            }
+                        });
+                    tdAcao.append(btnExcluir);
+                    tr.append(tdAcao);
+                    
+                    // Armazenar dados na linha
+                    tr.attr('data-nome-mes', `${ano}-${String(mes).padStart(2, '0')}-01`);
+                    tr.attr('data-id', ''); // Sem ID = nova linha
+                    tr.attr('data-info-alteracao', 'Base');
+                    tr.attr('data-valor-mes', '0.00');
+                    
+                    $('#corpoTabelaCronogramaEdicao').append(tr);
+                    
+                    mesesGerados++;
+                    
+                    // Avançar para o próximo mês
+                    dataAtual.setMonth(dataAtual.getMonth() + 1);
+                }
+                
+                console.log(`✅ ${mesesGerados} meses gerados com sucesso!`);
+                
+                // Adicionar eventos aos inputs
+                $('.cronograma-edicao-val-23, .cronograma-edicao-val-24').on('input', function() {
+                    const tr = $(this).closest('tr');
+                    atualizarTotalMesLinhaEdicao(tr);
+                });
+                
+                $('.cronograma-edicao-val-23, .cronograma-edicao-val-24').on('blur', function() {
+                    const tr = $(this).closest('tr');
+                    atualizarTotalMesLinhaEdicao(tr);
+                    recalcularTotaisCronogramaEdicao();
+                });
+                
+                recalcularTotaisCronogramaEdicao();
+                $('#semCronogramaEdicao').hide();
+                
+                alert(`✅ ${mesesGerados} meses adicionados com sucesso!\n\nPeríodo: ${dataInicioFormatada} até ${dataFimFormatada}`);
+            },
+            error: function(xhr, status, error) {
+                console.error('❌ Erro ao buscar parcelas:', error);
+                alert('❌ Erro ao buscar parcelas do termo.');
+            }
+        });
+        
+        if (confirm(mensagem)) {
+            linhasParaRemover.forEach(item => {
+                console.log(`🗑️ Removendo: ${item.parcela} - ${item.mes} - R$ ${item.total.toFixed(2)} (${item.motivo})`);
+                item.tr.remove();
+            });
+            
+            recalcularTotaisCronogramaEdicao();
+            alert(`✅ ${linhasParaRemover.length} linha(s) removida(s) com sucesso!`);
+        }
+    }
+    
+    // Habilitar colar do Excel no cronograma de edição
+    function habilitarColarExcelCronogramaEdicao() {
+        $('#corpoTabelaCronogramaEdicao').off('paste').on('paste', 'input, select', function(e) {
+            e.preventDefault();
+            
+            const clipboardData = e.originalEvent.clipboardData || window.clipboardData;
+            const pastedData = clipboardData.getData('text');
+            
+            console.log('📋 Dados colados do Excel:', pastedData);
+            
+            // Dividir em linhas e colunas
+            const linhas = pastedData.split('\n').filter(l => l.trim());
+            const dados = linhas.map(linha => linha.split('\t'));
+            
+            console.log('📋 Dados parseados:', dados);
+            
+            // Encontrar a linha e coluna atual
+            const inputAtual = $(this);
+            const trAtual = inputAtual.closest('tr');
+            const indexLinhaAtual = $('#corpoTabelaCronogramaEdicao tr').index(trAtual);
+            
+            // Determinar qual coluna é (info_alteracao=0, mes=1, val23=2, val24=3, parcela=4)
+            let indexColunaAtual = 0;
+            if (inputAtual.hasClass('cronograma-edicao-val-23')) indexColunaAtual = 2;
+            else if (inputAtual.hasClass('cronograma-edicao-val-24')) indexColunaAtual = 3;
+            else if (inputAtual.hasClass('cronograma-edicao-parcela-numero')) indexColunaAtual = 4;
+            else if (inputAtual.hasClass('cronograma-edicao-info-alteracao')) indexColunaAtual = 0;
+            
+            console.log(`🔹 Começando na linha ${indexLinhaAtual}, coluna ${indexColunaAtual}`);
+            
+            // Colar dados nas células
+            dados.forEach((linhaDados, offsetLinha) => {
+                const indexLinha = indexLinhaAtual + offsetLinha;
+                const tr = $(`#corpoTabelaCronogramaEdicao tr:eq(${indexLinha})`);
+                
+                if (tr.length === 0) {
+                    console.log(`⚠️ Linha ${indexLinha} não existe, pulando...`);
+                    return;
+                }
+                
+                linhaDados.forEach((valor, offsetColuna) => {
+                    const indexColuna = indexColunaAtual + offsetColuna;
+                    
+                    // Mapear coluna para seletor
+                    let input;
+                    if (indexColuna === 0) {
+                        input = tr.find('.cronograma-edicao-info-alteracao');
+                    } else if (indexColuna === 2) {
+                        input = tr.find('.cronograma-edicao-val-23');
+                    } else if (indexColuna === 3) {
+                        input = tr.find('.cronograma-edicao-val-24');
+                    } else if (indexColuna === 4) {
+                        input = tr.find('.cronograma-edicao-parcela-numero');
+                    }
+                    
+                    if (input && input.length > 0) {
+                        let valorLimpo = valor;
+                        
+                        // Se for campo monetário, limpar e converter
+                        if (indexColuna === 2 || indexColuna === 3) {
+                            // Remover R$, espaços, pontos de milhar
+                            valorLimpo = valor.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+                            const numero = parseFloat(valorLimpo);
+                            if (!isNaN(numero)) {
+                                valorLimpo = numero.toFixed(2).replace('.', ',');
+                            }
+                        } else {
+                            // Para outros campos (parcela_numero, info_alteracao), manter espaços
+                            valorLimpo = valor.trim(); // Apenas remove espaços das pontas
+                        }
+                        
+                        input.val(valorLimpo);
+                        console.log(`  ✅ Linha ${indexLinha}, Col ${indexColuna}: ${valorLimpo}`);
+                    }
+                });
+                
+                // Revalidar linha
+                validarLinhaCronogramaEdicao(tr);
+            });
+            
+            recalcularTotaisCronogramaEdicao();
+            console.log('✅ Paste concluído!');
+        });
+    }
+    
     // Salvar alterações do cronograma
     function salvarCronogramaEdicao() {
+        console.log('🔄 DEBUG: Iniciando salvarCronogramaEdicao()');
+        
         const numeroTermo = $('#cronograma_numero_termo_hidden').val();
+        console.log('🔑 DEBUG: numeroTermo =', numeroTermo);
+        
         if (!numeroTermo) {
             alert('⚠️ Erro: termo não identificado.');
             return;
@@ -4220,14 +5528,64 @@
         
         const cronograma = [];
         let mesAtual = null;
+        let problemasEncontrados = [];
+        
+        // Contar linhas na tabela
+        const totalLinhas = $('#corpoTabelaCronogramaEdicao tr').length;
+        console.log('📊 DEBUG: Total de linhas na tabela:', totalLinhas);
         
         $('#corpoTabelaCronogramaEdicao tr').each(function(index) {
             const tr = $(this);
-            const mesNome = tr.find('td:first').text().trim();
-            const val23 = parseFloat(tr.find('.cronograma-edicao-val-23').val().replace(',', '.')) || 0;
-            const val24 = parseFloat(tr.find('.cronograma-edicao-val-24').val().replace(',', '.')) || 0;
-            const parcela_numero = tr.find('td:last').text().trim();
+            
+            // Converter valor digitado para formato do banco (- → Base, 1 → Aditivo 1, etc.)
+            const valorDigitado = tr.find('.cronograma-edicao-info-alteracao').val();
+            const infoAlteracao = converterInfoAlteracao(valorDigitado);
+            
+            const mesNome = tr.find('td').eq(1).text().trim();
+            
+            // 🔥 CORREÇÃO CRÍTICA: Coletar valores com fallback para data-original
+            const input23 = tr.find('.cronograma-edicao-val-23');
+            const input24 = tr.find('.cronograma-edicao-val-24');
+            
+            // Tentar pegar do value, se estiver vazio ou zero, usar data-original
+            let val23Raw = input23.val();
+            let val24Raw = input24.val();
+            
+            // Parse dos valores
+            let val23 = parseFloat(val23Raw ? val23Raw.replace(',', '.') : '0') || 0;
+            let val24 = parseFloat(val24Raw ? val24Raw.replace(',', '.') : '0') || 0;
+            
+            // 🔥 SE AMBOS FOREM ZERO, tentar recuperar do data-original
+            if (val23 === 0 && val24 === 0) {
+                const original23 = parseFloat(input23.attr('data-original')) || 0;
+                const original24 = parseFloat(input24.attr('data-original')) || 0;
+                
+                // Se tinha valores originais mas agora estão zerados, usar os originais
+                if (original23 !== 0 || original24 !== 0) {
+                    console.log(`⚠️ Linha ${index + 1} (${mesNome}): Valores zerados, usando originais: 23=${original23}, 24=${original24}`);
+                    val23 = original23;
+                    val24 = original24;
+                    problemasEncontrados.push(`${mesNome}: Restaurado valores originais`);
+                }
+            }
+            
+            const parcela_numero = tr.find('.cronograma-edicao-parcela-numero').val() || '';
             const valorMes = val23 + val24;
+            
+            if (index === 0) {
+                console.log('🔍 DEBUG Primeira linha:', {
+                    mesNome, 
+                    val23, 
+                    val24, 
+                    valorMes, 
+                    parcela_numero, 
+                    infoAlteracao,
+                    val23Raw,
+                    val24Raw,
+                    original23: input23.attr('data-original'),
+                    original24: input24.attr('data-original')
+                });
+            }
             
             // Recriar data com base no mesNome (exemplo: "jan/25")
             // Precisamos inferir a data completa
@@ -4250,6 +5608,7 @@
             
             if (mesAtual) {
                 cronograma.push({
+                    info_alteracao: infoAlteracao,
                     nome_mes: mesAtual,
                     valor_mes_23: val23,
                     valor_mes_24: val24,
@@ -4264,9 +5623,30 @@
             return;
         }
         
-        if (!confirm(`Confirma a atualização do cronograma com ${cronograma.length} meses?`)) {
+        console.log('📊 DEBUG: Cronograma a ser enviado:', cronograma);
+        console.log('📊 DEBUG: Total de linhas:', cronograma.length);
+        
+        // Mostrar problemas encontrados
+        if (problemasEncontrados.length > 0) {
+            console.warn('⚠️ Problemas corrigidos automaticamente:', problemasEncontrados);
+            const mensagemProblemas = problemasEncontrados.join('\n');
+            alert(`⚠️ ATENÇÃO: Valores zerados foram restaurados:\n\n${mensagemProblemas}\n\nVerifique se está correto antes de confirmar.`);
+        }
+        
+        // Contar quantos meses têm valores não-zero
+        const mesesComValores = cronograma.filter(m => m.valor_mes > 0).length;
+        const mensagemConfirm = `Confirma a atualização do cronograma?\n\n` +
+            `Total de meses: ${cronograma.length}\n` +
+            `Meses com valores: ${mesesComValores}\n` +
+            `Meses zerados: ${cronograma.length - mesesComValores}`;
+        
+        if (!confirm(mensagemConfirm)) {
             return;
         }
+        
+        // Mostrar loading
+        const btnSalvar = $('#btnSalvarCronogramaEdicao');
+        btnSalvar.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Salvando...');
         
         $.ajax({
             url: '/gestao_financeira/ultra-liquidacoes/api/salvar-cronograma',
@@ -4275,28 +5655,28 @@
             data: JSON.stringify({
                 numero_termo: numeroTermo,
                 cronograma: cronograma,
-                info_alteracao: 'Base'
+                info_alteracao: 'Base'  // Este campo é mantido por compatibilidade, mas cada linha tem seu próprio info_alteracao
             }),
             success: function(response) {
+                btnSalvar.prop('disabled', false).html('💾 Salvar Alterações');
+                
                 if (response.success) {
                     alert(`✅ Cronograma atualizado com sucesso!\n\n${response.linhas_afetadas} registros salvos.`);
+                    // Recarregar o cronograma para refletir as mudanças
+                    carregarCronogramaEdicao(numeroTermo);
                 } else {
                     alert('⚠️ Erro: ' + (response.error || 'Erro desconhecido'));
                 }
             },
             error: function(xhr) {
+                btnSalvar.prop('disabled', false).html('💾 Salvar Alterações');
                 alert('❌ Erro ao salvar cronograma: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                console.error('Erro completo:', xhr);
             }
         });
     }
     
     // ==================== FIM FUNÇÕES CRONOGRAMA EDIÇÃO ====================
-    
-    // Abrir modal de adicionar parcelas
-    function abrirModalAdicionarParcelas() {
-        $('#modalAdicionarParcelas').modal('show');
-        carregarTermosDisponiveis();
-    }
     
     // Carregar termos disponíveis (que não estão em ultra_liquidacoes)
     function carregarTermosDisponiveis() {
@@ -4535,8 +5915,18 @@
     function converterInputParaData(dataInput) {
         if (!dataInput) return '';
         const partes = dataInput.split('-');
-        if (partes.length !== 3) return '';
-        return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        
+        // Formato YYYY-MM (input type="month") → converter para 01/MM/YYYY
+        if (partes.length === 2) {
+            return `01/${partes[1]}/${partes[0]}`;
+        }
+        
+        // Formato YYYY-MM-DD (input type="date") → converter para DD/MM/YYYY
+        if (partes.length === 3) {
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+        
+        return '';
     }
     
     // Formatar valor para moeda brasileira
@@ -4836,6 +6226,124 @@
         $('#subtotal-val-subtraido').text('R$ ' + totalSubtraido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
         $('#subtotal-val-encaminhado').text('R$ ' + totalEncaminhado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
         $('#subtotal-val-pago').text('R$ ' + totalPago.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+    }
+    
+    // ==================== PERSISTÊNCIA DE FILTROS ====================
+    
+    // Salvar filtros no localStorage
+    function salvarFiltros() {
+        const filtros = {
+            // Filtros de texto
+            numero_termo: $('#filtro_numero_termo').val(),
+            parcela_numero: $('#filtro_parcela_numero').val(),
+            tipo_termo: $('#filtro_tipo_termo').val(),
+            tipo_pendencia: $('#filtro_tipo_pendencia').val(),
+            data_pagamento: $('#filtro_data_pagamento').val(),
+            observacoes: $('#filtro_observacoes').val(),
+            osc: $('#filtro_osc').val(),
+            cnpj: $('#filtro_cnpj').val(),
+            sei_celeb: $('#filtro_sei_celeb').val(),
+            sei_pc: $('#filtro_sei_pc').val(),
+            
+            // Filtros de dropdowns
+            parcela_tipo: $('#filtro_parcela_tipo').val(),
+            
+            // Filtros de vigência
+            vig_inicial_mes: $('#filtro_vig_inicial_mes').val(),
+            vig_inicial_ano: $('#filtro_vig_inicial_ano').val(),
+            vig_final_mes: $('#filtro_vig_final_mes').val(),
+            vig_final_ano: $('#filtro_vig_final_ano').val(),
+            
+            // Checkboxes de colunas
+            chk_osc: $('#chk_osc').is(':checked'),
+            chk_cnpj: $('#chk_cnpj').is(':checked'),
+            chk_projeto: $('#chk_projeto').is(':checked'),
+            chk_sei_celeb: $('#chk_sei_celeb').is(':checked'),
+            chk_sei_pc: $('#chk_sei_pc').is(':checked'),
+            
+            // Seção ativa
+            secao: secaoAtual
+        };
+        
+        localStorage.setItem('ultra_liquidacoes_filtros', JSON.stringify(filtros));
+        console.log('💾 Filtros salvos no localStorage');
+    }
+    
+    // Restaurar filtros do localStorage
+    function restaurarFiltros() {
+        const filtrosSalvos = localStorage.getItem('ultra_liquidacoes_filtros');
+        
+        if (!filtrosSalvos) {
+            console.log('ℹ️ Nenhum filtro salvo encontrado');
+            return;
+        }
+        
+        try {
+            const filtros = JSON.parse(filtrosSalvos);
+            console.log('📂 Restaurando filtros:', filtros);
+            
+            // Restaurar filtros de texto
+            $('#filtro_numero_termo').val(filtros.numero_termo || '');
+            $('#filtro_parcela_numero').val(filtros.parcela_numero || '');
+            $('#filtro_tipo_termo').val(filtros.tipo_termo || '');
+            $('#filtro_tipo_pendencia').val(filtros.tipo_pendencia || '');
+            $('#filtro_data_pagamento').val(filtros.data_pagamento || '');
+            $('#filtro_observacoes').val(filtros.observacoes || '');
+            $('#filtro_osc').val(filtros.osc || '');
+            $('#filtro_cnpj').val(filtros.cnpj || '');
+            $('#filtro_sei_celeb').val(filtros.sei_celeb || '');
+            $('#filtro_sei_pc').val(filtros.sei_pc || '');
+            
+            // Restaurar dropdowns
+            $('#filtro_parcela_tipo').val(filtros.parcela_tipo || 'Programada');
+            
+            // Restaurar vigência
+            $('#filtro_vig_inicial_mes').val(filtros.vig_inicial_mes || '');
+            $('#filtro_vig_inicial_ano').val(filtros.vig_inicial_ano || '');
+            $('#filtro_vig_final_mes').val(filtros.vig_final_mes || '');
+            $('#filtro_vig_final_ano').val(filtros.vig_final_ano || '');
+            
+            // Restaurar checkboxes de colunas
+            $('#chk_osc').prop('checked', filtros.chk_osc || false);
+            $('#chk_cnpj').prop('checked', filtros.chk_cnpj || false);
+            $('#chk_projeto').prop('checked', filtros.chk_projeto || false);
+            $('#chk_sei_celeb').prop('checked', filtros.chk_sei_celeb || false);
+            $('#chk_sei_pc').prop('checked', filtros.chk_sei_pc || false);
+            
+            // Aplicar visibilidade das colunas
+            document.querySelectorAll('.col-osc').forEach(el => {
+                el.style.display = filtros.chk_osc ? '' : 'none';
+            });
+            document.querySelectorAll('.col-cnpj').forEach(el => {
+                el.style.display = filtros.chk_cnpj ? '' : 'none';
+            });
+            document.querySelectorAll('.col-projeto').forEach(el => {
+                el.style.display = filtros.chk_projeto ? '' : 'none';
+            });
+            document.querySelectorAll('.col-sei-celeb').forEach(el => {
+                el.style.display = filtros.chk_sei_celeb ? '' : 'none';
+            });
+            document.querySelectorAll('.col-sei-pc').forEach(el => {
+                el.style.display = filtros.chk_sei_pc ? '' : 'none';
+            });
+            
+            // Restaurar seção ativa
+            if (filtros.secao) {
+                secaoAtual = filtros.secao;
+                document.querySelectorAll('.secao-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                const tabAtiva = document.querySelector(`[data-secao="${filtros.secao}"]`);
+                if (tabAtiva) {
+                    tabAtiva.classList.add('active');
+                }
+            }
+            
+            console.log('✅ Filtros restaurados com sucesso');
+        } catch (e) {
+            console.error('❌ Erro ao restaurar filtros:', e);
+            localStorage.removeItem('ultra_liquidacoes_filtros');
+        }
     }
 </script>
 

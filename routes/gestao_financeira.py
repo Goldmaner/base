@@ -37,14 +37,21 @@ def api_termos():
     
     try:
         # Buscar termos únicos que NÃO estão em temp_acomp_empenhos
+        # Filtrar apenas termos com parcelas Programadas e no ano vigente (2026)
         if q:
             cur.execute("""
                 SELECT DISTINCT numero_termo
-                FROM gestao_financeira.temp_reservas_empenhos
+                FROM gestao_financeira.ultra_liquidacoes
                 WHERE numero_termo ILIKE %s
                   AND numero_termo NOT IN (
                       SELECT DISTINCT numero_termo 
                       FROM gestao_financeira.temp_acomp_empenhos
+                  )
+                  AND numero_termo IN (
+                      SELECT DISTINCT numero_termo
+                      FROM gestao_financeira.ultra_liquidacoes
+                      WHERE parcela_tipo = 'Programada'
+                        AND EXTRACT(YEAR FROM vigencia_inicial) = 2026
                   )
                 ORDER BY numero_termo
                 LIMIT 50
@@ -52,10 +59,16 @@ def api_termos():
         else:
             cur.execute("""
                 SELECT DISTINCT numero_termo
-                FROM gestao_financeira.temp_reservas_empenhos
+                FROM gestao_financeira.ultra_liquidacoes
                 WHERE numero_termo NOT IN (
                     SELECT DISTINCT numero_termo 
                     FROM gestao_financeira.temp_acomp_empenhos
+                )
+                AND numero_termo IN (
+                    SELECT DISTINCT numero_termo
+                    FROM gestao_financeira.ultra_liquidacoes
+                    WHERE parcela_tipo = 'Programada'
+                      AND EXTRACT(YEAR FROM vigencia_inicial) = 2026
                 )
                 ORDER BY numero_termo
                 LIMIT 50
@@ -102,30 +115,51 @@ def api_parcelas_termo():
     cur = get_cursor()
     
     try:
-        # Buscar parcelas do termo na tabela temp_reservas_empenhos
+        # Buscar parcelas do termo na tabela ultra_liquidacoes
+        # Filtrar apenas parcelas com vigencia_inicial em 2026
         cur.execute("""
             SELECT 
-                numero_parcela,
-                tipo_parcela,
-                parcela_total_previsto,
-                elemento_23,
-                elemento_24
-            FROM gestao_financeira.temp_reservas_empenhos
+                parcela_numero,
+                parcela_tipo,
+                valor_previsto,
+                valor_elemento_53_23,
+                valor_elemento_53_24
+            FROM gestao_financeira.ultra_liquidacoes
             WHERE numero_termo = %s
-            ORDER BY numero_parcela
+              AND EXTRACT(YEAR FROM vigencia_inicial) = 2026
+            ORDER BY parcela_numero
         """, (numero_termo,))
         
         parcelas = cur.fetchall()
+        
+        # Função para converter VARCHAR para float (substituir vírgula por ponto)
+        def converter_valor(val):
+            if not val:
+                return None
+            try:
+                # Remover espaços e substituir vírgula por ponto
+                val_str = str(val).strip().replace(',', '.')
+                # Remover pontos de milhar (ex: 1.000.000,00 -> 1000000.00)
+                # Primeiro, separar parte inteira da decimal
+                if '.' in val_str:
+                    partes = val_str.split('.')
+                    # Se houver mais de um ponto, são separadores de milhar
+                    if len(partes) > 2:
+                        val_str = ''.join(partes[:-1]) + '.' + partes[-1]
+                return float(val_str)
+            except (ValueError, AttributeError) as e:
+                print(f"[AVISO] Erro ao converter valor '{val}': {e}")
+                return None
         
         # Formatar resultado
         resultado = []
         for row in parcelas:
             resultado.append({
-                'numero': row['numero_parcela'],
-                'tipo': row['tipo_parcela'],
-                'valor': float(row['parcela_total_previsto']) if row['parcela_total_previsto'] else None,
-                'elemento_23': float(row['elemento_23']) if row['elemento_23'] else None,
-                'elemento_24': float(row['elemento_24']) if row['elemento_24'] else None
+                'numero': row['parcela_numero'],
+                'tipo': row['parcela_tipo'],
+                'valor': converter_valor(row['valor_previsto']),
+                'elemento_23': converter_valor(row['valor_elemento_53_23']),
+                'elemento_24': converter_valor(row['valor_elemento_53_24'])
             })
         
         cur.close()
@@ -135,7 +169,9 @@ def api_parcelas_termo():
         print(f"[ERRO] Erro ao buscar parcelas: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify([]), 500
+        if cur:
+            cur.close()
+        return jsonify({'error': str(e)}), 500
 
 
 @gestao_financeira_bp.route('/encaminhamento/gerar', methods=['POST'])
@@ -184,16 +220,15 @@ def gerar_encaminhamento():
                 numero_termo,
                 vigencia_inicial,
                 vigencia_final,
-                aditivo,
-                numero_parcela,
-                tipo_parcela,
-                elemento_23,
-                elemento_24,
-                parcela_total_previsto
-            FROM gestao_financeira.temp_reservas_empenhos
+                parcela_numero,
+                parcela_tipo,
+                valor_elemento_53_23,
+                valor_elemento_53_24,
+                valor_previsto
+            FROM gestao_financeira.ultra_liquidacoes
             WHERE numero_termo = %s
-              AND numero_parcela IN ({placeholders_parcelas})
-            ORDER BY numero_parcela
+              AND parcela_numero IN ({placeholders_parcelas})
+            ORDER BY parcela_numero
         """, [numero_termo] + parcelas_selecionadas)
         
         parcelas_dados = cur.fetchall()
@@ -249,11 +284,16 @@ def gerar_encaminhamento():
                     if ultimo_aditamento is None:
                         ultimo_aditamento = record['aditamento']
                         sei_aditamento = record['termo_sei_doc']
-                break  # Já ordenamos DESC, então o primeiro é o último/maior
+        
+        # Debug: Log das informações encontradas
+        print(f"[DEBUG] Termo: {numero_termo}")
+        print(f"[DEBUG] SEI Termo Original: {sei_termo_original}")
+        print(f"[DEBUG] Último Aditamento: {ultimo_aditamento}")
+        print(f"[DEBUG] SEI Aditamento: {sei_aditamento}")
         
         # 4. Calcular total previsto (soma das parcelas selecionadas)
         total_previsto = sum(
-            float(p['parcela_total_previsto'] or 0) for p in parcelas_dados
+            float(p['valor_previsto'] or 0) for p in parcelas_dados
         )
         total_previsto_formatado = f"R$ {total_previsto:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         
@@ -324,17 +364,17 @@ def gerar_encaminhamento():
         for parcela in parcelas_dados:
             vigencia_inicial = formatar_data_mes_ano(parcela['vigencia_inicial'])
             vigencia_final = formatar_data_mes_ano(parcela['vigencia_final'])
-            aditivo = parcela['aditivo'] if parcela['aditivo'] else '-'
+            aditivo = '-'  # ultra_liquidacoes não tem coluna aditivo
             termo = parcela['numero_termo']
             
             # Formatar parcela: número + tipo
-            numero_parcela = parcela['numero_parcela']
-            tipo_parcela = parcela['tipo_parcela'] if parcela['tipo_parcela'] else ''
+            numero_parcela = parcela['parcela_numero']  # Corrigido: coluna é parcela_numero
+            tipo_parcela = parcela['parcela_tipo'] if parcela['parcela_tipo'] else ''
             parcela_texto = f"{numero_parcela} {tipo_parcela}".strip()
             
-            elemento_23 = formatar_moeda(parcela['elemento_23'])
-            elemento_24 = formatar_moeda(parcela['elemento_24'])
-            total_parcela = formatar_moeda(parcela['parcela_total_previsto'])
+            elemento_23 = formatar_moeda(parcela['valor_elemento_53_23'])
+            elemento_24 = formatar_moeda(parcela['valor_elemento_53_24'])
+            total_parcela = formatar_moeda(parcela['valor_previsto'])
             
             # Criar linha HTML
             linha_html = f"""
@@ -454,7 +494,7 @@ def gerar_encaminhamento():
                 ) VALUES (%s, %s, %s, %s)
             """, (
                 idx,
-                parcela['aditivo'] or '-',
+                '-',  # ultra_liquidacoes não tem aditivo, usar padrão
                 numero_termo,
                 responsavel_nome
             ))
@@ -490,20 +530,30 @@ def relatorio_empenhos():
     cur = get_cursor()
     
     try:
-        # Estatística 1: Parcelas enviadas vs total
+        # Estatística 1: Parcelas enviadas vs total (ano 2026, apenas Programadas)
         cur.execute("SELECT COUNT(*) as total FROM gestao_financeira.temp_acomp_empenhos")
         parcelas_enviadas = cur.fetchone()['total']
         
-        cur.execute("SELECT COUNT(*) as total FROM gestao_financeira.temp_reservas_empenhos")
+        cur.execute("""
+            SELECT COUNT(*) as total 
+            FROM gestao_financeira.ultra_liquidacoes 
+            WHERE EXTRACT(YEAR FROM vigencia_inicial) = 2026
+              AND parcela_tipo = 'Programada'
+        """)
         parcelas_total = cur.fetchone()['total']
         
         percentual_parcelas = (parcelas_enviadas / parcelas_total * 100) if parcelas_total > 0 else 0
         
-        # Estatística 2: Termos únicos enviados vs total
+        # Estatística 2: Termos únicos enviados vs total (ano 2026, apenas Programadas)
         cur.execute("SELECT COUNT(DISTINCT numero_termo) as total FROM gestao_financeira.temp_acomp_empenhos")
         termos_enviados = cur.fetchone()['total']
         
-        cur.execute("SELECT COUNT(DISTINCT numero_termo) as total FROM gestao_financeira.temp_reservas_empenhos")
+        cur.execute("""
+            SELECT COUNT(DISTINCT numero_termo) as total 
+            FROM gestao_financeira.ultra_liquidacoes 
+            WHERE EXTRACT(YEAR FROM vigencia_inicial) = 2026
+              AND parcela_tipo = 'Programada'
+        """)
         termos_total = cur.fetchone()['total']
         
         percentual_termos = (termos_enviados / termos_total * 100) if termos_total > 0 else 0
@@ -606,11 +656,12 @@ def api_relatorio_empenhos():
             FROM gestao_financeira.temp_acomp_empenhos t
             LEFT JOIN public.parcerias p ON p.numero_termo = t.numero_termo
             LEFT JOIN LATERAL (
-                SELECT numero_parcela, tipo_parcela
-                FROM gestao_financeira.temp_reservas_empenhos
+                SELECT parcela_numero AS numero_parcela, parcela_tipo AS tipo_parcela
+                FROM gestao_financeira.ultra_liquidacoes
                 WHERE numero_termo = t.numero_termo
-                  AND (aditivo = t.aditivo OR (aditivo IS NULL AND t.aditivo = '-'))
-                ORDER BY numero_parcela
+                  AND EXTRACT(YEAR FROM vigencia_inicial) = 2026
+                  AND parcela_tipo = 'Programada'
+                ORDER BY parcela_numero
                 LIMIT 1 OFFSET (t.numero - 1)
             ) r ON true
             WHERE 1=1
@@ -800,11 +851,12 @@ def ver_encaminhamento():
                 r.numero_parcela
             FROM gestao_financeira.temp_acomp_empenhos t
             LEFT JOIN LATERAL (
-                SELECT numero_parcela
-                FROM gestao_financeira.temp_reservas_empenhos
+                SELECT parcela_numero AS numero_parcela
+                FROM gestao_financeira.ultra_liquidacoes
                 WHERE numero_termo = t.numero_termo
-                  AND (aditivo = t.aditivo OR (aditivo IS NULL AND t.aditivo = '-'))
-                ORDER BY numero_parcela
+                  AND EXTRACT(YEAR FROM vigencia_inicial) = 2026
+                  AND parcela_tipo = 'Programada'
+                ORDER BY parcela_numero
                 LIMIT 1 OFFSET (t.numero - 1)
             ) r ON true
             WHERE t.numero_termo = %s AND t.numero = %s
@@ -844,15 +896,17 @@ def ver_encaminhamento():
                 numero_termo,
                 vigencia_inicial,
                 vigencia_final,
-                aditivo,
-                numero_parcela,
-                tipo_parcela,
-                elemento_23,
-                elemento_24,
-                parcela_total_previsto
-            FROM gestao_financeira.temp_reservas_empenhos
+                '-' AS aditivo,
+                parcela_numero AS numero_parcela,
+                parcela_tipo AS tipo_parcela,
+                valor_elemento_53_23 AS elemento_23,
+                valor_elemento_53_24 AS elemento_24,
+                valor_previsto AS parcela_total_previsto
+            FROM gestao_financeira.ultra_liquidacoes
             WHERE numero_termo = %s
-              AND numero_parcela = %s
+              AND parcela_numero = %s
+              AND EXTRACT(YEAR FROM vigencia_inicial) = 2026
+              AND parcela_tipo = 'Programada'
             LIMIT 1
         """, (numero_termo, numero_parcela_real))
         
@@ -1739,17 +1793,19 @@ def api_sincronizar_empenhos():
         
         print(f"[DEBUG] Mapeados {len(processo_to_termo)} processos para termos")
         
-        # PASSO 3: Buscar parcelas programadas de temp_reservas_empenhos
-        print("[DEBUG] Buscando parcelas programadas...")
+        # PASSO 3: Buscar parcelas programadas de ultra_liquidacoes (apenas ano 2026)
+        print("[DEBUG] Buscando parcelas programadas de 2026...")
         cur.execute("""
             SELECT 
                 id,
                 numero_termo,
-                numero_parcela,
-                elemento_23,
-                elemento_24,
-                parcela_total_previsto
-            FROM gestao_financeira.temp_reservas_empenhos
+                parcela_numero,
+                valor_elemento_53_23,
+                valor_elemento_53_24,
+                valor_previsto
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE parcela_tipo = 'Programada'
+              AND EXTRACT(YEAR FROM vigencia_inicial) = 2026
             ORDER BY numero_termo, id
         """)
         
@@ -1761,10 +1817,10 @@ def api_sincronizar_empenhos():
             try:
                 id_reserva = parcela['id']
                 termo = parcela['numero_termo']
-                num_parcela = parcela['numero_parcela']
-                elem_23 = parcela['elemento_23']
-                elem_24 = parcela['elemento_24']
-                total_prev = parcela['parcela_total_previsto']
+                num_parcela = parcela['parcela_numero']
+                elem_23 = parcela['valor_elemento_53_23']
+                elem_24 = parcela['valor_elemento_53_24']
+                total_prev = parcela['valor_previsto']
             except (KeyError, TypeError):
                 id_reserva = parcela[0]
                 termo = parcela[1]
@@ -1776,12 +1832,21 @@ def api_sincronizar_empenhos():
             if termo not in parcelas_por_termo:
                 parcelas_por_termo[termo] = []
             
+            # Converter VARCHAR para float
+            def converter_valor_sync(val):
+                if not val:
+                    return 0
+                try:
+                    return float(str(val).replace(',', '.'))
+                except (ValueError, AttributeError):
+                    return 0
+            
             parcelas_por_termo[termo].append({
                 'id_reserva': id_reserva,
                 'numero_parcela': num_parcela,
-                'previsto_23': float(elem_23 or 0),
-                'previsto_24': float(elem_24 or 0),
-                'previsto_total': float(total_prev or 0)
+                'previsto_23': converter_valor_sync(elem_23),
+                'previsto_24': converter_valor_sync(elem_24),
+                'previsto_total': converter_valor_sync(total_prev)
             })
         
         # PASSO 3.5: Buscar parcelas de temp_acomp_empenhos (ordenadas por numero)
@@ -1843,7 +1908,7 @@ def api_sincronizar_empenhos():
             
             # Verificar se tem parcelas programadas E parcelas de acompanhamento
             if numero_termo not in parcelas_por_termo:
-                relatorio['alertas'].append(f"⚠️ Termo {numero_termo} não tem parcelas em temp_reservas_empenhos")
+                relatorio['alertas'].append(f"⚠️ Termo {numero_termo} não tem parcelas Programadas em ultra_liquidacoes")
                 continue
             
             if numero_termo not in acomp_por_termo:

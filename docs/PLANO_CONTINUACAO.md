@@ -35,9 +35,9 @@
 
 ## 7. Gestão Financeira
 - Implementar importação de hiper_liquidações e ampliar funções de conciliação. ✅
-- Adicionar automação no encaminhamento para pagamento. 
-- Melhorar filtros de pendências da Ultra.
-- Adicionar novos relatórios orçamentários e financeiros.
+- Adicionar automação no encaminhamento para pagamento.
+- Melhorar filtros de pendências da Ultra.✅
+- Adicionar novos relatórios orçamentários e financeiros.✅
 - Criar pasta dedicada para certidões e atualizações financeiras.
 
 ## 8. Celebração e DGP

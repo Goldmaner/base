@@ -429,3 +429,376 @@ def deletar(id):
         traceback.print_exc()
         flash(f'Erro ao deletar edital: {str(e)}', 'danger')
         return redirect(url_for('editais.listar'))
+
+
+# ==================== ORÇAMENTO DE EDITAIS ====================
+
+@editais_bp.route("/orcamento", methods=["GET"])
+@login_required
+@requires_access('editais')
+def orcamento_listar():
+    """Listagem de orçamentos de editais (consolidado)"""
+    from flask import jsonify
+    cur = get_cursor()
+    
+    try:
+        # Buscar editais agrupados
+        cur.execute("""
+            SELECT 
+                edital_nome,
+                edital_tipo,
+                edital_unidade,
+                dotacao_formatada,
+                projeto_atividade,
+                etapa,
+                observacoes,
+                MIN(nome_mes) as vigencia_inicio,
+                MAX(nome_mes) as vigencia_fim,
+                SUM(valor_mes) as valor_total,
+                COUNT(*) as qtd_meses,
+                created_por,
+                MAX(created_em) as ultima_atualizacao
+            FROM gestao_financeira.orcamento_edital_nova
+            GROUP BY edital_nome, edital_tipo, edital_unidade, dotacao_formatada, projeto_atividade, etapa, observacoes, created_por
+            ORDER BY ultima_atualizacao DESC
+        """)
+        
+        editais = []
+        for row in cur.fetchall():
+            vigencia_str = ''
+            if row['vigencia_inicio'] and row['vigencia_fim']:
+                inicio = row['vigencia_inicio']
+                fim = row['vigencia_fim']
+                
+                # Mapear meses em português
+                meses_pt = {
+                    'Jan': 'jan', 'Feb': 'fev', 'Mar': 'mar', 'Apr': 'abr',
+                    'May': 'mai', 'Jun': 'jun', 'Jul': 'jul', 'Aug': 'ago',
+                    'Sep': 'set', 'Oct': 'out', 'Nov': 'nov', 'Dec': 'dez'
+                }
+                
+                inicio_mes = meses_pt.get(inicio.strftime('%b'), inicio.strftime('%b').lower())
+                fim_mes = meses_pt.get(fim.strftime('%b'), fim.strftime('%b').lower())
+                vigencia_str = f"{inicio_mes}/{inicio.strftime('%y')}-{fim_mes}/{fim.strftime('%y')} ({row['qtd_meses']} meses)"
+            
+            editais.append({
+                'edital_nome': row['edital_nome'],
+                'edital_tipo': row['edital_tipo'] or '-',
+                'edital_unidade': row['edital_unidade'] or '-',
+                'dotacao_formatada': row['dotacao_formatada'] or '-',
+                'projeto_atividade': row['projeto_atividade'] or '-',
+                'valor_total': float(row['valor_total'] or 0),
+                'vigencia': vigencia_str,
+                'etapa': row['etapa'] or '-',
+                'observacoes': row['observacoes'] or '-',
+                'created_por': row['created_por'] or '-'
+            })
+        
+        # Buscar unidades disponíveis (coordenacao)
+        cur.execute("""
+            SELECT DISTINCT coordenacao
+            FROM categoricas.c_geral_dotacoes
+            WHERE coordenacao IS NOT NULL AND coordenacao != ''
+            ORDER BY coordenacao
+        """)
+        unidades_disponiveis = [row['coordenacao'] for row in cur.fetchall()]
+        
+        cur.close()
+        
+        return render_template('editais_orcamento.html', 
+                             editais=editais,
+                             unidades_disponiveis=unidades_disponiveis,
+                             total_count=len(editais))
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao listar orçamentos de editais: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f'Erro ao carregar orçamentos: {str(e)}', 'danger')
+        return render_template('editais_orcamento.html', editais=[], unidades_disponiveis=[], total_count=0)
+
+
+@editais_bp.route("/orcamento/api/dotacoes", methods=["GET"])
+@login_required
+@requires_access('editais')
+def api_dotacoes():
+    """API para buscar dotações por unidade"""
+    from flask import jsonify
+    cur = get_cursor()
+    
+    try:
+        unidade = request.args.get('unidade', '').strip()
+        
+        if not unidade:
+            return jsonify({'success': False, 'error': 'Unidade não fornecida'})
+        
+        print(f"\n[DEBUG API DOTAÇÕES] Buscando dotações para unidade: '{unidade}'")
+        
+        # Query com TRIM e comparação case-insensitive
+        cur.execute("""
+            SELECT DISTINCT dotacao_numero
+            FROM categoricas.c_geral_dotacoes
+            WHERE TRIM(coordenacao) ILIKE TRIM(%s)
+              AND dotacao_numero IS NOT NULL
+              AND dotacao_numero != ''
+            ORDER BY dotacao_numero
+        """, (unidade,))
+        
+        dotacoes = [row['dotacao_numero'] for row in cur.fetchall()]
+        
+        print(f"[DEBUG API DOTAÇÕES] Encontradas {len(dotacoes)} dotações")
+        if len(dotacoes) > 0:
+            print(f"[DEBUG API DOTAÇÕES] Primeiras 3 dotações: {dotacoes[:3]}")
+        
+        cur.close()
+        
+        return jsonify({'success': True, 'dotacoes': dotacoes})
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar dotações: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@editais_bp.route("/orcamento/api/edital/<edital_nome>", methods=["GET"])
+@login_required
+@requires_access('editais')
+def api_edital_detalhes(edital_nome):
+    """API para buscar detalhes completos de um edital (todos os meses)"""
+    from flask import jsonify
+    cur = get_cursor()
+    
+    try:
+        cur.execute("""
+            SELECT 
+                id,
+                edital_nome,
+                edital_tipo,
+                edital_unidade,
+                dotacao_formatada,
+                projeto_atividade,
+                valor_mes,
+                nome_mes,
+                etapa,
+                observacoes,
+                created_por
+            FROM gestao_financeira.orcamento_edital_nova
+            WHERE edital_nome = %s
+            ORDER BY nome_mes
+        """, (edital_nome,))
+        
+        meses = []
+        edital_info = None
+        
+        for row in cur.fetchall():
+            if not edital_info:
+                edital_info = {
+                    'edital_nome': row['edital_nome'],
+                    'edital_tipo': row['edital_tipo'],
+                    'edital_unidade': row['edital_unidade'],
+                    'dotacao_formatada': row['dotacao_formatada'],
+                    'projeto_atividade': row['projeto_atividade'],
+                    'etapa': row['etapa'],
+                    'observacoes': row['observacoes']
+                }
+            
+            meses.append({
+                'id': row['id'],
+                'valor_mes': float(row['valor_mes'] or 0),
+                'nome_mes': row['nome_mes'].strftime('%Y-%m-%d') if row['nome_mes'] else None
+            })
+        
+        cur.close()
+        
+        return jsonify({'success': True, 'edital': edital_info, 'meses': meses})
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao buscar detalhes do edital: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@editais_bp.route("/orcamento/criar", methods=["POST"])
+@login_required
+@requires_access('editais')
+def orcamento_criar():
+    """Criar novo orçamento de edital com cronograma mensal"""
+    from flask import jsonify
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        # Dados do formulário
+        edital_nome = request.form.get('edital_nome', '').strip()
+        edital_tipo = request.form.get('edital_tipo', '-').strip()
+        edital_unidade = request.form.get('edital_unidade', '').strip()
+        dotacao_formatada = request.form.get('dotacao_formatada', '').strip()
+        projeto_atividade = request.form.get('projeto_atividade', '').strip()
+        etapa = request.form.get('etapa', 'Em estudo preliminar').strip()
+        observacoes = request.form.get('observacoes', '').strip()
+        
+        # Cronograma mensal (JSON ou form data)
+        import json
+        meses_data = request.form.get('meses_data', '[]')
+        meses = json.loads(meses_data)
+        
+        if not edital_nome:
+            flash('Nome do edital é obrigatório!', 'danger')
+            return redirect(url_for('editais.orcamento_listar'))
+        
+        if not meses:
+            flash('Adicione pelo menos um mês no cronograma!', 'danger')
+            return redirect(url_for('editais.orcamento_listar'))
+        
+        # Verificar se já existe edital com esse nome
+        cur.execute("""
+            SELECT COUNT(*) as qtd
+            FROM gestao_financeira.orcamento_edital_nova
+            WHERE edital_nome = %s
+        """, (edital_nome,))
+        
+        if cur.fetchone()['qtd'] > 0:
+            flash(f'Já existe um edital com o nome "{edital_nome}"!', 'danger')
+            return redirect(url_for('editais.orcamento_listar'))
+        
+        # Obter usuário logado
+        username = session.get('username', 'Sistema')
+        
+        # Inserir cada mês como uma linha
+        for mes in meses:
+            cur.execute("""
+                INSERT INTO gestao_financeira.orcamento_edital_nova
+                (edital_nome, edital_tipo, edital_unidade, dotacao_formatada, projeto_atividade, 
+                 valor_mes, nome_mes, etapa, observacoes, created_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                edital_nome,
+                edital_tipo,
+                edital_unidade,
+                dotacao_formatada,
+                projeto_atividade,
+                mes['valor'],
+                mes['mes'],
+                etapa,
+                observacoes,
+                username
+            ))
+        
+        conn.commit()
+        cur.close()
+        
+        flash(f'Orçamento do edital "{edital_nome}" cadastrado com sucesso! ({len(meses)} meses)', 'success')
+        return redirect(url_for('editais.orcamento_listar'))
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"[ERRO] Erro ao criar orçamento: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f'Erro ao cadastrar orçamento: {str(e)}', 'danger')
+        return redirect(url_for('editais.orcamento_listar'))
+
+
+@editais_bp.route("/orcamento/deletar/<edital_nome>", methods=["POST"])
+@login_required
+@requires_access('editais')
+def orcamento_deletar(edital_nome):
+    """Deletar orçamento de edital (todas as linhas)"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        # Deletar todas as linhas do edital
+        cur.execute("""
+            DELETE FROM gestao_financeira.orcamento_edital_nova
+            WHERE edital_nome = %s
+        """, (edital_nome,))
+        
+        conn.commit()
+        cur.close()
+        
+        flash(f'Orçamento do edital "{edital_nome}" excluído com sucesso!', 'success')
+        return redirect(url_for('editais.orcamento_listar'))
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"[ERRO] Erro ao deletar orçamento: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f'Erro ao deletar orçamento: {str(e)}', 'danger')
+        return redirect(url_for('editais.orcamento_listar'))
+
+
+@editais_bp.route("/orcamento/editar/<edital_nome>", methods=["POST"])
+@login_required
+@requires_access('editais')
+def orcamento_editar(edital_nome):
+    """Editar orçamento de edital (deletar tudo e reinserir)"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        # Dados do formulário
+        edital_nome_novo = request.form.get('edital_nome', '').strip()
+        edital_tipo = request.form.get('edital_tipo', '-').strip()
+        edital_unidade = request.form.get('edital_unidade', '').strip()
+        dotacao_formatada = request.form.get('dotacao_formatada', '').strip()
+        projeto_atividade = request.form.get('projeto_atividade', '').strip()
+        etapa = request.form.get('etapa', 'Em estudo preliminar').strip()
+        observacoes = request.form.get('observacoes', '').strip()
+        
+        # Cronograma mensal
+        import json
+        meses_data = request.form.get('meses_data', '[]')
+        meses = json.loads(meses_data)
+        
+        if not edital_nome_novo:
+            flash('Nome do edital é obrigatório!', 'danger')
+            return redirect(url_for('editais.orcamento_listar'))
+        
+        if not meses:
+            flash('Adicione pelo menos um mês no cronograma!', 'danger')
+            return redirect(url_for('editais.orcamento_listar'))
+        
+        # Obter usuário logado
+        username = session.get('username', 'Sistema')
+        
+        # Deletar todas as linhas antigas
+        cur.execute("""
+            DELETE FROM gestao_financeira.orcamento_edital_nova
+            WHERE edital_nome = %s
+        """, (edital_nome,))
+        
+        # Inserir novamente com dados atualizados
+        for mes in meses:
+            cur.execute("""
+                INSERT INTO gestao_financeira.orcamento_edital_nova
+                (edital_nome, edital_tipo, edital_unidade, dotacao_formatada, projeto_atividade, 
+                 valor_mes, nome_mes, etapa, observacoes, created_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                edital_nome_novo,
+                edital_tipo,
+                edital_unidade,
+                dotacao_formatada,
+                projeto_atividade,
+                mes['valor'],
+                mes['mes'],
+                etapa,
+                observacoes,
+                username
+            ))
+        
+        conn.commit()
+        cur.close()
+        
+        flash(f'Orçamento do edital "{edital_nome_novo}" atualizado com sucesso! ({len(meses)} meses)', 'success')
+        return redirect(url_for('editais.orcamento_listar'))
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"[ERRO] Erro ao editar orçamento: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f'Erro ao editar orçamento: {str(e)}', 'danger')
+        return redirect(url_for('editais.orcamento_listar'))

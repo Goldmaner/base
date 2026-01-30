@@ -82,7 +82,7 @@
           <h2 class="accordion-header">
             <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGeral">
               <i class="bi bi-house-door me-2"></i> Geral
-              <span class="badge bg-primary section-badge">5</span>
+              <span class="badge bg-primary section-badge">3</span>
             </button>
           </h2>
           <div id="collapseGeral" class="accordion-collapse collapse show" data-bs-parent="#accordionModulos">
@@ -161,22 +161,24 @@
         </div>
         
         <!-- Seção: Departamento de Parcerias -->
-        {% if is_admin or 'editais' in user_acessos %}
+        {% if is_admin or 'editais' in user_acessos or 'gestao_orcamentaria' in user_acessos %}
         <div class="accordion-item">
           <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDP">
               <i class="bi bi-megaphone me-2"></i> Departamento de Parcerias
-              <span class="badge bg-info section-badge">1</span>
+              <span class="badge bg-info section-badge">2</span>
             </button>
           </h2>
           <div id="collapseDP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
             <div class="accordion-body">
               <div class="row g-2">
+                {% if is_admin or 'editais' in user_acessos %}
                 <div class="col-md-6">
                   <a href="{{ url_for('editais.listar') }}" class="btn btn-module" style="background-color:#0dcaf0; color:#000;">
                     <i class="bi bi-megaphone"></i> Edital
                   </a>
                 </div>
+                {% endif %}
                 {% if is_admin or 'gestao_orcamentaria' in user_acessos %}
                 <div class="col-md-6">
                   <a href="{{ url_for('gestao_orcamentaria.index') }}" class="btn btn-module" style="background-color:#764ba2; color:#fff;">

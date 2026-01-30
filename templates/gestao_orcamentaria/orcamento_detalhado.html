@@ -193,20 +193,32 @@
                     <div class="card card-body mt-2">
                         <div class="row g-3">
                             <div class="col-md-3">
-                                <label for="filtro_numero_termo" class="form-label">Número do Termo</label>
-                                <input type="text" class="form-control" id="filtro_numero_termo" placeholder="Ex: TCL/001/2024">
+                                <label for="filtro_numero_termo" class="form-label">Termo ou Edital</label>
+                                <input type="text" class="form-control" id="filtro_numero_termo" placeholder="Ex: TCL/001/2024 ou Edital 001/2024">
                             </div>
                             <div class="col-md-3">
                                 <label for="filtro_dotacao" class="form-label">Dotação Orçamentária</label>
-                                <input type="text" class="form-control" id="filtro_dotacao" placeholder="Ex: 335000000">
+                                <input type="text" class="form-control" id="filtro_dotacao" 
+                                       list="lista_dotacao" placeholder="Digite para buscar...">
+                                <datalist id="lista_dotacao">
+                                    <!-- Opções populadas via JavaScript -->
+                                </datalist>
                             </div>
                             <div class="col-md-3">
                                 <label for="filtro_projeto_atividade" class="form-label">Projeto-Atividade</label>
-                                <input type="text" class="form-control" id="filtro_projeto_atividade" placeholder="Ex: 2030">
+                                <input type="text" class="form-control" id="filtro_projeto_atividade" 
+                                       list="lista_projeto_atividade" placeholder="Digite para buscar...">
+                                <datalist id="lista_projeto_atividade">
+                                    <!-- Opções populadas via JavaScript -->
+                                </datalist>
                             </div>
                             <div class="col-md-3">
                                 <label for="filtro_programatica" class="form-label">Programática</label>
-                                <input type="text" class="form-control" id="filtro_programatica" placeholder="Ex: 02.08.14.422.0009.2030">
+                                <input type="text" class="form-control" id="filtro_programatica" 
+                                       list="lista_programatica" placeholder="Digite para buscar...">
+                                <datalist id="lista_programatica">
+                                    <!-- Opções populadas via JavaScript -->
+                                </datalist>
                             </div>
                         </div>
                     </div>
@@ -224,7 +236,10 @@
                         <div class="row g-3">
                             <div class="col-md-3">
                                 <label for="filtro_tipo_contrato" class="form-label">Tipo de Contrato</label>
-                                <input type="text" class="form-control" id="filtro_tipo_contrato" placeholder="Ex: TCL">
+                                <input type="text" class="form-control" id="filtro_tipo_contrato" list="lista_tipo_contrato" placeholder="Digite para buscar...">
+                                <datalist id="lista_tipo_contrato">
+                                    <!-- Opções populadas via JavaScript -->
+                                </datalist>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">Data de Término</label>
@@ -261,15 +276,61 @@
                             </div>
                             <div class="col-md-3">
                                 <label for="filtro_osc" class="form-label">OSC</label>
-                                <input type="text" class="form-control" id="filtro_osc" placeholder="Nome da OSC">
+                                <input type="text" class="form-control" id="filtro_osc" list="lista_osc" placeholder="Digite para buscar...">
+                                <datalist id="lista_osc">
+                                    <!-- Opções populadas via JavaScript -->
+                                </datalist>
                             </div>
                             <div class="col-md-3">
                                 <label for="filtro_projeto" class="form-label">Projeto</label>
-                                <input type="text" class="form-control" id="filtro_projeto" placeholder="Nome do projeto">
+                                <input type="text" class="form-control" id="filtro_projeto" list="lista_projeto" placeholder="Digite para buscar...">
+                                <datalist id="lista_projeto">
+                                    <!-- Opções populadas via JavaScript -->
+                                </datalist>
                             </div>
                             <div class="col-md-3">
                                 <label for="filtro_sei_celeb" class="form-label">SEI de Celebração</label>
                                 <input type="text" class="form-control" id="filtro_sei_celeb" placeholder="Ex: 6074.2024/0005678-9">
+                            </div>
+                        </div>
+                        
+                        <!-- Filtros de Valores -->
+                        <div class="row g-3 mt-2 border-top pt-3">
+                            <div class="col-12">
+                                <h6 class="text-muted mb-3"><i class="bi bi-calculator"></i> Filtros de Valores</h6>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Total Programado</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_programado_min" placeholder="Mínimo" step="0.01">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_programado_max" placeholder="Máximo" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Total Projetado</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_projetado_min" placeholder="Mínimo" step="0.01">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_projetado_max" placeholder="Máximo" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Total Global</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_global_min" placeholder="Mínimo" step="0.01">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_global_max" placeholder="Máximo" step="0.01">
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -288,6 +349,16 @@
                 </div>
             </div>
         </div>
+    </div>
+    
+    <!-- Modo Cronograma Detalhado -->
+    <div class="alert alert-info border mb-3">
+        <strong><i class="bi bi-calendar-week me-2"></i>Modo de Exibição:</strong>
+        <label class="ms-3">
+            <input type="checkbox" id="chk_cronograma_detalhado" onchange="alternarModoCronograma()">
+            <strong>Modo Cronograma Detalhado</strong>
+            <small class="text-muted">(Afeta apenas Total Global expandido - mostra valores mensais com parcelas)</small>
+        </label>
     </div>
     
     <!-- Colunas Opcionais -->
@@ -332,7 +403,7 @@
                     <th>Dotação Orçamentária</th>
                     <th>Projeto-Atividade</th>
                     <th>Programática</th>
-                    <th>Número do Termo</th>
+                    <th>Termo ou Edital</th>
                     <th class="col-tipo-contrato" style="display: none;">Tipo de Contrato</th>
                     <th class="col-data-termino" style="display: none;">Data de Término</th>
                     <th class="col-cnpj" style="display: none;">CNPJ</th>
@@ -340,12 +411,18 @@
                     <th class="col-osc" style="display: none;">OSC</th>
                     <th class="col-projeto" style="display: none;">Projeto</th>
                     <th class="col-sei-celeb" style="display: none;">SEI de Celebração</th>
-                    <th onclick="toggleCronogramaMensal()" style="cursor: pointer; background: linear-gradient(135deg, #28a745 0%, #20c997 100%);" title="Clique para expandir cronograma mensal">
+                    <th onclick="toggleCronogramaProgramado()" style="cursor: pointer; background: linear-gradient(135deg, #28a745 0%, #20c997 100%);" title="Clique para expandir cronograma mensal (Programadas)">
                         Total Programado
-                        <i class="bi bi-calendar3" id="icone-cronograma"></i>
+                        <i class="bi bi-calendar3" id="icone-cronograma-programado"></i>
                     </th>
-                    <th>Total Projetado</th>
-                    <th class="bg-success bg-opacity-50">Total Global</th>
+                    <th onclick="toggleCronogramaProjetado()" style="cursor: pointer; background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);" title="Clique para expandir cronograma mensal (Projetadas)">
+                        Total Projetado
+                        <i class="bi bi-calendar3" id="icone-cronograma-projetado"></i>
+                    </th>
+                    <th onclick="toggleCronogramaGlobal()" style="cursor: pointer; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);" title="Clique para expandir cronograma mensal (Global: Programadas + Projetadas)" class="bg-info bg-opacity-75 text-white">
+                        Total Global
+                        <i class="bi bi-calendar3" id="icone-cronograma-global"></i>
+                    </th>
                 </tr>
             </thead>
             <tbody id="corpoTabela">
@@ -386,8 +463,12 @@
 <script>
     let dadosCompletos = [];
     let dadosFiltrados = [];
-    let cronogramaExpandido = false;
+    let cronogramaProgramadoExpandido = false;
+    let cronogramaProjetadoExpandido = false;
+    let cronogramaGlobalExpandido = false;
     let dadosCronograma = {};
+    let modoDetalhado = false;
+    let dadosCronogramaDetalhado = {};
     
     // Configurar toastr
     toastr.options = {
@@ -399,40 +480,95 @@
     
     // Inicializar
     $(document).ready(function() {
-        // Setar ano atual
-        const anoAtual = new Date().getFullYear();
-        $('#ano_referencia').val(anoAtual);
+        // ⚡ NOVO: Restaurar ano e filtros salvos
+        const filtrosSalvos = restaurarFiltros();
+        
+        // Se não há ano salvo, usar ano atual
+        if (!filtrosSalvos || !filtrosSalvos.ano_referencia) {
+            const anoAtual = new Date().getFullYear();
+            $('#ano_referencia').val(anoAtual);
+        }
         
         // Carregar dados
         carregarDados();
         
         // Event listener para mudança de ano
         $('#ano_referencia').on('change', function() {
+            salvarFiltros(); // ⚡ NOVO: Salvar ao mudar ano
             carregarDados();
         });
     });
     
     // ==================== EXPANSÃO DO CRONOGRAMA MENSAL ====================
     // Quando o usuário clica no cabeçalho "Total Programado", a tabela se expande
-    // mostrando 12 colunas adicionais (Jan-Dez) com os valores distribuídos por mês.
-    // Cada valor mensal é calculado baseado na vigência da parcela:
-    //   - Se uma parcela tem vigencia_inicial = 2026-01-01 e vigencia_final = 2026-03-01
-    //   - E valor_previsto = R$ 102.048,66
-    //   - Então: Jan=R$34.016,22, Fev=R$34.016,22, Mar=R$34.016,22, demais=R$0,00
-    // A coluna "Total Global" mostra a soma de Programado + Projetado
-    // Passando o mouse sobre os valores mensais, mostra o detalhamento
+    // mostrando 12 colunas adicionais (Jan-Dez) com os valores das parcelas Programadas.
+    // Cada valor mensal é o VALOR INTEGRAL da parcela que tem vigencia_inicial naquele mês.
+    // Exemplo: Parcela 2026-01-01 a 2026-04-01 com R$ 458.732,28 → Janeiro = R$ 458.732,28
+    //
+    // De forma análoga, clicar em "Total Projetado" expande com parcelas Projetadas.
+    // Os dois cronogramas são independentes e podem estar abertos simultaneamente.
     
-    // Toggle do cronograma mensal
-    function toggleCronogramaMensal() {
-        cronogramaExpandido = !cronogramaExpandido;
+    // Toggle do cronograma de Programadas
+    function toggleCronogramaProgramado() {
+        cronogramaProgramadoExpandido = !cronogramaProgramadoExpandido;
         
-        if (cronogramaExpandido) {
-            $('#icone-cronograma').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
+        if (cronogramaProgramadoExpandido) {
+            $('#icone-cronograma-programado').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
             carregarCronogramaMensal();
         } else {
-            $('#icone-cronograma').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
+            $('#icone-cronograma-programado').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
             renderizarTabela();
         }
+    }
+    
+    // Toggle do cronograma de Projetadas
+    function toggleCronogramaProjetado() {
+        cronogramaProjetadoExpandido = !cronogramaProjetadoExpandido;
+        
+        if (cronogramaProjetadoExpandido) {
+            $('#icone-cronograma-projetado').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
+            carregarCronogramaMensal();
+        } else {
+            $('#icone-cronograma-projetado').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
+            renderizarTabela();
+        }
+    }
+    
+    // Toggle do cronograma Global (soma de Programadas + Projetadas)
+    function toggleCronogramaGlobal() {
+        cronogramaGlobalExpandido = !cronogramaGlobalExpandido;
+        
+        if (cronogramaGlobalExpandido) {
+            $('#icone-cronograma-global').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
+            if (modoDetalhado) {
+                carregarCronogramaDetalhado();
+            } else {
+                carregarCronogramaMensal();
+            }
+        } else {
+            $('#icone-cronograma-global').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
+            renderizarTabela();
+        }
+    }
+    
+    // Alternar entre modo normal e modo detalhado
+    function alternarModoCronograma() {
+        modoDetalhado = $('#chk_cronograma_detalhado').is(':checked');
+        
+        console.log('[DEBUG] Modo detalhado:', modoDetalhado);
+        
+        // Se cronograma global está expandido, recarregar com o modo correto
+        if (cronogramaGlobalExpandido) {
+            if (modoDetalhado) {
+                carregarCronogramaDetalhado();
+                toastr.info('Modo Cronograma Detalhado ativado');
+            } else {
+                carregarCronogramaMensal();
+                toastr.info('Modo Cronograma Normal ativado');
+            }
+        }
+        
+        salvarFiltros(); // Salvar preferência
     }
     
     // Carregar dados do cronograma mensal
@@ -467,6 +603,35 @@
         });
     }
     
+    // Carregar dados do cronograma DETALHADO (tabela ultra_liquidacoes_cronograma)
+    function carregarCronogramaDetalhado() {
+        const ano = $('#ano_referencia').val();
+        
+        if (!ano) {
+            toastr.error('Por favor, selecione um ano de referência');
+            return;
+        }
+        
+        $.ajax({
+            url: '/gestao_orcamentaria/api/cronograma-detalhado',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                if (response.success) {
+                    console.log('[DEBUG CRONOGRAMA DETALHADO] Dados recebidos:', response);
+                    dadosCronogramaDetalhado = response.dados || {};
+                    renderizarTabela();
+                    toastr.success('Cronograma detalhado carregado!');
+                } else {
+                    toastr.error('Erro ao carregar cronograma detalhado: ' + response.error);
+                }
+            },
+            error: function(xhr) {
+                toastr.error('Erro ao carregar cronograma detalhado: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
     // Carregar dados do servidor
     function carregarDados() {
         const ano = $('#ano_referencia').val();
@@ -494,6 +659,7 @@
                     if (dadosCompletos.length === 0) {
                         $('#sem-dados').show();
                     } else {
+                        popularDropdownsFiltros(); // Preencher dropdowns com valores únicos
                         aplicarFiltros();
                         renderizarTabela();
                         atualizarResumo();
@@ -508,6 +674,78 @@
                 $('#sem-dados').show();
                 toastr.error('Erro ao carregar dados: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
             }
+        });
+    }
+    
+    // Popular autocomplete (datalist) com valores únicos dos dados carregados
+    function popularDropdownsFiltros() {
+        // Função auxiliar para obter valores únicos e ordenados
+        const obterValoresUnicos = (campo) => {
+            const valores = new Set();
+            dadosCompletos.forEach(item => {
+                const valor = item[campo];
+                if (valor && valor !== '-' && String(valor).trim() !== '') {
+                    valores.add(String(valor).trim());
+                }
+            });
+            return Array.from(valores).sort();
+        };
+        
+        // Popular Tipo de Contrato (datalist)
+        const tiposContrato = obterValoresUnicos('tipo_contrato');
+        const datalistTipoContrato = $('#lista_tipo_contrato');
+        datalistTipoContrato.empty();
+        tiposContrato.forEach(tipo => {
+            datalistTipoContrato.append($('<option>').val(tipo));
+        });
+        
+        // Popular OSC (datalist)
+        const oscs = obterValoresUnicos('osc');
+        const datalistOsc = $('#lista_osc');
+        datalistOsc.empty();
+        oscs.forEach(osc => {
+            datalistOsc.append($('<option>').val(osc));
+        });
+        
+        // Popular Projeto (datalist)
+        const projetos = obterValoresUnicos('projeto');
+        const datalistProjeto = $('#lista_projeto');
+        datalistProjeto.empty();
+        projetos.forEach(projeto => {
+            datalistProjeto.append($('<option>').val(projeto));
+        });
+        
+        // Popular Dotação Orçamentária (datalist)
+        const dotacoes = obterValoresUnicos('dotacao_orcamentaria');
+        const datalistDotacao = $('#lista_dotacao');
+        datalistDotacao.empty();
+        dotacoes.forEach(dotacao => {
+            datalistDotacao.append($('<option>').val(dotacao));
+        });
+        
+        // Popular Projeto-Atividade (datalist)
+        const projetosAtividade = obterValoresUnicos('projeto_atividade');
+        const datalistProjetoAtividade = $('#lista_projeto_atividade');
+        datalistProjetoAtividade.empty();
+        projetosAtividade.forEach(pa => {
+            datalistProjetoAtividade.append($('<option>').val(pa));
+        });
+        
+        // Popular Programática (datalist)
+        const programaticas = obterValoresUnicos('programatica');
+        const datalistProgramatica = $('#lista_programatica');
+        datalistProgramatica.empty();
+        programaticas.forEach(prog => {
+            datalistProgramatica.append($('<option>').val(prog));
+        });
+        
+        console.log('✅ Autocomplete de filtros populados:', {
+            tiposContrato: tiposContrato.length,
+            oscs: oscs.length,
+            projetos: projetos.length,
+            dotacoes: dotacoes.length,
+            projetosAtividade: projetosAtividade.length,
+            programaticas: programaticas.length
         });
     }
     
@@ -528,6 +766,8 @@
         $('.col-osc').toggle(mostrarOsc);
         $('.col-projeto').toggle(mostrarProjeto);
         $('.col-sei-celeb').toggle(mostrarSeiCeleb);
+        
+        salvarFiltros(); // ⚡ NOVO: Salvar estado das colunas
     }
     
     // Renderizar tabela
@@ -542,30 +782,64 @@
         
         $('#sem-dados').hide();
         
-        // Se cronograma expandido, adicionar colunas de meses no header
-        if (cronogramaExpandido) {
-            const thead = $('#tabelaOrcamento thead tr');
-            const thProgramado = thead.find('th:contains("Total Programado")');
-            
-            // Remover colunas de meses anteriores se existirem
-            thead.find('.col-mes').remove();
-            
-            // Adicionar 12 colunas de meses antes do Total Programado
+        const thead = $('#tabelaOrcamento thead tr');
+        const thProgramado = thead.find('th').filter(function() {
+            return $(this).text().includes('Total Programado');
+        });
+        const thProjetado = thead.find('th').filter(function() {
+            return $(this).text().includes('Total Projetado');
+        });
+        const thGlobal = thead.find('th').filter(function() {
+            return $(this).text().includes('Total Global');
+        });
+        
+        // Remover colunas de meses anteriores se existirem
+        thead.find('.col-mes-programado').remove();
+        thead.find('.col-mes-projetado').remove();
+        thead.find('.col-mes-global').remove();
+        
+        // Se cronograma PROGRAMADO expandido, adicionar 12 colunas antes de "Total Programado"
+        if (cronogramaProgramadoExpandido) {
             const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
             meses.forEach(function(mes, index) {
-                const thMes = $('<th>').addClass('col-mes').text(mes).css({
-                    'min-width': '100px',
-                    'background': 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)'
-                });
+                const thMes = $('<th>').addClass('col-mes-programado').text(mes + ' 📅').css({
+                    'min-width': '120px',
+                    'background': 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                    'font-size': '0.85rem'
+                }).attr('title', 'Programadas: ' + mes);
                 thMes.insertBefore(thProgramado);
             });
-            
-            // Habilitar scroll horizontal
+        }
+        
+        // Se cronograma PROJETADO expandido, adicionar 12 colunas antes de "Total Projetado"
+        if (cronogramaProjetadoExpandido) {
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            meses.forEach(function(mes, index) {
+                const thMes = $('<th>').addClass('col-mes-projetado').text(mes + ' 🔮').css({
+                    'min-width': '120px',
+                    'background': 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)',
+                    'font-size': '0.85rem'
+                }).attr('title', 'Projetadas: ' + mes);
+                thMes.insertBefore(thProjetado);
+            });
+        }
+        
+        // Se cronograma GLOBAL expandido, adicionar 12 colunas antes de "Total Global"
+        if (cronogramaGlobalExpandido) {
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            meses.forEach(function(mes, index) {
+                const thMes = $('<th>').addClass('col-mes-global').text(mes + ' 🌍').css({
+                    'min-width': '120px',
+                    'background': 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)',
+                    'font-size': '0.85rem'
+                }).attr('title', 'Global (Prog + Proj): ' + mes);
+                thMes.insertBefore(thGlobal);
+            });
+        }
+        
+        // Habilitar scroll horizontal se algum cronograma expandido
+        if (cronogramaProgramadoExpandido || cronogramaProjetadoExpandido || cronogramaGlobalExpandido) {
             $('.table-responsive').css('overflow-x', 'auto');
-        } else {
-            // Remover colunas de meses
-            $('#tabelaOrcamento thead tr .col-mes').remove();
-            $('#tabelaOrcamento tfoot tr .col-mes').remove();
         }
         
         dadosFiltrados.forEach(function(item) {
@@ -585,25 +859,124 @@
             tr.append($('<td>').addClass('col-projeto').css('display', $('#chk_projeto').is(':checked') ? '' : 'none').text(item.projeto || '-'));
             tr.append($('<td>').addClass('col-sei-celeb').css('display', $('#chk_sei_celeb').is(':checked') ? '' : 'none').text(item.sei_celeb || '-'));
             
-            // Se cronograma expandido, adicionar colunas de valores mensais
-            if (cronogramaExpandido) {
+            // Se cronograma PROGRAMADO expandido, adicionar 12 colunas de valores mensais ANTES de Total Programado
+            if (cronogramaProgramadoExpandido) {
                 const cronogramaProgramado = dadosCronograma.programados?.[item.numero_termo] || {};
-                const cronogramaProjetado = dadosCronograma.projetados?.[item.numero_termo] || {};
                 
                 for (let mes = 1; mes <= 12; mes++) {
                     const valorProgramado = cronogramaProgramado[mes] || 0;
-                    const valorProjetado = cronogramaProjetado[mes] || 0;
-                    const valorGlobal = valorProgramado + valorProjetado;
                     
-                    // Mostrar valor global (soma de programado + projetado)
-                    tr.append($('<td>').addClass('valor-moeda col-mes').text(formatarMoeda(valorGlobal))
-                        .attr('title', `Programado: ${formatarMoeda(valorProgramado)}\nProjetado: ${formatarMoeda(valorProjetado)}`)
-                        .css('cursor', 'help'));
+                    const tdMes = $('<td>').addClass('valor-moeda col-mes-programado')
+                        .text(formatarMoeda(valorProgramado))
+                        .css({
+                            'background': valorProgramado > 0 ? '#d4edda' : '#fff',
+                            'font-weight': valorProgramado > 0 ? '600' : 'normal'
+                        });
+                    
+                    tr.append(tdMes);
                 }
             }
             
             tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(item.total_programado)));
+            
+            // Se cronograma PROJETADO expandido, adicionar 12 colunas de valores mensais ANTES de Total Projetado
+            if (cronogramaProjetadoExpandido) {
+                const cronogramaProjetado = dadosCronograma.projetados?.[item.numero_termo] || {};
+                
+                for (let mes = 1; mes <= 12; mes++) {
+                    const valorProjetado = cronogramaProjetado[mes] || 0;
+                    
+                    const tdMes = $('<td>').addClass('valor-moeda col-mes-projetado')
+                        .text(formatarMoeda(valorProjetado))
+                        .css({
+                            'background': valorProjetado > 0 ? '#fff3cd' : '#fff',
+                            'font-weight': valorProjetado > 0 ? '600' : 'normal'
+                        });
+                    
+                    tr.append(tdMes);
+                }
+            }
+            
             tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(item.total_projetado)));
+            
+            // Se cronograma GLOBAL expandido, adicionar 12 colunas de valores mensais ANTES de Total Global
+            if (cronogramaGlobalExpandido) {
+                // MODO DETALHADO: Usa dados da tabela ultra_liquidacoes_cronograma
+                if (modoDetalhado) {
+                    const cronogramaDetalhado = dadosCronogramaDetalhado[item.numero_termo] || {};
+                    
+                    for (let mes = 1; mes <= 12; mes++) {
+                        const dadosMes = cronogramaDetalhado[mes] || { valor: 0, parcelas: [] };
+                        const valorMes = dadosMes.valor;
+                        const parcelas = dadosMes.parcelas || [];
+                        
+                        const tdMes = $('<td>').addClass('valor-moeda col-mes-global');
+                        
+                        // Criar container para valor e badges
+                        const container = $('<div>').css({
+                            'display': 'flex',
+                            'flex-direction': 'column',
+                            'align-items': 'flex-end',
+                            'gap': '4px'
+                        });
+                        
+                        // Valor monetário
+                        const valorSpan = $('<span>').text(formatarMoeda(valorMes)).css({
+                            'font-weight': valorMes > 0 ? '600' : 'normal'
+                        });
+                        container.append(valorSpan);
+                        
+                        // Badges das parcelas
+                        if (parcelas.length > 0) {
+                            const badgesContainer = $('<div>').css({
+                                'display': 'flex',
+                                'flex-wrap': 'wrap',
+                                'gap': '2px',
+                                'justify-content': 'flex-end'
+                            });
+                            
+                            parcelas.forEach(parcela => {
+                                const badge = $('<span>').addClass('badge bg-primary').text(parcela).css({
+                                    'font-size': '0.7rem',
+                                    'padding': '2px 6px'
+                                });
+                                badgesContainer.append(badge);
+                            });
+                            
+                            container.append(badgesContainer);
+                        }
+                        
+                        tdMes.append(container).css({
+                            'background': valorMes > 0 ? '#d1ecf1' : '#fff',
+                            'min-width': '150px',
+                            'padding': '8px'
+                        });
+                        
+                        tr.append(tdMes);
+                    }
+                } 
+                // MODO NORMAL: Soma de Programadas + Projetadas
+                else {
+                    const cronogramaProgramado = dadosCronograma.programados?.[item.numero_termo] || {};
+                    const cronogramaProjetado = dadosCronograma.projetados?.[item.numero_termo] || {};
+                    
+                    for (let mes = 1; mes <= 12; mes++) {
+                        const valorProgramado = cronogramaProgramado[mes] || 0;
+                        const valorProjetado = cronogramaProjetado[mes] || 0;
+                        const valorGlobalMes = valorProgramado + valorProjetado;
+                        
+                        const tdMes = $('<td>').addClass('valor-moeda col-mes-global')
+                            .text(formatarMoeda(valorGlobalMes))
+                            .css({
+                                'background': valorGlobalMes > 0 ? '#d1ecf1' : '#fff',
+                                'font-weight': valorGlobalMes > 0 ? '600' : 'normal'
+                            })
+                            .attr('title', `Programado: ${formatarMoeda(valorProgramado)}\nProjetado: ${formatarMoeda(valorProjetado)}`);
+                        
+                        tr.append(tdMes);
+                    }
+                }
+            }
             
             // Adicionar Total Global
             const totalGlobal = (item.total_programado || 0) + (item.total_projetado || 0);
@@ -616,37 +989,111 @@
         const totalProgramado = dadosFiltrados.reduce((sum, item) => sum + (item.total_programado || 0), 0);
         const totalProjetado = dadosFiltrados.reduce((sum, item) => sum + (item.total_projetado || 0), 0);
         const totalGlobal = totalProgramado + totalProjetado;
-        $('#total_programado_footer').text(formatarMoeda(totalProgramado));
-        $('#total_projetado_footer').text(formatarMoeda(totalProjetado));
-        $('#total_global_footer').text(formatarMoeda(totalGlobal));
         
-        // Se cronograma expandido, adicionar totais mensais no footer
-        if (cronogramaExpandido) {
-            const footerRow = $('#tabelaOrcamento tfoot tr');
-            footerRow.find('.col-mes').remove();
+        const footerRow = $('#tabelaOrcamento tfoot tr');
+        footerRow.find('.col-mes-programado').remove();
+        footerRow.find('.col-mes-projetado').remove();
+        
+        // Se cronograma PROGRAMADO expandido, adicionar totais mensais
+        if (cronogramaProgramadoExpandido) {
+            const thProgramado = $('#total_programado_footer');
             
-            const thProgramado = footerRow.find('th:contains("R$")').first();
-            
-            // Calcular totais por mês (soma de programado + projetado)
             for (let mes = 1; mes <= 12; mes++) {
                 let totalMesProgramado = 0;
-                let totalMesProjetado = 0;
                 
                 dadosFiltrados.forEach(function(item) {
                     const cronogramaProg = dadosCronograma.programados?.[item.numero_termo] || {};
-                    const cronogramaProj = dadosCronograma.projetados?.[item.numero_termo] || {};
-                    
                     totalMesProgramado += cronogramaProg[mes] || 0;
-                    totalMesProjetado += cronogramaProj[mes] || 0;
                 });
                 
-                const totalMesGlobal = totalMesProgramado + totalMesProjetado;
-                const thMes = $('<th>').addClass('valor-moeda col-mes').text(formatarMoeda(totalMesGlobal))
-                    .attr('title', `Programado: ${formatarMoeda(totalMesProgramado)}\nProjetado: ${formatarMoeda(totalMesProjetado)}`)
-                    .css('cursor', 'help');
+                const thMes = $('<th>').addClass('valor-moeda col-mes-programado')
+                    .text(formatarMoeda(totalMesProgramado))
+                    .css({
+                        'background': totalMesProgramado > 0 ? '#d4edda' : '#f8f9fa',
+                        'font-weight': '700'
+                    });
                 thMes.insertBefore(thProgramado);
             }
         }
+        
+        $('#total_programado_footer').text(formatarMoeda(totalProgramado));
+        
+        // Se cronograma PROJETADO expandido, adicionar totais mensais
+        if (cronogramaProjetadoExpandido) {
+            const thProjetado = $('#total_projetado_footer');
+            
+            for (let mes = 1; mes <= 12; mes++) {
+                let totalMesProjetado = 0;
+                
+                dadosFiltrados.forEach(function(item) {
+                    const cronogramaProj = dadosCronograma.projetados?.[item.numero_termo] || {};
+                    totalMesProjetado += cronogramaProj[mes] || 0;
+                });
+                
+                const thMes = $('<th>').addClass('valor-moeda col-mes-projetado')
+                    .text(formatarMoeda(totalMesProjetado))
+                    .css({
+                        'background': totalMesProjetado > 0 ? '#fff3cd' : '#f8f9fa',
+                        'font-weight': '700'
+                    });
+                thMes.insertBefore(thProjetado);
+            }
+        }
+        
+        $('#total_projetado_footer').text(formatarMoeda(totalProjetado));
+        
+        // Se cronograma GLOBAL expandido, adicionar totais mensais
+        if (cronogramaGlobalExpandido) {
+            const thGlobal = $('#total_global_footer');
+            
+            // MODO DETALHADO: Usa dados da tabela ultra_liquidacoes_cronograma
+            if (modoDetalhado) {
+                for (let mes = 1; mes <= 12; mes++) {
+                    let totalMesDetalhado = 0;
+                    
+                    dadosFiltrados.forEach(function(item) {
+                        const cronogramaDetalhado = dadosCronogramaDetalhado[item.numero_termo] || {};
+                        const dadosMes = cronogramaDetalhado[mes] || { valor: 0, parcelas: [] };
+                        totalMesDetalhado += dadosMes.valor || 0;
+                    });
+                    
+                    const thMes = $('<th>').addClass('valor-moeda col-mes-global')
+                        .text(formatarMoeda(totalMesDetalhado))
+                        .css({
+                            'background': totalMesDetalhado > 0 ? '#d1ecf1' : '#f8f9fa',
+                            'font-weight': '700'
+                        })
+                        .attr('title', 'Modo Detalhado');
+                    thMes.insertBefore(thGlobal);
+                }
+            }
+            // MODO NORMAL: Soma de Programadas + Projetadas
+            else {
+                for (let mes = 1; mes <= 12; mes++) {
+                    let totalMesProgramado = 0;
+                    let totalMesProjetado = 0;
+                    
+                    dadosFiltrados.forEach(function(item) {
+                        const cronogramaProg = dadosCronograma.programados?.[item.numero_termo] || {};
+                        const cronogramaProj = dadosCronograma.projetados?.[item.numero_termo] || {};
+                        totalMesProgramado += cronogramaProg[mes] || 0;
+                        totalMesProjetado += cronogramaProj[mes] || 0;
+                    });
+                    
+                    const totalMesGlobal = totalMesProgramado + totalMesProjetado;
+                    const thMes = $('<th>').addClass('valor-moeda col-mes-global')
+                        .text(formatarMoeda(totalMesGlobal))
+                        .css({
+                            'background': totalMesGlobal > 0 ? '#d1ecf1' : '#f8f9fa',
+                            'font-weight': '700'
+                        })
+                        .attr('title', `Programado: ${formatarMoeda(totalMesProgramado)}\nProjetado: ${formatarMoeda(totalMesProjetado)}`);
+                    thMes.insertBefore(thGlobal);
+                }
+            }
+        }
+        
+        $('#total_global_footer').text(formatarMoeda(totalGlobal));
     }
     
     // Atualizar cards de resumo
@@ -666,6 +1113,8 @@
     // ==================== FILTROS SIMPLIFICADOS ====================
     
     function aplicarFiltros() {
+        salvarFiltros(); // ⚡ NOVO: Salvar filtros antes de aplicar
+        
         // Coletar valores dos filtros
         const filtros = {
             numero_termo: $('#filtro_numero_termo').val().toLowerCase(),
@@ -679,8 +1128,24 @@
             sei_pc: $('#filtro_sei_pc').val().toLowerCase(),
             osc: $('#filtro_osc').val().toLowerCase(),
             projeto: $('#filtro_projeto').val().toLowerCase(),
-            sei_celeb: $('#filtro_sei_celeb').val().toLowerCase()
+            sei_celeb: $('#filtro_sei_celeb').val().toLowerCase(),
+            programado_min: $('#filtro_programado_min').val() === '' ? null : parseFloat($('#filtro_programado_min').val()),
+            programado_max: $('#filtro_programado_max').val() === '' ? null : parseFloat($('#filtro_programado_max').val()),
+            projetado_min: $('#filtro_projetado_min').val() === '' ? null : parseFloat($('#filtro_projetado_min').val()),
+            projetado_max: $('#filtro_projetado_max').val() === '' ? null : parseFloat($('#filtro_projetado_max').val()),
+            global_min: $('#filtro_global_min').val() === '' ? null : parseFloat($('#filtro_global_min').val()),
+            global_max: $('#filtro_global_max').val() === '' ? null : parseFloat($('#filtro_global_max').val())
         };
+        
+        // DEBUG: Log dos filtros de valores
+        console.log('🔍 DEBUG FILTROS DE VALORES:', {
+            programado_min: filtros.programado_min,
+            programado_max: filtros.programado_max,
+            projetado_min: filtros.projetado_min,
+            projetado_max: filtros.projetado_max,
+            global_min: filtros.global_min,
+            global_max: filtros.global_max
+        });
         
         // Filtrar dados
         dadosFiltrados = dadosCompletos.filter(item => {
@@ -712,6 +1177,20 @@
             if (filtros.projeto && !item.projeto.toLowerCase().includes(filtros.projeto)) return false;
             if (filtros.sei_celeb && !item.sei_celeb.toLowerCase().includes(filtros.sei_celeb)) return false;
             
+            // Filtros de valores (min/max) - DEBUG
+            if (filtros.programado_min !== null && item.total_programado < filtros.programado_min) {
+                console.log(`❌ Filtrado por programado_min: ${item.numero_termo} (${item.total_programado} < ${filtros.programado_min})`);
+                return false;
+            }
+            if (filtros.programado_max !== null && item.total_programado > filtros.programado_max) {
+                console.log(`❌ Filtrado por programado_max: ${item.numero_termo} (${item.total_programado} > ${filtros.programado_max})`);
+                return false;
+            }
+            if (filtros.projetado_min !== null && item.total_projetado < filtros.projetado_min) return false;
+            if (filtros.projetado_max !== null && item.total_projetado > filtros.projetado_max) return false;
+            if (filtros.global_min !== null && item.total_global < filtros.global_min) return false;
+            if (filtros.global_max !== null && item.total_global > filtros.global_max) return false;
+            
             return true;
         });
         
@@ -721,12 +1200,34 @@
     }
     
     function limparFiltros() {
-        // Limpar campos
+        // Limpar campos de texto
         $('#filtro_numero_termo, #filtro_dotacao, #filtro_projeto_atividade, #filtro_programatica').val('');
-        $('#filtro_tipo_contrato, #filtro_cnpj, #filtro_sei_pc').val('');
-        $('#filtro_osc, #filtro_projeto, #filtro_sei_celeb').val('');
-        $('#filtro_mes_termino').val('');
-        $('#filtro_ano_termino').val('');
+        $('#filtro_cnpj, #filtro_sei_pc, #filtro_sei_celeb').val('');
+        
+        // Limpar autocomplete (inputs com datalist)
+        $('#filtro_tipo_contrato, #filtro_osc, #filtro_projeto').val('');
+        
+        // Limpar data de término
+        $('#filtro_mes_termino, #filtro_ano_termino').val('');
+        
+        // Limpar filtros de valores
+        $('#filtro_programado_min, #filtro_programado_max').val('');
+        $('#filtro_projetado_min, #filtro_projetado_max').val('');
+        $('#filtro_global_min, #filtro_global_max').val('');
+        
+        // ⚡ NOVO: Remover filtros do localStorage (mantém apenas ano e colunas)
+        const filtrosSalvos = JSON.parse(localStorage.getItem('orcamento_detalhado_filtros') || '{}');
+        const apenasAnoEColunas = {
+            ano_referencia: filtrosSalvos.ano_referencia,
+            chk_tipo_contrato: filtrosSalvos.chk_tipo_contrato,
+            chk_data_termino: filtrosSalvos.chk_data_termino,
+            chk_cnpj: filtrosSalvos.chk_cnpj,
+            chk_sei_pc: filtrosSalvos.chk_sei_pc,
+            chk_osc: filtrosSalvos.chk_osc,
+            chk_projeto: filtrosSalvos.chk_projeto,
+            chk_sei_celeb: filtrosSalvos.chk_sei_celeb
+        };
+        localStorage.setItem('orcamento_detalhado_filtros', JSON.stringify(apenasAnoEColunas));
         
         // Resetar dados filtrados
         dadosFiltrados = [...dadosCompletos];
@@ -758,7 +1259,7 @@
         
         // Criar CSV
         const BOM = '\uFEFF';
-        const cabecalho = ['Dotação Orçamentária', 'Projeto-Atividade', 'Programática', 'Número do Termo'];
+        const cabecalho = ['Dotação Orçamentária', 'Projeto-Atividade', 'Programática', 'Termo ou Edital'];
         
         // Adicionar colunas opcionais ao cabeçalho se estiverem visíveis
         if ($('#chk_tipo_contrato').is(':checked')) cabecalho.push('Tipo de Contrato');
@@ -769,14 +1270,32 @@
         if ($('#chk_projeto').is(':checked')) cabecalho.push('Projeto');
         if ($('#chk_sei_celeb').is(':checked')) cabecalho.push('SEI de Celebração');
         
-        // Se cronograma expandido, adicionar colunas de meses
-        if (cronogramaExpandido) {
-            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        // Se cronograma PROGRAMADO expandido, adicionar colunas de meses
+        if (cronogramaProgramadoExpandido) {
+            const meses = ['Jan (Prog)', 'Fev (Prog)', 'Mar (Prog)', 'Abr (Prog)', 'Mai (Prog)', 'Jun (Prog)', 
+                          'Jul (Prog)', 'Ago (Prog)', 'Set (Prog)', 'Out (Prog)', 'Nov (Prog)', 'Dez (Prog)'];
             meses.forEach(mes => cabecalho.push(mes));
         }
         
         cabecalho.push('Total Programado');
+        
+        // Se cronograma PROJETADO expandido, adicionar colunas de meses
+        if (cronogramaProjetadoExpandido) {
+            const meses = ['Jan (Proj)', 'Fev (Proj)', 'Mar (Proj)', 'Abr (Proj)', 'Mai (Proj)', 'Jun (Proj)', 
+                          'Jul (Proj)', 'Ago (Proj)', 'Set (Proj)', 'Out (Proj)', 'Nov (Proj)', 'Dez (Proj)'];
+            meses.forEach(mes => cabecalho.push(mes));
+        }
+        
         cabecalho.push('Total Projetado');
+        
+        // Se cronograma GLOBAL expandido, adicionar colunas de meses
+        if (cronogramaGlobalExpandido) {
+            const meses = ['Jan (Global)', 'Fev (Global)', 'Mar (Global)', 'Abr (Global)', 'Mai (Global)', 'Jun (Global)', 
+                          'Jul (Global)', 'Ago (Global)', 'Set (Global)', 'Out (Global)', 'Nov (Global)', 'Dez (Global)'];
+            meses.forEach(mes => cabecalho.push(mes));
+        }
+        
+        cabecalho.push('Total Global');
         
         const linhas = [cabecalho.join(';')];
         
@@ -797,17 +1316,54 @@
             if ($('#chk_projeto').is(':checked')) linha.push(item.projeto || '');
             if ($('#chk_sei_celeb').is(':checked')) linha.push(item.sei_celeb || '');
             
-            // Se cronograma expandido, adicionar valores mensais
-            if (cronogramaExpandido) {
-                const cronogramaTermo = dadosCronograma[item.numero_termo] || {};
+            // Se cronograma PROGRAMADO expandido, adicionar valores mensais
+            if (cronogramaProgramadoExpandido) {
+                const cronogramaProg = dadosCronograma.programados?.[item.numero_termo] || {};
                 for (let mes = 1; mes <= 12; mes++) {
-                    const valorMes = cronogramaTermo[mes] || 0;
+                    const valorMes = cronogramaProg[mes] || 0;
                     linha.push(formatarMoedaExcel(valorMes));
                 }
             }
             
             linha.push(formatarMoedaExcel(item.total_programado));
+            
+            // Se cronograma PROJETADO expandido, adicionar valores mensais
+            if (cronogramaProjetadoExpandido) {
+                const cronogramaProj = dadosCronograma.projetados?.[item.numero_termo] || {};
+                for (let mes = 1; mes <= 12; mes++) {
+                    const valorMes = cronogramaProj[mes] || 0;
+                    linha.push(formatarMoedaExcel(valorMes));
+                }
+            }
+            
             linha.push(formatarMoedaExcel(item.total_projetado));
+            
+            // Se cronograma GLOBAL expandido, adicionar valores mensais
+            if (cronogramaGlobalExpandido) {
+                // MODO DETALHADO: Usa dados da tabela ultra_liquidacoes_cronograma
+                if (modoDetalhado) {
+                    const cronogramaDetalhado = dadosCronogramaDetalhado[item.numero_termo] || {};
+                    
+                    for (let mes = 1; mes <= 12; mes++) {
+                        const dadosMes = cronogramaDetalhado[mes] || {};
+                        const valorMes = dadosMes.valor || 0;
+                        linha.push(formatarMoedaExcel(valorMes));
+                    }
+                }
+                // MODO NORMAL: Soma de Programadas + Projetadas
+                else {
+                    const cronogramaProg = dadosCronograma.programados?.[item.numero_termo] || {};
+                    const cronogramaProj = dadosCronograma.projetados?.[item.numero_termo] || {};
+                    for (let mes = 1; mes <= 12; mes++) {
+                        const valorProg = cronogramaProg[mes] || 0;
+                        const valorProj = cronogramaProj[mes] || 0;
+                        const valorGlobal = valorProg + valorProj;
+                        linha.push(formatarMoedaExcel(valorGlobal));
+                    }
+                }
+            }
+            
+            linha.push(formatarMoedaExcel(item.total_global || ((item.total_programado || 0) + (item.total_projetado || 0))));
             
             linhas.push(linha.join(';'));
         });
@@ -837,6 +1393,124 @@
     function formatarMoedaExcel(valor) {
         if (!valor) return '0,00';
         return parseFloat(valor).toFixed(2).replace('.', ',');
+    }
+    
+    // ==================== PERSISTÊNCIA DE FILTROS ====================
+    
+    // Salvar filtros no localStorage
+    function salvarFiltros() {
+        const filtros = {
+            // Ano de referência
+            ano_referencia: $('#ano_referencia').val(),
+            
+            // Filtros de texto
+            numero_termo: $('#filtro_numero_termo').val(),
+            dotacao: $('#filtro_dotacao').val(),
+            projeto_atividade: $('#filtro_projeto_atividade').val(),
+            programatica: $('#filtro_programatica').val(),
+            tipo_contrato: $('#filtro_tipo_contrato').val(),
+            mes_termino: $('#filtro_mes_termino').val(),
+            ano_termino: $('#filtro_ano_termino').val(),
+            cnpj: $('#filtro_cnpj').val(),
+            sei_pc: $('#filtro_sei_pc').val(),
+            osc: $('#filtro_osc').val(),
+            projeto: $('#filtro_projeto').val(),
+            sei_celeb: $('#filtro_sei_celeb').val(),
+            
+            // Filtros de valores
+            programado_min: $('#filtro_programado_min').val(),
+            programado_max: $('#filtro_programado_max').val(),
+            projetado_min: $('#filtro_projetado_min').val(),
+            projetado_max: $('#filtro_projetado_max').val(),
+            global_min: $('#filtro_global_min').val(),
+            global_max: $('#filtro_global_max').val(),
+            
+            // Checkboxes de colunas
+            chk_tipo_contrato: $('#chk_tipo_contrato').is(':checked'),
+            chk_data_termino: $('#chk_data_termino').is(':checked'),
+            chk_cnpj: $('#chk_cnpj').is(':checked'),
+            chk_sei_pc: $('#chk_sei_pc').is(':checked'),
+            chk_osc: $('#chk_osc').is(':checked'),
+            chk_projeto: $('#chk_projeto').is(':checked'),
+            chk_sei_celeb: $('#chk_sei_celeb').is(':checked'),
+            
+            // Modo cronograma detalhado
+            chk_cronograma_detalhado: $('#chk_cronograma_detalhado').is(':checked')
+        };
+        
+        localStorage.setItem('orcamento_detalhado_filtros', JSON.stringify(filtros));
+        console.log('💾 Filtros salvos no localStorage');
+    }
+    
+    // Restaurar filtros do localStorage
+    function restaurarFiltros() {
+        const filtrosSalvos = localStorage.getItem('orcamento_detalhado_filtros');
+        
+        if (!filtrosSalvos) {
+            console.log('ℹ️ Nenhum filtro salvo encontrado');
+            return null;
+        }
+        
+        try {
+            const filtros = JSON.parse(filtrosSalvos);
+            console.log('📂 Restaurando filtros:', filtros);
+            
+            // Restaurar ano de referência
+            if (filtros.ano_referencia) {
+                $('#ano_referencia').val(filtros.ano_referencia);
+            }
+            
+            // Restaurar filtros de texto
+            $('#filtro_numero_termo').val(filtros.numero_termo || '');
+            $('#filtro_dotacao').val(filtros.dotacao || '');
+            $('#filtro_projeto_atividade').val(filtros.projeto_atividade || '');
+            $('#filtro_programatica').val(filtros.programatica || '');
+            $('#filtro_tipo_contrato').val(filtros.tipo_contrato || '');
+            $('#filtro_mes_termino').val(filtros.mes_termino || '');
+            $('#filtro_ano_termino').val(filtros.ano_termino || '');
+            $('#filtro_cnpj').val(filtros.cnpj || '');
+            $('#filtro_sei_pc').val(filtros.sei_pc || '');
+            $('#filtro_osc').val(filtros.osc || '');
+            $('#filtro_projeto').val(filtros.projeto || '');
+            $('#filtro_sei_celeb').val(filtros.sei_celeb || '');
+            
+            // Restaurar filtros de valores
+            $('#filtro_programado_min').val(filtros.programado_min || '');
+            $('#filtro_programado_max').val(filtros.programado_max || '');
+            $('#filtro_projetado_min').val(filtros.projetado_min || '');
+            $('#filtro_projetado_max').val(filtros.projetado_max || '');
+            $('#filtro_global_min').val(filtros.global_min || '');
+            $('#filtro_global_max').val(filtros.global_max || '');
+            
+            // Restaurar checkboxes de colunas
+            $('#chk_tipo_contrato').prop('checked', filtros.chk_tipo_contrato || false);
+            $('#chk_data_termino').prop('checked', filtros.chk_data_termino || false);
+            $('#chk_cnpj').prop('checked', filtros.chk_cnpj || false);
+            $('#chk_sei_pc').prop('checked', filtros.chk_sei_pc || false);
+            $('#chk_osc').prop('checked', filtros.chk_osc || false);
+            $('#chk_projeto').prop('checked', filtros.chk_projeto || false);
+            $('#chk_sei_celeb').prop('checked', filtros.chk_sei_celeb || false);
+            
+            // Restaurar modo cronograma detalhado
+            $('#chk_cronograma_detalhado').prop('checked', filtros.chk_cronograma_detalhado || false);
+            modoDetalhado = filtros.chk_cronograma_detalhado || false;
+            
+            // Aplicar visibilidade das colunas
+            $('.col-tipo-contrato').toggle(filtros.chk_tipo_contrato || false);
+            $('.col-data-termino').toggle(filtros.chk_data_termino || false);
+            $('.col-cnpj').toggle(filtros.chk_cnpj || false);
+            $('.col-sei-pc').toggle(filtros.chk_sei_pc || false);
+            $('.col-osc').toggle(filtros.chk_osc || false);
+            $('.col-projeto').toggle(filtros.chk_projeto || false);
+            $('.col-sei-celeb').toggle(filtros.chk_sei_celeb || false);
+            
+            console.log('✅ Filtros restaurados com sucesso');
+            return filtros;
+        } catch (e) {
+            console.error('❌ Erro ao restaurar filtros:', e);
+            localStorage.removeItem('orcamento_detalhado_filtros');
+            return null;
+        }
     }
 </script>
 

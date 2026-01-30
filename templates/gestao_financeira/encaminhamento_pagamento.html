@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encaminhamento de Pagamento - Gestão Financeira</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            min-height: 100vh; 
+            padding: 20px; 
+        }
+        .main-container { 
+            max-width: 95%;
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 15px; 
+            padding: 30px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+        }
+        .btn-voltar {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+        }
+        .btn-voltar:hover {
+            background-color: #5a6268;
+            color: white;
+        }
+        .parcela-checkbox {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e9ecef;
+            transition: background-color 0.2s;
+        }
+        .parcela-checkbox:hover {
+            background-color: #f8f9fa;
+        }
+        .table thead th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+        .valor-moeda {
+            text-align: right;
+            font-weight: 600;
+            color: #198754;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Cabeçalho -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-0">
+                    <i class="bi bi-file-earmark-text me-2"></i>Encaminhamento de Pagamento
+                </h2>
+                <p class="text-muted mb-0">Termo: <strong id="info_numero_termo">{{ numero_termo }}</strong></p>
+            </div>
+            <a href="/gestao_financeira/ultra-liquidacoes" class="btn btn-voltar">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+
+        <!-- Seleção de Parcelas -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-check2-square me-2"></i>Selecione as Parcelas para Pagamento
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Checkbox "Todas as Parcelas" -->
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="todas_parcelas">
+                    <label class="form-check-label fw-bold" for="todas_parcelas">
+                        Selecionar Todas as Parcelas
+                    </label>
+                </div>
+
+                <!-- Tabela de Parcelas -->
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered" id="tabelaParcelas">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">
+                                    <input type="checkbox" id="check_header" title="Selecionar todas">
+                                </th>
+                                <th>Vigência Inicial</th>
+                                <th>Vigência Final</th>
+                                <th>Parcela</th>
+                                <th>Elemento 53/23</th>
+                                <th>Elemento 53/24</th>
+                                <th>Valor Previsto</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpoTabelaParcelas">
+                            <!-- Preenchido via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Botão Próximo -->
+                <div class="d-flex justify-content-end mt-3">
+                    <button type="button" id="btnProximo" class="btn btn-primary btn-lg" disabled>
+                        <i class="bi bi-arrow-right me-2"></i>Próximo: Gerar Documento
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const numeroTermo = "{{ numero_termo }}";
+        let parcelasDisponiveis = [];
+
+        $(document).ready(function() {
+            carregarParcelas();
+
+            // Checkbox "Todas as Parcelas" no header
+            $('#check_header').on('change', function() {
+                const checked = $(this).is(':checked');
+                $('.parcela-checkbox:visible').prop('checked', checked);
+                atualizarBotaoProximo();
+            });
+
+            // Atualizar estado ao mudar parcelas individuais
+            $(document).on('change', '.parcela-checkbox', function() {
+                atualizarEstadoCheckAll();
+                atualizarBotaoProximo();
+            });
+
+            // Botão Próximo
+            $('#btnProximo').on('click', function() {
+                const parcelasSelecionadas = [];
+                $('.parcela-checkbox:checked').each(function() {
+                    const id = $(this).data('id');
+                    const parcela = parcelasDisponiveis.find(p => p.id === id);
+                    if (parcela) {
+                        parcelasSelecionadas.push(parcela);
+                    }
+                });
+
+                if (parcelasSelecionadas.length === 0) {
+                    alert('Selecione pelo menos uma parcela');
+                    return;
+                }
+
+                // Redirecionar para página de geração com IDs
+                const ids = parcelasSelecionadas.map(p => p.id).join(',');
+                window.location.href = `/gestao_financeira/ultra-liquidacoes/gerar-encaminhamento-pagamento?numero_termo=${encodeURIComponent(numeroTermo)}&parcela_ids=${ids}`;
+            });
+        });
+
+        function carregarParcelas() {
+            $.ajax({
+                url: '/gestao_financeira/ultra-liquidacoes/api/parcelas-disponiveis-pagamento',
+                method: 'GET',
+                data: { numero_termo: numeroTermo },
+                success: function(response) {
+                    if (response.success) {
+                        parcelasDisponiveis = response.parcelas;
+                        renderizarParcelas(response.parcelas);
+                    } else {
+                        alert('Erro: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    alert('Erro ao carregar parcelas: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                }
+            });
+        }
+
+        function renderizarParcelas(parcelas) {
+            const tbody = $('#corpoTabelaParcelas');
+            tbody.empty();
+
+            if (parcelas.length === 0) {
+                tbody.html(`
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-0">Nenhuma parcela disponível para pagamento</p>
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            parcelas.forEach(function(p) {
+                const tr = $('<tr>');
+                
+                // Checkbox
+                tr.append($('<td>').html(`
+                    <input type="checkbox" class="parcela-checkbox form-check-input" 
+                           data-id="${p.id}" data-parcela="${p.parcela_numero}">
+                `));
+
+                // Dados da parcela
+                tr.append($('<td>').text(p.vigencia_inicial));
+                tr.append($('<td>').text(p.vigencia_final));
+                tr.append($('<td>').text(p.parcela_numero));
+                tr.append($('<td>').addClass('valor-moeda').text(p.valor_elemento_53_23_fmt));
+                tr.append($('<td>').addClass('valor-moeda').text(p.valor_elemento_53_24_fmt));
+                tr.append($('<td>').addClass('valor-moeda fw-bold').text(p.valor_previsto_fmt));
+                
+                // Status com badge
+                let badgeClass = 'bg-secondary';
+                if (p.parcela_status === 'Não Pago' || p.parcela_status === 'Nao Pago') {
+                    badgeClass = 'bg-warning text-dark';
+                } else if (p.parcela_status === 'Pago' && p.parcela_status_secundario === 'Parcial') {
+                    badgeClass = 'bg-info text-dark';
+                }
+                
+                const statusText = p.parcela_status_secundario === 'Parcial' 
+                    ? `${p.parcela_status} (${p.parcela_status_secundario})`
+                    : p.parcela_status;
+                
+                tr.append($('<td>').html(`<span class="badge ${badgeClass}">${statusText}</span>`));
+
+                tbody.append(tr);
+            });
+        }
+
+        function atualizarEstadoCheckAll() {
+            const total = $('.parcela-checkbox:visible').length;
+            const checados = $('.parcela-checkbox:checked').length;
+            $('#check_header').prop('checked', total > 0 && total === checados);
+        }
+
+        function atualizarBotaoProximo() {
+            const checados = $('.parcela-checkbox:checked').length;
+            $('#btnProximo').prop('disabled', checados === 0);
+        }
+    </script>
+</body>
+</html>

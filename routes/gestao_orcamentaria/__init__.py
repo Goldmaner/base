@@ -187,6 +187,62 @@ def api_orcamento_detalhado():
                     'total_global': total_global
                 })
         
+        # 3. Buscar EDITAIS da tabela orcamento_edital_nova
+        # Editais NUNCA têm valor programado, apenas projetado
+        cur.execute("""
+            SELECT 
+                edital_nome,
+                dotacao_formatada,
+                projeto_atividade,
+                SUM(valor_mes) as total_projetado
+            FROM gestao_financeira.orcamento_edital_nova
+            WHERE EXTRACT(YEAR FROM nome_mes) = %s
+            GROUP BY edital_nome, dotacao_formatada, projeto_atividade
+            ORDER BY edital_nome
+        """, (ano_referencia,))
+        
+        editais = cur.fetchall()
+        
+        for edital in editais:
+            edital_nome = edital['edital_nome']
+            dotacao_formatada = edital['dotacao_formatada']
+            projeto_atividade_edital = edital['projeto_atividade']
+            total_projetado_edital = float(edital['total_projetado'] or 0)
+            
+            # Buscar Programática usando dotacao_formatada na tabela c_geral_dotacoes
+            # A dotação contém o projeto-atividade, então buscamos pela dotação completa
+            programatica_edital = None
+            if dotacao_formatada:
+                cur.execute("""
+                    SELECT programa_aplicacao
+                    FROM categoricas.c_geral_dotacoes
+                    WHERE dotacao_numero = %s
+                    LIMIT 1
+                """, (dotacao_formatada,))
+                prog_row = cur.fetchone()
+                if prog_row:
+                    programatica_edital = prog_row['programa_aplicacao']
+            
+            # Adicionar edital aos resultados
+            # IMPORTANTE: Colunas auxiliares (CNPJ, Tipo de Contrato, etc.) = "-"
+            if total_projetado_edital > 0:
+                resultado.append({
+                    'numero_termo': edital_nome,  # Nome do edital na coluna "Termo ou Edital"
+                    'dotacao_orcamentaria': dotacao_formatada or 'Não identificada',
+                    'projeto_atividade': projeto_atividade_edital or '-',
+                    'programatica': programatica_edital or 'Não identificada',
+                    'cnpj': '-',  # ⚡ Editais não têm CNPJ
+                    'sei_pc': '-',  # ⚡ Editais não têm SEI PC
+                    'osc': '-',  # ⚡ Editais não têm OSC
+                    'projeto': '-',  # ⚡ Editais não têm Projeto
+                    'sei_celeb': '-',  # ⚡ Editais não têm SEI Celebração
+                    'tipo_contrato': '-',  # ⚡ Editais não têm Tipo de Contrato
+                    'data_termino': '-',  # ⚡ Editais não têm Data de Término
+                    'total_programado': 0,  # ⚡ Editais NUNCA têm valor programado
+                    'total_projetado': total_projetado_edital,
+                    'total_global': total_projetado_edital  # Global = Projetado (sem Programado)
+                })
+        
         return jsonify({
             'success': True,
             'dados': resultado,
@@ -195,6 +251,82 @@ def api_orcamento_detalhado():
     
     except Exception as e:
         print(f"Erro em api_orcamento_detalhado: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@gestao_orcamentaria_bp.route('/api/cronograma-detalhado')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_cronograma_detalhado():
+    """API para obter cronograma detalhado da tabela ultra_liquidacoes_cronograma"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        ano_referencia = request.args.get('ano_referencia')
+        
+        if not ano_referencia:
+            return jsonify({'success': False, 'error': 'Ano de referência não fornecido'}), 400
+        
+        print(f"[DEBUG CRONOGRAMA DETALHADO] Buscando cronograma detalhado para ano: {ano_referencia}")
+        
+        # Buscar dados da tabela ultra_liquidacoes_cronograma
+        # Filtrar apenas meses do ano de referência
+        cur.execute("""
+            SELECT 
+                numero_termo,
+                nome_mes,
+                valor_mes,
+                parcela_numero
+            FROM gestao_financeira.ultra_liquidacoes_cronograma
+            WHERE EXTRACT(YEAR FROM nome_mes) = %s
+            ORDER BY numero_termo, nome_mes
+        """, (ano_referencia,))
+        
+        resultados = cur.fetchall()
+        print(f"[DEBUG CRONOGRAMA DETALHADO] Registros encontrados: {len(resultados)}")
+        
+        # Organizar dados por termo e mês
+        # dados[numero_termo][mes] = {valor: valor_mes, parcela: parcela_numero}
+        dados = {}
+        
+        for row in resultados:
+            numero_termo = row['numero_termo']
+            nome_mes = row['nome_mes']  # DATE no formato YYYY-MM-01
+            valor_mes = float(row['valor_mes']) if row['valor_mes'] else 0
+            parcela_numero = row['parcela_numero']
+            
+            if numero_termo not in dados:
+                dados[numero_termo] = {}
+            
+            # Extrair mês (1-12)
+            mes = nome_mes.month
+            
+            # Acumular valor se já existe (caso haja múltiplas entradas para o mesmo mês)
+            if mes not in dados[numero_termo]:
+                dados[numero_termo][mes] = {
+                    'valor': 0,
+                    'parcelas': []
+                }
+            
+            dados[numero_termo][mes]['valor'] += valor_mes
+            if parcela_numero not in dados[numero_termo][mes]['parcelas']:
+                dados[numero_termo][mes]['parcelas'].append(parcela_numero)
+        
+        print(f"[DEBUG CRONOGRAMA DETALHADO] Termos processados: {len(dados)}")
+        
+        return jsonify({
+            'success': True,
+            'dados': dados
+        })
+    
+    except Exception as e:
+        print(f"[ERRO CRONOGRAMA DETALHADO] {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -219,8 +351,9 @@ def api_cronograma_mensal():
         
         print(f"[DEBUG CRONOGRAMA] Buscando cronograma para ano: {ano_referencia}")
         
-        # Buscar parcelas do ano com vigência que cruza os meses
-        # Para cada parcela, verificar em quais meses ela está vigente
+        # Buscar parcelas do ano com vigência que começa no ano de referência
+        # ⚡ IMPORTANTE: O valor integral da parcela aparece no mês de vigencia_inicial
+        # Não dividimos o valor pelos meses, cada parcela é um "pagamento esperado" naquele mês
         cur.execute("""
             SELECT 
                 ul.numero_termo,
@@ -230,56 +363,42 @@ def api_cronograma_mensal():
                 ul.parcela_tipo
             FROM gestao_financeira.ultra_liquidacoes ul
             WHERE EXTRACT(YEAR FROM ul.vigencia_inicial) = %s
-               OR (ul.vigencia_inicial < DATE_TRUNC('year', %s::date) 
-                   AND ul.vigencia_final >= DATE_TRUNC('year', %s::date))
             ORDER BY ul.numero_termo, ul.vigencia_inicial
-        """, (ano_referencia, f"{ano_referencia}-01-01", f"{ano_referencia}-01-01"))
+        """, (ano_referencia,))
         
         parcelas = cur.fetchall()
         print(f"[DEBUG CRONOGRAMA] Parcelas encontradas: {len(parcelas)}")
         
         # Organizar dados por termo, tipo e mês
+        # dados_programados[numero_termo][mes] = valor_total_do_mes
+        # dados_projetados[numero_termo][mes] = valor_total_do_mes
         dados_programados = {}
         dados_projetados = {}
         
         for parcela in parcelas:
             numero_termo = parcela['numero_termo']
             vig_inicial = parcela['vigencia_inicial']
-            vig_final = parcela['vigencia_final']
             valor_previsto = float(parcela['valor_previsto']) if parcela['valor_previsto'] else 0
             parcela_tipo = parcela['parcela_tipo']
             
-            # Calcular quantos meses a parcela cobre no ano de referência
-            from datetime import date
-            ano_int = int(ano_referencia)
+            if not vig_inicial:
+                continue
             
-            # Limitar vigência ao ano de referência
-            inicio_ano = date(ano_int, 1, 1)
-            fim_ano = date(ano_int, 12, 31)
+            # ⚡ LÓGICA CORRETA: Valor integral vai para o mês de vigencia_inicial
+            mes_pagamento = vig_inicial.month
             
-            inicio_efetivo = max(vig_inicial, inicio_ano) if vig_inicial else inicio_ano
-            fim_efetivo = min(vig_final, fim_ano) if vig_final else fim_ano
+            # Selecionar o dict correto baseado no tipo
+            dados_dict = dados_programados if parcela_tipo == 'Programada' else dados_projetados
             
-            # Se a vigência está dentro do ano
-            if inicio_efetivo <= fim_efetivo:
-                # Distribuir o valor pelos meses de vigência
-                mes_inicio = inicio_efetivo.month
-                mes_fim = fim_efetivo.month
-                
-                meses_vigencia = mes_fim - mes_inicio + 1
-                valor_por_mes = valor_previsto / meses_vigencia if meses_vigencia > 0 else 0
-                
-                # Selecionar o dict correto baseado no tipo
-                dados_dict = dados_programados if parcela_tipo == 'Programada' else dados_projetados
-                
-                if numero_termo not in dados_dict:
-                    dados_dict[numero_termo] = {}
-                
-                # Distribuir valor pelos meses
-                for mes in range(mes_inicio, mes_fim + 1):
-                    if mes not in dados_dict[numero_termo]:
-                        dados_dict[numero_termo][mes] = 0
-                    dados_dict[numero_termo][mes] += valor_por_mes
+            if numero_termo not in dados_dict:
+                dados_dict[numero_termo] = {}
+            
+            # Acumular valor no mês de pagamento (pode haver múltiplas parcelas no mesmo mês)
+            if mes_pagamento not in dados_dict[numero_termo]:
+                dados_dict[numero_termo][mes_pagamento] = 0
+            dados_dict[numero_termo][mes_pagamento] += valor_previsto
+            
+            print(f"[DEBUG] {numero_termo} | {parcela_tipo} | Mês {mes_pagamento} | R$ {valor_previsto:,.2f}")
         
         print(f"[DEBUG CRONOGRAMA] Termos programados: {len(dados_programados)}, Termos projetados: {len(dados_projetados)}")
         
@@ -291,6 +410,333 @@ def api_cronograma_mensal():
     
     except Exception as e:
         print(f"Erro em api_cronograma_mensal: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@gestao_orcamentaria_bp.route('/relatorio-dotacao')
+@login_required
+@requires_access('gestao_orcamentaria')
+def relatorio_dotacao():
+    """Página de relatório - Dotações Orçamentárias"""
+    return render_template('gestao_orcamentaria/relatorio_dotacao.html')
+
+
+@gestao_orcamentaria_bp.route('/api/dotacoes')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_dotacoes():
+    """API para obter dados das dotações orçamentárias"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        # Filtros opcionais
+        cod_cta_desp = request.args.get('cod_cta_desp', '33503900')  # Padrão: 33503900
+        cod_proj_atvd = request.args.get('cod_proj_atvd', '')
+        
+        # Query base
+        query = """
+            SELECT 
+                dotacao_formatada,
+                cod_proj_atvd_sof,
+                txt_proj_atvd,
+                cod_cta_desp,
+                saldo_dotacao,
+                val_tot_eph,
+                val_tot_pgto_dota,
+                criado_em
+            FROM gestao_financeira.back_dotacao
+            WHERE 1=1
+        """
+        
+        params = []
+        
+        # Aplicar filtro de conta despesa
+        if cod_cta_desp:
+            query += " AND cod_cta_desp = %s"
+            params.append(cod_cta_desp)
+        
+        # Aplicar filtro de projeto-atividade
+        if cod_proj_atvd:
+            query += " AND cod_proj_atvd_sof IS NOT NULL AND cod_proj_atvd_sof::text ILIKE %s"
+            params.append(f'%{cod_proj_atvd}%')
+        
+        query += " ORDER BY dotacao_formatada"
+        
+        cur.execute(query, params)
+        dotacoes = cur.fetchall()
+        
+        # Converter para formato JSON serializable
+        resultado = []
+        for d in dotacoes:
+            # Converter valores monetários de string (com vírgula) para float
+            def converter_valor(valor_str):
+                if not valor_str:
+                    return 0
+                # Substituir vírgula por ponto e converter para float
+                valor_limpo = str(valor_str).replace(',', '.')
+                try:
+                    return float(valor_limpo)
+                except:
+                    return 0
+            
+            resultado.append({
+                'dotacao_formatada': d['dotacao_formatada'],
+                'cod_proj_atvd_sof': d['cod_proj_atvd_sof'],
+                'txt_proj_atvd': d['txt_proj_atvd'],
+                'cod_cta_desp': d['cod_cta_desp'],
+                'saldo_dotacao': converter_valor(d['saldo_dotacao']),
+                'val_tot_eph': converter_valor(d['val_tot_eph']),
+                'val_tot_pgto_dota': converter_valor(d['val_tot_pgto_dota']),
+                'criado_em': d['criado_em'].strftime('%d/%m/%Y %H:%M') if d['criado_em'] else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'dados': resultado,
+            'total_registros': len(resultado)
+        })
+    
+    except Exception as e:
+        print(f"Erro em api_dotacoes: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@gestao_orcamentaria_bp.route('/api/dotacoes/agrupado-projeto')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_dotacoes_agrupado():
+    """API para relatório agrupado por projeto-atividade"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        cod_cta_desp = request.args.get('cod_cta_desp', '33503900')
+        
+        # Buscar dados agrupados por dotacao_formatada (somente com saldo > 0)
+        query = """
+            SELECT 
+                dotacao_formatada,
+                cod_proj_atvd_sof,
+                txt_proj_atvd,
+                CAST(REPLACE(saldo_dotacao, ',', '.') AS NUMERIC) as total_saldo,
+                cod_cta_desp,
+                criado_em as ultima_atualizacao
+            FROM gestao_financeira.back_dotacao
+            WHERE cod_cta_desp = %s
+              AND CAST(REPLACE(saldo_dotacao, ',', '.') AS NUMERIC) > 0
+            ORDER BY dotacao_formatada
+        """
+        
+        cur.execute(query, (cod_cta_desp,))
+        agrupados = cur.fetchall()
+        
+        # Converter para formato JSON
+        resultado = []
+        for ag in agrupados:
+            resultado.append({
+                'dotacao_formatada': ag['dotacao_formatada'],
+                'cod_proj_atvd_sof': ag['cod_proj_atvd_sof'],
+                'txt_proj_atvd': ag['txt_proj_atvd'],
+                'total_saldo': float(ag['total_saldo']) if ag['total_saldo'] else 0,
+                'cod_cta_desp': ag['cod_cta_desp'],
+                'ultima_atualizacao': ag['ultima_atualizacao'].strftime('%d/%m/%Y %H:%M') if ag['ultima_atualizacao'] else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'dados': resultado,
+            'total_dotacoes': len(resultado)
+        })
+    
+    except Exception as e:
+        print(f"Erro em api_dotacoes_agrupado: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@gestao_orcamentaria_bp.route('/relatorio-reservas')
+@login_required
+@requires_access('gestao_orcamentaria')
+def relatorio_reservas():
+    """Página de relatório - Reservas Orçamentárias"""
+    return render_template('gestao_orcamentaria/relatorio_reservas.html')
+
+
+@gestao_orcamentaria_bp.route('/api/reservas')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_reservas():
+    """API para obter dados das reservas orçamentárias"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        # Filtro opcional por dotação
+        dotacao_filter = request.args.get('dotacao', '')
+        
+        # Query base
+        query = """
+            SELECT 
+                cod_resv_dota_sof,
+                dt_efet_resv,
+                dotacao_formatada,
+                hist_resv,
+                vl_saldo_resv
+            FROM gestao_financeira.back_reservas
+            WHERE 1=1
+        """
+        
+        params = []
+        
+        # Aplicar filtro de dotação com LIKE
+        if dotacao_filter:
+            query += " AND dotacao_formatada ILIKE %s"
+            params.append(f'%{dotacao_filter}%')
+        
+        query += " ORDER BY dt_efet_resv DESC, cod_resv_dota_sof DESC"
+        
+        cur.execute(query, params)
+        reservas = cur.fetchall()
+        
+        # Converter valores monetários
+        def converter_valor(valor_str):
+            if not valor_str:
+                return 0
+            valor_limpo = str(valor_str).replace(',', '.')
+            try:
+                return float(valor_limpo)
+            except:
+                return 0
+        
+        # Converter para formato JSON serializable
+        resultado = []
+        for r in reservas:
+            resultado.append({
+                'cod_resv_dota_sof': r['cod_resv_dota_sof'],
+                'dt_efet_resv': r['dt_efet_resv'].strftime('%d/%m/%Y') if r['dt_efet_resv'] else None,
+                'dotacao_formatada': r['dotacao_formatada'],
+                'hist_resv': r['hist_resv'],
+                'vl_saldo_resv': converter_valor(r['vl_saldo_resv'])
+            })
+        
+        return jsonify({
+            'success': True,
+            'dados': resultado,
+            'total_registros': len(resultado)
+        })
+    
+    except Exception as e:
+        print(f"Erro em api_reservas: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@gestao_orcamentaria_bp.route('/relatorio-empenhos')
+@requires_access('gestao_orcamentaria')
+def relatorio_empenhos():
+    """Página do relatório de empenhos"""
+    return render_template('gestao_orcamentaria/relatorio_empenhos.html')
+
+
+@gestao_orcamentaria_bp.route('/api/empenhos')
+@requires_access('gestao_orcamentaria')
+def api_empenhos():
+    """API para obter dados dos empenhos"""
+    try:
+        cur = get_cursor()
+        
+        # Pegar filtros (opcional)
+        filtro_dotacao = request.args.get('dotacao_formatada', '').strip()
+        
+        # Função auxiliar para converter valores VARCHAR para float
+        def converter_valor(valor_str):
+            if not valor_str:
+                return 0
+            try:
+                valor_limpo = str(valor_str).replace(',', '.')
+                return float(valor_limpo)
+            except:
+                return 0
+        
+        # Query base
+        query = """
+            SELECT 
+                dt_eph,
+                cod_eph,
+                cod_nro_pcss_sof,
+                txt_obs_eph,
+                val_tot_eph,
+                val_tot_canc_eph,
+                val_tot_lqdc_eph,
+                val_tot_pago_eph,
+                cod_item_desp_sof,
+                nom_rzao_soci_sof,
+                cod_cpf_cnpj_sof,
+                txt_dotacao_fmt
+            FROM gestao_financeira.back_empenhos
+            WHERE 1=1
+        """
+        
+        params = []
+        
+        # Adicionar filtro de dotação se fornecido
+        if filtro_dotacao:
+            query += " AND txt_dotacao_fmt ILIKE %s"
+            params.append(f'%{filtro_dotacao}%')
+        
+        query += " ORDER BY dt_eph DESC, cod_eph DESC"
+        
+        cur.execute(query, params)
+        resultados = cur.fetchall()
+        
+        # Processar resultados
+        resultado = []
+        for r in resultados:
+            # Formatar data
+            dt_eph_formatada = r['dt_eph'].strftime('%d/%m/%Y') if r['dt_eph'] else None
+            
+            resultado.append({
+                'dt_eph': dt_eph_formatada,
+                'cod_eph': r['cod_eph'],
+                'cod_nro_pcss_sof': r['cod_nro_pcss_sof'],
+                'txt_obs_eph': r['txt_obs_eph'],
+                'val_tot_eph': converter_valor(r['val_tot_eph']),
+                'val_tot_canc_eph': converter_valor(r['val_tot_canc_eph']),
+                'val_tot_lqdc_eph': converter_valor(r['val_tot_lqdc_eph']),
+                'val_tot_pago_eph': converter_valor(r['val_tot_pago_eph']),
+                'cod_item_desp_sof': r['cod_item_desp_sof'],
+                'nom_rzao_soci_sof': r['nom_rzao_soci_sof'],
+                'cod_cpf_cnpj_sof': r['cod_cpf_cnpj_sof'],
+                'txt_dotacao_fmt': r['txt_dotacao_fmt']
+            })
+        
+        return jsonify({
+            'success': True,
+            'dados': resultado,
+            'total_registros': len(resultado)
+        })
+    
+    except Exception as e:
+        print(f"Erro em api_empenhos: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500

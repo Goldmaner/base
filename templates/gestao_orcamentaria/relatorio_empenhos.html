@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Empenhos - Gestão Orçamentária</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <style>
+        body {
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .main-container {
+            max-width: 98%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .header-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .filter-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .columns-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        
+        .table-empenhos {
+            width: 100%;
+            font-size: 0.9rem;
+        }
+        
+        .table-empenhos th {
+            background-color: #667eea;
+            color: white;
+            font-weight: 600;
+            text-align: center;
+            vertical-align: middle;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        
+        .table-empenhos td {
+            vertical-align: middle;
+        }
+        
+        .valor-positivo {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .valor-negativo {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        .sei-formatted {
+            font-family: 'Courier New', monospace;
+            background-color: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+        }
+        
+        .info-badge {
+            background-color: #e9ecef;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-right: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .loading-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .form-check-inline {
+            margin-right: 1.5rem;
+        }
+        
+        .column-optional {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div class="main-container">
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="mt-3 mb-0">Carregando dados...</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div class="header-section">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-2">
+                    <i class="bi bi-cash-stack me-2"></i>
+                    Relatório de Empenhos
+                </h2>
+                <p class="mb-0 opacity-75">Consulte empenhos, valores, liquidações e pagamentos</p>
+            </div>
+            <button class="btn btn-light btn-lg" onclick="window.location.href='/gestao_orcamentaria'">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filter-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">
+                <i class="bi bi-funnel me-2"></i>Filtros
+            </h5>
+            <div>
+                <button class="btn btn-sm btn-primary me-2" onclick="aplicarFiltros()">
+                    <i class="bi bi-search me-1"></i>Aplicar Filtros
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="limparFiltros()">
+                    <i class="bi bi-x-circle me-1"></i>Limpar Filtros
+                </button>
+            </div>
+        </div>
+        
+        <div class="accordion" id="accordionFiltros">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFiltros">
+                        <i class="bi bi-sliders me-2"></i>Filtros Detalhados
+                    </button>
+                </h2>
+                <div id="collapseFiltros" class="accordion-collapse collapse show" data-bs-parent="#accordionFiltros">
+                    <div class="accordion-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="filtroDataInicio" class="form-label">Data Início</label>
+                                <input type="date" class="form-control" id="filtroDataInicio">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtroDataFim" class="form-label">Data Fim</label>
+                                <input type="date" class="form-control" id="filtroDataFim">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtroCodigo" class="form-label">Código do Empenho</label>
+                                <input type="text" class="form-control" id="filtroCodigo" list="lista_codigo" placeholder="Digite o código">
+                                <datalist id="lista_codigo"></datalist>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filtroSEI" class="form-label">SEI de Celebração</label>
+                                <input type="text" class="form-control" id="filtroSEI" list="lista_sei" placeholder="Digite parte do SEI">
+                                <datalist id="lista_sei"></datalist>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="filtroTexto" class="form-label">Texto do Empenho</label>
+                                <input type="text" class="form-control" id="filtroTexto" list="lista_texto" placeholder="Digite parte do texto">
+                                <datalist id="lista_texto"></datalist>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="filtroDotacao" class="form-label">Dotação Formatada</label>
+                                <input type="text" class="form-control" id="filtroDotacao" list="lista_dotacao" placeholder="Digite parte da dotação">
+                                <datalist id="lista_dotacao"></datalist>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="filtroCodDespesa" class="form-label">Código da Despesa</label>
+                                <input type="text" class="form-control" id="filtroCodDespesa" list="lista_cod_despesa" placeholder="Digite o código">
+                                <datalist id="lista_cod_despesa"></datalist>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="filtroRazaoSocial" class="form-label">Razão Social</label>
+                                <input type="text" class="form-control" id="filtroRazaoSocial" list="lista_razao_social" placeholder="Digite parte da razão social">
+                                <datalist id="lista_razao_social"></datalist>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="filtroCNPJ" class="form-label">CNPJ</label>
+                                <input type="text" class="form-control" id="filtroCNPJ" list="lista_cnpj" placeholder="Digite parte do CNPJ">
+                                <datalist id="lista_cnpj"></datalist>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Colunas Opcionais -->
+    <div class="columns-card">
+        <h5 class="mb-3">
+            <i class="bi bi-columns-gap me-2"></i>Colunas Opcionais
+        </h5>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" id="checkRazaoSocial" onchange="toggleColuna('razao_social')">
+            <label class="form-check-label" for="checkRazaoSocial">
+                Razão Social
+            </label>
+        </div>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" id="checkCNPJ" onchange="toggleColuna('cnpj')">
+            <label class="form-check-label" for="checkCNPJ">
+                CNPJ
+            </label>
+        </div>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" id="checkDotacao" onchange="toggleColuna('dotacao')">
+            <label class="form-check-label" for="checkDotacao">
+                Dotação Formatada
+            </label>
+        </div>
+    </div>
+
+    <!-- Totalizadores -->
+    <div class="filter-card" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border: 2px solid #2196f3;">
+        <h5 class="mb-3" style="color: #1565c0;">
+            <i class="bi bi-calculator me-2"></i>Totalizadores
+        </h5>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="info-badge" style="background: white; border: 2px solid #4caf50; width: 100%;">
+                    <small class="text-muted d-block">Total de Empenhos</small>
+                    <strong class="fs-5" id="totalEmpenhos" style="color: #4caf50;">0</strong>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="info-badge" style="background: white; border: 2px solid #2196f3; width: 100%;">
+                    <small class="text-muted d-block">Total Empenhado</small>
+                    <strong class="fs-5" id="totalEmpenhado" style="color: #2196f3;">R$ 0,00</strong>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="info-badge" style="background: white; border: 2px solid #ff9800; width: 100%;">
+                    <small class="text-muted d-block">Total Liquidado</small>
+                    <strong class="fs-5" id="totalLiquidado" style="color: #ff9800;">R$ 0,00</strong>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="info-badge" style="background: white; border: 2px solid #9c27b0; width: 100%;">
+                    <small class="text-muted d-block">Total Pago</small>
+                    <strong class="fs-5" id="totalPago" style="color: #9c27b0;">R$ 0,00</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações e Ações -->
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-3">
+            <span class="info-badge">
+                <i class="bi bi-eye me-1"></i>
+                Exibindo: <strong id="registrosExibidos">0</strong> de <strong id="totalRegistros">0</strong>
+            </span>
+            <div class="d-flex align-items-center gap-2">
+                <label class="mb-0" style="white-space: nowrap;">Registros por página:</label>
+                <select class="form-select form-select-sm" id="selectPaginacao" onchange="mudarPaginacao()" style="width: auto;">
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="all">Todas</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-success" onclick="exportarCSV()">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
+        </button>
+    </div>
+
+    <!-- Paginação -->
+    <div class="mb-3 d-flex justify-content-center" id="paginacao" style="display: none !important;">
+        <nav>
+            <ul class="pagination" id="paginacaoList"></ul>
+        </nav>
+    </div>
+
+    <!-- Tabela Principal -->
+    <div class="table-container">
+        <h5 class="mb-3">
+            <i class="bi bi-list-ul me-2"></i>Detalhamento dos Empenhos
+        </h5>
+        <table class="table table-hover table-bordered table-empenhos" id="tabelaEmpenhos">
+            <thead>
+                <tr>
+                    <th>Data do Empenho</th>
+                    <th>Código</th>
+                    <th>SEI de Celebração</th>
+                    <th>Texto do Empenho</th>
+                    <th>Valor Total</th>
+                    <th>Valor Cancelado</th>
+                    <th>Valor Liquidado</th>
+                    <th>Valor Pago</th>
+                    <th>Cód. Despesa</th>
+                    <th class="column-optional col-razao_social">Razão Social</th>
+                    <th class="column-optional col-cnpj">CNPJ</th>
+                    <th class="column-optional col-dotacao">Dotação Formatada</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabela">
+                <tr>
+                    <td colspan="12" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p class="mt-2">Nenhum dado encontrado. Use os filtros acima para buscar.</p>
+                    </td>
+                </tr>
+            </tbody>
+            <tfoot class="table-secondary">
+                <tr>
+                    <th colspan="4" class="text-end">SUBTOTAL:</th>
+                    <th class="text-end" id="subtotal_valor_total">R$ 0,00</th>
+                    <th class="text-end" id="subtotal_valor_cancelado">R$ 0,00</th>
+                    <th class="text-end" id="subtotal_valor_liquidado">R$ 0,00</th>
+                    <th class="text-end" id="subtotal_valor_pago">R$ 0,00</th>
+                    <th class="column-optional col-razao_social"></th>
+                    <th class="column-optional col-cnpj"></th>
+                    <th class="column-optional col-dotacao"></th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    let dadosCompletos = [];
+    let dadosFiltrados = [];
+    let paginaAtual = 1;
+    let registrosPorPagina = 100;
+
+    // Formatar SEI: "6074202300004302" -> "6074.2023/0000430-2"
+    function formatarSEI(sei) {
+        if (!sei || sei.length !== 16) return sei || '-';
+        
+        const parte1 = sei.substring(0, 4);  // 6074
+        const parte2 = sei.substring(4, 8);  // 2023
+        const parte3 = sei.substring(8, 15); // 0000430
+        const parte4 = sei.substring(15, 16); // 2
+        
+        return `${parte1}.${parte2}/${parte3}-${parte4}`;
+    }
+
+    // Formatar valor como moeda brasileira
+    function formatarMoeda(valor) {
+        const num = parseFloat(valor);
+        if (isNaN(num)) return 'R$ 0,00';
+        return num.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    // Mostrar/esconder loading
+    function mostrarLoading() {
+        $('#loadingOverlay').css('display', 'flex');
+    }
+
+    function esconderLoading() {
+        $('#loadingOverlay').hide();
+    }
+
+    // Toggle de coluna opcional
+    function toggleColuna(nomeColuna) {
+        const colunas = $(`.col-${nomeColuna}`);
+        colunas.toggleClass('column-optional');
+    }
+
+    // Popular datalists com valores únicos
+    function popularDatalistsFiltros() {
+        if (dadosCompletos.length === 0) return;
+
+        // Função auxiliar para obter valores únicos
+        const obterValoresUnicos = (campo) => {
+            return Array.from(new Set(
+                dadosCompletos
+                    .map(item => item[campo])
+                    .filter(v => v && v !== '-' && String(v).trim() !== '')
+            )).sort();
+        };
+
+        // Popular cada datalist
+        const datalists = {
+            'lista_codigo': 'cod_eph',
+            'lista_sei': 'cod_nro_pcss_sof',
+            'lista_texto': 'txt_obs_eph',
+            'lista_dotacao': 'txt_dotacao_fmt',
+            'lista_cod_despesa': 'cod_item_desp_sof',
+            'lista_razao_social': 'nom_rzao_soci_sof',
+            'lista_cnpj': 'cod_cpf_cnpj_sof'
+        };
+
+        Object.entries(datalists).forEach(([listId, campo]) => {
+            const valores = obterValoresUnicos(campo);
+            const $lista = $(`#${listId}`);
+            $lista.empty();
+            
+            valores.forEach(valor => {
+                // Para SEI, mostrar formatado
+                const valorExibido = listId === 'lista_sei' ? formatarSEI(valor) : valor;
+                $lista.append($('<option>').val(valorExibido).text(valorExibido));
+            });
+        });
+
+        console.log('[DEBUG] Datalists populados com sucesso');
+    }
+
+    // Salvar filtros no localStorage
+    function salvarFiltros() {
+        const filtros = {
+            dataInicio: $('#filtroDataInicio').val(),
+            dataFim: $('#filtroDataFim').val(),
+            codigo: $('#filtroCodigo').val(),
+            sei: $('#filtroSEI').val(),
+            texto: $('#filtroTexto').val(),
+            dotacao: $('#filtroDotacao').val(),
+            codDespesa: $('#filtroCodDespesa').val(),
+            razaoSocial: $('#filtroRazaoSocial').val(),
+            cnpj: $('#filtroCNPJ').val(),
+            paginacao: $('#selectPaginacao').val()
+        };
+        localStorage.setItem('filtrosEmpenhos', JSON.stringify(filtros));
+    }
+
+    // Restaurar filtros do localStorage
+    function restaurarFiltros() {
+        const filtrosSalvos = localStorage.getItem('filtrosEmpenhos');
+        if (filtrosSalvos) {
+            const filtros = JSON.parse(filtrosSalvos);
+            $('#filtroDataInicio').val(filtros.dataInicio || '');
+            $('#filtroDataFim').val(filtros.dataFim || '');
+            $('#filtroCodigo').val(filtros.codigo || '');
+            $('#filtroSEI').val(filtros.sei || '');
+            $('#filtroTexto').val(filtros.texto || '');
+            $('#filtroDotacao').val(filtros.dotacao || '');
+            $('#filtroCodDespesa').val(filtros.codDespesa || '');
+            $('#filtroRazaoSocial').val(filtros.razaoSocial || '');
+            $('#filtroCNPJ').val(filtros.cnpj || '');
+            if (filtros.paginacao) {
+                $('#selectPaginacao').val(filtros.paginacao);
+                registrosPorPagina = filtros.paginacao === 'all' ? 999999 : parseInt(filtros.paginacao);
+            }
+        }
+    }
+
+    // Limpar filtros
+    function limparFiltros() {
+        $('#filtroDataInicio').val('');
+        $('#filtroDataFim').val('');
+        $('#filtroCodigo').val('');
+        $('#filtroSEI').val('');
+        $('#filtroTexto').val('');
+        $('#filtroDotacao').val('');
+        $('#filtroCodDespesa').val('');
+        $('#filtroRazaoSocial').val('');
+        $('#filtroCNPJ').val('');
+        $('#selectPaginacao').val('100');
+        registrosPorPagina = 100;
+        localStorage.removeItem('filtrosEmpenhos');
+        carregarDados();
+    }
+
+    // Aplicar filtros locais (frontend)
+    function aplicarFiltrosLocais() {
+        const filtros = {
+            dataInicio: $('#filtroDataInicio').val(),
+            dataFim: $('#filtroDataFim').val(),
+            codigo: $('#filtroCodigo').val().toLowerCase(),
+            sei: $('#filtroSEI').val().toLowerCase(),
+            texto: $('#filtroTexto').val().toLowerCase(),
+            dotacao: $('#filtroDotacao').val().toLowerCase(),
+            codDespesa: $('#filtroCodDespesa').val().toLowerCase(),
+            razaoSocial: $('#filtroRazaoSocial').val().toLowerCase(),
+            cnpj: $('#filtroCNPJ').val().toLowerCase()
+        };
+
+        dadosFiltrados = dadosCompletos.filter(item => {
+            // Filtro de data
+            if (filtros.dataInicio) {
+                const dataItem = item.dt_eph; // Formato DD/MM/YYYY
+                if (dataItem) {
+                    const [dia, mes, ano] = dataItem.split('/');
+                    const dataItemFormatada = `${ano}-${mes}-${dia}`;
+                    if (dataItemFormatada < filtros.dataInicio) return false;
+                }
+            }
+            if (filtros.dataFim) {
+                const dataItem = item.dt_eph;
+                if (dataItem) {
+                    const [dia, mes, ano] = dataItem.split('/');
+                    const dataItemFormatada = `${ano}-${mes}-${dia}`;
+                    if (dataItemFormatada > filtros.dataFim) return false;
+                }
+            }
+
+            // Filtros de texto
+            if (filtros.codigo && !String(item.cod_eph || '').toLowerCase().includes(filtros.codigo)) return false;
+            if (filtros.sei && !(item.cod_nro_pcss_sof || '').toLowerCase().includes(filtros.sei)) return false;
+            if (filtros.texto && !(item.txt_obs_eph || '').toLowerCase().includes(filtros.texto)) return false;
+            if (filtros.dotacao && !(item.txt_dotacao_fmt || '').toLowerCase().includes(filtros.dotacao)) return false;
+            if (filtros.codDespesa && !String(item.cod_item_desp_sof || '').toLowerCase().includes(filtros.codDespesa)) return false;
+            if (filtros.razaoSocial && !(item.nom_rzao_soci_sof || '').toLowerCase().includes(filtros.razaoSocial)) return false;
+            if (filtros.cnpj && !(item.cod_cpf_cnpj_sof || '').toLowerCase().includes(filtros.cnpj)) return false;
+
+            return true;
+        });
+
+        paginaAtual = 1;
+        renderizarTabela();
+        atualizarTotalizadores();
+        salvarFiltros();
+    }
+
+    // Função pública aplicarFiltros
+    function aplicarFiltros() {
+        aplicarFiltrosLocais();
+    }
+
+    // Mudar paginação
+    function mudarPaginacao() {
+        const valor = $('#selectPaginacao').val();
+        registrosPorPagina = valor === 'all' ? 999999 : parseInt(valor);
+        paginaAtual = 1;
+        renderizarTabela();
+        salvarFiltros();
+    }
+
+    // Atualizar totalizadores
+    function atualizarTotalizadores() {
+        const totalEmpenhos = dadosFiltrados.length;
+        
+        // Total Empenhado = Valor Total - Valor Cancelado
+        const totalEmpenhado = dadosFiltrados.reduce((sum, item) => {
+            return sum + ((item.val_tot_eph || 0) - (item.val_tot_canc_eph || 0));
+        }, 0);
+        
+        const totalLiquidado = dadosFiltrados.reduce((sum, item) => sum + (item.val_tot_lqdc_eph || 0), 0);
+        const totalPago = dadosFiltrados.reduce((sum, item) => sum + (item.val_tot_pago_eph || 0), 0);
+
+        $('#totalEmpenhos').text(totalEmpenhos);
+        $('#totalEmpenhado').text(formatarMoeda(totalEmpenhado));
+        $('#totalLiquidado').text(formatarMoeda(totalLiquidado));
+        $('#totalPago').text(formatarMoeda(totalPago));
+    }
+
+    // Carregar dados dos empenhos
+    async function carregarDados() {
+        console.log('[DEBUG] Iniciando carregamento de empenhos...');
+
+        mostrarLoading();
+
+        try {
+            const url = `/gestao_orcamentaria/api/empenhos`;
+            console.log('[DEBUG] URL da API:', url);
+            
+            const response = await fetch(url);
+            console.log('[DEBUG] Response status:', response.status);
+            
+            const data = await response.json();
+            console.log('[DEBUG] Dados recebidos:', data);
+
+            if (data.success) {
+                dadosCompletos = data.dados;
+                dadosFiltrados = [...dadosCompletos];
+                console.log('[DEBUG] Total de empenhos:', dadosCompletos.length);
+                
+                // Popular datalists com valores únicos
+                popularDatalistsFiltros();
+                
+                aplicarFiltrosLocais();
+                
+                $('#totalRegistros').text(data.total_registros);
+            } else {
+                alert('Erro ao carregar dados: ' + data.error);
+            }
+
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            alert('Erro ao carregar dados. Verifique o console para mais detalhes.');
+        } finally {
+            esconderLoading();
+        }
+    }
+
+    // Renderizar tabela
+    function renderizarTabela() {
+        const tbody = $('#corpoTabela');
+        tbody.empty();
+
+        if (dadosFiltrados.length === 0) {
+            const colunasTotais = 9 + ($('.col-razao_social').not('.column-optional').length > 0 ? 1 : 0) +
+                                      ($('.col-cnpj').not('.column-optional').length > 0 ? 1 : 0) +
+                                      ($('.col-dotacao').not('.column-optional').length > 0 ? 1 : 0);
+            
+            tbody.append(`
+                <tr>
+                    <td colspan="${colunasTotais}" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p class="mt-2">Nenhum dado encontrado com os filtros aplicados.</p>
+                    </td>
+                </tr>
+            `);
+            
+            // Zerar subtotais
+            $('#subtotal_valor_total').text('R$ 0,00');
+            $('#subtotal_valor_cancelado').text('R$ 0,00');
+            $('#subtotal_valor_liquidado').text('R$ 0,00');
+            $('#subtotal_valor_pago').text('R$ 0,00');
+            
+            $('#registrosExibidos').text('0');
+            $('#paginacao').hide();
+            return;
+        }
+
+        // Paginação
+        const inicio = (paginaAtual - 1) * registrosPorPagina;
+        const fim = Math.min(inicio + registrosPorPagina, dadosFiltrados.length);
+        const dadosPaginados = dadosFiltrados.slice(inicio, fim);
+
+        dadosPaginados.forEach(item => {
+            const valorTotalClass = item.val_tot_eph >= 0 ? 'valor-positivo' : 'valor-negativo';
+            const valorCanceladoClass = item.val_tot_canc_eph >= 0 ? 'valor-positivo' : 'valor-negativo';
+            const valorLiquidadoClass = item.val_tot_lqdc_eph >= 0 ? 'valor-positivo' : 'valor-negativo';
+            const valorPagoClass = item.val_tot_pago_eph >= 0 ? 'valor-positivo' : 'valor-negativo';
+
+            const row = `
+                <tr>
+                    <td class="text-center">${item.dt_eph || '-'}</td>
+                    <td class="text-center"><strong>${item.cod_eph || '-'}</strong></td>
+                    <td class="text-center"><span class="sei-formatted">${formatarSEI(item.cod_nro_pcss_sof)}</span></td>
+                    <td style="max-width: 300px; white-space: normal;">${item.txt_obs_eph || '-'}</td>
+                    <td class="text-end ${valorTotalClass}">${formatarMoeda(item.val_tot_eph)}</td>
+                    <td class="text-end ${valorCanceladoClass}">${formatarMoeda(item.val_tot_canc_eph)}</td>
+                    <td class="text-end ${valorLiquidadoClass}">${formatarMoeda(item.val_tot_lqdc_eph)}</td>
+                    <td class="text-end ${valorPagoClass}">${formatarMoeda(item.val_tot_pago_eph)}</td>
+                    <td class="text-center">${item.cod_item_desp_sof || '-'}</td>
+                    <td class="column-optional col-razao_social">${item.nom_rzao_soci_sof || '-'}</td>
+                    <td class="column-optional col-cnpj text-center">${item.cod_cpf_cnpj_sof || '-'}</td>
+                    <td class="column-optional col-dotacao">${item.txt_dotacao_fmt || '-'}</td>
+                </tr>
+            `;
+            tbody.append(row);
+        });
+        
+        // Calcular subtotais (de TODOS os dados filtrados, não só da página)
+        const subtotalValorTotal = dadosFiltrados.reduce((sum, item) => sum + (item.val_tot_eph || 0), 0);
+        const subtotalValorCancelado = dadosFiltrados.reduce((sum, item) => sum + (item.val_tot_canc_eph || 0), 0);
+        const subtotalValorLiquidado = dadosFiltrados.reduce((sum, item) => sum + (item.val_tot_lqdc_eph || 0), 0);
+        const subtotalValorPago = dadosFiltrados.reduce((sum, item) => sum + (item.val_tot_pago_eph || 0), 0);
+        
+        $('#subtotal_valor_total').text(formatarMoeda(subtotalValorTotal));
+        $('#subtotal_valor_cancelado').text(formatarMoeda(subtotalValorCancelado));
+        $('#subtotal_valor_liquidado').text(formatarMoeda(subtotalValorLiquidado));
+        $('#subtotal_valor_pago').text(formatarMoeda(subtotalValorPago));
+
+        // Atualizar contador de registros exibidos
+        $('#registrosExibidos').text(`${inicio + 1}-${fim}`);
+
+        // Renderizar paginação
+        renderizarPaginacao();
+    }
+
+    // Renderizar controles de paginação
+    function renderizarPaginacao() {
+        const totalPaginas = Math.ceil(dadosFiltrados.length / registrosPorPagina);
+        
+        if (totalPaginas <= 1) {
+            $('#paginacao').hide();
+            return;
+        }
+
+        $('#paginacao').show();
+        const lista = $('#paginacaoList');
+        lista.empty();
+
+        // Botão anterior
+        lista.append(`
+            <li class="page-item ${paginaAtual === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="mudarPagina(${paginaAtual - 1}); return false;">Anterior</a>
+            </li>
+        `);
+
+        // Páginas
+        const maxBotoes = 5;
+        let inicio = Math.max(1, paginaAtual - Math.floor(maxBotoes / 2));
+        let fim = Math.min(totalPaginas, inicio + maxBotoes - 1);
+        
+        if (fim - inicio < maxBotoes - 1) {
+            inicio = Math.max(1, fim - maxBotoes + 1);
+        }
+
+        if (inicio > 1) {
+            lista.append(`<li class="page-item"><a class="page-link" href="#" onclick="mudarPagina(1); return false;">1</a></li>`);
+            if (inicio > 2) {
+                lista.append(`<li class="page-item disabled"><span class="page-link">...</span></li>`);
+            }
+        }
+
+        for (let i = inicio; i <= fim; i++) {
+            lista.append(`
+                <li class="page-item ${i === paginaAtual ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="mudarPagina(${i}); return false;">${i}</a>
+                </li>
+            `);
+        }
+
+        if (fim < totalPaginas) {
+            if (fim < totalPaginas - 1) {
+                lista.append(`<li class="page-item disabled"><span class="page-link">...</span></li>`);
+            }
+            lista.append(`<li class="page-item"><a class="page-link" href="#" onclick="mudarPagina(${totalPaginas}); return false;">${totalPaginas}</a></li>`);
+        }
+
+        // Botão próximo
+        lista.append(`
+            <li class="page-item ${paginaAtual === totalPaginas ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="mudarPagina(${paginaAtual + 1}); return false;">Próximo</a>
+            </li>
+        `);
+    }
+
+    // Mudar página
+    function mudarPagina(novaPagina) {
+        const totalPaginas = Math.ceil(dadosFiltrados.length / registrosPorPagina);
+        if (novaPagina >= 1 && novaPagina <= totalPaginas) {
+            paginaAtual = novaPagina;
+            renderizarTabela();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
+    // Exportar para CSV
+    function exportarCSV() {
+        if (dadosCompletos.length === 0) {
+            alert('Não há dados para exportar.');
+            return;
+        }
+
+        // Verificar colunas visíveis
+        const mostrarRazaoSocial = $('#checkRazaoSocial').is(':checked');
+        const mostrarCNPJ = $('#checkCNPJ').is(':checked');
+        const mostrarDotacao = $('#checkDotacao').is(':checked');
+
+        // Cabeçalho base
+        let csv = 'Data do Empenho;Código;SEI de Celebração;Texto do Empenho;Valor Total;Valor Cancelado;Valor Liquidado;Valor Pago;Cód. Despesa';
+        
+        if (mostrarRazaoSocial) csv += ';Razão Social';
+        if (mostrarCNPJ) csv += ';CNPJ';
+        if (mostrarDotacao) csv += ';Dotação Formatada';
+        
+        csv += '\n';
+
+        // Dados
+        dadosCompletos.forEach(item => {
+            csv += `"${item.dt_eph || ''}";`;
+            csv += `${item.cod_eph || ''};`;
+            csv += `"${formatarSEI(item.cod_nro_pcss_sof)}";`;
+            csv += `"${(item.txt_obs_eph || '').replace(/"/g, '""')}";`;
+            csv += `${item.val_tot_eph || 0};`;
+            csv += `${item.val_tot_canc_eph || 0};`;
+            csv += `${item.val_tot_lqdc_eph || 0};`;
+            csv += `${item.val_tot_pago_eph || 0};`;
+            csv += `${item.cod_item_desp_sof || ''}`;
+            
+            if (mostrarRazaoSocial) csv += `;"${item.nom_rzao_soci_sof || ''}"`;
+            if (mostrarCNPJ) csv += `;"${item.cod_cpf_cnpj_sof || ''}"`;
+            if (mostrarDotacao) csv += `;"${item.txt_dotacao_fmt || ''}"`;
+            
+            csv += '\n';
+        });
+
+        // Subtotais
+        csv += '\nSUBTOTAL;;;';
+        csv += `;${dadosCompletos.reduce((sum, item) => sum + (item.val_tot_eph || 0), 0)};`;
+        csv += `${dadosCompletos.reduce((sum, item) => sum + (item.val_tot_canc_eph || 0), 0)};`;
+        csv += `${dadosCompletos.reduce((sum, item) => sum + (item.val_tot_lqdc_eph || 0), 0)};`;
+        csv += `${dadosCompletos.reduce((sum, item) => sum + (item.val_tot_pago_eph || 0), 0)}`;
+
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `relatorio_empenhos_${new Date().getTime()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Carregar dados ao iniciar (busca todos)
+    $(document).ready(function() {
+        // Restaurar filtros salvos
+        restaurarFiltros();
+        
+        // Permitir buscar com Enter em qualquer filtro
+        $('.form-control').on('keypress', function(e) {
+            if (e.which === 13) {
+                aplicarFiltros();
+            }
+        });
+
+        // Carregar dados iniciais
+        carregarDados();
+    });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

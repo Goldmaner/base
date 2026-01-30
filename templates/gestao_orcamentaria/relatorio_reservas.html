@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Reservas - Gestão Orçamentária</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    
+    <style>
+    body {
+        background: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+    }
+    
+    .main-container {
+        max-width: 98%;
+        margin: 0 auto;
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .header-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .table-container {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow-x: auto;
+    }
+    
+    .table-reservas {
+        width: 100%;
+        font-size: 0.9rem;
+    }
+    
+    .table-reservas th {
+        background-color: #667eea;
+        color: white;
+        font-weight: 600;
+        text-align: center;
+        vertical-align: middle;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-reservas td {
+        vertical-align: middle;
+    }
+    
+    .valor-positivo {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .valor-negativo {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    
+    .info-badge {
+        background-color: #e9ecef;
+        padding: 0.5rem 1rem;
+        border-radius: 5px;
+        font-size: 0.9rem;
+        display: inline-block;
+        margin-right: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .loading-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        text-align: center;
+    }
+</style>
+</head>
+<body>
+<div class="main-container">
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Carregando...</span>
+        </div>
+        <p class="mt-3 mb-0">Carregando dados...</p>
+    </div>
+</div>
+
+<!-- Header -->
+<div class="header-section">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-2">
+                <i class="bi bi-bookmark-check me-2"></i>
+                Relatório de Reservas Orçamentárias
+            </h2>
+            <p class="mb-0 opacity-75">Consulte reservas, datas e saldos reservados por dotação</p>
+        </div>
+        <button class="btn btn-light btn-lg" onclick="window.location.href='/gestao_orcamentaria'">
+            <i class="bi bi-arrow-left me-2"></i>Voltar
+        </button>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="filter-card">
+    <h5 class="mb-3">
+        <i class="bi bi-funnel me-2"></i>Filtros
+    </h5>
+    <div class="row g-3">
+        <div class="col-md-8">
+            <label for="filtroDotacao" class="form-label">Dotação Formatada</label>
+            <input type="text" class="form-control" id="filtroDotacao" placeholder="Digite parte da dotação (opcional)">
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-primary w-100" onclick="carregarDados()">
+                <i class="bi bi-search me-2"></i>Buscar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Informações e Ações -->
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <div>
+        <span class="info-badge">
+            <i class="bi bi-table me-1"></i>
+            <strong id="totalRegistros">0</strong> reservas
+        </span>
+    </div>
+    <button class="btn btn-success" onclick="exportarCSV()">
+        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
+    </button>
+</div>
+
+<!-- Tabela Principal -->
+<div class="table-container">
+    <h5 class="mb-3">
+        <i class="bi bi-list-ul me-2"></i>Reservas Orçamentárias
+    </h5>
+    <table class="table table-hover table-bordered table-reservas" id="tabelaReservas">
+        <thead>
+            <tr>
+                <th style="width: 15%;">Código da Reserva</th>
+                <th style="width: 12%;">Data da Reserva</th>
+                <th style="width: 20%;">Dotação Formatada</th>
+                <th style="width: 38%;">Histórico da Reserva</th>
+                <th style="width: 15%;">Saldo de Reservado</th>
+            </tr>
+        </thead>
+        <tbody id="corpoTabela">
+            <tr>
+                <td colspan="5" class="text-center text-muted py-5">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mt-2">Clique em Buscar para visualizar as reservas.</p>
+                </td>
+            </tr>
+        </tbody>
+        <tfoot class="table-secondary">
+            <tr>
+                <th colspan="4" class="text-end">SUBTOTAL:</th>
+                <th class="text-end valor-moeda" id="subtotal_saldo">R$ 0,00</th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<script>
+    let dadosCompletos = [];
+
+    // Formatar valor como moeda brasileira
+    function formatarMoeda(valor) {
+        const num = parseFloat(valor);
+        if (isNaN(num)) return 'R$ 0,00';
+        return num.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    // Mostrar loading
+    function mostrarLoading() {
+        $('#loadingOverlay').css('display', 'flex');
+    }
+
+    // Esconder loading
+    function esconderLoading() {
+        $('#loadingOverlay').hide();
+    }
+
+    // Carregar dados das reservas
+    async function carregarDados() {
+        const dotacaoFilter = $('#filtroDotacao').val().trim();
+
+        mostrarLoading();
+
+        try {
+            const params = new URLSearchParams();
+            
+            if (dotacaoFilter) {
+                params.append('dotacao', dotacaoFilter);
+            }
+
+            const url = `/gestao_orcamentaria/api/reservas?${params}`;
+            console.log('[DEBUG] URL da API:', url);
+            
+            const response = await fetch(url);
+            console.log('[DEBUG] Response status:', response.status);
+            
+            const data = await response.json();
+            console.log('[DEBUG] Dados recebidos:', data);
+
+            if (data.success) {
+                dadosCompletos = data.dados;
+                console.log('[DEBUG] Total de registros:', dadosCompletos.length);
+                renderizarTabela();
+                
+                // Atualizar informações
+                $('#totalRegistros').text(data.total_registros);
+            } else {
+                alert('Erro ao carregar dados: ' + data.error);
+            }
+
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            alert('Erro ao carregar dados. Verifique o console para mais detalhes.');
+        } finally {
+            esconderLoading();
+        }
+    }
+
+    // Renderizar tabela principal
+    function renderizarTabela() {
+        const tbody = $('#corpoTabela');
+        tbody.empty();
+
+        if (dadosCompletos.length === 0) {
+            tbody.append(`
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p class="mt-2">Nenhuma reserva encontrada com os filtros aplicados.</p>
+                    </td>
+                </tr>
+            `);
+            $('#subtotal_saldo').text('R$ 0,00');
+            return;
+        }
+
+        dadosCompletos.forEach(item => {
+            const saldoClass = item.vl_saldo_resv >= 0 ? 'valor-positivo' : 'valor-negativo';
+
+            const row = `
+                <tr>
+                    <td class="text-center"><strong>${item.cod_resv_dota_sof || '-'}</strong></td>
+                    <td class="text-center">${item.dt_efet_resv || '-'}</td>
+                    <td>${item.dotacao_formatada || '-'}</td>
+                    <td><small>${item.hist_resv || '-'}</small></td>
+                    <td class="text-end ${saldoClass}">${formatarMoeda(item.vl_saldo_resv)}</td>
+                </tr>
+            `;
+            tbody.append(row);
+        });
+        
+        // Calcular e atualizar subtotal
+        const subtotalSaldo = dadosCompletos.reduce((sum, item) => sum + (item.vl_saldo_resv || 0), 0);
+        $('#subtotal_saldo').text(formatarMoeda(subtotalSaldo));
+    }
+
+    // Exportar para CSV
+    function exportarCSV() {
+        if (dadosCompletos.length === 0) {
+            alert('Não há dados para exportar.');
+            return;
+        }
+
+        let csv = 'Código da Reserva;Data da Reserva;Dotação Formatada;Histórico da Reserva;Saldo de Reservado\n';
+
+        dadosCompletos.forEach(item => {
+            csv += `${item.cod_resv_dota_sof || ''};`;
+            csv += `"${item.dt_efet_resv || ''}";`;
+            csv += `"${item.dotacao_formatada || ''}";`;
+            csv += `"${item.hist_resv || ''}";`;
+            csv += `${item.vl_saldo_resv || 0}\n`;
+        });
+
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `relatorio_reservas_${new Date().getTime()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Carregar dados ao iniciar
+    $(document).ready(function() {
+        // Permitir buscar com Enter
+        $('#filtroDotacao').on('keypress', function(e) {
+            if (e.which === 13) {
+                carregarDados();
+            }
+        });
+
+        // Carregar dados iniciais
+        carregarDados();
+    });
+</script>
+
+</div><!-- Fecha main-container -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+</body>
+</html>

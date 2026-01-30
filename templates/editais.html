@@ -57,6 +57,9 @@
           <p class="mb-0">Controle de editais e processos seletivos</p>
         </div>
         <div class="d-flex gap-2">
+          <a href="{{ url_for('editais.orcamento_listar') }}" class="btn btn-info">
+            <i class="bi bi-cash-stack"></i> Orçamento de Editais
+          </a>
           <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalCriar">
             <i class="bi bi-plus-circle"></i> Cadastrar Edital
           </button>

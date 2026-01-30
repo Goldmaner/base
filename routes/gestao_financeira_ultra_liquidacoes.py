@@ -34,8 +34,8 @@ def formatar_data_br(data):
     return data.strftime('%d/%m/%Y')
 
 
-def formatar_data_mes_ano(data):
-    """Formata date para string 'mês/ano' (ex: jan/26)"""
+def formatar_data_mes_ano(data, formato_completo=False):
+    """Formata date para string 'mês/ano' (ex: jan/26) ou 'mês de ano' (ex: janeiro de 2026)"""
     if data is None:
         return ''
     if isinstance(data, str):
@@ -46,25 +46,44 @@ def formatar_data_mes_ano(data):
             return data
     
     # Mapeamento de meses em português
-    meses = {
+    meses_abrev = {
         1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
         7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
     }
     
-    mes_abrev = meses.get(data.month, '')
-    ano_curto = str(data.year)[2:]  # Últimos 2 dígitos do ano
+    meses_completo = {
+        1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril', 5: 'maio', 6: 'junho',
+        7: 'julho', 8: 'agosto', 9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'
+    }
     
-    return f"{mes_abrev}/{ano_curto}"
+    if formato_completo:
+        mes_nome = meses_completo.get(data.month, '')
+        return f"{mes_nome} de {data.year}"
+    else:
+        mes_abrev = meses_abrev.get(data.month, '')
+        ano_curto = str(data.year)[2:]  # Últimos 2 dígitos do ano
+        return f"{mes_abrev}/{ano_curto}"
 
 
 def parse_data_br(data_str):
-    """Parse string dd/mm/yyyy para date"""
+    """Parse string dd/mm/yyyy ou mm/yyyy para date"""
     if not data_str:
         return None
+    
+    # Tentar formato DD/MM/YYYY
     try:
         return datetime.strptime(data_str, '%d/%m/%Y').date()
     except:
-        return None
+        pass
+    
+    # Tentar formato MM/YYYY (assumir dia 01)
+    try:
+        # Se vier '01/MM/YYYY' do converterInputParaData
+        return datetime.strptime(data_str, '%d/%m/%Y').date()
+    except:
+        pass
+    
+    return None
 
 
 def converter_sei_para_cod_sof(sei_celeb):
@@ -343,6 +362,9 @@ def api_filtros_dados():
 @login_required
 def api_listar_parcelas():
     """API para listar parcelas com filtros e paginação"""
+    print("\n" + "="*80)
+    print("🚀 API LISTAR PARCELAS CHAMADA")
+    print("="*80)
     conn = get_db()
     cur = get_cursor()
     
@@ -372,6 +394,13 @@ def api_listar_parcelas():
         filtro_tipo_termo = request.args.get('tipo_termo', '')
         filtro_tipo_pendencia = request.args.get('tipo_pendencia', '')  # sem_cor, amarelo, verde_claro, verde_escuro
         filtro_ano_termino_termo = request.args.get('ano_termino_termo', '')  # Ano de término da PARCERIA
+        
+        # DEBUG: Log do filtro de pendência
+        print(f"\n🔍 DEBUG FILTRO PENDÊNCIA:")
+        print(f"   tipo_pendencia = '{filtro_tipo_pendencia}'")
+        print(f"   tipo_pendencia vazio? {filtro_tipo_pendencia == ''}")
+        print(f"   tipo_pendencia bool? {bool(filtro_tipo_pendencia)}")
+        print(f"   len(tipo_pendencia) = {len(filtro_tipo_pendencia)}")
         
         # Filtro padrão: apenas parcelas "Programada" se usuário não especificar
         # Não aplicar filtro de tipo se não for especificado (mostrar todos)
@@ -502,6 +531,15 @@ def api_listar_parcelas():
             where_filtros.append("EXTRACT(YEAR FROM p.final) = %s")
             params.append(int(filtro_ano_termino_termo))
         
+        # DEBUG: Log para verificar se vai usar query com filtro de cor
+        print(f"\n📊 DECISÃO DE QUERY:")
+        print(f"   filtro_tipo_pendencia = '{filtro_tipo_pendencia}'")
+        print(f"   bool(filtro_tipo_pendencia) = {bool(filtro_tipo_pendencia)}")
+        if filtro_tipo_pendencia:
+            print(f"   ✅ VAI USAR QUERY COM FILTRO DE COR (subquery complexa)")
+        else:
+            print(f"   ✅ VAI USAR QUERY SIMPLES (sem filtro de cor)")
+        
         # Filtro de status secundário
         if status_sec_lista:
             # Construir lista de condições para cada status
@@ -588,10 +626,12 @@ def api_listar_parcelas():
                 WHERE {where_clause}
             ) subq
             WHERE 
-                ('{filtro_tipo_pendencia}' = 'amarelo' AND subq.tem_inconsistencia = true)
-                OR ('{filtro_tipo_pendencia}' = 'verde_claro' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = true)
-                OR ('{filtro_tipo_pendencia}' = 'verde_escuro' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = false AND subq.empenho_cobre = true)
-                OR ('{filtro_tipo_pendencia}' = 'sem_cor' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = false AND subq.empenho_cobre = false)
+                -- Se filtro vazio, mostrar todos; caso contrário, filtrar por cor
+                ('{filtro_tipo_pendencia}' = '' OR
+                 ('{filtro_tipo_pendencia}' = 'amarelo' AND subq.tem_inconsistencia = true) OR
+                 ('{filtro_tipo_pendencia}' = 'verde_claro' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = true) OR
+                 ('{filtro_tipo_pendencia}' = 'verde_escuro' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = false AND subq.empenho_cobre = true) OR
+                 ('{filtro_tipo_pendencia}' = 'sem_cor' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = false AND subq.empenho_cobre = false))
             ORDER BY 
                 -- Ano atual primeiro
                 CASE WHEN EXTRACT(YEAR FROM subq.vigencia_inicial) = EXTRACT(YEAR FROM CURRENT_DATE) THEN 0 ELSE 1 END ASC,
@@ -660,8 +700,16 @@ def api_listar_parcelas():
         query += " LIMIT %s OFFSET %s"
         params.extend([por_pagina, (pagina - 1) * por_pagina])
         
+        print(f"\n🔄 EXECUTANDO QUERY...")
+        print(f"   Total de parâmetros: {len(params)}")
+        print(f"   Usando query COM filtro de cor? {bool(filtro_tipo_pendencia)}")
+        print(f"\n📝 QUERY SQL (primeiros 1000 chars):")
+        print(query[:1000])
+        print(f"\n📝 Parâmetros (primeiros 5): {params[:5]}")
         cur.execute(query, params)
         parcelas = cur.fetchall()
+        print(f"\n✅ QUERY EXECUTADA")
+        print(f"   Resultados retornados: {len(parcelas)}")
         
         # Contar total
         if filtro_tipo_pendencia:
@@ -706,13 +754,15 @@ def api_listar_parcelas():
                 WHERE {where_clause}
             ) subq
             WHERE 
-                ('{filtro_tipo_pendencia}' = 'amarelo' AND subq.tem_inconsistencia = true)
-                OR ('{filtro_tipo_pendencia}' = 'verde_claro' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = true)
-                OR ('{filtro_tipo_pendencia}' = 'verde_escuro' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = false AND subq.empenho_cobre = true)
-                OR ('{filtro_tipo_pendencia}' = 'sem_cor' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = false AND subq.empenho_cobre = false)
+                ('{filtro_tipo_pendencia}' = '' OR
+                 ('{filtro_tipo_pendencia}' = 'amarelo' AND subq.tem_inconsistencia = true) OR
+                 ('{filtro_tipo_pendencia}' = 'verde_claro' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = true) OR
+                 ('{filtro_tipo_pendencia}' = 'verde_escuro' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = false AND subq.empenho_cobre = true) OR
+                 ('{filtro_tipo_pendencia}' = 'sem_cor' AND subq.tem_inconsistencia = false AND subq.necessita_regularizacao = false AND subq.empenho_cobre = false))
             """
             cur.execute(query_count, params[:-2])  # Sem LIMIT/OFFSET
         else:
+            # Query count SEM filtro de cor (query simples)
             query_count = f"""
                 SELECT COUNT(*) as total
                 FROM gestao_financeira.ultra_liquidacoes ul
@@ -721,6 +771,7 @@ def api_listar_parcelas():
             """
             cur.execute(query_count, params[:-2])  # Sem LIMIT/OFFSET
         total = cur.fetchone()['total']
+        print(f"\n📈 TOTAL DE REGISTROS (query_count): {total}")
         
         # Formatar resultado
         resultado = []
@@ -938,6 +989,15 @@ def api_listar_parcelas():
         total_empenho_cobre = sum(1 for r in resultado if r['empenho_cobre_valor'])
         total_pago_integral = sum(1 for r in resultado if r.get('pago_integral', False))
         total_pago_parcial = sum(1 for r in resultado if r.get('pago_parcial', False))
+        
+        print(f"\n📦 RETORNANDO JSON:")
+        print(f"   success: True")
+        print(f"   data: {len(resultado)} parcelas")
+        print(f"   total: {total}")
+        print(f"   pagina: {pagina}")
+        print(f"   total_paginas: {(total + por_pagina - 1) // por_pagina}")
+        print(f"   total_pendencias: {total_pendencias}")
+        print("="*80 + "\n")
         
         return jsonify({
             'success': True,
@@ -1168,20 +1228,79 @@ def api_exportar_csv():
         secao = request.args.get('secao', 'nao_pago')
         
         # Mesma lógica de filtros da listagem
-        where_clause = "1=1"
+        where_clauses = []
         params = []
         
-        if modo == 'secao' or modo == 'filtrado':
+        # Aplicar filtro de seção se não for 'tudo'
+        if modo != 'tudo':
             if secao == 'nao_pago':
-                where_clause = "ul.parcela_status = 'Não Pago'"
+                where_clauses.append("ul.parcela_status = %s")
+                params.append('Não Pago')
             elif secao == 'encaminhado':
-                where_clause = "ul.parcela_status = 'Encaminhado para Pagamento'"
+                where_clauses.append("ul.parcela_status = %s")
+                params.append('Encaminhado para Pagamento')
             elif secao == 'pago':
-                where_clause = "ul.parcela_status = 'Pago'"
+                where_clauses.append("ul.parcela_status = %s")
+                params.append('Pago')
         
+        # Aplicar filtros adicionais se modo='filtrado'
         if modo == 'filtrado':
-            # Aplicar filtros adicionais (mesma lógica da API de listagem)
-            pass  # TODO: implementar filtros se necessário
+            # Filtros de texto
+            if request.args.get('numero_termo'):
+                where_clauses.append("ul.numero_termo ILIKE %s")
+                params.append(f"%{request.args.get('numero_termo')}%")
+            
+            if request.args.get('osc'):
+                where_clauses.append("p.osc ILIKE %s")
+                params.append(f"%{request.args.get('osc')}%")
+            
+            if request.args.get('cnpj'):
+                where_clauses.append("p.cnpj ILIKE %s")
+                params.append(f"%{request.args.get('cnpj')}%")
+            
+            if request.args.get('parcela_tipo'):
+                where_clauses.append("ul.parcela_tipo = %s")
+                params.append(request.args.get('parcela_tipo'))
+            
+            if request.args.get('parcela_numero'):
+                where_clauses.append("ul.parcela_numero::text ILIKE %s")
+                params.append(f"%{request.args.get('parcela_numero')}%")
+            
+            if request.args.get('status_secundario'):
+                where_clauses.append("ul.parcela_status_secundario = %s")
+                params.append(request.args.get('status_secundario'))
+            
+            # Filtros de data
+            if request.args.get('vigencia_inicial_de'):
+                where_clauses.append("ul.vigencia_inicial >= %s")
+                params.append(request.args.get('vigencia_inicial_de'))
+            
+            if request.args.get('vigencia_inicial_ate'):
+                where_clauses.append("ul.vigencia_inicial <= %s")
+                params.append(request.args.get('vigencia_inicial_ate'))
+            
+            if request.args.get('vigencia_final_de'):
+                where_clauses.append("ul.vigencia_final >= %s")
+                params.append(request.args.get('vigencia_final_de'))
+            
+            if request.args.get('vigencia_final_ate'):
+                where_clauses.append("ul.vigencia_final <= %s")
+                params.append(request.args.get('vigencia_final_ate'))
+            
+            if request.args.get('data_pagamento_de'):
+                where_clauses.append("ul.data_pagamento >= %s")
+                params.append(request.args.get('data_pagamento_de'))
+            
+            if request.args.get('data_pagamento_ate'):
+                where_clauses.append("ul.data_pagamento <= %s")
+                params.append(request.args.get('data_pagamento_ate'))
+            
+            # Filtro de ano
+            if request.args.get('ano_vigencia'):
+                where_clauses.append("EXTRACT(YEAR FROM ul.vigencia_inicial) = %s")
+                params.append(int(request.args.get('ano_vigencia')))
+        
+        where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
         
         query = f"""
             SELECT 
@@ -1253,10 +1372,13 @@ def api_exportar_csv():
         
         output.seek(0)
         
+        # Adicionar BOM UTF-8 para Excel reconhecer encoding
+        csv_content = '\ufeff' + output.getvalue()
+        
         from flask import Response
         return Response(
-            output.getvalue(),
-            mimetype='text/csv',
+            csv_content.encode('utf-8'),
+            mimetype='text/csv; charset=utf-8',
             headers={
                 'Content-Disposition': f'attachment; filename=ultra_liquidacoes_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
                 'Content-Type': 'text/csv; charset=utf-8'
@@ -1459,77 +1581,102 @@ def get_parcelas_termo(numero_termo):
 @ultra_liquidacoes_bp.route('/api/termo/<path:numero_termo>/atualizar-multiplas', methods=['PUT'])
 @login_required
 def atualizar_multiplas_parcelas(numero_termo):
-    """Atualiza múltiplas parcelas de um termo (edição em tabela)"""
+    """Atualiza múltiplas parcelas de um termo (edição em tabela)
+    Suporta: INSERT (sem ID), UPDATE (com ID), DELETE (lista de IDs)"""
     conn = get_db()
     cur = get_cursor()
     
     try:
         dados = request.get_json()
         parcelas = dados.get('parcelas', [])
-        
-        if not parcelas:
-            return jsonify({'success': False, 'error': 'Nenhuma parcela fornecida'}), 400
+        ids_excluir = dados.get('ids_excluir', [])
         
         parcelas_atualizadas = 0
+        parcelas_inseridas = 0
+        parcelas_excluidas = 0
         
+        # PASSO 1: EXCLUIR parcelas marcadas
+        if ids_excluir:
+            placeholders = ','.join(['%s'] * len(ids_excluir))
+            query_delete = f"DELETE FROM gestao_financeira.ultra_liquidacoes WHERE id IN ({placeholders})"
+            cur.execute(query_delete, ids_excluir)
+            parcelas_excluidas = cur.rowcount
+        
+        # PASSO 2: INSERIR novas parcelas (sem ID) ou ATUALIZAR existentes (com ID)
         for parcela in parcelas:
             parcela_id = parcela.get('id')
             
-            if not parcela_id:
-                continue
-            
-            # Construir UPDATE dinâmico
-            campos_update = []
-            valores = []
+            # Preparar dados comuns
+            dados_parcela = {}
             
             if parcela.get('vigencia_inicial'):
-                campos_update.append('vigencia_inicial = %s')
-                valores.append(parse_data_br(parcela['vigencia_inicial']))
+                dados_parcela['vigencia_inicial'] = parse_data_br(parcela['vigencia_inicial'])
             
             if parcela.get('vigencia_final'):
-                campos_update.append('vigencia_final = %s')
-                valores.append(parse_data_br(parcela['vigencia_final']))
+                dados_parcela['vigencia_final'] = parse_data_br(parcela['vigencia_final'])
             
             if parcela.get('parcela_tipo'):
-                campos_update.append('parcela_tipo = %s')
-                valores.append(parcela['parcela_tipo'])
+                dados_parcela['parcela_tipo'] = parcela['parcela_tipo']
             
             if 'parcela_numero' in parcela:
-                campos_update.append('parcela_numero = %s')
-                valores.append(parcela['parcela_numero'])
+                dados_parcela['parcela_numero'] = parcela['parcela_numero']
             
             # Valores monetários
             for campo in ['valor_elemento_53_23', 'valor_elemento_53_24', 'valor_previsto', 
                          'valor_subtraido', 'valor_encaminhado', 'valor_pago']:
                 if campo in parcela:
                     valor = parcela[campo]
-                    campos_update.append(f'{campo} = %s')
-                    valores.append(Decimal(str(valor)) if valor else None)
+                    dados_parcela[campo] = Decimal(str(valor)) if valor else None
             
             if parcela.get('parcela_status'):
-                campos_update.append('parcela_status = %s')
-                valores.append(parcela['parcela_status'])
+                dados_parcela['parcela_status'] = parcela['parcela_status']
             
             if 'parcela_status_secundario' in parcela:
-                campos_update.append('parcela_status_secundario = %s')
-                valores.append(parcela['parcela_status_secundario'] if parcela['parcela_status_secundario'] else None)
+                dados_parcela['parcela_status_secundario'] = parcela['parcela_status_secundario'] if parcela['parcela_status_secundario'] else None
             
             if 'data_pagamento' in parcela:
-                campos_update.append('data_pagamento = %s')
-                valores.append(parse_data_br(parcela['data_pagamento']) if parcela['data_pagamento'] else None)
+                dados_parcela['data_pagamento'] = parse_data_br(parcela['data_pagamento']) if parcela['data_pagamento'] else None
             
-            if campos_update:
-                valores.append(parcela_id)
-                query = f"UPDATE gestao_financeira.ultra_liquidacoes SET {', '.join(campos_update)} WHERE id = %s"
-                cur.execute(query, valores)
-                parcelas_atualizadas += cur.rowcount
+            # Adicionar numero_termo sempre
+            dados_parcela['numero_termo'] = numero_termo
+            
+            if parcela_id:
+                # UPDATE: parcela existente
+                if dados_parcela:
+                    campos_update = [f"{k} = %s" for k in dados_parcela.keys()]
+                    valores = list(dados_parcela.values())
+                    valores.append(parcela_id)
+                    
+                    query = f"UPDATE gestao_financeira.ultra_liquidacoes SET {', '.join(campos_update)} WHERE id = %s"
+                    cur.execute(query, valores)
+                    parcelas_atualizadas += cur.rowcount
+            else:
+                # INSERT: nova parcela
+                if dados_parcela:
+                    campos = list(dados_parcela.keys())
+                    placeholders = ', '.join(['%s'] * len(campos))
+                    valores = list(dados_parcela.values())
+                    
+                    query = f"INSERT INTO gestao_financeira.ultra_liquidacoes ({', '.join(campos)}) VALUES ({placeholders})"
+                    cur.execute(query, valores)
+                    parcelas_inseridas += 1
         
         conn.commit()
         
+        mensagem = []
+        if parcelas_inseridas > 0:
+            mensagem.append(f'{parcelas_inseridas} inserida(s)')
+        if parcelas_atualizadas > 0:
+            mensagem.append(f'{parcelas_atualizadas} atualizada(s)')
+        if parcelas_excluidas > 0:
+            mensagem.append(f'{parcelas_excluidas} excluída(s)')
+        
         return jsonify({
             'success': True,
-            'message': f'{parcelas_atualizadas} parcelas atualizadas',
-            'parcelas_atualizadas': parcelas_atualizadas
+            'message': ', '.join(mensagem) if mensagem else 'Nenhuma alteração realizada',
+            'parcelas_inseridas': parcelas_inseridas,
+            'parcelas_atualizadas': parcelas_atualizadas,
+            'parcelas_excluidas': parcelas_excluidas
         })
     
     except Exception as e:
@@ -1954,87 +2101,9 @@ def get_termos_vigentes_colaboracao():
         cur.close()
 
 
-@ultra_liquidacoes_bp.route('/api/salvar-cronograma', methods=['POST'])
-@login_required
-def salvar_cronograma():
-    """Salvar ou atualizar cronograma mensal"""
-    conn = get_db()
-    cur = get_cursor()
-    
-    try:
-        dados = request.get_json()
-        print(f"🔍 DEBUG salvar_cronograma: Dados recebidos: {dados}")
-        
-        numero_termo = dados.get('numero_termo')
-        cronograma = dados.get('cronograma', [])
-        info_alteracao_global = dados.get('info_alteracao', 'Base')  # Fallback (não será mais usado)
-        
-        print(f"🔍 DEBUG: numero_termo={numero_termo}, total_meses={len(cronograma)}")
-        
-        if not numero_termo:
-            return jsonify({'success': False, 'error': 'Número do termo não fornecido'}), 400
-        
-        if not cronograma:
-            return jsonify({'success': False, 'error': 'Cronograma vazio'}), 400
-        
-        # Debug: mostrar primeiro mês
-        if cronograma:
-            print(f"🔍 DEBUG: Primeiro mês: {cronograma[0]}")
-        
-        # Inserir novos registros (permite duplicatas para acréscimos no mesmo mês)
-        # Cada mês agora pode ter seu próprio info_alteracao
-        linhas_inseridas = 0
-        
-        for idx, mes_dados in enumerate(cronograma):
-            # Pegar info_alteracao específico deste mês, ou usar 'Base' como fallback
-            info_alteracao = mes_dados.get('info_alteracao', 'Base')
-            
-            print(f"🔍 DEBUG: Inserindo mês {idx + 1}/{len(cronograma)}: {mes_dados['nome_mes']} - Info: {info_alteracao}")
-            
-            cur.execute("""
-                INSERT INTO gestao_financeira.ultra_liquidacoes_cronograma (
-                    numero_termo,
-                    info_alteracao,
-                    nome_mes,
-                    valor_mes_23,
-                    valor_mes_24,
-                    valor_mes,
-                    parcela_numero,
-                    created_por,
-                    created_em
-                ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, NOW()
-                )
-            """, [
-                numero_termo,
-                info_alteracao,
-                mes_dados['nome_mes'],
-                mes_dados.get('valor_mes_23'),
-                mes_dados.get('valor_mes_24'),
-                mes_dados.get('valor_mes'),
-                mes_dados.get('parcela_numero'),
-                session.get('username', 'Sistema')
-            ])
-            
-            linhas_inseridas += cur.rowcount
-        
-        print(f"✅ DEBUG: Total inserido={linhas_inseridas}")
-        conn.commit()
-        print(f"✅ DEBUG: Commit realizado com sucesso!")
-        
-        return jsonify({
-            'success': True,
-            'message': f'Cronograma salvo com sucesso. {linhas_inseridas} meses inseridos.',
-            'linhas_afetadas': linhas_inseridas
-        })
-    
-    except Exception as e:
-        print(f"❌ ERRO em salvar_cronograma: {str(e)}")
-        import traceback
-        print("❌ Traceback completo:")
-        print(traceback.format_exc())
-        conn.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+# ⚠️ FUNÇÃO ANTIGA REMOVIDA - estava causando duplicação de parcelas
+# A rota /api/salvar-cronograma agora é tratada por api_salvar_cronograma() (linha ~2300)
+# que FAZ DELETE antes de INSERT, evitando duplicatas
 
 
 @ultra_liquidacoes_bp.route('/api/debug-termo')
@@ -2162,31 +2231,48 @@ def api_salvar_cronograma():
     """
     Salva cronograma mensal em ultra_liquidacoes_cronograma
     """
+    print("\n" + "="*80)
+    print("💾 API SALVAR CRONOGRAMA CHAMADA")
+    print("="*80)
+    
     try:
         dados = request.get_json()
+        print(f"📝 Dados recebidos: {dados.keys() if dados else 'None'}")
+        
         numero_termo = dados.get('numero_termo')
         cronograma = dados.get('cronograma', [])
         info_alteracao = dados.get('info_alteracao', 'Base')
         
+        print(f"🔑 numero_termo: {numero_termo}")
+        print(f"📊 Total de meses no cronograma: {len(cronograma)}")
+        print(f"🏷️ info_alteracao: {info_alteracao}")
+        
         if not numero_termo or not cronograma:
+            print("⚠️ Dados incompletos!")
             return jsonify({'success': False, 'error': 'Dados incompletos'}), 400
         
         conn = get_db()
         cur = get_cursor()
         
+        print(f"🗑️ Deletando registros existentes para termo {numero_termo}...")
         # Deletar registros existentes para este termo
         cur.execute("""
             DELETE FROM gestao_financeira.ultra_liquidacoes_cronograma
             WHERE numero_termo = %s
         """, (numero_termo,))
+        print(f"✅ Registros deletados")
         
         # Inserir novos registros
+        print(f"📝 Inserindo {len(cronograma)} novos registros...")
         linhas_inseridas = 0
-        for mes in cronograma:
+        email_usuario = session.get('username', 'Sistema')
+        for idx, mes in enumerate(cronograma):
+            if idx < 3:  # Log apenas os primeiros 3
+                print(f"  - Mês {idx + 1}: {mes.get('nome_mes')} = {mes.get('valor_mes')} (info: {mes.get('info_alteracao', 'N/A')})")
             cur.execute("""
                 INSERT INTO gestao_financeira.ultra_liquidacoes_cronograma
-                (numero_termo, nome_mes, valor_mes_23, valor_mes_24, valor_mes, parcela_numero, info_alteracao)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (numero_termo, nome_mes, valor_mes_23, valor_mes_24, valor_mes, parcela_numero, info_alteracao, created_por, created_em)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
             """, (
                 numero_termo,
                 mes['nome_mes'],
@@ -2194,11 +2280,17 @@ def api_salvar_cronograma():
                 mes['valor_mes_24'],
                 mes['valor_mes'],
                 mes['parcela_numero'],
-                info_alteracao
+                info_alteracao,
+                email_usuario
             ))
             linhas_inseridas += 1
         
+        print(f"🔄 Executando COMMIT...")
         conn.commit()
+        print(f"✅ COMMIT realizado com sucesso!")
+        
+        print(f"✅ Cronograma salvo: {linhas_inseridas} linhas inseridas")
+        print("="*80)
         
         return jsonify({
             'success': True,
@@ -2206,8 +2298,18 @@ def api_salvar_cronograma():
         })
         
     except Exception as e:
+        print(f"\n❌ ERRO ao salvar cronograma:")
+        print(f"❌ Tipo: {type(e).__name__}")
+        print(f"❌ Mensagem: {str(e)}")
+        import traceback
+        print(f"❌ Traceback completo:")
+        traceback.print_exc()
+        print("="*80)
+        
         if conn:
+            print("🔄 Executando ROLLBACK...")
             conn.rollback()
+            print("✅ ROLLBACK executado")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -2259,7 +2361,7 @@ def api_status_pagamento():
     """
     try:
         conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_cursor()  # ⚡ CORRETO: usar get_cursor() que já tem RealDictCursor
         
         cur.execute("""
             SELECT DISTINCT parcela_status, status_secundario
@@ -2275,6 +2377,9 @@ def api_status_pagamento():
         })
         
     except Exception as e:
+        print(f"❌ ERRO em api_status_pagamento: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -2356,3 +2461,427 @@ def api_adicionar_parcelas():
         if conn:
             conn.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ========== ENCAMINHAMENTO DE PAGAMENTO ==========
+
+@ultra_liquidacoes_bp.route('/encaminhamento-pagamento/<path:numero_termo>')
+@login_required
+def encaminhamento_pagamento(numero_termo):
+    """Página de seleção de parcelas para encaminhamento de pagamento"""
+    return render_template('gestao_financeira/encaminhamento_pagamento.html', numero_termo=numero_termo)
+
+
+@ultra_liquidacoes_bp.route('/api/parcelas-disponiveis-pagamento')
+@login_required
+def api_parcelas_disponiveis_pagamento():
+    """API para listar parcelas disponíveis para encaminhamento de pagamento"""
+    conn = None
+    try:
+        numero_termo = request.args.get('numero_termo', '')
+        if not numero_termo:
+            return jsonify({'success': False, 'error': 'Número do termo não fornecido'}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Buscar parcelas:
+        # - Status "Não Pago" OU ("Pago" E status_secundario "Parcial")
+        # - Tipo "Programada" (não "Projetada")
+        query = """
+            SELECT 
+                id,
+                numero_termo,
+                vigencia_inicial,
+                vigencia_final,
+                parcela_numero,
+                parcela_status,
+                parcela_status_secundario,
+                parcela_tipo,
+                valor_elemento_53_23,
+                valor_elemento_53_24,
+                valor_previsto
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE numero_termo = %s
+              AND parcela_tipo = 'Programada'
+              AND (
+                  parcela_status = 'Não Pago'
+                  OR parcela_status = 'Nao Pago'
+                  OR (parcela_status = 'Pago' AND parcela_status_secundario = 'Parcial')
+              )
+            ORDER BY vigencia_inicial, parcela_numero
+        """
+        
+        cursor.execute(query, (numero_termo,))
+        rows = cursor.fetchall()
+        
+        parcelas = []
+        for row in rows:
+            parcelas.append({
+                'id': row[0],
+                'numero_termo': row[1],
+                'vigencia_inicial': row[2].strftime('%d/%m/%Y') if row[2] else '',
+                'vigencia_final': row[3].strftime('%d/%m/%Y') if row[3] else '',
+                'parcela_numero': row[4],
+                'parcela_status': row[5],
+                'parcela_status_secundario': row[6],
+                'parcela_tipo': row[7],
+                'valor_elemento_53_23': float(row[8]) if row[8] else 0.0,
+                'valor_elemento_53_23_fmt': formatar_moeda_br(row[8]) if row[8] else 'R$ 0,00',
+                'valor_elemento_53_24': float(row[9]) if row[9] else 0.0,
+                'valor_elemento_53_24_fmt': formatar_moeda_br(row[9]) if row[9] else 'R$ 0,00',
+                'valor_previsto': float(row[10]) if row[10] else 0.0,
+                'valor_previsto_fmt': formatar_moeda_br(row[10]) if row[10] else 'R$ 0,00',
+            })
+        
+        return jsonify({'success': True, 'parcelas': parcelas})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@ultra_liquidacoes_bp.route('/gerar-encaminhamento-pagamento')
+@login_required
+def gerar_encaminhamento_pagamento():
+    """Gera o documento de encaminhamento de pagamento com placeholders substituídos"""
+    conn = None
+    try:
+        numero_termo = request.args.get('numero_termo', '')
+        parcela_ids_str = request.args.get('parcela_ids', '')
+        
+        if not numero_termo or not parcela_ids_str:
+            return "Parâmetros inválidos", 400
+        
+        parcela_ids = [int(x.strip()) for x in parcela_ids_str.split(',') if x.strip().isdigit()]
+        if not parcela_ids:
+            return "Nenhuma parcela selecionada", 400
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # 1. Buscar modelo de texto (id=20)
+        cursor.execute("""
+            SELECT modelo_texto 
+            FROM categoricas.c_geral_modelo_textos 
+            WHERE id = 20
+        """)
+        modelo_row = cursor.fetchone()
+        if not modelo_row or not modelo_row[0]:
+            return "Modelo de texto (ID 20) não encontrado", 404
+        
+        modelo_html = modelo_row[0]
+        
+        # 2. Buscar parcelas selecionadas
+        placeholders = ','.join(['%s'] * len(parcela_ids))
+        query_parcelas = f"""
+            SELECT 
+                id, numero_termo, vigencia_inicial, vigencia_final,
+                parcela_numero, valor_previsto, 
+                valor_elemento_53_23, valor_elemento_53_24
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE id IN ({placeholders})
+            ORDER BY vigencia_inicial, parcela_numero
+        """
+        cursor.execute(query_parcelas, tuple(parcela_ids))
+        parcelas_rows = cursor.fetchall()
+        
+        if not parcelas_rows:
+            return "Parcelas não encontradas", 404
+        
+        # 3. Buscar dados da parceria (apenas portaria, coordenação vem do numero_termo)
+        cursor.execute("""
+            SELECT 
+                numero_termo, portaria
+            FROM public.parcerias
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        parceria_row = cursor.fetchone()
+        
+        if not parceria_row:
+            return f"Parceria {numero_termo} não encontrada", 404
+        
+        # Extrair coordenação do numero_termo (ex: TCL/004/2024/SMDHC/SESANA -> SESANA)
+        partes_termo = numero_termo.split('/')
+        coordenacao = partes_termo[-1] if len(partes_termo) > 0 else ''
+        
+        portaria = parceria_row[1] if parceria_row[1] else ''
+        
+        # 4. Buscar dados do SEI (termo original e aditamento)
+        cursor.execute("""
+            SELECT aditamento, termo_sei_doc
+            FROM public.parcerias_sei
+            WHERE numero_termo = %s
+            ORDER BY id
+        """, (numero_termo,))
+        sei_rows = cursor.fetchall()
+        
+        sei_termo = ''
+        numero_aditamento = ''
+        sei_aditamento = ''
+        
+        # Buscar SEI do termo original (aditamento = "-")
+        for row in sei_rows:
+            if row[0] == '-':
+                sei_termo = row[1] if row[1] else ''
+                break
+        
+        # Buscar ÚLTIMO aditamento diferente de "-"
+        aditamentos_validos = [(row[0], row[1]) for row in sei_rows if row[0] and row[0] != '-']
+        if aditamentos_validos:
+            ultimo_aditamento = aditamentos_validos[-1]
+            numero_aditamento = ultimo_aditamento[0]
+            sei_aditamento = ultimo_aditamento[1] if ultimo_aditamento[1] else ''
+        
+        # 5. Calcular valores e ranges das parcelas
+        vigencias_iniciais = [row[2] for row in parcelas_rows if row[2]]
+        vigencias_finais = [row[3] for row in parcelas_rows if row[3]]
+        
+        mes_vigencia_inicial = ''
+        mes_vigencia_final = ''
+        
+        if vigencias_iniciais and vigencias_finais:
+            data_inicial_min = min(vigencias_iniciais)
+            data_final_max = max(vigencias_finais)
+            
+            # Mapeamento de meses completos
+            meses_completo = {
+                1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril', 5: 'maio', 6: 'junho',
+                7: 'julho', 8: 'agosto', 9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'
+            }
+            
+            # Se mesmo mês/ano, usar formato "janeiro de 2026"
+            if data_inicial_min.month == data_final_max.month and data_inicial_min.year == data_final_max.year:
+                mes_vigencia_inicial = formatar_data_mes_ano(data_inicial_min, formato_completo=True)
+                mes_vigencia_final = ''  # Vazio para remover bloco condicional
+            # Se mesmo ano mas meses diferentes, usar "janeiro a fevereiro de 2026"
+            elif data_inicial_min.year == data_final_max.year:
+                mes_inicial = meses_completo.get(data_inicial_min.month, '')
+                mes_final = meses_completo.get(data_final_max.month, '')
+                mes_vigencia_inicial = f"{mes_inicial} a {mes_final} de {data_inicial_min.year}"
+                mes_vigencia_final = ''  # Vazio pois já está tudo em mes_vigencia_inicial
+            # Se anos diferentes, usar formato abreviado "jan/26 a dez/27"
+            else:
+                mes_vigencia_inicial = formatar_data_mes_ano(data_inicial_min)
+                mes_vigencia_final = formatar_data_mes_ano(data_final_max)
+        
+        # Calcular total previsto
+        total_previsto = sum([float(row[5]) if row[5] else 0.0 for row in parcelas_rows])
+        
+        # Formatar n_parcela usando texto direto do banco (já vem formatado)
+        parcelas_texto = sorted(set([row[4] for row in parcelas_rows if row[4]]))
+        n_parcela = formatar_lista_parcelas(parcelas_texto)
+        
+        # 6. Buscar empenhos correspondentes
+        cursor.execute("""
+            SELECT 
+                nota_empenho_23, sei_nota_empenho_23, total_empenhado_23,
+                nota_empenho_24, sei_nota_empenho_24, total_empenhado_24
+            FROM gestao_financeira.temp_acomp_empenhos
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        empenhos_row = cursor.fetchone()
+        
+        n_empenho_23 = ''
+        sei_empenho_23 = ''
+        n_empenho_24 = ''
+        sei_empenho_24 = ''
+        
+        if empenhos_row:
+            # Comparar valores para confirmar correspondência
+            total_empenhado_23 = float(empenhos_row[2]) if empenhos_row[2] else 0.0
+            total_empenhado_24 = float(empenhos_row[5]) if empenhos_row[5] else 0.0
+            total_empenhado = total_empenhado_23 + total_empenhado_24
+            
+            # Tolerância de 0.01 para comparação
+            if abs(total_empenhado - total_previsto) < 0.01:
+                n_empenho_23 = empenhos_row[0] if empenhos_row[0] else ''
+                sei_empenho_23 = empenhos_row[1] if empenhos_row[1] else ''
+                n_empenho_24 = empenhos_row[3] if empenhos_row[3] else ''
+                sei_empenho_24 = empenhos_row[4] if empenhos_row[4] else ''
+        
+        # 7. Mapear coordenação com regra SESANA (passa numero_termo para identificar TCL vs TFM)
+        coordenacao_formatada = mapear_coordenacao(coordenacao, numero_termo)
+        
+        # 8. Converter valor para extenso
+        valor_extenso = valor_por_extenso(total_previsto)
+        
+        # 9. Substituir placeholders
+        replacements = {
+            'COORDENAÇÃO_INFORMADO_USUARIO': coordenacao_formatada,
+            'numero_termo_usuario': numero_termo,
+            'n_parcela_usuario': n_parcela,
+            'mes_vigencia_inicial_usuario': mes_vigencia_inicial,
+            'mês_vigência_final_usuario': mes_vigencia_final,
+            'info_aditamento_usuario': numero_aditamento,  # Para bloco condicional do aditamento
+            'numero_aditamento_usuario': numero_aditamento,
+            'sei_aditamento_usuario': sei_aditamento,
+            'sei_termo_usuario': sei_termo,
+            'total_previsto_usuario': formatar_moeda_br(total_previsto),
+            'valor_extenso': valor_extenso,
+            'n_empenho_23_usuario': n_empenho_23,
+            'sei_empenho_23_usuario': sei_empenho_23,
+            'n_empenho_24_usuario': n_empenho_24,
+            'sei_empenho_24_usuario': sei_empenho_24,
+            'portaria_usuario': portaria,
+        }
+        
+        # Substituir placeholders normais (sem chaves duplas)
+        html_final = modelo_html
+        for placeholder, valor in replacements.items():
+            html_final = html_final.replace(placeholder, str(valor))
+        
+        # 10. Processar texto opcional com colchetes
+        # Formato: [info_aditamento_usuario: texto aqui]
+        # Se info_aditamento_usuario tiver valor, mantém o texto; senão, remove o bloco inteiro
+        html_final = processar_texto_opcional(html_final, replacements)
+        
+        # Renderizar template com formatação SEI completa
+        return render_template(
+            'gestao_financeira/documento_encaminhamento.html',
+            numero_termo=numero_termo,
+            html_content=html_final
+        )
+        
+    except Exception as e:
+        import traceback
+        return f"Erro ao gerar documento: {str(e)}<br><pre>{traceback.format_exc()}</pre>", 500
+    finally:
+        if conn:
+            conn.close()
+
+
+# ========== FUNÇÕES AUXILIARES PARA ENCAMINHAMENTO ==========
+
+def formatar_lista_parcelas(parcelas_texto):
+    """
+    Formata lista de parcelas (aceita texto já formatado do banco):
+    ["1ª Parcela"] -> "1ª Parcela"
+    ["1ª Parcela", "2ª Parcela"] -> "1ª e 2ª Parcela"
+    ["1ª Parcela Complementar"] -> "1ª Parcela Complementar"
+    """
+    if not parcelas_texto:
+        return ''
+    
+    # Se for apenas uma parcela, retornar o texto direto
+    if len(parcelas_texto) == 1:
+        return parcelas_texto[0]
+    
+    # Se tiver múltiplas parcelas, concatenar
+    elif len(parcelas_texto) == 2:
+        return f"{parcelas_texto[0]} e {parcelas_texto[1]}"
+    else:
+        partes = ', '.join(parcelas_texto[:-1])
+        return f"{partes} e {parcelas_texto[-1]}"
+
+
+def mapear_coordenacao(coordenacao, numero_termo=''):
+    """
+    Mapeia coordenação para formato do documento com caminho completo SEI.
+    Regra especial SESANA:
+    - TCL + SESANA -> SMDHC/SESANA/COSAN/RCE
+    - TFM + SESANA -> SMDHC/SESANA/COSAN/EMENDAS
+    """
+    MAPA_COORDENACOES_SETOR = {
+        'DP': 'SMDHC/DP',
+        'CPCA': 'SMDHC/CPDDH/CPCA',
+        'CPIR': 'SMDHC/CPDDH/CPIR',
+        'CPJ': 'SMDHC/CPDDH/CPJ',
+        'CPLGBTI': 'SMDHC/CPDDH/CPLGBTI',
+        'CPPI': 'SMDHC/CPDDH/CPPI/EM',
+        'CPM': 'SMDHC/CPDDH/CPM',
+        'CPDDH': 'SMDHC/CPDDH',
+        'COSAN': 'SMDHC/SESANA/COSAN/EMENDAS',
+        'COPIND': 'SMDHC/CPDDH/COPIND',
+        'ODH': 'SMDHC/CPDDH/ODH',
+        'DPS': 'SMDHC/CPDDH/DPS',
+        'CPD': 'SMDHC/CPDDH/CPD',
+        'Eventos': 'SMDHC/GAB/AEV',
+        'CAF': 'SMDHC/CAF',
+        'EGRESSOS': 'SMDHC/CPDDH/CPEF',
+        'DEDH': 'SMDHC/CPDDH/CEDH',
+        'CEDH': 'SMDHC/CPDDH/CEDH',
+        'CPIPTD': 'SMDHC/CPDDH/CPIPTD',
+        'CIDADESOLIDÁRIA': 'SMDHC/SESANA/COSAN/EMENDAS',
+        'CPPSR': 'SMDHC/CPDDH/CPPSR',
+        'FUMCAD': 'SMDHC/CPDDH/CPCA/FUMCAD',
+        'FMID': 'SMDHC/CPDDH/CPPI'
+    }
+    
+    coordenacao_upper = coordenacao.strip().upper() if coordenacao else ''
+    
+    # Regra especial para SESANA: depende do tipo de termo (TCL vs TFM)
+    if coordenacao_upper == 'SESANA':
+        tipo_termo = numero_termo.split('/')[0].upper() if numero_termo else ''
+        if tipo_termo == 'TCL':
+            return 'SMDHC/SESANA/COSAN/RCE'
+        else:  # TFM ou outros
+            return 'SMDHC/SESANA/COSAN/EMENDAS'
+    
+    # Buscar no mapa (case-sensitive primeiro, depois case-insensitive)
+    if coordenacao in MAPA_COORDENACOES_SETOR:
+        return MAPA_COORDENACOES_SETOR[coordenacao]
+    
+    # Tentar case-insensitive
+    for sigla, caminho in MAPA_COORDENACOES_SETOR.items():
+        if sigla.upper() == coordenacao_upper:
+            return caminho
+    
+    # Se não encontrou, retornar original
+    return coordenacao if coordenacao else ''
+
+
+def valor_por_extenso(valor):
+    """
+    Converte valor numérico para extenso em português.
+    Exemplo: 150000.00 -> "cento e cinquenta mil reais"
+    """
+    try:
+        from num2words import num2words
+        valor_int = int(valor)
+        valor_centavos = int((valor - valor_int) * 100)
+        
+        extenso_reais = num2words(valor_int, lang='pt_BR')
+        
+        if valor_centavos > 0:
+            extenso_centavos = num2words(valor_centavos, lang='pt_BR')
+            return f"{extenso_reais} reais e {extenso_centavos} centavos"
+        else:
+            return f"{extenso_reais} reais"
+    except ImportError:
+        # Fallback se num2words não estiver disponível
+        return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    except Exception:
+        return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def processar_texto_opcional(html, replacements):
+    """
+    Processa blocos opcionais no formato: [variavel: texto com variavel]
+    Se 'variavel' tiver valor em replacements, mantém o texto.
+    Senão, remove o bloco inteiro (incluindo colchetes).
+    """
+    import re
+    
+    # Regex para capturar: [variavel: qualquer texto] (aceita acentos e Unicode)
+    pattern = r'\[([\w\u00C0-\u017F]+):\s*(.*?)\]'
+    
+    def substituir(match):
+        variavel = match.group(1)
+        texto = match.group(2)
+        
+        # Verificar se variável tem valor
+        valor = replacements.get(variavel, '')
+        if valor and str(valor).strip():
+            # Substituir placeholders dentro do texto opcional (SEM chaves duplas)
+            texto_processado = texto
+            for placeholder, val in replacements.items():
+                texto_processado = texto_processado.replace(placeholder, str(val))
+            return texto_processado
+        else:
+            # Remover bloco inteiro
+            return ''
+    
+    return re.sub(pattern, substituir, html, flags=re.DOTALL)
