@@ -418,6 +418,77 @@ def api_cronograma_mensal():
         cur.close()
 
 
+@gestao_orcamentaria_bp.route('/api/cronograma-editais')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_cronograma_editais():
+    """API para obter dados do cronograma mensal dos editais"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        ano_referencia = request.args.get('ano_referencia')
+        
+        if not ano_referencia:
+            return jsonify({'success': False, 'error': 'Ano de referência não fornecido'}), 400
+        
+        print(f"[DEBUG CRONOGRAMA EDITAIS] Buscando cronograma de editais para ano: {ano_referencia}")
+        
+        # Buscar dados mensais da tabela orcamento_edital_nova
+        # ⚡ Para editais, não há diferença entre modo normal e detalhado
+        # Ambos usam os mesmos dados mensais da tabela
+        cur.execute("""
+            SELECT 
+                edital_nome,
+                nome_mes,
+                valor_mes
+            FROM gestao_financeira.orcamento_edital_nova
+            WHERE EXTRACT(YEAR FROM nome_mes) = %s
+            ORDER BY edital_nome, nome_mes
+        """, (ano_referencia,))
+        
+        resultados = cur.fetchall()
+        print(f"[DEBUG CRONOGRAMA EDITAIS] Registros encontrados: {len(resultados)}")
+        
+        # Organizar dados por edital e mês
+        # dados_editais[edital_nome][mes] = valor_mes
+        dados_editais = {}
+        
+        for row in resultados:
+            edital_nome = row['edital_nome']
+            nome_mes = row['nome_mes']  # DATE no formato YYYY-MM-01
+            valor_mes = float(row['valor_mes']) if row['valor_mes'] else 0
+            
+            if edital_nome not in dados_editais:
+                dados_editais[edital_nome] = {}
+            
+            # Extrair mês (1-12)
+            mes = nome_mes.month
+            
+            # Acumular valor se já existe (caso haja múltiplas entradas para o mesmo mês)
+            if mes not in dados_editais[edital_nome]:
+                dados_editais[edital_nome][mes] = 0
+            dados_editais[edital_nome][mes] += valor_mes
+            
+            print(f"[DEBUG] {edital_nome} | Mês {mes} | R$ {valor_mes:,.2f}")
+        
+        print(f"[DEBUG CRONOGRAMA EDITAIS] Editais processados: {len(dados_editais)}")
+        
+        return jsonify({
+            'success': True,
+            'dados_editais': dados_editais
+        })
+    
+    except Exception as e:
+        print(f"[ERRO CRONOGRAMA EDITAIS] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
 @gestao_orcamentaria_bp.route('/relatorio-dotacao')
 @login_required
 @requires_access('gestao_orcamentaria')

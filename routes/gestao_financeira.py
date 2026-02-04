@@ -558,6 +558,24 @@ def relatorio_empenhos():
         
         percentual_termos = (termos_enviados / termos_total * 100) if termos_total > 0 else 0
         
+        # Estatística 3: Notas de Empenho registradas e SEIs preenchidos
+        cur.execute("""
+            SELECT 
+                COUNT(CASE WHEN nota_empenho_23 IS NOT NULL AND nota_empenho_23 != '' THEN 1 END) as ne_23,
+                COUNT(CASE WHEN sei_nota_empenho_23 IS NOT NULL AND sei_nota_empenho_23 != '' THEN 1 END) as sei_23,
+                COUNT(CASE WHEN nota_empenho_24 IS NOT NULL AND nota_empenho_24 != '' THEN 1 END) as ne_24,
+                COUNT(CASE WHEN sei_nota_empenho_24 IS NOT NULL AND sei_nota_empenho_24 != '' THEN 1 END) as sei_24,
+                COUNT(*) as total
+            FROM gestao_financeira.temp_acomp_empenhos
+        """)
+        stats_empenhos = cur.fetchone()
+        
+        ne_23_registradas = stats_empenhos['ne_23']
+        sei_23_preenchidos = stats_empenhos['sei_23']
+        ne_24_registradas = stats_empenhos['ne_24']
+        sei_24_preenchidos = stats_empenhos['sei_24']
+        total_registros = stats_empenhos['total']
+        
         cur.close()
         
         return render_template(
@@ -567,7 +585,12 @@ def relatorio_empenhos():
             percentual_parcelas=percentual_parcelas,
             termos_enviados=termos_enviados,
             termos_total=termos_total,
-            percentual_termos=percentual_termos
+            percentual_termos=percentual_termos,
+            ne_23_registradas=ne_23_registradas,
+            sei_23_preenchidos=sei_23_preenchidos,
+            ne_24_registradas=ne_24_registradas,
+            sei_24_preenchidos=sei_24_preenchidos,
+            total_registros=total_registros
         )
         
     except Exception as e:
@@ -579,7 +602,12 @@ def relatorio_empenhos():
             percentual_parcelas=0,
             termos_enviados=0,
             termos_total=0,
-            percentual_termos=0
+            percentual_termos=0,
+            ne_23_registradas=0,
+            sei_23_preenchidos=0,
+            ne_24_registradas=0,
+            sei_24_preenchidos=0,
+            total_registros=0
         )
 
 
@@ -1753,6 +1781,11 @@ def api_sincronizar_empenhos():
             except (ValueError, TypeError):
                 print(f"[AVISO] Erro ao converter valores para empenho {ne}: total={val_total}, canc={val_canc}")
                 valor_liquido = 0
+            
+            # ⚠️ IGNORAR empenhos totalmente cancelados (valor_liquido = 0)
+            if valor_liquido <= 0:
+                print(f"[INFO] Empenho {ne} ignorado (totalmente cancelado ou zerado): total={val_total_str}, canc={val_canc_str}")
+                continue
             
             if processo_norm not in empenhos_por_processo:
                 empenhos_por_processo[processo_norm] = {}

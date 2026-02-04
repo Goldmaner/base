@@ -82,7 +82,7 @@
           <h2 class="accordion-header">
             <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGeral">
               <i class="bi bi-house-door me-2"></i> Geral
-              <span class="badge bg-primary section-badge">3</span>
+              <span class="badge bg-primary section-badge">4</span>
             </button>
           </h2>
           <div id="collapseGeral" class="accordion-collapse collapse show" data-bs-parent="#accordionModulos">
@@ -104,8 +104,16 @@
                 </div>
                 {% endif %}
                 
+                {% if is_admin or 'certidoes' in user_acessos %}
+                <div class="col-md-6">
+                  <a href="{{ url_for('certidoes.index') }}" class="btn btn-module" style="background-color:#9C27B0;">
+                    <i class="bi bi-file-earmark-check"></i> Central de Certidões
+                  </a>
+                </div>
+                {% endif %}
+                
                 {% if is_admin or 'parcerias_notificacoes' in user_acessos %}
-                <div class="col-12">
+                <div class="col-md-6">
                   <a href="{{ url_for('parcerias_notificacoes.listar') }}" class="btn btn-module" style="background-color:#fd7e14;">
                     <i class="bi bi-envelope-fill"></i> Ofícios, Documentos e Notificações
                   </a>
@@ -675,6 +683,7 @@
         // Geral
         { id: 'parcerias', nome: 'Parcerias', grupo: 'Geral' },
         { id: 'orcamento', nome: 'Orçamento Anual', grupo: 'Geral' },
+        { id: 'certidoes', nome: 'Central de Certidões', grupo: 'Geral' },
         { id: 'parcerias_notificacoes', nome: 'Ofícios, Documentos e Notificações', grupo: 'Geral' },
         
         // Análise de Contas

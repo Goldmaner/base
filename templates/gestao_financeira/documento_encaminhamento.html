@@ -177,8 +177,9 @@
             <div>
                 <button type="button" class="btn btn-copiar btn-sm me-2" onclick="copiarDocumento()">
                     <i class="bi bi-clipboard me-2"></i>Copiar Documento
-                </button>
-                <a href="/gestao_financeira/ultra-liquidacoes/encaminhamento-pagamento/{{ numero_termo }}" class="btn btn-voltar btn-sm">
+                </button>                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalAnuencia()">
+                    <i class="bi bi-arrow-right-circle me-2"></i>Prosseguir para Anuência
+                </button>                <a href="/gestao_financeira/ultra-liquidacoes/encaminhamento-pagamento/{{ numero_termo }}" class="btn btn-voltar btn-sm">
                     <i class="bi bi-arrow-left me-2"></i>Voltar
                 </a>
             </div>
@@ -197,12 +198,104 @@
         </div>
     </div>
 
+    <!-- Modal para informar SEI do Encaminhamento -->
+    <div class="modal fade" id="modalSeiEncaminhamento" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-file-earmark-text me-2"></i>Informar SEI do Encaminhamento
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">
+                        Para prosseguir com a geração da Anuência da Pessoa Gestora, 
+                        informe o número SEI do encaminhamento de pagamento que você acabou de gerar:
+                    </p>
+                    <div class="mb-3">
+                        <label for="input_sei_encaminhamento" class="form-label fw-bold">
+                            Número SEI do Encaminhamento *
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="input_sei_encaminhamento" 
+                               placeholder="Ex: 6001.2026/0001234-5"
+                               required>
+                        <div class="form-text">
+                            Digite o número SEI completo do documento de encaminhamento
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="prosseguirParaAnuencia()">
+                        <i class="bi bi-arrow-right-circle me-2"></i>Prosseguir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        const numeroTermo = "{{ numero_termo }}";
+        const parcelaIds = new URLSearchParams(window.location.search).get('parcela_ids');
+        function abrirModalAnuencia() {
+            const modal = new bootstrap.Modal(document.getElementById('modalSeiEncaminhamento'));
+            modal.show();
+        }
+
+        function prosseguirParaAnuencia() {
+            const seiEncaminhamento = document.getElementById('input_sei_encaminhamento').value.trim();
+            
+            if (!seiEncaminhamento) {
+                alert('Por favor, informe o número SEI do encaminhamento');
+                return;
+            }
+            
+            // Coletar HTML completo do documento
+            const htmlCompleto = document.getElementById('conteudoDocumento').innerHTML;
+            
+            // Enviar dados para backend salvar auditoria e gerar anuência
+            const btnProsseguir = event.target;
+            btnProsseguir.disabled = true;
+            btnProsseguir.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando...';
+            
+            $.ajax({
+                url: '/gestao_financeira/ultra-liquidacoes/gerar-anuencia-pessoa-gestora',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    numero_termo: numeroTermo,
+                    parcela_ids: parcelaIds,
+                    sei_encaminhamento: seiEncaminhamento,
+                    html_encaminhamento: htmlCompleto
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        // Redirecionar para página da anuência
+                        window.location.href = response.redirect_url;
+                    } else {
+                        alert('Erro: ' + response.error);
+                        btnProsseguir.disabled = false;
+                        btnProsseguir.innerHTML = '<i class="bi bi-arrow-right-circle me-2"></i>Prosseguir';
+                    }
+                },
+                error: function(xhr) {
+                    alert('Erro ao processar: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                    btnProsseguir.disabled = false;
+                    btnProsseguir.innerHTML = '<i class="bi bi-arrow-right-circle me-2"></i>Prosseguir';
+                }
+            });
+        }
+
         function copiarDocumento() {
             const conteudo = document.getElementById('conteudoDocumento');
             

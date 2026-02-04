@@ -240,7 +240,7 @@
 
         <!-- Estatísticas -->
         <div class="row g-3 mb-4">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card border-primary">
                     <div class="card-body">
                         <h5 class="card-title text-primary">
@@ -267,7 +267,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card border-success">
                     <div class="card-body">
                         <h5 class="card-title text-success">
@@ -289,6 +289,47 @@
                                  aria-valuenow="{{ percentual_termos }}" 
                                  aria-valuemin="0" 
                                  aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-info">
+                    <div class="card-body">
+                        <h5 class="card-title text-info">
+                            <i class="bi bi-receipt me-2"></i>Empenhos Registrados
+                        </h5>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-primary me-2">NE 23</span>
+                                    <strong>{{ ne_23_registradas }}</strong>
+                                </div>
+                                <small class="text-muted">Notas registradas</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-primary me-2">SEI 23</span>
+                                    <strong>{{ sei_23_preenchidos }}</strong>
+                                </div>
+                                <small class="text-muted">SEIs preenchidos</small>
+                            </div>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-success me-2">NE 24</span>
+                                    <strong>{{ ne_24_registradas }}</strong>
+                                </div>
+                                <small class="text-muted">Notas registradas</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-success me-2">SEI 24</span>
+                                    <strong>{{ sei_24_preenchidos }}</strong>
+                                </div>
+                                <small class="text-muted">SEIs preenchidos</small>
                             </div>
                         </div>
                     </div>
@@ -524,6 +565,25 @@
                     .val(registro.sei_nota_empenho_23)
                     .on('blur', function() {
                         salvarCampo(registro.id, 'sei_nota_empenho_23', $(this).val());
+                    })
+                    .on('keydown', function(e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            // SALVAR IMEDIATO antes de navegar
+                            salvarImediato(registro.id, 'sei_nota_empenho_23', $(this).val());
+                            // EXCEL-STYLE: Navegar para MESMA COLUNA na linha ABAIXO
+                            const currentRow = $(this).closest('tr');
+                            const currentCell = $(this).closest('td');
+                            const cellIndex = currentCell.index();
+                            const nextRow = currentRow.next('tr');
+                            if (nextRow.length) {
+                                const nextCell = nextRow.find('td').eq(cellIndex);
+                                const nextInput = nextCell.find('input, select');
+                                if (nextInput.length) {
+                                    nextInput.focus().select();
+                                }
+                            }
+                        }
                     });
                 tr.append($('<td>').append(inputSEI23));
 
@@ -535,6 +595,25 @@
                     .val(registro.nota_empenho_24 || '')
                     .on('blur', function() {
                         salvarCampo(registro.id, 'nota_empenho_24', $(this).val());
+                    })
+                    .on('keydown', function(e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            // SALVAR IMEDIATO antes de navegar
+                            salvarImediato(registro.id, 'nota_empenho_24', $(this).val());
+                            // EXCEL-STYLE: Navegar para MESMA COLUNA na linha ABAIXO
+                            const currentRow = $(this).closest('tr');
+                            const currentCell = $(this).closest('td');
+                            const cellIndex = currentCell.index();
+                            const nextRow = currentRow.next('tr');
+                            if (nextRow.length) {
+                                const nextCell = nextRow.find('td').eq(cellIndex);
+                                const nextInput = nextCell.find('input, select');
+                                if (nextInput.length) {
+                                    nextInput.focus().select();
+                                }
+                            }
+                        }
                     });
                 tr.append($('<td>').append(inputNE24));
 
@@ -546,6 +625,25 @@
                     .val(registro.sei_nota_empenho_24)
                     .on('blur', function() {
                         salvarCampo(registro.id, 'sei_nota_empenho_24', $(this).val());
+                    })
+                    .on('keydown', function(e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            // SALVAR IMEDIATO antes de navegar
+                            salvarImediato(registro.id, 'sei_nota_empenho_24', $(this).val());
+                            // EXCEL-STYLE: Navegar para MESMA COLUNA na linha ABAIXO
+                            const currentRow = $(this).closest('tr');
+                            const currentCell = $(this).closest('td');
+                            const cellIndex = currentCell.index();
+                            const nextRow = currentRow.next('tr');
+                            if (nextRow.length) {
+                                const nextCell = nextRow.find('td').eq(cellIndex);
+                                const nextInput = nextCell.find('input, select');
+                                if (nextInput.length) {
+                                    nextInput.focus().select();
+                                }
+                            }
+                        }
                     });
                 tr.append($('<td>').append(inputSEI24));
 
@@ -604,7 +702,47 @@
             });
         }
 
-        // Salvar campo com debounce
+        // Fila de salvamento para evitar perda de dados
+        let saveQueue = [];
+        let isSaving = false;
+
+        // Processar fila de salvamento
+        function processarFilaSalvamento() {
+            if (isSaving || saveQueue.length === 0) {
+                return;
+            }
+
+            isSaving = true;
+            const item = saveQueue.shift();
+
+            $.ajax({
+                url: `/gestao_financeira/api/atualizar-empenho/${item.id}`,
+                method: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    campo: item.campo,
+                    valor: item.valor
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        mostrarFeedback();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erro ao salvar:', error);
+                    alert('Erro ao salvar: ' + error);
+                },
+                complete: function() {
+                    isSaving = false;
+                    // Processar próximo item da fila
+                    if (saveQueue.length > 0) {
+                        setTimeout(processarFilaSalvamento, 100);
+                    }
+                }
+            });
+        }
+
+        // Salvar campo COM DEBOUNCE (usado no blur)
         function salvarCampo(id, campo, valor) {
             // Limpar timeout anterior
             if (debounceTimer) {
@@ -613,24 +751,27 @@
 
             // Criar novo timeout
             debounceTimer = setTimeout(function() {
-                $.ajax({
-                    url: `/gestao_financeira/api/atualizar-empenho/${id}`,
-                    method: 'PUT',
-                    contentType: 'application/json',
-                    data: JSON.stringify({
-                        campo: campo,
-                        valor: valor
-                    }),
-                    success: function(response) {
-                        if (response.success) {
-                            mostrarFeedback();
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        alert('Erro ao salvar: ' + error);
-                    }
-                });
+                salvarImediato(id, campo, valor);
             }, 500); // 500ms de delay
+        }
+
+        // Salvar campo IMEDIATO (usado no Enter)
+        function salvarImediato(id, campo, valor) {
+            // Limpar timeout pendente se houver
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+                debounceTimer = null;
+            }
+
+            // Adicionar à fila
+            saveQueue.push({
+                id: id,
+                campo: campo,
+                valor: valor
+            });
+
+            // Processar fila
+            processarFilaSalvamento();
         }
 
         // Mostrar feedback de salvamento

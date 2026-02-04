@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- jQuery UI (para autocomplete) -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
     
     <style>
     body {
@@ -294,6 +297,9 @@
             <button type="button" class="btn btn-primary" onclick="abrirModalAdicionarParcelas()">
                 <i class="bi bi-plus-circle me-2"></i>Adicionar Parcelas
             </button>
+            <a href="/gestao_financeira/ultra-liquidacoes/consultar-encaminhamentos" class="btn btn-info">
+                <i class="bi bi-file-earmark-text me-2"></i>Consultar Encaminhamentos
+            </a>
             <div class="btn-group">
                 <button type="button" class="btn btn-warning dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-bug me-2"></i>DEBUG
@@ -640,21 +646,21 @@
                             <label class="form-label">Valor Elemento 53/23</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_elemento_53_23" onchange="validarValores()" placeholder="0,00">
+                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_elemento_53_23" onchange="validarValores()" placeholder="0.00">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Valor Elemento 53/24</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_elemento_53_24" onchange="validarValores()" placeholder="0,00">
+                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_elemento_53_24" onchange="validarValores()" placeholder="0.00">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Valor Previsto *</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_previsto" required onchange="validarValores()" placeholder="0,00">
+                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_previsto" required onchange="validarValores()" placeholder="0.00">
                             </div>
                             <small class="text-danger" id="erro_valor_previsto" style="display: none;">
                                 ⚠️ Deve ser igual à soma dos elementos 23 + 24
@@ -667,7 +673,7 @@
                             <label class="form-label">Valor Subtraído</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_subtraido" onchange="validarValores()" placeholder="0,00">
+                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_subtraido" onchange="validarValores()" placeholder="0.00">
                             </div>
                             <small class="text-danger" id="erro_valor_subtraido" style="display: none;">
                                 ⚠️ Não pode superar o valor previsto
@@ -677,7 +683,7 @@
                             <label class="form-label">Valor Encaminhado</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_encaminhado" onchange="validarValores()" placeholder="0,00">
+                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_encaminhado" onchange="validarValores()" placeholder="0.00">
                             </div>
                             <small class="text-danger" id="erro_valor_encaminhado" style="display: none;">
                                 ⚠️ Não pode superar previsto - subtraído
@@ -691,7 +697,7 @@
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_pago" onchange="validarValores()" placeholder="0,00">
+                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_pago" onchange="validarValores()" placeholder="0.00">
                             </div>
                             <div class="form-check mt-2">
                                 <input class="form-check-input" type="checkbox" id="edit_pagamento_inconsistente" onchange="validarValores()">
@@ -2876,6 +2882,8 @@
     // Avançar para fase de cronograma
     function avancarParaCronograma() {
         const termo = termoSelecionadoGlobal;
+        console.log('🚀 [avancarParaCronograma] Iniciando...', termo);
+        
         if (!termo) {
             alert('⚠️ Selecione um termo antes de continuar.');
             return;
@@ -2886,8 +2894,16 @@
         console.log('🔍 Modo Parcelas Projetadas:', modoParcelasProjetadas);
         
         // Mudar de fase
+        console.log('👁️ [avancarParaCronograma] Ocultando FASE 1...');
         $('#fase1_selecao').hide();
+        
+        console.log('👁️ [avancarParaCronograma] Mostrando FASE 2...');
         $('#fase2_cronograma').show();
+        
+        console.log('👁️ [avancarParaCronograma] Verificando se FASE 2 está visível:', $('#fase2_cronograma').is(':visible'));
+        console.log('👁️ [avancarParaCronograma] Verificando tbody do cronograma:', $('#corpo_cronograma').length, 'encontrado(s)');
+        
+        console.log('👁️ [avancarParaCronograma] Alternando botões...');
         $('#btnAvancarCronograma').hide();
         $('#btnSalvarCronograma').show();
         $('#btnVoltarFase1').show();
@@ -3259,19 +3275,44 @@
     // Gerar cronograma baseado no termo selecionado
     function gerarCronograma() {
         const termo = termoSelecionadoGlobal;
-        if (!termo) return;
+        console.log('🔍 [gerarCronograma] termoSelecionadoGlobal:', termo);
+        
+        if (!termo) {
+            console.error('❌ [gerarCronograma] termo é null ou undefined');
+            return;
+        }
+        
+        if (!termo.inicio || !termo.final) {
+            console.error('❌ [gerarCronograma] termo não tem propriedades inicio/final:', termo);
+            alert('⚠️ Erro: Termo selecionado não possui datas de vigência.\nPropriedades disponíveis: ' + Object.keys(termo).join(', '));
+            return;
+        }
         
         const tipoParcela = $('input[name="tipo_parcela_manual"]:checked').val();
+        console.log('🔍 [gerarCronograma] tipoParcela:', tipoParcela);
         
         // Converter datas (vem em formato dd/mm/yyyy)
+        console.log('🔍 [gerarCronograma] termo.inicio:', termo.inicio, 'termo.final:', termo.final);
         const partesInicio = termo.inicio.split('/');
         const partesFim = termo.final.split('/');
         const dataInicio = new Date(partesInicio[2], partesInicio[1] - 1, partesInicio[0]);
         const dataFim = new Date(partesFim[2], partesFim[1] - 1, partesFim[0]);
+        console.log('🔍 [gerarCronograma] dataInicio:', dataInicio, 'dataFim:', dataFim);
         
         const meses = gerarMesesVigencia(dataInicio, dataFim);
+        console.log('📊 [gerarCronograma] Total de meses gerados:', meses.length);
+        console.log('📊 [gerarCronograma] Meses:', meses);
+        
         const tbody = $('#corpo_cronograma');
         tbody.empty();
+        
+        if (meses.length === 0) {
+            console.error('❌ [gerarCronograma] Nenhum mês gerado!');
+            alert('⚠️ Erro: Não foi possível gerar cronograma.\nVerifique se as datas de vigência estão corretas.');
+            return;
+        }
+        
+        console.log('🔨 [gerarCronograma] Iniciando construção de linhas da tabela...');
         
         meses.forEach(function(mesObj, index) {
             const numeroParcela = calcularNumeroParcela(index, tipoParcela, meses.length, mesObj.mes, mesObj.ano);
@@ -3336,8 +3377,12 @@
             tbody.append(tr);
         });
         
+        console.log('✅ [gerarCronograma] Linhas adicionadas ao tbody. Total:', $('#corpo_cronograma tr').length);
+        
         aplicarEventosCronograma();
         recalcularTotaisCronograma();
+        
+        console.log('✅ [gerarCronograma] Cronograma gerado com sucesso!');
     }
     
     // Aplicar eventos de calculadora aos campos do cronograma
@@ -5932,10 +5977,8 @@
     // Formatar valor para moeda brasileira
     function formatarValorMonetario(valor) {
         if (!valor || valor === '') return '';
-        // Remove tudo exceto números e vírgula/ponto
-        let numero = valor.toString().replace(/[^\d.,]/g, '');
-        // Substitui vírgula por ponto para conversão
-        numero = numero.replace(',', '.');
+        // Remove R$, espaços, pontos de milhar e substitui vírgula por ponto
+        let numero = valor.toString().replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
         const valorFloat = parseFloat(numero);
         if (isNaN(valorFloat)) return '';
         
@@ -6152,10 +6195,8 @@
     // Formatar valor para moeda brasileira
     function formatarValorMonetario(valor) {
         if (!valor || valor === '') return '';
-        // Remove tudo exceto números e vírgula/ponto
-        let numero = valor.toString().replace(/[^\d.,]/g, '');
-        // Substitui vírgula por ponto para conversão
-        numero = numero.replace(',', '.');
+        // Remove R$, espaços, pontos de milhar e substitui vírgula por ponto
+        let numero = valor.toString().replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
         const valorFloat = parseFloat(numero);
         if (isNaN(valorFloat)) return '';
         

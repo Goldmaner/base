@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certidões - {{ osc }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        .main-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .certidao-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: white;
+            transition: all 0.3s ease;
+            min-height: 320px;
+        }
+        .certidao-card:hover {
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+        }
+        .certidao-card.preenchida {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+        .certidao-card.vencida {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        .certidao-card.vence-breve {
+            border-color: #ffc107;
+            background: #fffbf0;
+        }
+        .certidao-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .upload-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+        .upload-zone:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        .upload-zone.has-file {
+            border-color: #28a745;
+            background: #f0fff4;
+            border-style: solid;
+        }
+        .file-info {
+            display: none;
+            margin-top: 15px;
+        }
+        .file-info.show {
+            display: block;
+        }
+        .btn-salvar-geral {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .info-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .badge-prazo {
+            font-size: 0.85rem;
+            padding: 5px 10px;
+        }
+        .certidao-detalhes {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 10px;
+        }
+        .help-text {
+            font-size: 0.8rem;
+            color: #999;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Cabeçalho -->
+        <div class="main-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="bi bi-building me-3"></i>{{ osc }}</h1>
+                    <p class="mb-0">
+                        <i class="bi bi-card-text me-2"></i>CNPJ: {{ cnpj }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('certidoes.index') }}" class="btn btn-outline-light">
+                        <i class="bi bi-arrow-left me-2"></i>Voltar à Central
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Informações -->
+        <div class="info-card">
+            <div class="row">
+                <div class="col-md-8">
+                    <h5 class="mb-3"><i class="bi bi-info-circle me-2"></i>Instruções</h5>
+                    <ul class="mb-0">
+                        <li>Faça upload das 7 certidões obrigatórias abaixo</li>
+                        <li>Tamanho máximo: <strong>300KB</strong> por arquivo</li>
+                        <li>Formato aceito: <strong>Apenas PDF</strong></li>
+                        <li>Vencimentos são calculados automaticamente, mas podem ser editados</li>
+                        <li>Para substituir uma certidão, basta fazer novo upload</li>
+                        <li>Para remover uma certidão, clique em "Deletar"</li>
+                        <li><strong>💡 Com 2 ou mais certidões válidas, você poderá gerar um PDF único!</strong></li>
+                    </ul>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div class="stat-box">
+                        <div class="display-4 text-success" id="contador-certidoes">
+                            {% set total_preenchidas = certidoes_map.keys()|length %}
+                            {{ total_preenchidas }}/7
+                        </div>
+                        <p class="text-muted mb-0">Certidões Encartadas</p>
+                        
+                        {% if total_preenchidas >= 2 %}
+                        {% set todas_validas = True %}
+                        {% for cert_nome, cert_data in certidoes_map.items() %}
+                            {% if (cert_data.certidao_vencimento - now().date()).days < 0 %}
+                                {% set todas_validas = False %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if todas_validas %}
+                        <button class="btn btn-primary btn-sm mt-3 w-100" onclick="baixarPDFUnificado()">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>Baixar PDF Único
+                        </button>
+                        {% if total_preenchidas < 7 %}
+                        <small class="text-muted d-block mt-2">{{ total_preenchidas }} de 7 certidões</small>
+                        {% endif %}
+                        {% else %}
+                        <div class="alert alert-warning mt-3 mb-0 py-2">
+                            <small><i class="bi bi-exclamation-triangle me-1"></i>Atualize certidões vencidas para gerar PDF único</small>
+                        </div>
+                        {% endif %}
+                        {% elif total_preenchidas == 1 %}
+                        <div class="alert alert-info mt-3 mb-0 py-2">
+                            <small><i class="bi bi-info-circle me-1"></i>Adicione mais 1 certidão para gerar PDF único</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid de Certidões -->
+        <div class="row">
+            {% for cert in certidoes_obrigatorias %}
+            {% set cert_cadastrada = certidoes_map.get(cert.certidao_nome_resumido) %}
+            {% set preenchida = cert_cadastrada is not none %}
+            
+            <!-- Verificar status de vencimento -->
+            {% set status_class = '' %}
+            {% set badge_vencimento = '' %}
+            {% if preenchida %}
+                {% set dias_restantes = (cert_cadastrada.certidao_vencimento - now().date()).days %}
+                {% if dias_restantes < 0 %}
+                    {% set status_class = 'vencida' %}
+                    {% set badge_vencimento = 'danger' %}
+                {% elif dias_restantes <= 30 %}
+                    {% set status_class = 'vence-breve' %}
+                    {% set badge_vencimento = 'warning' %}
+                {% else %}
+                    {% set status_class = 'preenchida' %}
+                    {% set badge_vencimento = 'success' %}
+                {% endif %}
+            {% endif %}
+            
+            <div class="col-md-6">
+                <div class="certidao-card {{ status_class }}" data-certidao="{{ cert.certidao_nome_resumido }}">
+                    <div class="certidao-header">
+                        <span>
+                            <i class="bi bi-file-earmark-text me-2"></i>{{ cert.certidao_nome_resumido }}
+                        </span>
+                        {% if preenchida %}
+                        <span class="badge bg-{{ badge_vencimento }}">
+                            <i class="bi bi-calendar-check me-1"></i>
+                            Vence: {{ cert_cadastrada.certidao_vencimento.strftime('%d/%m/%Y') }}
+                        </span>
+                        {% else %}
+                        <span class="badge bg-secondary">Pendente</span>
+                        {% endif %}
+                    </div>
+                    
+                    <small class="text-muted d-block mb-2">
+                        <strong>{{ cert.certidao_nome_completo }}</strong>
+                    </small>
+                    
+                    {% if cert.certidao_prazo %}
+                    <small class="badge badge-prazo bg-info mb-2">
+                        <i class="bi bi-clock me-1"></i>Validade: {{ cert.certidao_prazo }} dias
+                    </small>
+                    {% endif %}
+                    
+                    <!-- Upload Zone -->
+                    <div class="upload-zone {% if preenchida %}has-file{% endif %}" 
+                         onclick="document.getElementById('file-{{ cert.certidao_nome_resumido }}').click()">
+                        <input type="file" 
+                               id="file-{{ cert.certidao_nome_resumido }}" 
+                               class="d-none" 
+                               accept=".pdf"
+                               data-certidao-nome="{{ cert.certidao_nome_resumido }}"
+                               data-prazo="{{ cert.certidao_prazo or 0 }}"
+                               onchange="handleFileSelect(this)">
+                        
+                        {% if preenchida %}
+                        <i class="bi bi-file-earmark-check text-success" style="font-size: 2.5rem;"></i>
+                        <p class="mb-0 mt-2"><strong>Arquivo Encartado</strong></p>
+                        <small class="text-muted">{{ cert_cadastrada.certidao_arquivo_nome }}</small>
+                        <small class="text-muted d-block">
+                            Tamanho: {{ (cert_cadastrada.certidao_arquivo_size / 1024)|round(1) }} KB
+                        </small>
+                        <small class="text-muted d-block">
+                            Por: {{ cert_cadastrada.certidao_emissor }}
+                        </small>
+                        {% else %}
+                        <i class="bi bi-cloud-upload text-muted" style="font-size: 2.5rem;"></i>
+                        <p class="mb-0 mt-2">Clique para fazer upload</p>
+                        <small class="text-muted">ou arraste o arquivo aqui</small>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Informações do Arquivo Selecionado -->
+                    <div class="file-info" id="info-{{ cert.certidao_nome_resumido }}">
+                        <div class="alert alert-info py-2 mb-2">
+                            <small>
+                                <i class="bi bi-file-earmark me-1"></i>
+                                <strong>Novo arquivo:</strong> <span class="file-name"></span>
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <label class="form-label fw-bold mb-1" style="font-size: 0.85rem;">
+                                Data de Vencimento:
+                            </label>
+                            <input type="date" 
+                                   class="form-control form-control-sm" 
+                                   id="vencimento-{{ cert.certidao_nome_resumido }}"
+                                   value="{% if preenchida %}{{ cert_cadastrada.certidao_vencimento.strftime('%Y-%m-%d') }}{% endif %}">
+                            <small class="help-text">
+                                <i class="bi bi-info-circle me-1"></i>Calculado automaticamente, mas você pode ajustar
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <label class="form-label fw-bold mb-1" style="font-size: 0.85rem;">
+                                Observações (opcional):
+                            </label>
+                            <textarea class="form-control form-control-sm" 
+                                      id="obs-{{ cert.certidao_nome_resumido }}"
+                                      rows="2"
+                                      placeholder="Informações adicionais...">{% if preenchida %}{{ cert_cadastrada.observacoes or '' }}{% endif %}</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Ações -->
+                    <div class="mt-3">
+                        {% if preenchida %}
+                        <button class="btn btn-sm btn-outline-danger w-100" 
+                                onclick="deletarCertidao('{{ cert.certidao_nome_resumido }}', {{ cert_cadastrada.id }})">
+                            <i class="bi bi-trash me-1"></i>Deletar Certidão
+                        </button>
+                        <input type="hidden" id="certidao-id-{{ cert.certidao_nome_resumido }}" value="{{ cert_cadastrada.id }}">
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Links úteis -->
+                    {% if cert.certidao_link %}
+                    <div class="mt-2">
+                        <a href="{{ cert.certidao_link }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                            <i class="bi bi-link-45deg me-1"></i>Acessar Site Oficial
+                        </a>
+                    </div>
+                    {% endif %}
+                    
+                    {% if cert.certidao_passos %}
+                    <div class="certidao-detalhes mt-2">
+                        <details>
+                            <summary style="cursor: pointer;" class="text-primary">
+                                <i class="bi bi-info-circle me-1"></i>Como obter esta certidão
+                            </summary>
+                            <div class="mt-2 p-2 bg-light rounded">
+                                <small>{{ cert.certidao_passos }}</small>
+                            </div>
+                        </details>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Botão Salvar (fixo) -->
+    <button class="btn btn-success btn-lg btn-salvar-geral" onclick="salvarTodasCertidoes()" id="btn-salvar">
+        <i class="bi bi-cloud-check me-2"></i>Salvar Alterações
+        <span class="badge bg-white text-success ms-2" id="contador-pendentes">0</span>
+    </button>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Armazenar arquivos selecionados temporariamente
+        const arquivosSelecionados = {};
+        
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const certidaoNome = input.getAttribute('data-certidao-nome');
+            const prazo = parseInt(input.getAttribute('data-prazo')) || 0;
+            
+            // Validar tamanho (300KB)
+            if (file.size > 300 * 1024) {
+                alert('Arquivo muito grande! Tamanho máximo: 300KB');
+                input.value = '';
+                return;
+            }
+            
+            // Validar extensão - apenas PDF
+            const extensao = file.name.split('.').pop().toLowerCase();
+            if (extensao !== 'pdf') {
+                alert('Formato não permitido! Apenas arquivos PDF são aceitos.');
+                input.value = '';
+                return;
+            }
+            
+            // Armazenar arquivo
+            arquivosSelecionados[certidaoNome] = file;
+            
+            // Calcular data de vencimento automaticamente
+            const hoje = new Date();
+            const vencimento = new Date(hoje);
+            vencimento.setDate(vencimento.getDate() + prazo);
+            const vencimentoStr = vencimento.toISOString().split('T')[0];
+            
+            // Atualizar UI
+            const infoDiv = document.getElementById(`info-${certidaoNome}`);
+            infoDiv.classList.add('show');
+            infoDiv.querySelector('.file-name').textContent = file.name;
+            
+            const vencimentoInput = document.getElementById(`vencimento-${certidaoNome}`);
+            if (!vencimentoInput.value) {  // Só preenche se estiver vazio
+                vencimentoInput.value = vencimentoStr;
+            }
+            
+            // Atualizar classe do card
+            const card = document.querySelector(`[data-certidao="${certidaoNome}"]`);
+            card.classList.add('preenchida');
+            
+            // Atualizar contador
+            atualizarContadores();
+        }
+        
+        async function salvarTodasCertidoes() {
+            const certidoesParaSalvar = Object.keys(arquivosSelecionados);
+            
+            if (certidoesParaSalvar.length === 0) {
+                alert('Nenhuma alteração para salvar!');
+                return;
+            }
+            
+            const btnSalvar = document.getElementById('btn-salvar');
+            btnSalvar.disabled = true;
+            btnSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+            
+            let sucessos = 0;
+            let erros = 0;
+            
+            for (const certidaoNome of certidoesParaSalvar) {
+                try {
+                    const formData = new FormData();
+                    formData.append('arquivo', arquivosSelecionados[certidaoNome]);
+                    formData.append('osc', '{{ osc }}');
+                    formData.append('cnpj', '{{ cnpj }}');
+                    formData.append('certidao_nome_resumido', certidaoNome);
+                    formData.append('certidao_vencimento', document.getElementById(`vencimento-${certidaoNome}`).value);
+                    formData.append('observacoes', document.getElementById(`obs-${certidaoNome}`).value);
+                    
+                    // Se já existe certidão, enviar ID para atualizar
+                    const certidaoIdInput = document.getElementById(`certidao-id-${certidaoNome}`);
+                    if (certidaoIdInput) {
+                        formData.append('certidao_id', certidaoIdInput.value);
+                    }
+                    
+                    const response = await fetch('/certidoes/api/certidoes/upload-individual', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        sucessos++;
+                    } else {
+                        erros++;
+                        console.error(`Erro ao salvar ${certidaoNome}:`, result.erro);
+                    }
+                } catch (error) {
+                    erros++;
+                    console.error(`Erro ao salvar ${certidaoNome}:`, error);
+                }
+            }
+            
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = '<i class="bi bi-cloud-check me-2"></i>Salvar Alterações';
+            
+            if (erros === 0) {
+                alert(`✅ ${sucessos} certidão(ões) salva(s) com sucesso!`);
+                window.location.reload();
+            } else {
+                alert(`⚠️ ${sucessos} salvas com sucesso, ${erros} com erro.\n\nRecarregue a página e tente novamente.`);
+            }
+        }
+        
+        async function deletarCertidao(certidaoNome, certidaoId) {
+            if (!confirm(`Tem certeza que deseja deletar a certidão ${certidaoNome}?\n\nEsta ação não pode ser desfeita!`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/certidoes/api/certidoes/deletar-individual/${certidaoId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Certidão deletada com sucesso!');
+                    window.location.reload();
+                } else {
+                    alert('Erro ao deletar: ' + result.erro);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao deletar certidão.');
+            }
+        }
+        
+        function atualizarContadores() {
+            const totalPendentes = Object.keys(arquivosSelecionados).length;
+            document.getElementById('contador-pendentes').textContent = totalPendentes;
+            
+            const btnSalvar = document.getElementById('btn-salvar');
+            if (totalPendentes > 0) {
+                btnSalvar.classList.add('pulse');
+            } else {
+                btnSalvar.classList.remove('pulse');
+            }
+        }
+        
+        async function baixarPDFUnificado() {
+            if (!confirm('Deseja gerar um PDF único com todas as 7 certidões válidas?\n\nO arquivo será baixado automaticamente.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/certidoes/api/juntar-pdfs/{{ nome_pasta }}');
+                
+                if (!response.ok) {
+                    const result = await response.json();
+                    alert('Erro: ' + result.erro);
+                    return;
+                }
+                
+                // Baixar arquivo
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Certidoes_{{ nome_pasta }}_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                alert('✅ PDF unificado gerado com sucesso!');
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao gerar PDF unificado.');
+            }
+        }
+        
+        // Adicionar animação de pulse
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0% { box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); }
+                50% { box-shadow: 0 4px 25px rgba(40, 167, 69, 0.6); }
+                100% { box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); }
+            }
+            .pulse {
+                animation: pulse 2s infinite;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

@@ -3594,7 +3594,13 @@ def dgp_alteracoes_temp_sei():
     """
     Relatório editável de parcerias_sei - renderiza apenas o template
     """
-    return render_template('dgp_alteracoes_temp_sei.html')
+    # Buscar lista de termos para dropdown
+    cur = get_cursor()
+    cur.execute("SELECT numero_termo FROM public.parcerias ORDER BY numero_termo DESC")
+    termos = [row['numero_termo'] for row in cur.fetchall()]
+    cur.close()
+    
+    return render_template('dgp_alteracoes_temp_sei.html', termos=termos)
 
 
 @parcerias_bp.route("/api/parcerias_sei/dados", methods=["POST"])
@@ -3625,7 +3631,8 @@ def api_parcerias_sei_dados():
             3: 'data_assinatura',
             4: 'aditamento',
             5: 'apostilamento',
-            6: 'id'  # Ações (não filtrável)
+            6: 'termo_tipo_sei',
+            7: 'id'  # Ações (não filtrável)
         }
         
         order_column = columns_map.get(order_column_idx, 'id')  # Padrão: ordenar por ID (mais recentes)
@@ -3640,7 +3647,8 @@ def api_parcerias_sei_dados():
                 termo_sei_doc,
                 data_assinatura,
                 aditamento,
-                apostilamento
+                apostilamento,
+                termo_tipo_sei
             FROM public.parcerias_sei
             WHERE 1=1
         """
@@ -3654,15 +3662,16 @@ def api_parcerias_sei_dados():
                 termo_sei_doc ILIKE %s OR
                 CAST(data_assinatura AS TEXT) ILIKE %s OR
                 aditamento ILIKE %s OR
-                apostilamento ILIKE %s
+                apostilamento ILIKE %s OR
+                termo_tipo_sei ILIKE %s
             )"""
             search_pattern = f"%{search_value}%"
-            params.extend([search_pattern] * 5)
+            params.extend([search_pattern] * 6)
         
         # Filtros por coluna individual
         for idx, col_filter in enumerate(column_filters):
             col_search = col_filter.get('search', {}).get('value', '')
-            if col_search and idx in [1, 2, 3, 4, 5]:  # Apenas colunas filtráveis
+            if col_search and idx in [1, 2, 3, 4, 5, 6]:  # Apenas colunas filtráveis
                 col_name = columns_map[idx]
                 if col_name == 'data_assinatura':
                     query += f" AND CAST({col_name} AS TEXT) ILIKE %s"
@@ -3686,15 +3695,16 @@ def api_parcerias_sei_dados():
                 termo_sei_doc ILIKE %s OR
                 CAST(data_assinatura AS TEXT) ILIKE %s OR
                 aditamento ILIKE %s OR
-                apostilamento ILIKE %s
+                apostilamento ILIKE %s OR
+                termo_tipo_sei ILIKE %s
             )"""
             search_pattern = f"%{search_value}%"
-            count_params.extend([search_pattern] * 5)
+            count_params.extend([search_pattern] * 6)
         
         # Filtros por coluna individual na query de contagem
         for idx, col_filter in enumerate(column_filters):
             col_search = col_filter.get('search', {}).get('value', '')
-            if col_search and idx in [1, 2, 3, 4, 5]:
+            if col_search and idx in [1, 2, 3, 4, 5, 6]:
                 col_name = columns_map[idx]
                 if col_name == 'data_assinatura':
                     count_query += f" AND CAST({col_name} AS TEXT) ILIKE %s"
@@ -3727,6 +3737,7 @@ def api_parcerias_sei_dados():
                 reg['data_assinatura'].strftime('%d/%m/%Y') if reg['data_assinatura'] else '',
                 reg['aditamento'] or '',
                 reg['apostilamento'] or '',
+                reg['termo_tipo_sei'] or '',
                 reg['id']  # Para botão de ação
             ])
         
@@ -3885,7 +3896,7 @@ def api_atualizar_parcerias_sei():
         
         # Validar campo permitido
         campos_permitidos = ['numero_termo', 'termo_sei_doc', 
-                            'data_assinatura', 'aditamento', 'apostilamento']
+                            'data_assinatura', 'aditamento', 'apostilamento', 'termo_tipo_sei']
         if campo not in campos_permitidos:
             return jsonify({'success': False, 'error': 'Campo não permitido'}), 400
         
@@ -3937,6 +3948,85 @@ def api_excluir_parcerias_sei():
         
     except Exception as e:
         print(f"[ERRO] api_excluir_parcerias_sei: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@parcerias_bp.route("/api/parcerias_sei/inserir", methods=["POST"])
+@login_required
+@requires_access('parcerias')
+def api_inserir_parcerias_sei():
+    """
+    API para inserir novo registro em parcerias_sei
+    """
+    try:
+        data = request.get_json()
+        numero_termo = data.get('numero_termo')
+        aditamento = data.get('aditamento', '-').strip()
+        apostilamento = data.get('apostilamento', '-').strip()
+        termo_sei_doc = data.get('termo_sei_doc', '').strip()
+        termo_tipo_sei = data.get('termo_tipo_sei', '').strip()
+        data_assinatura = data.get('data_assinatura', '').strip()
+        
+        # Validações
+        if not numero_termo:
+            return jsonify({'success': False, 'error': 'Número do termo é obrigatório'}), 400
+        
+        # Validar aditamento (só números ou "-")
+        if aditamento and aditamento != '-' and not aditamento.isdigit():
+            return jsonify({'success': False, 'error': 'Aditamento deve conter apenas números ou "-"'}), 400
+        
+        # Validar apostilamento (só números ou "-")
+        if apostilamento and apostilamento != '-' and not apostilamento.isdigit():
+            return jsonify({'success': False, 'error': 'Apostilamento deve conter apenas números ou "-"'}), 400
+        
+        conn = get_db()
+        cur = get_cursor()
+        
+        # Verificar duplicação - mesmo numero_termo, termo_sei_doc e (aditamento ou apostilamento)
+        cur.execute("""
+            SELECT id FROM public.parcerias_sei
+            WHERE numero_termo = %s
+              AND termo_sei_doc = %s
+              AND (aditamento = %s OR apostilamento = %s)
+        """, (numero_termo, termo_sei_doc if termo_sei_doc else None, aditamento, apostilamento))
+        
+        registro_existente = cur.fetchone()
+        if registro_existente:
+            cur.close()
+            return jsonify({
+                'success': False, 
+                'error': 'Registro duplicado! Já existe um registro com o mesmo número de termo, SEI documento e aditamento/apostilamento.'
+            }), 400
+        
+        # Inserir novo registro
+        cur.execute("""
+            INSERT INTO public.parcerias_sei 
+            (numero_termo, termo_sei_doc, data_assinatura, aditamento, apostilamento, termo_tipo_sei)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            numero_termo,
+            termo_sei_doc if termo_sei_doc else None,
+            data_assinatura if data_assinatura else None,
+            aditamento,
+            apostilamento,
+            termo_tipo_sei if termo_tipo_sei else None
+        ))
+        
+        novo_id = cur.fetchone()['id']
+        conn.commit()
+        cur.close()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Registro inserido com sucesso',
+            'id': novo_id
+        })
+        
+    except Exception as e:
+        print(f"[ERRO] api_inserir_parcerias_sei: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -580,25 +580,66 @@
             return;
         }
         
+        // Carregar dados dos TERMOS (Programadas e Projetadas)
         $.ajax({
             url: '/gestao_orcamentaria/api/cronograma-mensal',
             method: 'GET',
             data: { ano_referencia: ano },
             success: function(response) {
                 if (response.success) {
-                    console.log('[DEBUG CRONOGRAMA] Dados recebidos:', response);
+                    console.log('[DEBUG CRONOGRAMA] Dados dos termos recebidos:', response);
                     dadosCronograma = {
                         programados: response.dados_programados || {},
                         projetados: response.dados_projetados || {}
                     };
-                    renderizarTabela();
-                    toastr.success('Cronograma mensal carregado!');
+                    
+                    // Agora carregar dados dos EDITAIS
+                    carregarCronogramaEditais();
                 } else {
                     toastr.error('Erro ao carregar cronograma: ' + response.error);
                 }
             },
             error: function(xhr) {
                 toastr.error('Erro ao carregar cronograma: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Carregar dados do cronograma de EDITAIS
+    function carregarCronogramaEditais() {
+        const ano = $('#ano_referencia').val();
+        
+        if (!ano) {
+            toastr.error('Por favor, selecione um ano de referência');
+            return;
+        }
+        
+        $.ajax({
+            url: '/gestao_orcamentaria/api/cronograma-editais',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                if (response.success) {
+                    console.log('[DEBUG CRONOGRAMA EDITAIS] Dados recebidos:', response);
+                    
+                    // ⚡ MESCLAR editais no objeto projetados (editais só têm valores projetados)
+                    const dadosEditais = response.dados_editais || {};
+                    for (const editalNome in dadosEditais) {
+                        dadosCronograma.projetados[editalNome] = dadosEditais[editalNome];
+                    }
+                    
+                    renderizarTabela();
+                    toastr.success('Cronograma mensal carregado (termos + editais)!');
+                } else {
+                    toastr.error('Erro ao carregar cronograma de editais: ' + response.error);
+                    // Mesmo com erro, renderizar o que já foi carregado
+                    renderizarTabela();
+                }
+            },
+            error: function(xhr) {
+                toastr.error('Erro ao carregar cronograma de editais: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                // Mesmo com erro, renderizar o que já foi carregado
+                renderizarTabela();
             }
         });
     }
@@ -612,22 +653,69 @@
             return;
         }
         
+        // Carregar dados detalhados dos TERMOS
         $.ajax({
             url: '/gestao_orcamentaria/api/cronograma-detalhado',
             method: 'GET',
             data: { ano_referencia: ano },
             success: function(response) {
                 if (response.success) {
-                    console.log('[DEBUG CRONOGRAMA DETALHADO] Dados recebidos:', response);
+                    console.log('[DEBUG CRONOGRAMA DETALHADO] Dados dos termos recebidos:', response);
                     dadosCronogramaDetalhado = response.dados || {};
-                    renderizarTabela();
-                    toastr.success('Cronograma detalhado carregado!');
+                    
+                    // Agora carregar dados dos EDITAIS (mesma fonte para modo detalhado)
+                    carregarCronogramaEditaisDetalhado();
                 } else {
                     toastr.error('Erro ao carregar cronograma detalhado: ' + response.error);
                 }
             },
             error: function(xhr) {
                 toastr.error('Erro ao carregar cronograma detalhado: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Carregar dados do cronograma de EDITAIS para modo detalhado
+    function carregarCronogramaEditaisDetalhado() {
+        const ano = $('#ano_referencia').val();
+        
+        if (!ano) {
+            toastr.error('Por favor, selecione um ano de referência');
+            return;
+        }
+        
+        $.ajax({
+            url: '/gestao_orcamentaria/api/cronograma-editais',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                if (response.success) {
+                    console.log('[DEBUG CRONOGRAMA EDITAIS DETALHADO] Dados recebidos:', response);
+                    
+                    // ⚡ Para editais no modo detalhado, usar mesma estrutura (sem parcelas)
+                    const dadosEditais = response.dados_editais || {};
+                    for (const editalNome in dadosEditais) {
+                        dadosCronogramaDetalhado[editalNome] = {};
+                        for (const mes in dadosEditais[editalNome]) {
+                            dadosCronogramaDetalhado[editalNome][mes] = {
+                                valor: dadosEditais[editalNome][mes],
+                                parcelas: []  // Editais não têm parcelas individuais
+                            };
+                        }
+                    }
+                    
+                    renderizarTabela();
+                    toastr.success('Cronograma detalhado carregado (termos + editais)!');
+                } else {
+                    toastr.error('Erro ao carregar cronograma de editais: ' + response.error);
+                    // Mesmo com erro, renderizar o que já foi carregado
+                    renderizarTabela();
+                }
+            },
+            error: function(xhr) {
+                toastr.error('Erro ao carregar cronograma de editais: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                // Mesmo com erro, renderizar o que já foi carregado
+                renderizarTabela();
             }
         });
     }

@@ -1117,13 +1117,19 @@ def api_atualizar_parcela(parcela_id):
         vigencia_final = parse_data_br(dados.get('vigencia_final'))
         data_pagamento = parse_data_br(dados.get('data_pagamento'))
         
-        # Parse de valores numéricos
-        valor_elemento_53_23 = Decimal(str(dados.get('valor_elemento_53_23', 0)))
-        valor_elemento_53_24 = Decimal(str(dados.get('valor_elemento_53_24', 0)))
-        valor_previsto = Decimal(str(dados.get('valor_previsto', 0)))
-        valor_subtraido = Decimal(str(dados.get('valor_subtraido', 0)))
-        valor_encaminhado = Decimal(str(dados.get('valor_encaminhado', 0)))
-        valor_pago = Decimal(str(dados.get('valor_pago', 0)))
+        # Parse de valores numéricos - converte None/null para 0
+        def parse_valor_decimal(valor):
+            """Converte valor para Decimal, tratando None, null, strings vazias"""
+            if valor is None or valor == '' or valor == 'null' or valor == 'None':
+                return Decimal('0')
+            return Decimal(str(valor))
+        
+        valor_elemento_53_23 = parse_valor_decimal(dados.get('valor_elemento_53_23'))
+        valor_elemento_53_24 = parse_valor_decimal(dados.get('valor_elemento_53_24'))
+        valor_previsto = parse_valor_decimal(dados.get('valor_previsto'))
+        valor_subtraido = parse_valor_decimal(dados.get('valor_subtraido'))
+        valor_encaminhado = parse_valor_decimal(dados.get('valor_encaminhado'))
+        valor_pago = parse_valor_decimal(dados.get('valor_pago'))
         
         # Campos texto
         parcela_tipo = dados.get('parcela_tipo', '')
@@ -1183,7 +1189,9 @@ def api_atualizar_parcela(parcela_id):
         return jsonify({'success': True, 'message': 'Parcela atualizada com sucesso'})
     
     except Exception as e:
-        print(f"[ERRO] Erro ao atualizar parcela: {str(e)}")
+        print(f"[ERRO] Erro ao atualizar parcela: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         conn.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
     
@@ -2628,12 +2636,23 @@ def gerar_encaminhamento_pagamento():
                 sei_termo = row[1] if row[1] else ''
                 break
         
-        # Buscar ÚLTIMO aditamento diferente de "-"
-        aditamentos_validos = [(row[0], row[1]) for row in sei_rows if row[0] and row[0] != '-']
+        # Buscar ÚLTIMO aditamento numérico (maior número)
+        aditamentos_validos = []
+        for row in sei_rows:
+            if row[0] and row[0] != '-':
+                try:
+                    num_aditamento = int(row[0])
+                    aditamentos_validos.append((num_aditamento, row[0], row[1]))
+                except ValueError:
+                    # Se não for número, adicionar mesmo assim
+                    aditamentos_validos.append((0, row[0], row[1]))
+        
         if aditamentos_validos:
-            ultimo_aditamento = aditamentos_validos[-1]
-            numero_aditamento = ultimo_aditamento[0]
-            sei_aditamento = ultimo_aditamento[1] if ultimo_aditamento[1] else ''
+            # Ordenar por número (maior primeiro) e pegar o primeiro da lista
+            aditamentos_validos.sort(key=lambda x: x[0], reverse=True)
+            ultimo_aditamento = aditamentos_validos[0]
+            numero_aditamento = ultimo_aditamento[1]  # Texto original do aditamento
+            sei_aditamento = ultimo_aditamento[2] if ultimo_aditamento[2] else ''
         
         # 5. Calcular valores e ranges das parcelas
         vigencias_iniciais = [row[2] for row in parcelas_rows if row[2]]
@@ -2674,6 +2693,12 @@ def gerar_encaminhamento_pagamento():
         parcelas_texto = sorted(set([row[4] for row in parcelas_rows if row[4]]))
         n_parcela = formatar_lista_parcelas(parcelas_texto)
         
+        # Verificar se alguma parcela é "1ª Parcela" (para condicional de glosa/retenção)
+        tem_primeira_parcela = any('1ª Parcela' in p for p in parcelas_texto)
+        
+        # Gerar linhas da tabela de parcelas
+        linhas_tabela_html = gerar_linhas_tabela_parcelas(parcelas_rows)
+        
         # 6. Buscar empenhos correspondentes
         cursor.execute("""
             SELECT 
@@ -2708,7 +2733,41 @@ def gerar_encaminhamento_pagamento():
         # 8. Converter valor para extenso
         valor_extenso = valor_por_extenso(total_previsto)
         
-        # 9. Substituir placeholders
+        # 9. Construir texto dos empenhos dinamicamente
+        texto_empenhos = []
+        if n_empenho_23 and sei_empenho_23:
+            texto_empenhos.append(f"nº {n_empenho_23} sob SEI nº {sei_empenho_23}")
+        if n_empenho_24 and sei_empenho_24:
+            texto_empenhos.append(f"nº {n_empenho_24} sob SEI nº {sei_empenho_24}")
+        
+        # Formatação final do texto de empenhos
+        # Suporta 1, 2, 3 ou mais empenhos com formatação correta
+        if len(texto_empenhos) == 0:
+            texto_empenhos_formatado = ""  # Nenhum empenho
+        elif len(texto_empenhos) == 1:
+            texto_empenhos_formatado = texto_empenhos[0]
+        elif len(texto_empenhos) == 2:
+            texto_empenhos_formatado = f"{texto_empenhos[0]} e {texto_empenhos[1]}"
+        else:
+            # 3 ou mais: "nº X sob SEI Y, nº A sob SEI B e nº C sob SEI D"
+            texto_empenhos_formatado = ", ".join(texto_empenhos[:-1]) + " e " + texto_empenhos[-1]
+        
+        # DEBUG: Log valores importantes
+        print(f"\n=== DEBUG ENCAMINHAMENTO PAGAMENTO ===")
+        print(f"Termo: {numero_termo}")
+        print(f"Aditamentos encontrados: {sei_rows}")
+        print(f"numero_aditamento: '{numero_aditamento}'")
+        print(f"sei_aditamento: '{sei_aditamento}'")
+        print(f"mes_vigencia_inicial: '{mes_vigencia_inicial}'")
+        print(f"mes_vigencia_final: '{mes_vigencia_final}'")
+        print(f"\n--- EMPENHOS ---")
+        print(f"n_empenho_23: '{n_empenho_23}'")
+        print(f"sei_empenho_23: '{sei_empenho_23}'")
+        print(f"n_empenho_24: '{n_empenho_24}'")
+        print(f"sei_empenho_24: '{sei_empenho_24}'")
+        print(f"=====================================\n")
+        
+        # 10. Substituir placeholders
         replacements = {
             'COORDENAÇÃO_INFORMADO_USUARIO': coordenacao_formatada,
             'numero_termo_usuario': numero_termo,
@@ -2725,15 +2784,53 @@ def gerar_encaminhamento_pagamento():
             'sei_empenho_23_usuario': sei_empenho_23,
             'n_empenho_24_usuario': n_empenho_24,
             'sei_empenho_24_usuario': sei_empenho_24,
+            'texto_empenhos_formatado': texto_empenhos_formatado,  # Novo placeholder com texto completo
             'portaria_usuario': portaria,
         }
         
+        print(f"\n--- DEBUG PLACEHOLDERS ---")
+        print(f"Total de placeholders: {len(replacements)}")
+        
+        # Verificar se placeholders de empenho existem no HTML
+        placeholders_empenho = ['n_empenho_23_usuario', 'sei_empenho_23_usuario', 'n_empenho_24_usuario', 'sei_empenho_24_usuario']
+        for ph in placeholders_empenho:
+            existe = ph in modelo_html
+            valor = replacements.get(ph, 'N/A')
+            print(f"  • {ph}: existe no modelo? {existe}, valor='{valor}'")
+        
+        # Mostrar trecho do modelo onde aparece 'empenho'
+        if 'empenho' in modelo_html.lower():
+            idx = modelo_html.lower().find('empenho')
+            trecho = modelo_html[max(0, idx-100):min(len(modelo_html), idx+300)]
+            print(f"\n--- TRECHO DO MODELO COM 'EMPENHO' (400 chars) ---")
+            print(f"{trecho}")
+            print(f"--------------------------------------------------\n")
+        
         # Substituir placeholders normais (sem chaves duplas)
         html_final = modelo_html
+        substituicoes_realizadas = 0
         for placeholder, valor in replacements.items():
-            html_final = html_final.replace(placeholder, str(valor))
+            ocorrencias = html_final.count(placeholder)
+            if ocorrencias > 0:
+                html_final = html_final.replace(placeholder, str(valor))
+                substituicoes_realizadas += 1
+                if placeholder in placeholders_empenho:
+                    print(f"  ✓ '{placeholder}' substituído ({ocorrencias}x)")
+            elif placeholder in placeholders_empenho:
+                print(f"  ✗ '{placeholder}' NÃO ENCONTRADO no modelo")
         
-        # 10. Processar texto opcional com colchetes
+        print(f"\nTotal de substituições realizadas: {substituicoes_realizadas}/{len(replacements)}")
+        
+        # 11. Substituir placeholder da tabela de parcelas
+        html_final = html_final.replace('<!-- LINHAS_TABELA_PARCELAS -->', linhas_tabela_html)
+        
+        # 12. Remover parágrafos condicionais se houver "1ª Parcela"
+        if tem_primeira_parcela:
+            html_final = remover_bloco_condicional(html_final, 
+                '<!-- CONDICIONAL_GLOSA_RETENCAO_INICIO -->', 
+                '<!-- CONDICIONAL_GLOSA_RETENCAO_FIM -->')
+        
+        # 13. Processar texto opcional com colchetes
         # Formato: [info_aditamento_usuario: texto aqui]
         # Se info_aditamento_usuario tiver valor, mantém o texto; senão, remove o bloco inteiro
         html_final = processar_texto_opcional(html_final, replacements)
@@ -2824,6 +2921,92 @@ def mapear_coordenacao(coordenacao, numero_termo=''):
     if coordenacao in MAPA_COORDENACOES_SETOR:
         return MAPA_COORDENACOES_SETOR[coordenacao]
     
+    # Fallback para busca case-insensitive
+    for key, value in MAPA_COORDENACOES_SETOR.items():
+        if key.upper() == coordenacao_upper:
+            return value
+    
+    # Se não encontrou, retornar com SMDHC/ na frente
+    return f'SMDHC/{coordenacao}' if coordenacao else 'SMDHC'
+
+
+def gerar_linhas_tabela_parcelas(parcelas_rows):
+    """
+    Gera as linhas HTML da tabela de parcelas para encaminhamento de pagamento.
+    
+    Estrutura de parcelas_rows:
+    (id, numero_termo, vigencia_inicial, vigencia_final, 
+     parcela_numero, valor_previsto, valor_elemento_53_23, valor_elemento_53_24)
+    """
+    linhas = []
+    
+    for row in parcelas_rows:
+        parcela_numero = row[4] if row[4] else ''
+        valor_53_23 = float(row[6]) if row[6] else 0.0
+        valor_53_24 = float(row[7]) if row[7] else 0.0
+        valor_previsto = float(row[5]) if row[5] else 0.0
+        vigencia_inicial = row[2]
+        vigencia_final = row[3]
+        
+        # Formatar valores monetários
+        valor_53_23_fmt = formatar_moeda_br(valor_53_23)
+        valor_53_24_fmt = formatar_moeda_br(valor_53_24)
+        valor_previsto_fmt = formatar_moeda_br(valor_previsto)
+        
+        # Formatar datas
+        vigencia_inicial_fmt = formatar_data_mes_ano(vigencia_inicial) if vigencia_inicial else ''
+        vigencia_final_fmt = formatar_data_mes_ano(vigencia_final) if vigencia_final else ''
+        
+        # Construir linha da tabela
+        linha_html = f'''        <tr>
+            <td style="border-width: 1px; border-style: solid; border-color: rgb(163, 163, 163); vertical-align: middle; padding: 5px; text-align: center;">
+                <p class="Tabela_Texto_Centralizado">{parcela_numero}</p>
+            </td>
+            <td style="border-width: 1px; border-style: solid; border-color: rgb(163, 163, 163); vertical-align: middle; padding: 5px; text-align: center;">
+                <p class="Tabela_Texto_Centralizado">{valor_53_23_fmt}</p>
+            </td>
+            <td style="border-width: 1px; border-style: solid; border-color: rgb(163, 163, 163); vertical-align: middle; padding: 5px; text-align: center;">
+                <p class="Tabela_Texto_Centralizado">{valor_53_24_fmt}</p>
+            </td>
+            <td style="border-width: 1px; border-style: solid; border-color: rgb(163, 163, 163); vertical-align: middle; padding: 5px; text-align: center;">
+                <p class="Tabela_Texto_Centralizado">{valor_previsto_fmt}</p>
+            </td>
+            <td style="border-width: 1px; border-style: solid; border-color: rgb(163, 163, 163); vertical-align: middle; padding: 5px; text-align: center;">
+                <p class="Tabela_Texto_Centralizado">{vigencia_inicial_fmt}</p>
+            </td>
+            <td style="border-width: 1px; border-style: solid; border-color: rgb(163, 163, 163); vertical-align: middle; padding: 5px; text-align: center;">
+                <p class="Tabela_Texto_Centralizado">{vigencia_final_fmt}</p>
+            </td>
+        </tr>'''
+        
+        linhas.append(linha_html)
+    
+    return '\n'.join(linhas)
+
+
+def remover_bloco_condicional(html, marcador_inicio, marcador_fim):
+    """
+    Remove um bloco de HTML entre dois marcadores (inclusive os marcadores).
+    
+    Args:
+        html: String HTML completa
+        marcador_inicio: Comentário HTML de início (ex: <!-- CONDICIONAL_INICIO -->)
+        marcador_fim: Comentário HTML de fim (ex: <!-- CONDICIONAL_FIM -->)
+    
+    Returns:
+        HTML com o bloco removido
+    """
+    inicio = html.find(marcador_inicio)
+    fim = html.find(marcador_fim)
+    
+    if inicio != -1 and fim != -1 and inicio < fim:
+        # Remover desde o início do marcador_inicio até o fim do marcador_fim
+        fim_completo = fim + len(marcador_fim)
+        html = html[:inicio] + html[fim_completo:]
+    
+    return html
+
+
     # Tentar case-insensitive
     for sigla, caminho in MAPA_COORDENACOES_SETOR.items():
         if sigla.upper() == coordenacao_upper:
@@ -2865,23 +3048,414 @@ def processar_texto_opcional(html, replacements):
     """
     import re
     
-    # Regex para capturar: [variavel: qualquer texto] (aceita acentos e Unicode)
-    pattern = r'\[([\w\u00C0-\u017F]+):\s*(.*?)\]'
+    # Regex para capturar APENAS variáveis válidas: letras, números, underscores, acentos
+    # Deve começar com letra e ter pelo menos 3 caracteres para evitar capturar números soltos ou HTML
+    pattern = r'\[([a-zA-ZÀ-ÿ_][a-zA-ZÀ-ÿ0-9_]{2,}):\s*(.*?)\]'
     
     def substituir(match):
-        variavel = match.group(1)
+        variavel = match.group(1).strip()  # Remover espaços do nome da variável
         texto = match.group(2)
+        
+        print(f"[DEBUG processar_texto_opcional] Encontrado bloco: [{variavel}: {texto[:50]}...]")
         
         # Verificar se variável tem valor
         valor = replacements.get(variavel, '')
+        print(f"[DEBUG processar_texto_opcional] Variável '{variavel}' = '{valor}'")
+        
         if valor and str(valor).strip():
             # Substituir placeholders dentro do texto opcional (SEM chaves duplas)
             texto_processado = texto
             for placeholder, val in replacements.items():
                 texto_processado = texto_processado.replace(placeholder, str(val))
+            print(f"[DEBUG processar_texto_opcional] MANTENDO bloco (variável tem valor)")
             return texto_processado
         else:
             # Remover bloco inteiro
+            print(f"[DEBUG processar_texto_opcional] REMOVENDO bloco (variável vazia)")
             return ''
     
     return re.sub(pattern, substituir, html, flags=re.DOTALL)
+
+
+# ========== ROTAS PARA ANUÊNCIA DA PESSOA GESTORA ==========
+
+@ultra_liquidacoes_bp.route('/gerar-anuencia-pessoa-gestora', methods=['POST'])
+@login_required
+def gerar_anuencia_pessoa_gestora():
+    """
+    Salva auditoria do encaminhamento e redireciona para geração da anuência
+    """
+    conn = None
+    try:
+        dados = request.get_json()
+        numero_termo = dados.get('numero_termo', '')
+        parcela_ids_str = dados.get('parcela_ids', '')
+        sei_encaminhamento = dados.get('sei_encaminhamento', '')
+        html_encaminhamento = dados.get('html_encaminhamento', '')
+        
+        if not all([numero_termo, parcela_ids_str, sei_encaminhamento, html_encaminhamento]):
+            return jsonify({'success': False, 'error': 'Dados incompletos'}), 400
+        
+        parcela_ids = [int(x.strip()) for x in parcela_ids_str.split(',') if x.strip().isdigit()]
+        if not parcela_ids:
+            return jsonify({'success': False, 'error': 'Nenhuma parcela selecionada'}), 400
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Buscar parcelas para obter parcela_numero
+        placeholders = ','.join(['%s'] * len(parcela_ids))
+        query_parcelas = f"""
+            SELECT parcela_numero
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE id IN ({placeholders})
+            ORDER BY vigencia_inicial, parcela_numero
+        """
+        cursor.execute(query_parcelas, tuple(parcela_ids))
+        parcelas_rows = cursor.fetchall()
+        
+        # Agregar parcela_numero como "1ª Parcela;2ª Parcela;3ª Parcela"
+        parcelas_texto = [row[0] for row in parcelas_rows if row[0]]
+        parcela_numero_agregado = ';'.join(parcelas_texto)
+        
+        # Salvar em auditoria_memoria.auditoria_enc_pagamento
+        usuario = session.get('usuario_nome', 'Sistema')
+        cursor.execute("""
+            INSERT INTO auditoria_memoria.auditoria_enc_pagamento
+            (numero_termo, enc_pagamento_completo, created_por, created_em, numero_sei, parcela_numero)
+            VALUES (%s, %s, %s, NOW(), %s, %s)
+        """, (
+            numero_termo,
+            html_encaminhamento,
+            usuario,
+            sei_encaminhamento,
+            parcela_numero_agregado
+        ))
+        
+        conn.commit()
+        
+        # Redirecionar para página de anuência
+        redirect_url = f"/gestao_financeira/ultra-liquidacoes/documento-anuencia-pessoa-gestora?numero_termo={numero_termo}&parcela_ids={parcela_ids_str}&sei_encaminhamento={sei_encaminhamento}"
+        
+        return jsonify({
+            'success': True,
+            'redirect_url': redirect_url
+        })
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        import traceback
+        print(f"[ERRO] Erro ao processar anuência: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@ultra_liquidacoes_bp.route('/documento-anuencia-pessoa-gestora')
+@login_required
+def documento_anuencia_pessoa_gestora():
+    """Gera o documento de anuência da pessoa gestora com placeholders substituídos"""
+    conn = None
+    try:
+        numero_termo = request.args.get('numero_termo', '')
+        parcela_ids_str = request.args.get('parcela_ids', '')
+        sei_encaminhamento = request.args.get('sei_encaminhamento', '')
+        
+        if not numero_termo or not parcela_ids_str:
+            return "Parâmetros inválidos", 400
+        
+        parcela_ids = [int(x.strip()) for x in parcela_ids_str.split(',') if x.strip().isdigit()]
+        if not parcela_ids:
+            return "Nenhuma parcela selecionada", 400
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # 1. Buscar modelo de texto (id=21)
+        cursor.execute("""
+            SELECT modelo_texto 
+            FROM categoricas.c_geral_modelo_textos 
+            WHERE id = 21
+        """)
+        modelo_row = cursor.fetchone()
+        if not modelo_row or not modelo_row[0]:
+            return "Modelo de texto (ID 21) não encontrado", 404
+        
+        modelo_html = modelo_row[0]
+        
+        # 2. Buscar parcelas selecionadas
+        placeholders = ','.join(['%s'] * len(parcela_ids))
+        query_parcelas = f"""
+            SELECT 
+                id, numero_termo, vigencia_inicial, vigencia_final,
+                parcela_numero, valor_previsto, 
+                valor_elemento_53_23, valor_elemento_53_24
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE id IN ({placeholders})
+            ORDER BY vigencia_inicial, parcela_numero
+        """
+        cursor.execute(query_parcelas, tuple(parcela_ids))
+        parcelas_rows = cursor.fetchall()
+        
+        if not parcelas_rows:
+            return "Parcelas não encontradas", 404
+        
+        # 3. Buscar dados da parceria (portaria, coordenação e OSC)
+        cursor.execute("""
+            SELECT 
+                numero_termo, portaria, osc
+            FROM public.parcerias
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        parceria_row = cursor.fetchone()
+        
+        if not parceria_row:
+            return f"Parceria {numero_termo} não encontrada", 404
+        
+        # Extrair coordenação do numero_termo
+        partes_termo = numero_termo.split('/')
+        coordenacao = partes_termo[-1] if len(partes_termo) > 0 else ''
+        
+        portaria = parceria_row[1] if parceria_row[1] else ''
+        osc = parceria_row[2] if parceria_row[2] else ''
+        
+        # 4. Buscar dados do SEI (termo original e aditamento)
+        cursor.execute("""
+            SELECT aditamento, termo_sei_doc
+            FROM public.parcerias_sei
+            WHERE numero_termo = %s
+            ORDER BY id
+        """, (numero_termo,))
+        sei_rows = cursor.fetchall()
+        
+        sei_termo = ''
+        numero_aditamento = ''
+        sei_aditamento = ''
+        
+        # Buscar SEI do termo original
+        for row in sei_rows:
+            if row[0] == '-':
+                sei_termo = row[1] if row[1] else ''
+                break
+        
+        # Buscar ÚLTIMO aditamento numérico
+        aditamentos_validos = []
+        for row in sei_rows:
+            if row[0] and row[0] != '-':
+                try:
+                    num_aditamento = int(row[0])
+                    aditamentos_validos.append((num_aditamento, row[0], row[1]))
+                except ValueError:
+                    aditamentos_validos.append((0, row[0], row[1]))
+        
+        if aditamentos_validos:
+            aditamentos_validos.sort(key=lambda x: x[0], reverse=True)
+            ultimo_aditamento = aditamentos_validos[0]
+            numero_aditamento = ultimo_aditamento[1]
+            sei_aditamento = ultimo_aditamento[2] if ultimo_aditamento[2] else ''
+        
+        # 5. Calcular valores e ranges das parcelas
+        vigencias_iniciais = [row[2] for row in parcelas_rows if row[2]]
+        vigencias_finais = [row[3] for row in parcelas_rows if row[3]]
+        
+        mes_vigencia_inicial = ''
+        mes_vigencia_final = ''
+        
+        if vigencias_iniciais and vigencias_finais:
+            data_inicial_min = min(vigencias_iniciais)
+            data_final_max = max(vigencias_finais)
+            
+            meses_completo = {
+                1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril', 5: 'maio', 6: 'junho',
+                7: 'julho', 8: 'agosto', 9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'
+            }
+            
+            if data_inicial_min.month == data_final_max.month and data_inicial_min.year == data_final_max.year:
+                mes_vigencia_inicial = formatar_data_mes_ano(data_inicial_min, formato_completo=True)
+                mes_vigencia_final = ''
+            elif data_inicial_min.year == data_final_max.year:
+                mes_inicial = meses_completo.get(data_inicial_min.month, '')
+                mes_final = meses_completo.get(data_final_max.month, '')
+                mes_vigencia_inicial = f"{mes_inicial} a {mes_final} de {data_inicial_min.year}"
+                mes_vigencia_final = ''
+            else:
+                mes_vigencia_inicial = formatar_data_mes_ano(data_inicial_min)
+                mes_vigencia_final = formatar_data_mes_ano(data_final_max)
+        
+        # Calcular total previsto
+        total_previsto = sum([float(row[5]) if row[5] else 0.0 for row in parcelas_rows])
+        
+        # Formatar n_parcela
+        parcelas_texto = sorted(set([row[4] for row in parcelas_rows if row[4]]))
+        n_parcela = formatar_lista_parcelas(parcelas_texto)
+        
+        # 6. Mapear coordenação
+        coordenacao_formatada = mapear_coordenacao(coordenacao, numero_termo)
+        
+        # 7. Converter valor para extenso
+        valor_extenso = valor_por_extenso(total_previsto)
+        
+        # 8. Substituir placeholders
+        replacements = {
+            'n_parcela_usuario': n_parcela,
+            'mes_vigencia_inicial_usuario': mes_vigencia_inicial,
+            'mes_vigencia_final_usuario': mes_vigencia_final,
+            'info_aditamento_usuario': numero_aditamento,
+            'numero_aditamento_usuario': numero_aditamento,
+            'sei_aditamento_usuario': sei_aditamento,
+            'numero_termo_usuario': numero_termo,
+            'sei_termo_usuario': sei_termo,
+            'osc_usuario': osc,
+            'total_previsto_usuario': formatar_moeda_br(total_previsto),
+            'valor_extenso': valor_extenso,
+            'encaminhamento da DAC': sei_encaminhamento,
+        }
+        
+        # Substituir placeholders normais
+        html_final = modelo_html
+        for placeholder, valor in replacements.items():
+            html_final = html_final.replace(placeholder, str(valor))
+        
+        # Processar texto opcional com colchetes
+        html_final = processar_texto_opcional(html_final, replacements)
+        
+        # Renderizar template
+        return render_template(
+            'gestao_financeira/documento_anuencia.html',
+            numero_termo=numero_termo,
+            html_content=html_final,
+            sei_encaminhamento=sei_encaminhamento
+        )
+        
+    except Exception as e:
+        import traceback
+        return f"Erro ao gerar documento: {str(e)}<br><pre>{traceback.format_exc()}</pre>", 500
+    finally:
+        if conn:
+            conn.close()
+
+
+# ============================================================================
+# ROTAS: CONSULTA DE ENCAMINHAMENTOS (AUDITORIA)
+# ============================================================================
+
+@ultra_liquidacoes_bp.route('/consultar-encaminhamentos', methods=['GET'])
+@login_required
+def consultar_encaminhamentos_page():
+    """Página para consultar encaminhamentos de pagamento"""
+    return render_template('gestao_financeira/consultar_encaminhamentos.html')
+
+
+@ultra_liquidacoes_bp.route('/api/encaminhamentos', methods=['GET'])
+@login_required
+def listar_encaminhamentos():
+    """
+    Lista todos os encaminhamentos de pagamento salvos na auditoria
+    com filtro opcional por número do termo
+    """
+    conn = None
+    try:
+        numero_termo_filtro = request.args.get('numero_termo', '').strip()
+        
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Query base
+        query = """
+            SELECT 
+                id,
+                numero_termo,
+                created_por,
+                created_em,
+                numero_sei,
+                parcela_numero,
+                enc_pagamento_completo
+            FROM auditoria_memoria.auditoria_enc_pagamento
+        """
+        
+        params = []
+        
+        # Filtro por número do termo
+        if numero_termo_filtro:
+            query += " WHERE numero_termo ILIKE %s"
+            params.append(f'%{numero_termo_filtro}%')
+        
+        # Ordenar por data mais recente
+        query += " ORDER BY created_em DESC"
+        
+        cursor.execute(query, params)
+        encaminhamentos = cursor.fetchall()
+        
+        # Converter para lista de dicts
+        resultado = []
+        for enc in encaminhamentos:
+            resultado.append({
+                'id': enc['id'],
+                'numero_termo': enc['numero_termo'],
+                'created_por': enc['created_por'],
+                'created_em': enc['created_em'].isoformat() if enc['created_em'] else None,
+                'numero_sei': enc['numero_sei'],
+                'parcela_numero': enc['parcela_numero'],
+                'enc_pagamento_completo': enc['enc_pagamento_completo']
+            })
+        
+        return jsonify({
+            'success': True,
+            'encaminhamentos': resultado,
+            'total': len(resultado)
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@ultra_liquidacoes_bp.route('/api/encaminhamentos-termos', methods=['GET'])
+@login_required
+def listar_termos_encaminhamentos():
+    """
+    Lista todos os números de termo únicos que possuem encaminhamentos salvos
+    para usar no autocomplete do filtro
+    """
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT DISTINCT numero_termo
+            FROM auditoria_memoria.auditoria_enc_pagamento
+            WHERE numero_termo IS NOT NULL
+            ORDER BY numero_termo
+        """
+        
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+        termos = [row[0] for row in rows]
+        
+        return jsonify({
+            'success': True,
+            'termos': termos
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'trace': traceback.format_exc()
+        }), 500
+    finally:
+        if conn:
+            conn.close()

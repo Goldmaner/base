@@ -156,6 +156,9 @@
           <i class="bi bi-table"></i> Registros de SEI
         </h5>
         <div class="d-flex gap-2">
+          <button id="btnNovoRegistro" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoRegistro">
+            <i class="bi bi-plus-circle"></i> Novo Registro
+          </button>
           <button id="btnExportarCSV" class="btn btn-success btn-sm">
             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
           </button>
@@ -177,6 +180,7 @@
               <th>Data Assinatura</th>
               <th>Aditamento</th>
               <th>Apostilamento</th>
+              <th>Tipo SEI</th>
               <th style="width: 80px;">Ação</th>
             </tr>
             <tr class="filters">
@@ -186,6 +190,7 @@
               <th><input type="text" class="form-control form-control-sm" placeholder="Data"></th>
               <th><input type="text" class="form-control form-control-sm" placeholder="Aditamento"></th>
               <th><input type="text" class="form-control form-control-sm" placeholder="Apostilamento"></th>
+              <th><input type="text" class="form-control form-control-sm" placeholder="Tipo"></th>
               <th></th>
             </tr>
           </thead>
@@ -193,6 +198,80 @@
             <!-- Preenchido via AJAX -->
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Novo Registro -->
+  <div class="modal fade" id="modalNovoRegistro" tabindex="-1" aria-labelledby="modalNovoRegistroLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="modalNovoRegistroLabel">
+            <i class="bi bi-plus-circle"></i> Adicionar Novo Registro de SEI
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Instruções -->
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            <strong>Instruções:</strong>
+            <ul class="mb-0 mt-2">
+              <li>Preencha os campos abaixo para adicionar um novo registro de SEI</li>
+              <li><strong>Aditamento</strong> e <strong>Apostilamento</strong> aceitam apenas números ou "-"</li>
+              <li>Campos com * são obrigatórios</li>
+            </ul>
+          </div>
+
+          <form id="formNovoRegistro">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="numero_termo" class="form-label">Número do Termo *</label>
+                <input type="text" class="form-control" id="numero_termo" name="numero_termo" 
+                       list="listaTermos" placeholder="Digite para buscar..." required autocomplete="off">
+                <datalist id="listaTermos">
+                  {% for termo in termos %}
+                  <option value="{{ termo }}">
+                  {% endfor %}
+                </datalist>
+              </div>
+
+              <div class="col-md-6">
+                <label for="termo_sei_doc" class="form-label">SEI Documento</label>
+                <input type="text" class="form-control" id="termo_sei_doc" name="termo_sei_doc" placeholder="Ex: 0000.0000/0000000-0">
+              </div>
+
+              <div class="col-md-6">
+                <label for="data_assinatura" class="form-label">Data de Assinatura</label>
+                <input type="date" class="form-control" id="data_assinatura" name="data_assinatura">
+              </div>
+
+              <div class="col-md-4">
+                <label for="aditamento" class="form-label">Aditamento</label>
+                <input type="text" class="form-control" id="aditamento" name="aditamento" value="-" pattern="^[0-9\-]+$" title="Apenas números ou '-'">
+              </div>
+
+              <div class="col-md-4">
+                <label for="apostilamento" class="form-label">Apostilamento</label>
+                <input type="text" class="form-control" id="apostilamento" name="apostilamento" value="-" pattern="^[0-9\-]+$" title="Apenas números ou '-'">
+              </div>
+
+              <div class="col-md-4">
+                <label for="termo_tipo_sei" class="form-label">Tipo de SEI</label>
+                <input type="text" class="form-control" id="termo_tipo_sei" name="termo_tipo_sei" placeholder="Ex: aditamento, apostilamento">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <button type="button" class="btn btn-primary" id="btnSalvarRegistro">
+            <i class="bi bi-check-circle"></i> Salvar
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -265,6 +344,12 @@
           },
           { 
             data: 6,
+            render: function(data, type, row) {
+              return '<span class="editable-cell" data-campo="termo_tipo_sei">' + data + '</span>';
+            }
+          },
+          { 
+            data: 7,
             orderable: false,
             render: function(data, type, row) {
               return '<button class="btn btn-danger btn-sm btn-excluir" data-id="' + data + '" title="Excluir"><i class="bi bi-trash"></i></button>';
@@ -289,7 +374,7 @@
         },
         initComplete: function() {
           // Adicionar filtros por coluna
-          this.api().columns([1, 2, 3, 4, 5]).every(function() {
+          this.api().columns([1, 2, 3, 4, 5, 6]).every(function() {
             var column = this;
             var input = $('.filters th').eq(column.index()).find('input');
             
@@ -439,6 +524,73 @@
           btn.prop('disabled', false);
           btn.html(textoOriginal);
         });
+      });
+
+      // Salvar novo registro
+      $('#btnSalvarRegistro').on('click', function() {
+        const btn = $(this);
+        const form = $('#formNovoRegistro');
+        
+        // Validar formulário HTML5
+        if (!form[0].checkValidity()) {
+          form[0].reportValidity();
+          return;
+        }
+        
+        // Coletar dados
+        const dados = {
+          numero_termo: $('#numero_termo').val(),
+          termo_sei_doc: $('#termo_sei_doc').val(),
+          data_assinatura: $('#data_assinatura').val(),
+          aditamento: $('#aditamento').val(),
+          apostilamento: $('#apostilamento').val(),
+          termo_tipo_sei: $('#termo_tipo_sei').val()
+        };
+        
+        // Validar aditamento
+        if (dados.aditamento && dados.aditamento !== '-' && !/^[0-9]+$/.test(dados.aditamento)) {
+          alert('Aditamento deve conter apenas números ou "-"');
+          $('#aditamento').focus();
+          return;
+        }
+        
+        // Validar apostilamento
+        if (dados.apostilamento && dados.apostilamento !== '-' && !/^[0-9]+$/.test(dados.apostilamento)) {
+          alert('Apostilamento deve conter apenas números ou "-"');
+          $('#apostilamento').focus();
+          return;
+        }
+        
+        // Desabilitar botão e mostrar loading
+        const textoOriginal = btn.html();
+        btn.prop('disabled', true);
+        btn.html('<span class="spinner-border spinner-border-sm me-2"></span>Salvando...');
+        
+        // Enviar requisição
+        $.ajax({
+          url: '/parcerias/api/parcerias_sei/inserir',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify(dados),
+          success: function(response) {
+            alert('Registro inserido com sucesso!');
+            $('#modalNovoRegistro').modal('hide');
+            form[0].reset();
+            table.draw();
+            btn.prop('disabled', false);
+            btn.html(textoOriginal);
+          },
+          error: function(xhr) {
+            alert('Erro ao inserir: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            btn.prop('disabled', false);
+            btn.html(textoOriginal);
+          }
+        });
+      });
+
+      // Limpar formulário ao fechar modal
+      $('#modalNovoRegistro').on('hidden.bs.modal', function() {
+        $('#formNovoRegistro')[0].reset();
       });
     });
 

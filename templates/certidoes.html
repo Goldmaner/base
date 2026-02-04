@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Certidões</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        .main-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .osc-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: white;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .osc-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+        .osc-card.expanded {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        .osc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .osc-nome {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+        }
+        .osc-cnpj {
+            font-size: 0.9rem;
+            color: #666;
+            font-family: 'Courier New', monospace;
+        }
+        .certidao-item {
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .certidao-item.vencida {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .certidao-item.vence_breve {
+            border-left-color: #ffc107;
+            background: #fffbf0;
+        }
+        .certidao-item.valida {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+        .certidoes-lista {
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px dashed #e0e0e0;
+        }
+        .badge-vencimento {
+            font-size: 0.85rem;
+            padding: 5px 10px;
+        }
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+        }
+        .btn-upload:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            color: white;
+        }
+        .filtros-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        #modalRelatorioOSCs .card {
+            border-left: 4px solid #28a745;
+        }
+        #modalRelatorioOSCs .table-sm {
+            font-size: 0.85rem;
+        }
+        #modalRelatorioOSCs .card-header {
+            border-bottom: 2px solid #c8e6c9;
+        }
+        .osc-grid-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            min-height: 220px;
+        }
+        .osc-grid-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            transform: translateY(-5px);
+        }
+        .osc-card-nome {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #333;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .osc-icon {
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Cabeçalho -->
+        <div class="main-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="bi bi-file-earmark-check me-3"></i>Central de Certidões</h1>
+                    <p class="mb-0">Gerenciamento centralizado de certidões por OSC</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-light">
+                        <i class="bi bi-house-door me-2"></i>Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <div class="stat-number" id="stat-oscs">{{ total_oscs }}</div>
+                    <div class="stat-label">OSCs Cadastradas</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <div class="stat-number text-info" id="stat-total-certidoes">
+                        {% set total = namespace(value=0) %}
+                        {% for osc in oscs_com_pastas %}
+                            {% set total.value = total.value + osc.total_certidoes %}
+                        {% endfor %}
+                        {{ total.value }}
+                    </div>
+                    <div class="stat-label">Total de Certidões</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <div class="stat-number text-success" id="stat-pastas">{{ total_oscs }}</div>
+                    <div class="stat-label">Pastas Ativas</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Busca e Ações -->
+        <div class="filtros-section">
+            <div class="row align-items-end mb-3">
+                <div class="col-md-8">
+                    <label class="form-label fw-bold">Buscar OSC:</label>
+                    <input type="text" id="filtro-busca" class="form-control form-control-lg" 
+                           placeholder="Digite o nome da OSC para buscar..." 
+                           value="{{ filtro_busca }}"
+                           onkeypress="if(event.key === 'Enter') aplicarFiltro()">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100 btn-lg" onclick="aplicarFiltro()">
+                        <i class="bi bi-search me-2"></i>Buscar
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100 btn-lg" onclick="limparFiltro()">
+                        <i class="bi bi-x-circle me-2"></i>Limpar
+                    </button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <button class="btn btn-success w-100" onclick="gerarPastasOSCs()">
+                        <i class="bi bi-folder-plus me-2"></i>Gerar Pastas de OSCs Ativas
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid de OSCs -->
+        <div id="grid-oscs">
+            {% if oscs_com_pastas %}
+                <div class="row g-4">
+                    {% for osc in oscs_com_pastas %}
+                    <div class="col-md-3">
+                        <div class="card osc-grid-card h-100" onclick="abrirOSC('{{ osc.nome_pasta }}')">
+                            <div class="card-body text-center">
+                                <div class="osc-icon mb-3">
+                                    <i class="bi bi-folder-fill text-primary" style="font-size: 3rem;"></i>
+                                </div>
+                                <h5 class="card-title osc-card-nome">{{ osc.nome_exibicao }}</h5>
+                                <p class="card-text text-muted small mb-2">
+                                    <i class="bi bi-card-text me-1"></i>{{ osc.cnpj }}
+                                </p>
+                                <div class="mt-3">
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-file-earmark-text me-1"></i>
+                                        {{ osc.total_certidoes }} certidão(ões)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info text-center mt-4">
+                    <i class="bi bi-info-circle me-2" style="font-size: 2rem;"></i>
+                    <h4>Nenhuma OSC encontrada</h4>
+                    <p class="mb-3">{% if filtro_busca %}Nenhuma OSC corresponde à sua busca. Tente outro termo.{% else %}Ainda não há pastas de OSCs criadas.{% endif %}</p>
+                    <button class="btn btn-success btn-lg" onclick="gerarPastasOSCs()">
+                        <i class="bi bi-folder-plus me-2"></i>Gerar Pastas de OSCs Ativas
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal: Relatório de OSCs Ativas -->
+    <div class="modal fade" id="modalRelatorioOSCs" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Relatório de OSCs com Parcelas Futuras
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <!-- Loading -->
+                    <div id="relatorio-loading" class="text-center p-5">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-3">Carregando dados...</p>
+                    </div>
+                    
+                    <!-- Resumo -->
+                    <div id="relatorio-resumo" style="display: none;">
+                        <div class="alert alert-info">
+                            <h6 class="mb-2"><i class="bi bi-info-circle me-2"></i>Resumo Geral</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <strong>Total de OSCs:</strong> <span id="resumo-total-oscs">0</span>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Total de Parcelas:</strong> <span id="resumo-total-parcelas">0</span>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Valor Total:</strong> R$ <span id="resumo-valor-total">0,00</span>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>🆕 Novas Pastas:</strong> <span id="resumo-pastas-novas" class="text-success fw-bold">0</span>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <small class="text-muted">
+                                        <i class="bi bi-check-circle text-success me-1"></i>
+                                        <span id="resumo-pastas-existentes">0</span> pasta(s) já existe(m) e será(ão) mantida(s)
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista Detalhada -->
+                    <div id="relatorio-conteudo" style="display: none;">
+                        <!-- Será preenchido dinamicamente -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="confirmarGeracaoPastas()">
+                        <i class="bi bi-folder-plus me-2"></i>Confirmar e Gerar Pastas
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Nova Certidão -->
+    <div class="modal fade" id="modalNovaCertidao" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h5 class="modal-title">
+                        <i class="bi bi-cloud-upload me-2"></i>Encartar Nova Certidão
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formNovaCertidao" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome da OSC: <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="input-osc" name="osc" required>
+                                <small class="text-muted">Digite o nome completo da OSC</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">CNPJ: <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="input-cnpj" name="cnpj" 
+                                       placeholder="XX.XXX.XXX/XXXX-XX" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome da Certidão: <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="input-certidao-nome" name="certidao_nome" 
+                                       placeholder="Ex: Certidão Negativa de Débitos Federais" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Emissor: <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="input-emissor" name="certidao_emissor" 
+                                       placeholder="Ex: Receita Federal" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Vencimento: <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="input-vencimento" name="certidao_vencimento" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Arquivo: <span class="text-danger">*</span></label>
+                                <input type="file" class="form-control" id="input-arquivo" name="arquivo" 
+                                       accept=".pdf" required>
+                                <small class="text-muted">Apenas arquivos PDF (máx. 300KB)</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Observações:</label>
+                            <textarea class="form-control" id="input-observacoes" name="observacoes" 
+                                      rows="3" placeholder="Informações adicionais (opcional)"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-upload" onclick="salvarNovaCertidao()">
+                        <i class="bi bi-cloud-upload me-2"></i>Encartar Certidão
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Certidão -->
+    <div class="modal fade" id="modalEditarCertidao" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title">
+                        <i class="bi bi-pencil me-2"></i>Editar Certidão
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-certidao-id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Nome da Certidão:</label>
+                            <input type="text" class="form-control" id="edit-certidao-nome">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Emissor:</label>
+                            <input type="text" class="form-control" id="edit-emissor">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Data de Vencimento:</label>
+                            <input type="date" class="form-control" id="edit-vencimento">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Status:</label>
+                            <select class="form-select" id="edit-status">
+                                <option value="válida">Válida</option>
+                                <option value="vencida">Vencida</option>
+                                <option value="cancelada">Cancelada</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Observações:</label>
+                        <textarea class="form-control" id="edit-observacoes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" onclick="salvarEdicaoCertidao()">
+                        <i class="bi bi-check-circle me-2"></i>Salvar Alterações
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function aplicarFiltro() {
+            const busca = document.getElementById('filtro-busca').value;
+            const url = new URL(window.location.href);
+            url.searchParams.set('filtro_busca', busca);
+            window.location.href = url.toString();
+        }
+
+        function limparFiltro() {
+            window.location.href = '{{ url_for("certidoes.index") }}';
+        }
+        
+        function abrirOSC(nomePasta) {
+            // Redirecionar para página de gestão da OSC
+            window.location.href = `/certidoes/osc/${nomePasta}`;
+        }
+
+        function abrirModalNovaCertidao(osc = '', cnpj = '') {
+            document.getElementById('formNovaCertidao').reset();
+            if (osc) document.getElementById('input-osc').value = osc;
+            if (cnpj) document.getElementById('input-cnpj').value = cnpj;
+            new bootstrap.Modal(document.getElementById('modalNovaCertidao')).show();
+        }
+
+        async function salvarNovaCertidao() {
+            const form = document.getElementById('formNovaCertidao');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            
+            try {
+                const response = await fetch('/certidoes/api/certidoes', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Certidão cadastrada com sucesso!');
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + result.erro);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao cadastrar certidão.');
+            }
+        }
+
+        async function editarCertidao(certidaoId) {
+            try {
+                const response = await fetch(`/certidoes/api/certidoes/${certidaoId}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const cert = result.certidao;
+                    document.getElementById('edit-certidao-id').value = cert.id;
+                    document.getElementById('edit-certidao-nome').value = cert.certidao_nome;
+                    document.getElementById('edit-emissor').value = cert.certidao_emissor;
+                    document.getElementById('edit-vencimento').value = cert.certidao_vencimento;
+                    document.getElementById('edit-status').value = cert.certidao_status;
+                    document.getElementById('edit-observacoes').value = cert.observacoes || '';
+                    
+                    new bootstrap.Modal(document.getElementById('modalEditarCertidao')).show();
+                } else {
+                    alert('Erro ao carregar certidão: ' + result.erro);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao carregar certidão.');
+            }
+        }
+
+        async function salvarEdicaoCertidao() {
+            const certidaoId = document.getElementById('edit-certidao-id').value;
+            
+            const data = {
+                certidao_nome: document.getElementById('edit-certidao-nome').value,
+                certidao_emissor: document.getElementById('edit-emissor').value,
+                certidao_vencimento: document.getElementById('edit-vencimento').value,
+                certidao_status: document.getElementById('edit-status').value,
+                observacoes: document.getElementById('edit-observacoes').value
+            };
+            
+            try {
+                const response = await fetch(`/certidoes/api/certidoes/${certidaoId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Certidão atualizada com sucesso!');
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + result.erro);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao atualizar certidão.');
+            }
+        }
+
+        async function excluirCertidao(certidaoId, nomeCertidao) {
+            if (!confirm(`Tem certeza que deseja excluir a certidão "${nomeCertidao}"?\n\nEsta ação não pode ser desfeita!`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/certidoes/api/certidoes/${certidaoId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Certidão excluída com sucesso!');
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + result.erro);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao excluir certidão.');
+            }
+        }
+
+        async function gerarPastasOSCs() {
+            // Abrir modal com relatório primeiro
+            const modal = new bootstrap.Modal(document.getElementById('modalRelatorioOSCs'));
+            modal.show();
+            
+            // Mostrar loading
+            document.getElementById('relatorio-loading').style.display = 'block';
+            document.getElementById('relatorio-resumo').style.display = 'none';
+            document.getElementById('relatorio-conteudo').style.display = 'none';
+            
+            try {
+                const response = await fetch('/certidoes/api/oscs-ativas');
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Ocultar loading
+                    document.getElementById('relatorio-loading').style.display = 'none';
+                    
+                    // Mostrar resumo
+                    document.getElementById('relatorio-resumo').style.display = 'block';
+                    document.getElementById('resumo-total-oscs').textContent = result.total_oscs;
+                    document.getElementById('resumo-total-parcelas').textContent = result.total_parcelas_geral;
+                    document.getElementById('resumo-pastas-novas').textContent = result.total_pastas_novas;
+                    document.getElementById('resumo-pastas-existentes').textContent = result.total_pastas_existentes;
+                    
+                    // Calcular valor total
+                    const valorTotal = result.oscs.reduce((sum, osc) => sum + osc.total_valor, 0);
+                    document.getElementById('resumo-valor-total').textContent = valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    
+                    // Gerar conteúdo detalhado
+                    let html = '';
+                    
+                    result.oscs.forEach((osc, index) => {
+                        // Badge de status da pasta
+                        const pastaStatus = osc.pasta_existe 
+                            ? '<span class="badge bg-success ms-2"><i class="bi bi-check-circle me-1"></i>Pasta Existe</span>'
+                            : '<span class="badge bg-warning text-dark ms-2"><i class="bi bi-plus-circle me-1"></i>Pasta Nova</span>';
+                        
+                        html += `
+                            <div class="card mb-3">
+                                <div class="card-header" style="background-color: ${osc.pasta_existe ? '#e8f5e9' : '#fff3cd'};">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">
+                                                <i class="bi bi-building me-2"></i>${index + 1}. ${osc.osc}
+                                                ${pastaStatus}
+                                            </h6>
+                                            <small class="text-muted">CNPJ: ${osc.cnpj}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-primary me-2">${osc.total_termos} termo(s)</span>
+                                            <span class="badge bg-success">${osc.total_parcelas} parcela(s)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-4">
+                                            <strong>Termos:</strong><br>
+                                            <small>${osc.termos.join(', ')}</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Meses com Parcelas:</strong><br>
+                                            <small>${osc.meses.join(', ')}</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Valor Total:</strong><br>
+                                            <small>R$ ${osc.total_valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</small>
+                                        </div>
+                                    </div>
+                                    ${osc.pasta_existe ? '<div class="alert alert-success py-2 mb-3"><small><i class="bi bi-folder-check me-2"></i>Pasta: <code>' + osc.nome_pasta + '</code> já existe e será mantida</small></div>' : '<div class="alert alert-warning py-2 mb-3"><small><i class="bi bi-folder-plus me-2"></i>Nova pasta será criada: <code>' + osc.nome_pasta + '</code></small></div>'}
+                                    
+                                    <button class="btn btn-sm btn-outline-primary" type="button" 
+                                            data-bs-toggle="collapse" data-bs-target="#parcelas-${index}">
+                                        <i class="bi bi-list-ul me-2"></i>Ver Detalhes das ${osc.total_parcelas} Parcelas
+                                    </button>
+                                    
+                                    <div class="collapse mt-3" id="parcelas-${index}">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Termo</th>
+                                                        <th>Mês/Ano</th>
+                                                        <th>Vigência</th>
+                                                        <th>Tipo</th>
+                                                        <th class="text-end">Valor</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                        `;
+                        
+                        osc.parcelas.forEach(parcela => {
+                            html += `
+                                <tr>
+                                    <td><small>${parcela.numero_termo}</small></td>
+                                    <td><small>${parcela.mes_referencia}</small></td>
+                                    <td><small>${parcela.vigencia_inicial} a ${parcela.vigencia_final}</small></td>
+                                    <td><small><span class="badge ${parcela.parcela_tipo === 'Programada' ? 'bg-info' : 'bg-warning text-dark'}">${parcela.parcela_tipo}</span></small></td>
+                                    <td class="text-end"><small>R$ ${parcela.parcela_valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</small></td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += `
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    if (result.oscs.length === 0) {
+                        html = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Nenhuma OSC com parcelas futuras não pagas encontrada.</div>';
+                    }
+                    
+                    document.getElementById('relatorio-conteudo').innerHTML = html;
+                    document.getElementById('relatorio-conteudo').style.display = 'block';
+                } else {
+                    alert('Erro ao carregar relatório: ' + result.erro);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao carregar relatório.');
+            }
+        }
+        
+        async function confirmarGeracaoPastas() {
+            // Fechar modal de relatório
+            bootstrap.Modal.getInstance(document.getElementById('modalRelatorioOSCs')).hide();
+            
+            if (!confirm('Confirma a geração de pastas para todas as OSCs listadas no relatório?\n\nObservação: Pastas que já existem serão mantidas (não serão recriadas).')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/certidoes/api/gerar-pastas', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    let mensagem = `✅ Operação concluída com sucesso!\n\n`;
+                    mensagem += `📊 Estatísticas:\n`;
+                    mensagem += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    mensagem += `📁 Total de OSCs processadas: ${result.total_oscs}\n`;
+                    mensagem += `🆕 Pastas CRIADAS (novas): ${result.pastas_criadas.length}\n`;
+                    mensagem += `✓ Pastas JÁ EXISTENTES: ${result.pastas_existentes.length}\n`;
+                    
+                    if (result.pastas_criadas.length > 0) {
+                        mensagem += `\n🆕 Novas pastas criadas:\n`;
+                        result.pastas_criadas.forEach((pasta, index) => {
+                            mensagem += `  ${index + 1}. ${pasta.osc}\n`;
+                        });
+                    }
+                    
+                    if (result.pastas_existentes.length > 0 && result.pastas_existentes.length <= 10) {
+                        mensagem += `\n✓ Pastas que já existiam:\n`;
+                        result.pastas_existentes.forEach((pasta, index) => {
+                            mensagem += `  ${index + 1}. ${pasta.osc}\n`;
+                        });
+                    } else if (result.pastas_existentes.length > 10) {
+                        mensagem += `\n✓ ${result.pastas_existentes.length} pastas já existiam e foram mantidas.\n`;
+                    }
+                    
+                    if (result.erros.length > 0) {
+                        mensagem += `\n❌ Erros encontrados: ${result.erros.length}\n`;
+                        result.erros.forEach((erro, index) => {
+                            mensagem += `  ${index + 1}. ${erro.osc}: ${erro.erro}\n`;
+                        });
+                    }
+                    
+                    mensagem += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    mensagem += `💡 Dica: Execute esta função sempre que adicionar\n`;
+                    mensagem += `   novas parcelas futuras. Apenas pastas novas\n`;
+                    mensagem += `   serão criadas, as existentes são preservadas.`;
+                    
+                    alert(mensagem);
+                } else {
+                    alert('❌ Erro ao gerar pastas: ' + result.erro);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao gerar pastas. Verifique o console para detalhes.');
+            }
+        }
+    </script>
+</body>
+</html>

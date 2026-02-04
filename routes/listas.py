@@ -821,6 +821,44 @@ TABELAS_CONFIG = {
         },
         'inline_edit': True,
         'inline_columns': ['status']
+    },
+    'c_geral_certidoes': {
+        'nome': 'Geral: Certidões',
+        'schema': 'categoricas',
+        'colunas_editaveis': [
+            'certidao_nome_completo',
+            'certidao_nome_resumido',
+            'certidao_aplicabilidade',
+            'certidao_link',
+            'certidao_passos',
+            'certidao_prazo',
+            'observacoes'
+        ],
+        'colunas_obrigatorias': ['certidao_nome_completo', 'certidao_nome_resumido'],
+        'labels': {
+            'certidao_nome_completo': 'Nome Completo da Certidão',
+            'certidao_nome_resumido': 'Nome Resumido',
+            'certidao_aplicabilidade': 'Aplicabilidade',
+            'certidao_link': 'Link/URL',
+            'certidao_passos': 'Passos para Obtenção',
+            'certidao_prazo': 'Prazo de Validade (dias)',
+            'observacoes': 'Observações'
+        },
+        'colunas_filtro': ['certidao_nome_completo', 'certidao_nome_resumido', 'certidao_aplicabilidade'],
+        'colunas_ordenacao': ['certidao_nome_completo', 'certidao_nome_resumido'],
+        'ordem': 'certidao_nome_completo',
+        'tipos_campo': {
+            'certidao_nome_completo': 'text',
+            'certidao_nome_resumido': 'text',
+            'certidao_aplicabilidade': 'textarea',
+            'rows_certidao_aplicabilidade': 4,
+            'certidao_link': 'text',
+            'certidao_passos': 'textarea',
+            'rows_certidao_passos': 6,
+            'certidao_prazo': 'number',
+            'observacoes': 'textarea',
+            'rows_observacoes': 4
+        }
     }
 }
 
