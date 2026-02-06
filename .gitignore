@@ -28,6 +28,15 @@ backups/*.backup
 !backups/README.md
 !backups/*.py
 
+# Modelos (documentos Word, Excel, templates)
+modelos/
+!modelos/CHECKLIST_MODELOS.md
+!modelos/README.md
+
+# Testes (scripts de teste e arquivos temporários)
+testes/
+!testes/README.md
+
 # Excel / exports / uploads temporários
 *.xlsx
 *.xls
