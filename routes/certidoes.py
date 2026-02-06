@@ -3,7 +3,7 @@ Blueprint de Central de Certidões
 Gerenciamento centralizado de certidões por OSC/CNPJ
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, send_file, current_app
 from db import get_cursor, get_db
 from utils import login_required
 from decorators import requires_access
@@ -33,25 +33,31 @@ def index():
     Exibe grid de OSCs com pastas criadas
     """
     import time
-    start_time = time.time()
+    from datetime import datetime, date
+    from dateutil.relativedelta import relativedelta
     
+    start_total = time.time()
     cur = get_cursor()
     
-    # Obter filtro de busca
+    # Obter filtros
     filtro_busca = request.args.get('filtro_busca', '').strip().lower()
+    filtro_data_parcela = request.args.get('filtro_data_parcela', '').strip()
     
-    print(f"[DEBUG] Inicio do carregamento - Filtro: {filtro_busca}")
+    if filtro_data_parcela:
+        current_app.logger.warning(f"🔍 FILTRO ATIVO: {filtro_data_parcela}")
+    else:
+        current_app.logger.info(f"📋 Carregando sem filtro de data")
     
+    t1 = time.time()
+    
+    t1 = time.time()
     # Listar todas as pastas de OSCs
     oscs_com_pastas = []
     
     if os.path.exists(UPLOAD_FOLDER):
-        t1 = time.time()
         pastas = os.listdir(UPLOAD_FOLDER)
-        print(f"[DEBUG] Listou {len(pastas)} pastas em {(time.time() - t1)*1000:.2f}ms")
         
         # Buscar todos os CNPJs de uma vez para otimizar
-        t2 = time.time()
         cur.execute("""
             SELECT DISTINCT 
                 LOWER(SUBSTRING(osc FROM 1 FOR 50)) as osc_inicio,
@@ -77,10 +83,7 @@ def index():
             # Indexar por várias versões
             mapa_cnpj[chave_limpa] = row['cnpj']
             mapa_cnpj[chave_limpa.replace(' ', '')] = row['cnpj']  # Sem espaços
-            
-        print(f"[DEBUG] Carregou {len(oscs_banco)} OSCs do banco em {(time.time() - t2)*1000:.2f}ms")
         
-        t3 = time.time()
         for pasta in pastas:
             caminho_completo = os.path.join(UPLOAD_FOLDER, pasta)
             
@@ -124,19 +127,216 @@ def index():
                         'cnpj': cnpj,
                         'total_certidoes': total_certidoes
                     })
+    
+    print(f"⏱️ [PERF] Listar pastas: {(time.time() - t1)*1000:.0f}ms ({len(oscs_com_pastas)} OSCs)")
+    
+    # ========================================
+    # OTIMIZAÇÃO: Bulk Queries
+    # ========================================
+    
+    t2 = time.time()
+    # Criar mapa de nomes de pastas para OSCs do banco
+    nomes_busca = [osc['nome_exibicao'].lower() for osc in oscs_com_pastas]
+    
+    # Query 1: Buscar todas as OSCs do banco de uma vez usando unaccent
+    cur.execute("""
+        SELECT DISTINCT 
+            osc,
+            unaccent(LOWER(osc)) as osc_normalized
+        FROM public.parcerias
+    """)
+    
+    todas_oscs_banco = cur.fetchall()
+    
+    # Criar mapa: nome_normalizado -> nome_real
+    mapa_oscs = {}
+    for row in todas_oscs_banco:
+        mapa_oscs[row['osc_normalized']] = row['osc']
+    
+    # Associar cada pasta com seu nome real no banco
+    oscs_nomes_reais = []
+    for osc_data in oscs_com_pastas:
+        nome_busca = osc_data['nome_exibicao'].lower()
+        palavras = nome_busca.split()
         
-        print(f"[DEBUG] Processou pastas em {(time.time() - t3)*1000:.2f}ms")
+        # Tentar match por unaccent
+        nome_real = None
+        
+        # Tentar primeiras 3 palavras
+        if len(palavras) >= 3:
+            busca_3 = ' '.join(palavras[:3])
+            for norm, real in mapa_oscs.items():
+                if busca_3 in norm:
+                    nome_real = real
+                    break
+        
+        # Tentar nome completo
+        if not nome_real:
+            for norm, real in mapa_oscs.items():
+                if nome_busca in norm or norm.startswith(nome_busca):
+                    nome_real = real
+                    break
+        
+        # Tentar primeira palavra
+        if not nome_real and palavras:
+            for norm, real in mapa_oscs.items():
+                if norm.startswith(palavras[0]):
+                    nome_real = real
+                    break
+        
+        if nome_real:
+            oscs_nomes_reais.append(nome_real)
+            osc_data['osc_nome_banco'] = nome_real
+        else:
+            osc_data['osc_nome_banco'] = None
+    
+    print(f"⏱️ [PERF] Mapear OSCs: {(time.time() - t2)*1000:.0f}ms")
+    
+    # Query 2: Buscar TODAS as certidões de uma vez
+    t3 = time.time()
+    if oscs_nomes_reais:
+        placeholders = ','.join(['%s'] * len(oscs_nomes_reais))
+        cur.execute(f"""
+            SELECT 
+                osc,
+                certidao_nome,
+                certidao_vencimento
+            FROM public.certidoes
+            WHERE osc IN ({placeholders})
+        """, oscs_nomes_reais)
+        
+        todas_certidoes = cur.fetchall()
+        
+        # Agrupar certidões por OSC
+        certidoes_por_osc = {}
+        hoje = date.today()
+        
+        for cert in todas_certidoes:
+            osc_nome = cert['osc']
+            if osc_nome not in certidoes_por_osc:
+                certidoes_por_osc[osc_nome] = {'em_dia': 0, 'atrasadas': 0, 'total': 0}
+            
+            certidoes_por_osc[osc_nome]['total'] += 1
+            if cert['certidao_vencimento'] >= hoje:
+                certidoes_por_osc[osc_nome]['em_dia'] += 1
+            else:
+                certidoes_por_osc[osc_nome]['atrasadas'] += 1
+        
+        print(f"⏱️ [PERF] Buscar certidões (bulk): {(time.time() - t3)*1000:.0f}ms ({len(todas_certidoes)} certidões)")
+    else:
+        certidoes_por_osc = {}
+    
+    # Query 3: Buscar TODAS as parcelas pendentes de uma vez
+    t4 = time.time()
+    parcelas_por_osc = {}
+    
+    if oscs_nomes_reais:
+        if filtro_data_parcela:
+            # Filtro específico por data
+            data_ref = datetime.strptime(filtro_data_parcela, '%Y-%m-%d').date()
+            primeiro_dia = data_ref.replace(day=1)
+            ultimo_dia = (primeiro_dia + relativedelta(months=1)) - relativedelta(days=1)
+            
+            cur.execute(f"""
+                SELECT 
+                    p.osc,
+                    COUNT(*) as total,
+                    TO_CHAR(%s, 'MM/YY') as mes_ref
+                FROM gestao_financeira.ultra_liquidacoes ul
+                INNER JOIN public.parcerias p ON ul.numero_termo = p.numero_termo
+                WHERE p.osc IN ({placeholders})
+                  AND ul.vigencia_inicial >= %s
+                  AND ul.vigencia_inicial <= %s
+                  AND ul.parcela_tipo IN ('Programada', 'Projetada')
+                  AND ul.parcela_status = 'Não Pago'
+                GROUP BY p.osc
+            """, [data_ref] + oscs_nomes_reais + [primeiro_dia, ultimo_dia])
+            
+            for row in cur.fetchall():
+                parcelas_por_osc[row['osc']] = {
+                    'total': row['total'],
+                    'mes_ref': row['mes_ref']
+                }
+        else:
+            # Parcelas no mês atual ou passadas não pagas
+            cur.execute(f"""
+                WITH parcelas_agrupadas AS (
+                    SELECT 
+                        p.osc,
+                        TO_CHAR(ul.vigencia_inicial, 'MM/YY') as mes_ref,
+                        COUNT(*) as total,
+                        MIN(ul.vigencia_inicial) as primeira_vigencia,
+                        ROW_NUMBER() OVER (PARTITION BY p.osc ORDER BY MIN(ul.vigencia_inicial) DESC) as rn
+                    FROM gestao_financeira.ultra_liquidacoes ul
+                    INNER JOIN public.parcerias p ON ul.numero_termo = p.numero_termo
+                    WHERE p.osc IN ({placeholders})
+                      AND ul.vigencia_inicial <= CURRENT_DATE
+                      AND ul.parcela_tipo IN ('Programada', 'Projetada')
+                      AND ul.parcela_status = 'Não Pago'
+                    GROUP BY p.osc, TO_CHAR(ul.vigencia_inicial, 'MM/YY')
+                )
+                SELECT osc, mes_ref, total
+                FROM parcelas_agrupadas
+                WHERE rn = 1
+            """, oscs_nomes_reais)
+            
+            for row in cur.fetchall():
+                parcelas_por_osc[row['osc']] = {
+                    'total': row['total'],
+                    'mes_ref': row['mes_ref']
+                }
+        
+        print(f"⏱️ [PERF] Buscar parcelas (bulk): {(time.time() - t4)*1000:.0f}ms")
+    
+    # Aplicar dados agrupados aos objetos OSC
+    t5 = time.time()
+    for osc_data in oscs_com_pastas:
+        nome_banco = osc_data.get('osc_nome_banco')
+        
+        if nome_banco:
+            # Certidões
+            if nome_banco in certidoes_por_osc:
+                osc_data['certidoes_em_dia'] = certidoes_por_osc[nome_banco]['em_dia']
+                osc_data['certidoes_atrasadas'] = certidoes_por_osc[nome_banco]['atrasadas']
+                osc_data['total_certidoes_db'] = certidoes_por_osc[nome_banco]['total']
+            else:
+                osc_data['certidoes_em_dia'] = 0
+                osc_data['certidoes_atrasadas'] = 0
+                osc_data['total_certidoes_db'] = 0
+            
+            # Parcelas
+            if nome_banco in parcelas_por_osc:
+                osc_data['parcelas_pendentes'] = parcelas_por_osc[nome_banco]['total']
+                osc_data['mes_parcela'] = parcelas_por_osc[nome_banco]['mes_ref']
+            else:
+                osc_data['parcelas_pendentes'] = 0
+                osc_data['mes_parcela'] = None
+        else:
+            osc_data['certidoes_em_dia'] = 0
+            osc_data['certidoes_atrasadas'] = 0
+            osc_data['total_certidoes_db'] = 0
+            osc_data['parcelas_pendentes'] = 0
+            osc_data['mes_parcela'] = None
+    
+    print(f"⏱️ [PERF] Aplicar dados: {(time.time() - t5)*1000:.0f}ms")
+    
+    print(f"⏱️ [PERF] Aplicar dados: {(time.time() - t5)*1000:.0f}ms")
+    
+    # Filtrar por data de parcela se necessário
+    if filtro_data_parcela:
+        oscs_com_pastas = [osc for osc in oscs_com_pastas if osc.get('parcelas_pendentes', 0) > 0]
     
     # Ordenar por nome
     oscs_com_pastas.sort(key=lambda x: x['nome_exibicao'])
     
-    total_time = (time.time() - start_time) * 1000
-    print(f"[DEBUG] Tempo total: {total_time:.2f}ms")
+    tempo_total = (time.time() - start_total) * 1000
+    print(f"✅ [PERF] TEMPO TOTAL: {tempo_total:.0f}ms ({len(oscs_com_pastas)} OSCs carregadas)")
     
     return render_template(
         'certidoes.html',
         oscs_com_pastas=oscs_com_pastas,
         filtro_busca=filtro_busca,
+        filtro_data_parcela=filtro_data_parcela,
         total_oscs=len(oscs_com_pastas)
     )
 
@@ -149,50 +349,48 @@ def gestao_osc(nome_pasta):
     Página de gestão de certidões de uma OSC específica
     Exibe grid das 7 certidões obrigatórias com upload
     """
-    import time
-    start_time = time.time()
-    
     cur = get_cursor()
     
     # Buscar dados da OSC
     nome_busca = nome_pasta.replace('_', ' ').lower()
-    print(f"[DEBUG OSC] Buscando OSC: {nome_busca}")
-    
-    # Busca simples: primeiras 3 palavras
     palavras = nome_busca.split()[:3]
     
-    t1 = time.time()
     cur.execute("""
-        SELECT DISTINCT osc, cnpj 
+        SELECT osc, cnpj 
         FROM public.parcerias 
-        WHERE LOWER(osc) LIKE %s
+        WHERE unaccent(LOWER(osc)) LIKE unaccent(%s)
         LIMIT 1
     """, [f'%{" ".join(palavras)}%'])
     
     osc_data = cur.fetchone()
-    print(f"[DEBUG OSC] Busca 1 em {(time.time() - t1)*1000:.2f}ms - Resultado: {osc_data is not None}")
     
-    # Se não encontrou, tentar apenas primeira palavra
-    if not osc_data and palavras:
-        t2 = time.time()
+    # Se não encontrou, tentar com nome completo usando LIKE inicial
+    if not osc_data:
         cur.execute("""
-            SELECT DISTINCT osc, cnpj 
+            SELECT osc, cnpj 
             FROM public.parcerias 
-            WHERE LOWER(osc) LIKE %s
+            WHERE unaccent(LOWER(osc)) LIKE unaccent(%s)
+            ORDER BY LENGTH(osc) ASC
+            LIMIT 1
+        """, [f'{nome_busca}%'])
+        osc_data = cur.fetchone()
+    
+    # Busca 3: Apenas primeira palavra se ainda não encontrou
+    if not osc_data and palavras:
+        cur.execute("""
+            SELECT osc, cnpj 
+            FROM public.parcerias 
+            WHERE unaccent(LOWER(osc)) LIKE unaccent(%s)
+            ORDER BY LENGTH(osc) ASC
             LIMIT 1
         """, [f'{palavras[0]}%'])
         osc_data = cur.fetchone()
-        print(f"[DEBUG OSC] Busca 2 em {(time.time() - t2)*1000:.2f}ms - Resultado: {osc_data is not None}")
     
     if not osc_data:
-        print(f"[DEBUG OSC] OSC não encontrada: {nome_busca}")
         flash(f'OSC não encontrada: {nome_busca}. Verifique se o nome está correto na tabela parcerias.', 'error')
         return redirect(url_for('certidoes.index'))
     
-    print(f"[DEBUG OSC] OSC encontrada: {osc_data['osc']} - CNPJ: {osc_data['cnpj']}")
-    
     # Buscar lista de certidões obrigatórias com seus prazos
-    t3 = time.time()
     cur.execute("""
         SELECT 
             certidao_nome_resumido,
@@ -216,10 +414,8 @@ def gestao_osc(nome_pasta):
     """)
     
     certidoes_obrigatorias = cur.fetchall()
-    print(f"[DEBUG OSC] Buscou certidões obrigatórias em {(time.time() - t3)*1000:.2f}ms")
     
     # Buscar certidões já cadastradas para esta OSC
-    t4 = time.time()
     cur.execute("""
         SELECT 
             id,
@@ -238,20 +434,11 @@ def gestao_osc(nome_pasta):
     """, [osc_data['osc']])
     
     certidoes_cadastradas = cur.fetchall()
-    print(f"[DEBUG OSC] Buscou certidões cadastradas em {(time.time() - t4)*1000:.2f}ms")
-    print(f"[DEBUG OSC] Certidões cadastradas: {[cert['certidao_nome'] for cert in certidoes_cadastradas]}")
     
     # Criar mapa de certidões cadastradas por nome resumido
     certidoes_map = {}
     for cert in certidoes_cadastradas:
-        # Usar o certidao_nome diretamente como chave (já é o nome resumido)
         certidoes_map[cert['certidao_nome']] = dict(cert)
-        print(f"[DEBUG OSC] Mapeou: {cert['certidao_nome']}")
-    
-    print(f"[DEBUG OSC] Certidões no mapa: {list(certidoes_map.keys())}")
-    
-    total_time = (time.time() - start_time) * 1000
-    print(f"[DEBUG OSC] Tempo total: {total_time:.2f}ms")
     
     return render_template(
         'certidoes_osc.html',

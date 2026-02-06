@@ -197,12 +197,20 @@
         <!-- Barra de Busca e Ações -->
         <div class="filtros-section">
             <div class="row align-items-end mb-3">
-                <div class="col-md-8">
+                <div class="col-md-5">
                     <label class="form-label fw-bold">Buscar OSC:</label>
                     <input type="text" id="filtro-busca" class="form-control form-control-lg" 
-                           placeholder="Digite o nome da OSC para buscar..." 
+                           placeholder="Digite o nome da OSC..." 
                            value="{{ filtro_busca }}"
                            onkeypress="if(event.key === 'Enter') aplicarFiltro()">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-calendar3 me-1"></i>Parcelas em:
+                    </label>
+                    <input type="month" id="filtro-data-parcela" class="form-control form-control-lg"
+                           value="{{ filtro_data_parcela[:7] if filtro_data_parcela else '' }}"
+                           onchange="aplicarFiltro()">
                 </div>
                 <div class="col-md-2">
                     <button class="btn btn-primary w-100 btn-lg" onclick="aplicarFiltro()">
@@ -232,6 +240,11 @@
                     <div class="col-md-3">
                         <div class="card osc-grid-card h-100" onclick="abrirOSC('{{ osc.nome_pasta }}')">
                             <div class="card-body text-center">
+                                <!-- 🔍 DEBUG: Mostrar nome_pasta -->
+                                <small class="text-muted" style="font-size: 0.7rem; display: block; margin-bottom: 5px;">
+                                    <code>{{ osc.nome_pasta }}</code>
+                                </small>
+                                
                                 <div class="osc-icon mb-3">
                                     <i class="bi bi-folder-fill text-primary" style="font-size: 3rem;"></i>
                                 </div>
@@ -239,10 +252,43 @@
                                 <p class="card-text text-muted small mb-2">
                                     <i class="bi bi-card-text me-1"></i>{{ osc.cnpj }}
                                 </p>
+                                
+                                <!-- Status das Certidões -->
+                                <div class="mt-2 mb-2">
+                                    {% if osc.total_certidoes_db > 0 %}
+                                        {% if osc.certidoes_atrasadas == 0 %}
+                                            <div class="badge bg-success mb-1">
+                                                <i class="bi bi-check-circle-fill me-1"></i>
+                                                {{ osc.certidoes_em_dia }} certidão(ões) em dia
+                                            </div>
+                                        {% else %}
+                                            <div class="badge bg-warning text-dark mb-1">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                                {{ osc.certidoes_em_dia }} em dia, {{ osc.certidoes_atrasadas }} atrasada(s)
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <div class="badge bg-secondary mb-1">
+                                            <i class="bi bi-dash-circle me-1"></i>
+                                            Sem certidões cadastradas
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Parcelas Pendentes -->
+                                {% if osc.parcelas_pendentes and osc.parcelas_pendentes > 0 %}
+                                <div class="mt-2">
+                                    <small class="text-info">
+                                        <i class="bi bi-cash-coin me-1"></i>
+                                        Parcelas existentes em {{ osc.mes_parcela }}
+                                    </small>
+                                </div>
+                                {% endif %}
+                                
                                 <div class="mt-3">
                                     <span class="badge bg-info">
                                         <i class="bi bi-file-earmark-text me-1"></i>
-                                        {{ osc.total_certidoes }} certidão(ões)
+                                        {{ osc.total_certidoes }} arquivo(s)
                                     </span>
                                 </div>
                             </div>
@@ -455,8 +501,23 @@
     <script>
         function aplicarFiltro() {
             const busca = document.getElementById('filtro-busca').value;
+            const dataParcela = document.getElementById('filtro-data-parcela').value;
+            
             const url = new URL(window.location.href);
-            url.searchParams.set('filtro_busca', busca);
+            
+            if (busca) {
+                url.searchParams.set('filtro_busca', busca);
+            } else {
+                url.searchParams.delete('filtro_busca');
+            }
+            
+            if (dataParcela) {
+                // Converter YYYY-MM para YYYY-MM-01 (primeiro dia do mês)
+                url.searchParams.set('filtro_data_parcela', dataParcela + '-01');
+            } else {
+                url.searchParams.delete('filtro_data_parcela');
+            }
+            
             window.location.href = url.toString();
         }
 
@@ -465,7 +526,6 @@
         }
         
         function abrirOSC(nomePasta) {
-            // Redirecionar para página de gestão da OSC
             window.location.href = `/certidoes/osc/${nomePasta}`;
         }
 

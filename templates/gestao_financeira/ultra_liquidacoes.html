@@ -646,21 +646,21 @@
                             <label class="form-label">Valor Elemento 53/23</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_elemento_53_23" onchange="validarValores()" placeholder="0.00">
+                                <input type="text" class="form-control campo-moeda" id="edit_valor_elemento_53_23" onchange="validarValores()" placeholder="0,00">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Valor Elemento 53/24</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_elemento_53_24" onchange="validarValores()" placeholder="0.00">
+                                <input type="text" class="form-control campo-moeda" id="edit_valor_elemento_53_24" onchange="validarValores()" placeholder="0,00">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Valor Previsto *</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_previsto" required onchange="validarValores()" placeholder="0.00">
+                                <input type="text" class="form-control campo-moeda" id="edit_valor_previsto" required onchange="validarValores()" placeholder="0,00">
                             </div>
                             <small class="text-danger" id="erro_valor_previsto" style="display: none;">
                                 ⚠️ Deve ser igual à soma dos elementos 23 + 24
@@ -673,7 +673,7 @@
                             <label class="form-label">Valor Subtraído</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_subtraido" onchange="validarValores()" placeholder="0.00">
+                                <input type="text" class="form-control campo-moeda" id="edit_valor_subtraido" onchange="validarValores()" placeholder="0,00">
                             </div>
                             <small class="text-danger" id="erro_valor_subtraido" style="display: none;">
                                 ⚠️ Não pode superar o valor previsto
@@ -683,7 +683,7 @@
                             <label class="form-label">Valor Encaminhado</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_encaminhado" onchange="validarValores()" placeholder="0.00">
+                                <input type="text" class="form-control campo-moeda" id="edit_valor_encaminhado" onchange="validarValores()" placeholder="0,00">
                             </div>
                             <small class="text-danger" id="erro_valor_encaminhado" style="display: none;">
                                 ⚠️ Não pode superar previsto - subtraído
@@ -697,7 +697,7 @@
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control campo-moeda" id="edit_valor_pago" onchange="validarValores()" placeholder="0.00">
+                                <input type="text" class="form-control campo-moeda" id="edit_valor_pago" onchange="validarValores()" placeholder="0,00">
                             </div>
                             <div class="form-check mt-2">
                                 <input class="form-check-input" type="checkbox" id="edit_pagamento_inconsistente" onchange="validarValores()">
@@ -1105,7 +1105,8 @@
                             </tbody>
                             <tfoot class="table-secondary">
                                 <tr>
-                                    <th>TOTAIS:</th>
+                                    <th colspan="2">TOTAIS:</th>
+                                    <th></th>
                                     <th id="total_23_cronograma">R$ 0,00</th>
                                     <th id="total_24_cronograma">R$ 0,00</th>
                                     <th id="total_geral_cronograma">R$ 0,00</th>
@@ -1200,6 +1201,17 @@
         return Math.round(numero * 100);
     }
     
+    // Função para converter valor com formato BR (vírgula decimal, ponto milhar) para número
+    function parseMoedaBR(valor) {
+        if (!valor || valor === '') return null;
+        // Remove tudo exceto números, pontos e vírgulas
+        const limpo = valor.toString().replace(/[^\d,.]/g, '');
+        // Remove pontos (separadores de milhar) e substitui vírgula por ponto
+        const numero = limpo.replace(/\./g, '').replace(',', '.');
+        const resultado = parseFloat(numero);
+        return isNaN(resultado) ? null : resultado;
+    }
+    
     // ==================== NAVEGAÇÃO COM ENTER ====================
     // Função genérica para navegar com Enter em tabelas editáveis
     function habilitarNavegacaoEnter(seletorTabela, seletorCampos) {
@@ -1257,13 +1269,7 @@
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
         
-        // Formatar campos de moeda no modal
-        $('#edit_valor_elemento_53_23, #edit_valor_elemento_53_24, #edit_valor_previsto, #edit_valor_subtraido, #edit_valor_encaminhado, #edit_valor_pago').on('blur', function() {
-            const val = parseFloat($(this).val());
-            if (!isNaN(val)) {
-                $(this).val(val.toFixed(2));
-            }
-        });
+        // Formatar campos de moeda no modal - REMOVIDO para evitar problemas de formatação
         
         // Monitorar mudança de aba para alterar texto do botão
         $('#tabsEdicao button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
@@ -1905,6 +1911,12 @@
         const tbody = $('#corpoTabelaColetiva');
         tbody.empty();
         
+        console.log('🔍 DEBUG COLETIVA: Renderizando', parcelas.length, 'parcelas');
+        if (parcelas.length > 0) {
+            console.log('🔍 DEBUG COLETIVA: Primeira parcela:', parcelas[0]);
+            console.log('🔍 DEBUG COLETIVA: valor_pago bruto:', parcelas[0].valor_pago, 'tipo:', typeof parcelas[0].valor_pago);
+        }
+        
         parcelas.forEach(function(p) {
             const tr = $('<tr>').data('parcela-id', p.id);
             
@@ -1940,13 +1952,15 @@
             // Nº Parcela
             tr.append($('<td>').html(`<input type="text" class="form-control form-control-sm edit-numero" value="${p.parcela_numero || ''}">`));
             
-            // Valores com máscara monetária
-            const val23 = p.valor_elemento_53_23 ? formatarValorMonetario(p.valor_elemento_53_23) : '';
-            const val24 = p.valor_elemento_53_24 ? formatarValorMonetario(p.valor_elemento_53_24) : '';
-            const valPrevisto = p.valor_previsto ? formatarValorMonetario(p.valor_previsto) : '';
-            const valSubtraido = p.valor_subtraido ? formatarValorMonetario(p.valor_subtraido) : '';
-            const valEncaminhado = p.valor_encaminhado ? formatarValorMonetario(p.valor_encaminhado) : '';
-            const valPago = p.valor_pago ? formatarValorMonetario(p.valor_pago) : '';
+            // 🔧 CORRIGIDO: Formatar valores usando toLocaleString direto (igual à edição individual)
+            const val23 = p.valor_elemento_53_23 ? parseFloat(p.valor_elemento_53_23).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+            const val24 = p.valor_elemento_53_24 ? parseFloat(p.valor_elemento_53_24).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+            const valPrevisto = p.valor_previsto ? parseFloat(p.valor_previsto).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+            const valSubtraido = p.valor_subtraido ? parseFloat(p.valor_subtraido).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+            const valEncaminhado = p.valor_encaminhado ? parseFloat(p.valor_encaminhado).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+            const valPago = p.valor_pago ? parseFloat(p.valor_pago).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+            
+            console.log('🔍 DEBUG COLETIVA: Parcela ID', p.id, '- valor_pago:', p.valor_pago, '→ formatado:', valPago);
             
             tr.append($('<td>').html(`<input type="text" class="form-control form-control-sm campo-moeda edit-val-23" value="${val23}">`));
             tr.append($('<td>').html(`<input type="text" class="form-control form-control-sm campo-moeda edit-val-24" value="${val24}">`));
@@ -2104,6 +2118,9 @@
                 if (response.success) {
                     const dados = response.data;
                     
+                    console.log('🔍 DEBUG INDIVIDUAL: Dados recebidos da API:', dados);
+                    console.log('🔍 DEBUG INDIVIDUAL: valor_pago bruto:', dados.valor_pago, 'tipo:', typeof dados.valor_pago);
+                    
                     // Preencher aba individual
                     $('#edit_id').val(dados.id);
                     $('#info_numero_termo').text(dados.numero_termo);
@@ -2114,12 +2131,36 @@
                     $('#edit_vigencia_inicial').val(converterDataParaInput(dados.vigencia_inicial));
                     $('#edit_vigencia_final').val(converterDataParaInput(dados.vigencia_final));
                     $('#edit_parcela_numero').val(dados.parcela_numero);
-                    $('#edit_valor_elemento_53_23').val(dados.valor_elemento_53_23);
-                    $('#edit_valor_elemento_53_24').val(dados.valor_elemento_53_24);
-                    $('#edit_valor_previsto').val(dados.valor_previsto);
-                    $('#edit_valor_subtraido').val(dados.valor_subtraido);
-                    $('#edit_valor_encaminhado').val(dados.valor_encaminhado);
-                    $('#edit_valor_pago').val(dados.valor_pago);
+                    
+                    // 🔧 Formatar valores monetários ao carregar
+                    const val23 = dados.valor_elemento_53_23 ? parseFloat(dados.valor_elemento_53_23).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+                    const val24 = dados.valor_elemento_53_24 ? parseFloat(dados.valor_elemento_53_24).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+                    const valPrevisto = dados.valor_previsto ? parseFloat(dados.valor_previsto).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+                    const valSubtraido = dados.valor_subtraido ? parseFloat(dados.valor_subtraido).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+                    const valEncaminhado = dados.valor_encaminhado ? parseFloat(dados.valor_encaminhado).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+                    const valPago = dados.valor_pago ? parseFloat(dados.valor_pago).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+                    
+                    console.log('🔍 DEBUG INDIVIDUAL: Valores formatados:');
+                    console.log('  - val23:', val23);
+                    console.log('  - val24:', val24);
+                    console.log('  - valPrevisto:', valPrevisto);
+                    console.log('  - valPago:', valPago);
+                    
+                    // 🔍 DEBUG: Verificar tipo e existência dos inputs
+                    console.log('🔍 DEBUG INPUTS:');
+                    console.log('  #edit_valor_elemento_53_23 - existe:', $('#edit_valor_elemento_53_23').length, 'type:', $('#edit_valor_elemento_53_23').attr('type'));
+                    console.log('  #edit_valor_pago - existe:', $('#edit_valor_pago').length, 'type:', $('#edit_valor_pago').attr('type'));
+                    
+                    $('#edit_valor_elemento_53_23').val(val23);
+                    console.log('  Após .val(val23), valor no campo:', $('#edit_valor_elemento_53_23').val());
+                    
+                    $('#edit_valor_elemento_53_24').val(val24);
+                    $('#edit_valor_previsto').val(valPrevisto);
+                    $('#edit_valor_subtraido').val(valSubtraido);
+                    $('#edit_valor_encaminhado').val(valEncaminhado);
+                    $('#edit_valor_pago').val(valPago);
+                    console.log('  Após .val(valPago), valor no campo:', $('#edit_valor_pago').val());
+                    
                     $('#edit_parcela_status').val(dados.parcela_status);
                     $('#edit_parcela_status_secundario').val(dados.parcela_status_secundario);
                     $('#edit_data_pagamento').val(converterDataParaInput(dados.data_pagamento));
@@ -2157,12 +2198,12 @@
     
     // Validar valores
     function validarValores() {
-        const valor23 = parseFloat($('#edit_valor_elemento_53_23').val()) || 0;
-        const valor24 = parseFloat($('#edit_valor_elemento_53_24').val()) || 0;
-        const previsto = parseFloat($('#edit_valor_previsto').val()) || 0;
-        const subtraido = parseFloat($('#edit_valor_subtraido').val()) || 0;
-        const encaminhado = parseFloat($('#edit_valor_encaminhado').val()) || 0;
-        const pago = parseFloat($('#edit_valor_pago').val()) || 0;
+        const valor23 = parseMoedaBR($('#edit_valor_elemento_53_23').val()) || 0;
+        const valor24 = parseMoedaBR($('#edit_valor_elemento_53_24').val()) || 0;
+        const previsto = parseMoedaBR($('#edit_valor_previsto').val()) || 0;
+        const subtraido = parseMoedaBR($('#edit_valor_subtraido').val()) || 0;
+        const encaminhado = parseMoedaBR($('#edit_valor_encaminhado').val()) || 0;
+        const pago = parseMoedaBR($('#edit_valor_pago').val()) || 0;
         const inconsistente = $('#edit_pagamento_inconsistente').is(':checked');
         
         let temErro = false;
@@ -2247,12 +2288,12 @@
             vigencia_final: converterInputParaData($('#edit_vigencia_final').val()),
             parcela_tipo: $('#edit_parcela_tipo').val(),
             parcela_numero: $('#edit_parcela_numero').val(),
-            valor_elemento_53_23: $('#edit_valor_elemento_53_23').val(),
-            valor_elemento_53_24: $('#edit_valor_elemento_53_24').val(),
-            valor_previsto: $('#edit_valor_previsto').val(),
-            valor_subtraido: $('#edit_valor_subtraido').val(),
-            valor_encaminhado: $('#edit_valor_encaminhado').val(),
-            valor_pago: $('#edit_valor_pago').val(),
+            valor_elemento_53_23: parseMoedaBR($('#edit_valor_elemento_53_23').val()),
+            valor_elemento_53_24: parseMoedaBR($('#edit_valor_elemento_53_24').val()),
+            valor_previsto: parseMoedaBR($('#edit_valor_previsto').val()),
+            valor_subtraido: parseMoedaBR($('#edit_valor_subtraido').val()),
+            valor_encaminhado: parseMoedaBR($('#edit_valor_encaminhado').val()),
+            valor_pago: parseMoedaBR($('#edit_valor_pago').val()),
             parcela_status: $('#edit_parcela_status').val(),
             parcela_status_secundario: $('#edit_parcela_status_secundario').val(),
             data_pagamento: converterInputParaData($('#edit_data_pagamento').val()),
@@ -3573,7 +3614,8 @@
             const ano = parseInt(input.data('ano'));
             
             const numeroParcela = calcularNumeroParcela(index, tipoParcela, totalLinhas, mes, ano);
-            tr.find('td').eq(4).text(numeroParcela);
+            // Coluna 6 = Nº Parcela (0:Salvar, 1:Info, 2:Mês, 3:Val23, 4:Val24, 5:Total, 6:Parcela, 7:Ação)
+            tr.find('td').eq(6).text(numeroParcela);
         });
         
         console.log(`✅ Números de parcelas atualizados para tipo: ${tipoParcela}`);
@@ -5991,8 +6033,10 @@
     // Desformatar valor monetário para número
     function desformatarValorMonetario(valorFormatado) {
         if (!valorFormatado || valorFormatado === '') return null;
-        // Remove R$, pontos de milhar e substitui vírgula por ponto
-        const numero = valorFormatado.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+        // Remove tudo exceto números, pontos e vírgulas
+        const limpo = valorFormatado.toString().replace(/[^\d,.]/g, '');
+        // Remove TODOS os pontos (separadores de milhar) e substitui vírgula por ponto
+        const numero = limpo.replace(/\./g, '').replace(',', '.');
         const valorFloat = parseFloat(numero);
         return isNaN(valorFloat) ? null : valorFloat;
     }
@@ -6206,11 +6250,13 @@
         });
     }
     
-    // Desformatar valor monetário para número
+    // Desformatar valor monetário para número (duplicata - usar parseMoedaBR quando possível)
     function desformatarValorMonetario(valorFormatado) {
         if (!valorFormatado || valorFormatado === '') return null;
-        // Remove R$, pontos de milhar e substitui vírgula por ponto
-        const numero = valorFormatado.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+        // Remove tudo exceto números, pontos e vírgulas
+        const limpo = valorFormatado.toString().replace(/[^\d,.]/g, '');
+        // Remove TODOS os pontos (separadores de milhar) e substitui vírgula por ponto
+        const numero = limpo.replace(/\./g, '').replace(',', '.');
         const valorFloat = parseFloat(numero);
         return isNaN(valorFloat) ? null : valorFloat;
     }

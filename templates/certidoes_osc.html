@@ -209,9 +209,11 @@
                             <i class="bi bi-file-earmark-text me-2"></i>{{ cert.certidao_nome_resumido }}
                         </span>
                         {% if preenchida %}
-                        <span class="badge bg-{{ badge_vencimento }}">
+                        <span class="badge bg-{{ badge_vencimento }}" style="cursor: pointer;" 
+                              onclick="event.stopPropagation(); editarDataVencimento('{{ cert.certidao_nome_resumido }}', '{{ cert_cadastrada.id }}', '{{ cert_cadastrada.certidao_vencimento }}')">
                             <i class="bi bi-calendar-check me-1"></i>
                             Vence: {{ cert_cadastrada.certidao_vencimento.strftime('%d/%m/%Y') }}
+                            <i class="bi bi-pencil-square ms-1" style="font-size: 0.9rem;"></i>
                         </span>
                         {% else %}
                         <span class="badge bg-secondary">Pendente</span>
@@ -481,6 +483,45 @@
                 btnSalvar.classList.add('pulse');
             } else {
                 btnSalvar.classList.remove('pulse');
+            }
+        }
+        
+        async function editarDataVencimento(certidaoNome, certidaoId, dataAtual) {
+            const novaData = prompt(`Editar data de vencimento de ${certidaoNome}:\n\nData atual: ${new Date(dataAtual).toLocaleDateString('pt-BR')}\n\nDigite a nova data (DD/MM/AAAA):`, new Date(dataAtual).toLocaleDateString('pt-BR'));
+            
+            if (!novaData) return;
+            
+            // Converter DD/MM/AAAA para AAAA-MM-DD
+            const partes = novaData.split('/');
+            if (partes.length !== 3) {
+                alert('Formato inválido! Use DD/MM/AAAA');
+                return;
+            }
+            
+            const dataFormatada = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
+            
+            try {
+                const response = await fetch(`/certidoes/api/certidoes/${certidaoId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        certidao_vencimento: dataFormatada
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ Data de vencimento atualizada!');
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + result.erro);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao atualizar data de vencimento.');
             }
         }
         

@@ -174,6 +174,28 @@ TABELAS_CONFIG = {
         'inline_edit': True,
         'inline_columns': ['status']
     },
+    'c_dgp_cents_status': {
+        'nome': 'DGP: Status de CENTS',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['cents_status', 'descricao', 'status_status'],
+        'colunas_obrigatorias': ['cents_status'],
+        'labels': {
+            'cents_status': 'Status de CENTS',
+            'descricao': 'Descrição',
+            'status_status': 'Status do Status'
+        },
+        'colunas_filtro': ['cents_status', 'status_status'],
+        'ordem': 'cents_status',
+        'tipos_campo': {
+            'cents_status': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'status_status': 'select',
+            'opcoes_status_status': ['ativo', 'inativo', 'pendente']
+        },
+        'inline_edit': True,
+        'inline_columns': ['status_status']
+    },
     'c_alt_instrumento': {
         'nome': 'DGP/ALT: Instrumentos Jurídicos para Alterações de Contrato',
         'schema': 'categoricas',
