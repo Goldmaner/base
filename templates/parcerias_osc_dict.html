@@ -132,12 +132,20 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 <td><input type="text" class="osc-input" value="{{ osc_item.osc }}" data-original="{{ osc_item.osc }}"></td>
 <td><span class="badge bg-secondary">{{ osc_item.cnpj_exemplo or 'N/A' }}</span></td>
 <td class="text-center">
-    <span class="badge bg-success badge-termos" 
-        data-osc="{{ osc_item.osc }}"
-        data-total-termos="{{ osc_item.total_termos }}"
-        title="Clique para ver os termos">
-        <i class="bi bi-list-ul"></i> {{ osc_item.total_termos }}
-    </span>
+    {% if osc_item.total_termos > 0 %}
+        <span class="badge bg-success badge-termos" 
+            data-osc="{{ osc_item.osc }}"
+            data-total-termos="{{ osc_item.total_termos }}"
+            title="Clique para ver os termos">
+            <i class="bi bi-list-ul"></i> {{ osc_item.total_termos }}
+        </span>
+    {% elif osc_item.total_cents > 0 %}
+        <span class="badge bg-info" title="OSC exclusiva de CENTS">
+            <i class="bi bi-award"></i> CENTS
+        </span>
+    {% else %}
+        <span class="badge bg-secondary">0</span>
+    {% endif %}
 </td>
 <td class="text-center">
     <button class="btn btn-primary btn-sm btn-salvar me-1" onclick="salvarOSC(this)" title="Salvar alterações">

@@ -2092,25 +2092,43 @@ def dicionario_oscs():
         
         cur = get_cursor()
         
-        # Buscar total de OSCs únicas
+        # Buscar total de OSCs únicas (agregando Parcerias + CENTS por CNPJ)
         cur.execute("""
-            SELECT COUNT(DISTINCT osc) as total
-            FROM Parcerias
-            WHERE osc IS NOT NULL AND osc != ''
+            SELECT COUNT(*) as total
+            FROM (
+                SELECT COALESCE(cnpj, osc) as chave
+                FROM (
+                    SELECT DISTINCT cnpj, osc FROM public.Parcerias WHERE osc IS NOT NULL AND osc != ''
+                    UNION
+                    SELECT DISTINCT osc_cnpj as cnpj, osc FROM celebracao.gestao_cents WHERE osc IS NOT NULL AND osc != ''
+                ) sub
+                GROUP BY COALESCE(cnpj, osc)
+            ) unique_oscs
         """)
         total_oscs = cur.fetchone()['total']
         total_paginas = (total_oscs + por_pagina - 1) // por_pagina
         
-        # Buscar OSCs com contagem de termos (paginado)
+        # Buscar OSCs com contagem de termos e CENTS (paginado)
+        # Agrupa por CNPJ quando disponível, evitando duplicações
         query = """
             SELECT 
-                osc,
-                COUNT(numero_termo) as total_termos,
-                MIN(cnpj) as cnpj_exemplo
-            FROM Parcerias
-            WHERE osc IS NOT NULL AND osc != ''
-            GROUP BY osc
-            ORDER BY osc
+                MAX(osc) as osc,
+                COUNT(DISTINCT CASE WHEN fonte = 'parcerias' THEN numero_termo END) as total_termos,
+                COUNT(DISTINCT CASE WHEN fonte = 'cents' THEN id_cents END) as total_cents,
+                MAX(cnpj) as cnpj_exemplo
+            FROM (
+                SELECT osc, numero_termo, NULL::integer as id_cents, cnpj, 'parcerias' as fonte
+                FROM public.Parcerias
+                WHERE osc IS NOT NULL AND osc != ''
+                
+                UNION ALL
+                
+                SELECT osc, NULL as numero_termo, id as id_cents, osc_cnpj as cnpj, 'cents' as fonte
+                FROM celebracao.gestao_cents
+                WHERE osc IS NOT NULL AND osc != ''
+            ) combined
+            GROUP BY COALESCE(cnpj, osc)
+            ORDER BY MAX(osc)
             LIMIT %s OFFSET %s
         """
         
@@ -2147,20 +2165,30 @@ def buscar_oscs():
         
         cur = get_cursor()
         
-        # Buscar OSCs que contenham o termo (ILIKE para case-insensitive)
+        # Buscar OSCs que contenham o termo (agregando Parcerias + CENTS por CNPJ)
         query = """
             SELECT 
-                osc,
-                COUNT(numero_termo) as total_termos,
-                MIN(cnpj) as cnpj_exemplo
-            FROM Parcerias
-            WHERE osc ILIKE %s
-            GROUP BY osc
-            ORDER BY osc
+                MAX(osc) as osc,
+                COUNT(DISTINCT CASE WHEN fonte = 'parcerias' THEN numero_termo END) as total_termos,
+                COUNT(DISTINCT CASE WHEN fonte = 'cents' THEN id_cents END) as total_cents,
+                MAX(cnpj) as cnpj_exemplo
+            FROM (
+                SELECT osc, numero_termo, NULL::integer as id_cents, cnpj, 'parcerias' as fonte
+                FROM public.Parcerias
+                WHERE osc ILIKE %s
+                
+                UNION ALL
+                
+                SELECT osc, NULL as numero_termo, id as id_cents, osc_cnpj as cnpj, 'cents' as fonte
+                FROM celebracao.gestao_cents
+                WHERE osc ILIKE %s
+            ) combined
+            GROUP BY COALESCE(cnpj, osc)
+            ORDER BY MAX(osc)
             LIMIT 100
         """
         
-        cur.execute(query, (f'%{termo_busca}%',))
+        cur.execute(query, (f'%{termo_busca}%', f'%{termo_busca}%'))
         oscs = cur.fetchall()
         cur.close()
         

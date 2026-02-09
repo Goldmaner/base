@@ -1,0 +1,1553 @@
+<!-- templates/cents.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gerenciamento e Análise dos CENTS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      padding: 20px;
+    }
+    .main-container { 
+      max-width: 100%; 
+      margin: 0 auto; 
+      padding: 0 20px;
+    }
+    
+    /* Header Section */
+    .header-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .header-section h3 {
+      font-size: 2rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .header-section small {
+      opacity: 0.9;
+      font-size: 1rem;
+    }
+    
+    /* Modal Headers */
+    .card-header-custom { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      color: white;
+    }
+    
+    /* Prioridades */
+    .prioridade-alto { 
+      background-color: #ffe5e7 !important;
+      border-left: 4px solid #dc3545 !important;
+    }
+    .prioridade-baixo { 
+      background-color: #e7f5ec !important;
+      border-left: 4px solid #198754 !important;
+    }
+    .badge-alto { 
+      background-color: #dc3545;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+    }
+    .badge-baixo { 
+      background-color: #198754;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+    }
+    
+    /* Tabela */
+    .table th { 
+      white-space: nowrap; 
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 12px 8px;
+    }
+    .table td { 
+      font-size: 0.85rem; 
+      vertical-align: middle;
+      padding: 10px 8px;
+    }
+    .table-hover tbody tr:hover {
+      background-color: #f1f3f5;
+      cursor: pointer;
+    }
+    
+    /* Cards */
+    .filtro-card { 
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: all 0.3s ease;
+    }
+    .filtro-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    /* Outros */
+    .required-asterisk { 
+      color: #dc3545; 
+      font-weight: bold;
+      margin-left: 2px;
+    }
+    .select2-container { 
+      width: 100% !important; 
+    }
+    .table-responsive { 
+      max-height: 65vh; 
+      overflow-y: auto;
+      border-radius: 8px;
+    }
+    .sticky-header th { 
+      position: sticky; 
+      top: 0; 
+      z-index: 10; 
+      background-color: #212529;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Badges customizados */
+    .badge {
+      padding: 6px 12px;
+      font-weight: 500;
+      font-size: 0.8rem;
+    }
+    
+    /* Botões */
+    .btn {
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 0.85rem;
+    }
+    
+    /* Paginação */
+    .pagination {
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    /* Stats Badge */
+    .stats-badge {
+      background: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      display: inline-block;
+    }
+    .stats-badge i {
+      color: #764ba2;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container-fluid main-container">
+  <!-- Cabeçalho -->
+  <div class="header-section">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h3 class="mb-2">
+          <i class="bi bi-file-earmark-medical me-2"></i>
+          Gerenciamento e Análise dos CENTS
+        </h3>
+        <small>Certificados de Entidades - Gestão de Parcerias</small>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-light btn-lg" data-bs-toggle="modal" data-bs-target="#modalAdicionar">
+          <i class="bi bi-plus-circle me-2"></i> Novo CENTS
+        </button>
+        <a href="{{ url_for('main.index') }}" class="btn btn-outline-light btn-lg">
+          <i class="bi bi-arrow-left me-2"></i> Voltar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros (Collapse) -->
+  <div class="card filtro-card mb-4">
+    <div class="card-header bg-gradient d-flex justify-content-between align-items-center py-3" style="background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);">
+      <div>
+        <i class="bi bi-funnel-fill me-2" style="color: #764ba2;"></i>
+        <strong style="color: #333;">Filtros de Busca</strong>
+        {% set filtros_ativos = [] %}
+        {% if filtro_osc %}{% set _ = filtros_ativos.append('OSC') %}{% endif %}
+        {% if filtro_cnpj %}{% set _ = filtros_ativos.append('CNPJ') %}{% endif %}
+        {% if filtro_sei %}{% set _ = filtros_ativos.append('SEI') %}{% endif %}
+        {% if filtro_responsavel %}{% set _ = filtros_ativos.append('Responsável') %}{% endif %}
+        {% if filtro_status %}{% set _ = filtros_ativos.append('Status') %}{% endif %}
+        {% if filtro_prioridade %}{% set _ = filtros_ativos.append('Prioridade') %}{% endif %}
+        {% if filtros_ativos %}
+          <span class="badge bg-primary ms-2">{{ filtros_ativos|length }} ativo(s)</span>
+        {% endif %}
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFiltros">
+        <i class="bi bi-chevron-down"></i>
+      </button>
+    </div>
+    <div class="collapse {% if filtros_ativos %}show{% endif %}" id="collapseFiltros">
+      <div class="card-body">
+        <form method="GET" action="{{ url_for('cents.index') }}" id="formFiltros">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <label class="form-label form-label-sm">OSC</label>
+              <input type="text" class="form-control form-control-sm" name="filtro_osc"
+                     value="{{ filtro_osc }}" placeholder="Buscar por OSC...">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">CNPJ</label>
+              <input type="text" class="form-control form-control-sm" name="filtro_cnpj"
+                     value="{{ filtro_cnpj }}" placeholder="Buscar CNPJ...">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Processo SEI</label>
+              <input type="text" class="form-control form-control-sm" name="filtro_sei"
+                     value="{{ filtro_sei }}" placeholder="Buscar SEI...">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Responsável</label>
+              <input type="text" class="form-control form-control-sm" name="filtro_responsavel"
+                     value="{{ filtro_responsavel }}" placeholder="Buscar responsável...">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Status</label>
+              <select class="form-select form-select-sm" name="filtro_status">
+                <option value="">Todos</option>
+                {% for s in status_list %}
+                <option value="{{ s }}" {% if filtro_status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-1">
+              <label class="form-label form-label-sm">Prioridade</label>
+              <select class="form-select form-select-sm" name="filtro_prioridade">
+                <option value="">Todas</option>
+                <option value="Alto" {% if filtro_prioridade == 'Alto' %}selected{% endif %}>Alto</option>
+                <option value="Baixo" {% if filtro_prioridade == 'Baixo' %}selected{% endif %}>Baixo</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-2 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="bi bi-search me-1"></i> Filtrar
+            </button>
+            <a href="{{ url_for('cents.index') }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-x-circle me-1"></i> Limpar Filtros
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumo e Paginação Superior -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="stats-badge">
+      <i class="bi bi-database-fill"></i>
+      <strong>{{ total }}</strong> registro(s) encontrado(s)
+      {% if total > 0 %}
+        <span class="text-muted">|</span> Página <strong>{{ page }}</strong> de <strong>{{ total_pages }}</strong>
+      {% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0 text-muted">Exibir:</label>
+      <select class="form-select form-select-sm" style="width:90px;" onchange="mudarPorPagina(this.value)">
+        {% for pp in [10, 20, 50, 100] %}
+        <option value="{{ pp }}" {% if per_page == pp %}selected{% endif %}>{{ pp }}</option>
+        {% endfor %}
+      </select>
+      <span class="text-muted">por página</span>
+    </div>
+  </div>
+
+  <!-- Tabela Principal -->
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover table-bordered table-sm mb-0">
+        <thead class="table-dark sticky-header">
+          <tr>
+            <th>#</th>
+            <th>OSC</th>
+            <th>CNPJ</th>
+            <th>Processo SEI</th>
+            <th>Responsável</th>
+            <th>Requerimento</th>
+            <th>Última Not.</th>
+            <th>Publicação</th>
+            <th>Vencimento</th>
+            <th>Status</th>
+            <th>Prioridade</th>
+            <th>Observações</th>
+            <th class="text-center" style="min-width:90px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if registros %}
+            {% for r in registros %}
+            <tr class="{% if r.cents_prioridade == 'Alto' %}prioridade-alto{% elif r.cents_prioridade == 'Baixo' %}prioridade-baixo{% endif %}">
+              <td>{{ r.id }}</td>
+              <td title="{{ r.osc }}">{{ r.osc[:40] }}{% if r.osc|length > 40 %}...{% endif %}</td>
+              <td>{{ r.osc_cnpj or '-' }}</td>
+              <td>{{ r.cents_sei or '-' }}</td>
+              <td>
+                {% if r.cents_responsavel %}
+                  {% for resp in r.cents_responsavel.split(';') %}
+                    <span class="badge bg-primary me-1 mb-1">{{ resp.strip() }}</span>
+                  {% endfor %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ r.cents_requerimento.strftime('%d/%m/%Y') if r.cents_requerimento else '-' }}</td>
+              <td>{{ r.cents_ultima_not.strftime('%d/%m/%Y') if r.cents_ultima_not else '-' }}</td>
+              <td>{{ r.cents_publicacao.strftime('%d/%m/%Y') if r.cents_publicacao else '-' }}</td>
+              <td>{{ r.cents_vencimento.strftime('%d/%m/%Y') if r.cents_vencimento else '-' }}</td>
+              <td>
+                {% if r.cents_status %}
+                  <span class="badge bg-info text-dark">{{ r.cents_status }}</span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if r.cents_prioridade == 'Alto' %}
+                  <span class="badge badge-alto">Alto</span>
+                {% elif r.cents_prioridade == 'Baixo' %}
+                  <span class="badge badge-baixo">Baixo</span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td title="{{ r.observacoes or '' }}">
+                {{ (r.observacoes or '-')[:30] }}{% if r.observacoes and r.observacoes|length > 30 %}...{% endif %}
+              </td>
+              <td class="text-center">
+                <button class="btn btn-sm btn-warning me-1" onclick="editarCents({{ r.id }})" title="Editar">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+                <button class="btn btn-sm btn-info" onclick="adicionarContatos({{ r.id }}, '{{ r.osc|e }}')" title="Adicionar Contatos">
+                  <i class="bi bi-person-plus"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="13" class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                Nenhum registro encontrado.
+                {% if filtros_ativos %}
+                  <br><a href="{{ url_for('cents.index') }}">Limpar filtros</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Paginação -->
+  {% if total_pages > 1 %}
+  <nav class="mt-3 d-flex justify-content-center">
+    <ul class="pagination pagination-sm">
+      <!-- Anterior -->
+      <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('cents.index', page=page-1, per_page=per_page,
+           filtro_osc=filtro_osc, filtro_cnpj=filtro_cnpj, filtro_sei=filtro_sei,
+           filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+           filtro_prioridade=filtro_prioridade) }}">
+          <i class="bi bi-chevron-left"></i> Anterior
+        </a>
+      </li>
+
+      {% set start_page = [1, page - 2]|max %}
+      {% set end_page = [total_pages, start_page + 4]|min %}
+
+      {% if start_page > 1 %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('cents.index', page=1, per_page=per_page,
+             filtro_osc=filtro_osc, filtro_cnpj=filtro_cnpj, filtro_sei=filtro_sei,
+             filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+             filtro_prioridade=filtro_prioridade) }}">1</a>
+        </li>
+        {% if start_page > 2 %}
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+      {% endif %}
+
+      {% for p in range(start_page, end_page + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for('cents.index', page=p, per_page=per_page,
+             filtro_osc=filtro_osc, filtro_cnpj=filtro_cnpj, filtro_sei=filtro_sei,
+             filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+             filtro_prioridade=filtro_prioridade) }}">{{ p }}</a>
+        </li>
+      {% endfor %}
+
+      {% if end_page < total_pages %}
+        {% if end_page < total_pages - 1 %}
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('cents.index', page=total_pages, per_page=per_page,
+             filtro_osc=filtro_osc, filtro_cnpj=filtro_cnpj, filtro_sei=filtro_sei,
+             filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+             filtro_prioridade=filtro_prioridade) }}">{{ total_pages }}</a>
+        </li>
+      {% endif %}
+
+      <!-- Próximo -->
+      <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('cents.index', page=page+1, per_page=per_page,
+           filtro_osc=filtro_osc, filtro_cnpj=filtro_cnpj, filtro_sei=filtro_sei,
+           filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+           filtro_prioridade=filtro_prioridade) }}">
+          Próximo <i class="bi bi-chevron-right"></i>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- =============================== -->
+<!-- Modal: Gerenciar Contatos       -->
+<!-- =============================== -->
+<div class="modal fade" id="modalContatos" tabindex="-1" aria-labelledby="modalContatosLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title" id="modalContatosLabel">
+          <i class="bi bi-person-lines-fill"></i> Gerenciar Contatos da OSC
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info mb-3">
+          <strong>OSC:</strong> <span id="oscNomeContatos"></span>
+        </div>
+        
+        <!-- Formulário de Novo Contato -->
+        <div class="card mb-3">
+          <div class="card-header bg-primary text-white">
+            <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Adicionar Novo Contato</h6>
+          </div>
+          <div class="card-body">
+            <form id="formNovoContato">
+              <!-- Campos Únicos -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label for="novo_contato_nome" class="form-label">
+                    Nome *
+                    <i class="bi bi-info-circle text-primary" 
+                       data-bs-toggle="tooltip" 
+                       data-bs-placement="right" 
+                       title="Para contatos institucionais, pode usar apenas 'Institucional'"
+                       style="cursor: help;"></i>
+                  </label>
+                  <input type="text" class="form-control" id="novo_contato_nome" required>
+                </div>
+                <div class="col-md-6">
+                  <label for="novo_contato_posicao" class="form-label">Posição</label>
+                  <input type="text" class="form-control" id="novo_contato_posicao" placeholder="Ex: Diretor, Coordenador">
+                </div>
+              </div>
+              
+              <!-- Blocos de Contato Dinâmicos -->
+              <div class="border rounded p-3 mb-3 bg-light">
+                <h6 class="mb-3">Tipos de Contato</h6>
+                <div id="contatosContainer"></div>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarBlocoContato()">
+                  <i class="bi bi-plus-circle"></i> Adicionar Tipo de Contato
+                </button>
+              </div>
+              
+              <!-- Observação -->
+              <div class="mb-3">
+                <label for="novo_observacao" class="form-label">Observação</label>
+                <textarea class="form-control" id="novo_observacao" rows="3" placeholder="Informações adicionais (opcional)"></textarea>
+              </div>
+              
+              <div class="text-end">
+                <button type="submit" class="btn btn-success">
+                  <i class="bi bi-check-circle"></i> Salvar Contato(s)
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- Lista de Contatos Existentes -->
+        <div class="card">
+          <div class="card-header bg-secondary text-white">
+            <h6 class="mb-0"><i class="bi bi-list-ul"></i> Contatos Cadastrados</h6>
+          </div>
+          <div class="card-body">
+            <div id="listaContatos">
+              <div class="text-center">
+                <div class="spinner-border text-info" role="status">
+                  <span class="visually-hidden">Carregando...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Editar Contato -->
+<div class="modal fade" id="modalEditarContato" tabindex="-1" aria-labelledby="modalEditarContatoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title" id="modalEditarContatoLabel">
+          <i class="bi bi-pencil"></i> Editar Contato
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formEditarContato">
+          <input type="hidden" id="edit_contato_id">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="edit_contato_nome" class="form-label">Nome *</label>
+              <input type="text" class="form-control" id="edit_contato_nome" required>
+            </div>
+            <div class="col-md-6">
+              <label for="edit_contato_posicao" class="form-label">Posição</label>
+              <input type="text" class="form-control" id="edit_contato_posicao">
+            </div>
+            <div class="col-md-6">
+              <label for="edit_contato_tipo" class="form-label">Tipo de Contato *</label>
+              <select class="form-select" id="edit_contato_tipo" required onchange="ajustarMascara('edit')">
+                <option value="">-- Selecione --</option>
+                <option value="E-mail Institucional">E-mail Institucional</option>
+                <option value="E-mail Pessoal">E-mail Pessoal</option>
+                <option value="Telefone Institucional">Telefone Institucional</option>
+                <option value="Telefone Pessoal">Telefone Pessoal</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="edit_contato_info" class="form-label">Informação de Contato *</label>
+              <input type="text" class="form-control" id="edit_contato_info" required>
+              <small class="text-muted" id="hint_edit"></small>
+            </div>
+            <div class="col-md-6">
+              <label for="edit_contato_status" class="form-label">Status *</label>
+              <select class="form-select" id="edit_contato_status" required>
+                <option value="Ativo">Ativo</option>
+                <option value="Inativo">Inativo</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="edit_observacao" class="form-label">Observação</label>
+              <input type="text" class="form-control" id="edit_observacao">
+            </div>
+          </div>
+          <div class="mt-3 text-end">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-warning">
+              <i class="bi bi-check-lg"></i> Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============================== -->
+<!-- Modal: Adicionar novo CENTS     -->
+<!-- =============================== -->
+<div class="modal fade" id="modalAdicionar" tabindex="-1" aria-labelledby="modalAdicionarLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header card-header-custom">
+        <h5 class="modal-title" id="modalAdicionarLabel">
+          <i class="bi bi-plus-circle me-2"></i> Novo CENTS
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formAdicionarCents">
+          <div class="row g-3">
+            <!-- OSC * -->
+            <div class="col-md-8">
+              <label for="add_osc" class="form-label">
+                OSC <span class="required-asterisk">*</span>
+              </label>
+              <select class="form-select select2-osc" id="add_osc" name="osc" required>
+                <option value="">Selecione ou digite uma OSC...</option>
+                {% for o in oscs_list %}
+                <option value="{{ o.osc }}" data-cnpj="{{ o.cnpj or '' }}">{{ o.osc }}</option>
+                {% endfor %}
+              </select>
+              <small class="text-muted">Ou digite para criar uma nova OSC</small>
+            </div>
+
+            <!-- CNPJ * -->
+            <div class="col-md-4">
+              <label for="add_cnpj" class="form-label">
+                CNPJ <span class="required-asterisk">*</span>
+              </label>
+              <input type="text" class="form-control" id="add_cnpj" name="osc_cnpj" required
+                     placeholder="00.000.000/0000-00" maxlength="20">
+            </div>
+
+            <!-- Processo SEI -->
+            <div class="col-md-4">
+              <label for="add_sei" class="form-label">
+                Processo SEI
+              </label>
+              <input type="text" class="form-control" id="add_sei" name="cents_sei"
+                     placeholder="0000.0000/0000000-0" maxlength="40">
+            </div>
+
+            <!-- Responsável * -->
+            <div class="col-md-4">
+              <label for="add_responsavel" class="form-label">
+                Responsável(is) <span class="required-asterisk">*</span>
+              </label>
+              <select class="form-select select2-responsavel" id="add_responsavel" name="cents_responsavel" required multiple>
+                <option value="">Selecione...</option>
+                {% for r in responsaveis %}
+                <option value="{{ r.nome_analista }}" data-ativo="{{ 'true' if r.status else 'false' }}">
+                  {{ r.nome_analista }}{% if not r.status %} (Inativo){% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="add_mostrar_inativos" onchange="toggleResponsaveisInativos('add')">
+                <label class="form-check-label text-muted" for="add_mostrar_inativos">
+                  <small>Mostrar responsáveis inativos</small>
+                </label>
+              </div>
+            </div>
+
+            <!-- Status * -->
+            <div class="col-md-4">
+              <label for="add_status" class="form-label">
+                Status <span class="required-asterisk">*</span>
+              </label>
+              <select class="form-select" id="add_status" name="cents_status" required>
+                <option value="">Selecione...</option>
+                {% for s in status_list %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <hr class="my-2">
+
+            <!-- Data de Requerimento -->
+            <div class="col-md-3">
+              <label for="add_requerimento" class="form-label">Data de Requerimento</label>
+              <input type="date" class="form-control" id="add_requerimento" name="cents_requerimento">
+            </div>
+
+            <!-- Data da Última Notificação -->
+            <div class="col-md-3">
+              <label for="add_ultima_not" class="form-label">Data da Última Notificação</label>
+              <input type="date" class="form-control" id="add_ultima_not" name="cents_ultima_not">
+            </div>
+
+            <!-- Data de Publicação -->
+            <div class="col-md-3">
+              <label for="add_publicacao" class="form-label">Data de Publicação</label>
+              <input type="date" class="form-control" id="add_publicacao" name="cents_publicacao">
+            </div>
+
+            <!-- Data de Vencimento -->
+            <div class="col-md-3">
+              <label for="add_vencimento" class="form-label">Data de Vencimento</label>
+              <input type="date" class="form-control" id="add_vencimento" name="cents_vencimento">
+            </div>
+
+            <!-- Prioridade -->
+            <div class="col-md-3">
+              <label for="add_prioridade" class="form-label">Nível de Prioridade</label>
+              <select class="form-select" id="add_prioridade" name="cents_prioridade">
+                <option value="">Selecione...</option>
+                <option value="Alto">🔴 Alto</option>
+                <option value="Baixo">🟢 Baixo</option>
+              </select>
+            </div>
+
+            <!-- Observações -->
+            <div class="col-md-9">
+              <label for="add_observacoes" class="form-label">Observações</label>
+              <textarea class="form-control" id="add_observacoes" name="observacoes"
+                        rows="2" placeholder="Observações adicionais..."></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-1"></i> Cancelar
+        </button>
+        <button type="button" class="btn btn-success" onclick="salvarNovoCents()">
+          <i class="bi bi-check-circle me-1"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============================== -->
+<!-- Modal: Editar CENTS             -->
+<!-- =============================== -->
+<div class="modal fade" id="modalEditar" tabindex="-1" aria-labelledby="modalEditarLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title" id="modalEditarLabel">
+          <i class="bi bi-pencil-square me-2"></i> Editar CENTS
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formEditarCents">
+          <input type="hidden" id="edit_id">
+          <div class="row g-3">
+            <!-- OSC * -->
+            <div class="col-md-8">
+              <label for="edit_osc" class="form-label">
+                OSC <span class="required-asterisk">*</span>
+              </label>
+              <select class="form-select select2-osc-edit" id="edit_osc" required>
+                <option value="">Selecione ou digite uma OSC...</option>
+                {% for o in oscs_list %}
+                <option value="{{ o.osc }}" data-cnpj="{{ o.cnpj or '' }}">{{ o.osc }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- CNPJ * -->
+            <div class="col-md-4">
+              <label for="edit_cnpj" class="form-label">
+                CNPJ <span class="required-asterisk">*</span>
+              </label>
+              <input type="text" class="form-control" id="edit_cnpj" required maxlength="20">
+            </div>
+
+            <!-- Processo SEI -->
+            <div class="col-md-4">
+              <label for="edit_sei" class="form-label">
+                Processo SEI
+              </label>
+              <input type="text" class="form-control" id="edit_sei" maxlength="40">
+            </div>
+
+            <!-- Responsável * -->
+            <div class="col-md-4">
+              <label for="edit_responsavel" class="form-label">
+                Responsável(is) <span class="required-asterisk">*</span>
+              </label>
+              <select class="form-select select2-responsavel-edit" id="edit_responsavel" required multiple>
+                <option value="">Selecione...</option>
+                {% for r in responsaveis %}
+                <option value="{{ r.nome_analista }}" data-ativo="{{ 'true' if r.status else 'false' }}">
+                  {{ r.nome_analista }}{% if not r.status %} (Inativo){% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="edit_mostrar_inativos" onchange="toggleResponsaveisInativos('edit')">
+                <label class="form-check-label text-muted" for="edit_mostrar_inativos">
+                  <small>Mostrar responsáveis inativos</small>
+                </label>
+              </div>
+            </div>
+
+            <!-- Status * -->
+            <div class="col-md-4">
+              <label for="edit_status" class="form-label">
+                Status <span class="required-asterisk">*</span>
+              </label>
+              <select class="form-select" id="edit_status" required>
+                <option value="">Selecione...</option>
+                {% for s in status_list %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <hr class="my-2">
+
+            <!-- Data de Requerimento -->
+            <div class="col-md-3">
+              <label for="edit_requerimento" class="form-label">Data de Requerimento</label>
+              <input type="date" class="form-control" id="edit_requerimento">
+            </div>
+
+            <!-- Data da Última Notificação -->
+            <div class="col-md-3">
+              <label for="edit_ultima_not" class="form-label">Data da Última Notificação</label>
+              <input type="date" class="form-control" id="edit_ultima_not">
+            </div>
+
+            <!-- Data de Publicação -->
+            <div class="col-md-3">
+              <label for="edit_publicacao" class="form-label">Data de Publicação</label>
+              <input type="date" class="form-control" id="edit_publicacao">
+            </div>
+
+            <!-- Data de Vencimento -->
+            <div class="col-md-3">
+              <label for="edit_vencimento" class="form-label">Data de Vencimento</label>
+              <input type="date" class="form-control" id="edit_vencimento">
+            </div>
+
+            <!-- Prioridade -->
+            <div class="col-md-3">
+              <label for="edit_prioridade" class="form-label">Nível de Prioridade</label>
+              <select class="form-select" id="edit_prioridade">
+                <option value="">Selecione...</option>
+                <option value="Alto">🔴 Alto</option>
+                <option value="Baixo">🟢 Baixo</option>
+              </select>
+            </div>
+
+            <!-- Observações -->
+            <div class="col-md-9">
+              <label for="edit_observacoes" class="form-label">Observações</label>
+              <textarea class="form-control" id="edit_observacoes" rows="2"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-1"></i> Cancelar
+        </button>
+        <button type="button" class="btn btn-warning" onclick="salvarEdicaoCents()">
+          <i class="bi bi-check-circle me-1"></i> Salvar Alterações
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  // ── Select2 para OSC e Responsável ──
+  $(document).ready(function() {
+    // Select2 para OSC (modal adicionar)
+    $('.select2-osc').select2({
+      theme: 'bootstrap-5',
+      placeholder: 'Digite para buscar ou criar nova OSC...',
+      allowClear: true,
+      tags: true,  // Permite criar nova OSC digitando
+      dropdownParent: $('#modalAdicionar')
+    });
+
+    // Auto-preencher CNPJ quando selecionar OSC (modal adicionar)
+    $('#add_osc').on('change', function() {
+      const selectedOption = $(this).find('option:selected');
+      const cnpj = selectedOption.data('cnpj');
+      if (cnpj) {
+        $('#add_cnpj').val(cnpj);
+      }
+    });
+
+    // Select2 para Responsável (modal adicionar)
+    $('.select2-responsavel').select2({
+      theme: 'bootstrap-5',
+      placeholder: 'Digite para buscar...',
+      allowClear: true,
+      dropdownParent: $('#modalAdicionar')
+    });
+
+    // Inicializar estado (mostrar apenas ativos por padrão)
+    setTimeout(() => {
+      document.getElementById('add_mostrar_inativos').checked = false;
+      toggleResponsaveisInativos('add');
+    }, 100);
+  });
+
+  // ── Mostrar/Ocultar Responsáveis Inativos ──
+  // Armazenar todas as opções originais
+  const responsaveisOriginais = {
+    add: [],
+    edit: []
+  };
+
+  // Capturar opções na inicialização
+  $(document).ready(function() {
+    // Capturar opções do modal adicionar (incluindo inativos)
+    $('#add_responsavel option').each(function() {
+      if ($(this).val() !== '') {  // Ignorar opção vazia
+        responsaveisOriginais.add.push({
+          value: $(this).val(),
+          text: $(this).text(),
+          ativo: $(this).data('ativo') === 'true' || $(this).data('ativo') === true
+        });
+      }
+    });
+  });
+
+  function toggleResponsaveisInativos(tipo) {
+    const checkboxId = tipo === 'add' ? 'add_mostrar_inativos' : 'edit_mostrar_inativos';
+    const selectId = tipo === 'add' ? 'add_responsavel' : 'edit_responsavel';
+    
+    const checkbox = document.getElementById(checkboxId);
+    const mostrar = checkbox.checked;
+    const selectJq = $('#' + selectId);
+    
+    // Salvar valores selecionados atuais (array para múltipla seleção)
+    const valoresAtuais = selectJq.val() || [];
+    
+    // Limpar todas as opções
+    selectJq.empty();
+    
+    // Recriar opções baseado no estado do checkbox
+    const opcoes = responsaveisOriginais[tipo];
+    opcoes.forEach(opt => {
+      // Se mostrar inativos está marcado, mostrar todas
+      // Se não está marcado, mostrar apenas ativos
+      if (mostrar || opt.ativo) {
+        const option = new Option(opt.text, opt.value, false, false);
+        selectJq.append(option);
+      }
+    });
+    
+    // Restaurar valores selecionados que ainda existem nas opções
+    const valoresRestaurar = valoresAtuais.filter(valor => 
+      selectJq.find('option[value="' + valor + '"]').length > 0
+    );
+    
+    if (valoresRestaurar.length > 0) {
+      selectJq.val(valoresRestaurar);
+    }
+    
+    // Atualizar Select2
+    selectJq.trigger('change');
+  }
+
+  // ── Mudar quantidade por página ──
+  function mudarPorPagina(valor) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('per_page', valor);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+  }
+
+  // ── Salvar Novo CENTS ──
+  async function salvarNovoCents() {
+    const form = document.getElementById('formAdicionarCents');
+
+    // Validação HTML5
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
+    // Concatenar múltiplos responsáveis com ;
+    const responsaveisArray = $('#add_responsavel').val();
+    const responsaveisStr = responsaveisArray ? responsaveisArray.join(';') : '';
+    
+    const formData = new FormData(form);
+    formData.set('cents_responsavel', responsaveisStr);
+
+    try {
+      const response = await fetch("{{ url_for('cents.adicionar') }}", {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(result.mensagem || 'CENTS adicionado com sucesso!');
+        window.location.reload();
+      } else {
+        alert('Erro: ' + (result.erro || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert('Erro ao salvar. Verifique o console.');
+    }
+  }
+
+  // ── Editar CENTS (carregar dados no modal) ──
+  let dadosEdicaoTemp = null;
+  
+  async function editarCents(id) {
+    try {
+      const response = await fetch(`/cents/editar/${id}`);
+      const result = await response.json();
+
+      if (!result.success) {
+        alert('Erro: ' + result.erro);
+        return;
+      }
+
+      // Armazenar dados temporariamente
+      dadosEdicaoTemp = result.registro;
+
+      // Abrir modal (o preenchimento será feito no evento shown.bs.modal)
+      const modal = new bootstrap.Modal(document.getElementById('modalEditar'));
+      modal.show();
+
+    } catch (error) {
+      console.error('Erro ao carregar:', error);
+      alert('Erro ao carregar dados do registro.');
+    }
+  }
+  
+  // Preencher formulário quando modal estiver totalmente aberto
+  $('#modalEditar').on('shown.bs.modal', function() {
+    // Inicializar Select2 primeiro (apenas uma vez)
+    if (!$('.select2-osc-edit').hasClass('select2-hidden-accessible')) {
+      // Select2 para OSC (modal editar)
+      $('.select2-osc-edit').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Digite para buscar ou criar nova OSC...',
+        allowClear: true,
+        tags: true,
+        dropdownParent: $('#modalEditar')
+      });
+
+      // Auto-preencher CNPJ quando selecionar OSC (modal editar)
+      $('#edit_osc').off('change').on('change', function() {
+        const selectedOption = $(this).find('option:selected');
+        const cnpj = selectedOption.data('cnpj');
+        if (cnpj) {
+          $('#edit_cnpj').val(cnpj);
+        }
+      });
+
+      // Select2 para Responsável (modal editar)
+      $('.select2-responsavel-edit').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Digite para buscar...',
+        allowClear: true,
+        dropdownParent: $('#modalEditar')
+      });
+
+      // Capturar opções do modal editar (incluindo inativos)
+      if (responsaveisOriginais.edit.length === 0) {
+        $('#edit_responsavel option').each(function() {
+          if ($(this).val() !== '') {
+            responsaveisOriginais.edit.push({
+              value: $(this).val(),
+              text: $(this).text(),
+              ativo: $(this).data('ativo') === 'true' || $(this).data('ativo') === true
+            });
+          }
+        });
+      }
+    }
+    
+    // Preencher dados se houver
+    if (!dadosEdicaoTemp) {
+      return;
+    }
+    
+    const r = dadosEdicaoTemp;
+    
+    document.getElementById('edit_id').value = r.id;
+    
+    // Verificar se OSC existe nas opções, senão criar como tag
+    const oscSelect = $('#edit_osc');
+    if (r.osc) {
+      const existingOption = oscSelect.find(`option[value="${r.osc}"]`);
+      if (existingOption.length === 0) {
+        const newOption = new Option(r.osc, r.osc, true, true);
+        oscSelect.append(newOption);
+      }
+      oscSelect.val(r.osc).trigger('change');
+    }
+    
+    document.getElementById('edit_cnpj').value = r.osc_cnpj || '';
+    document.getElementById('edit_sei').value = r.cents_sei || '';
+    document.getElementById('edit_requerimento').value = r.cents_requerimento || '';
+    document.getElementById('edit_ultima_not').value = r.cents_ultima_not || '';
+    document.getElementById('edit_publicacao').value = r.cents_publicacao || '';
+    document.getElementById('edit_vencimento').value = r.cents_vencimento || '';
+    document.getElementById('edit_observacoes').value = r.observacoes || '';
+
+    // Selects simples
+    if (r.cents_status) {
+      document.getElementById('edit_status').value = r.cents_status;
+    }
+    document.getElementById('edit_prioridade').value = r.cents_prioridade || '';
+
+    // Preparar responsáveis
+    const responsaveis = r.cents_responsavel ? r.cents_responsavel.split(';') : [];
+
+    // Inicializar toggle e depois definir valores com delay maior
+    setTimeout(() => {
+      document.getElementById('edit_mostrar_inativos').checked = true; // Mostrar todos primeiro
+      toggleResponsaveisInativos('edit');
+      
+      // Após toggle, definir responsáveis
+      setTimeout(() => {
+        $('#edit_responsavel').val(responsaveis).trigger('change');
+      }, 150);
+    }, 100);
+    
+    // Limpar dados temporários
+    dadosEdicaoTemp = null;
+  });
+
+  // ── Salvar Edição ──
+  async function salvarEdicaoCents() {
+    const id = document.getElementById('edit_id').value;
+
+    // Concatenar múltiplos responsáveis com ;
+    const responsaveisArray = $('#edit_responsavel').val();
+    const responsaveisStr = responsaveisArray ? responsaveisArray.join(';') : '';
+    
+    const dados = {
+      osc: $('#edit_osc').val() || '',  // Usar jQuery para pegar valor do Select2
+      osc_cnpj: document.getElementById('edit_cnpj').value,
+      cents_sei: document.getElementById('edit_sei').value,
+      cents_responsavel: responsaveisStr,
+      cents_status: document.getElementById('edit_status').value,
+      cents_requerimento: document.getElementById('edit_requerimento').value,
+      cents_ultima_not: document.getElementById('edit_ultima_not').value,
+      cents_publicacao: document.getElementById('edit_publicacao').value,
+      cents_vencimento: document.getElementById('edit_vencimento').value,
+      cents_prioridade: document.getElementById('edit_prioridade').value,
+      observacoes: document.getElementById('edit_observacoes').value
+    };
+
+    // Validação básica
+    if (!dados.osc || !dados.osc_cnpj || !dados.cents_responsavel || !dados.cents_status) {
+      alert('Preencha todos os campos obrigatórios (*)');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/cents/editar/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dados)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(result.mensagem || 'CENTS atualizado com sucesso!');
+        window.location.reload();
+      } else {
+        alert('Erro: ' + (result.erro || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      console.error('Erro ao salvar edição:', error);
+      alert('Erro ao salvar alterações.');
+    }
+  }
+
+  // ── Adicionar/Gerenciar Contatos ──
+  let oscAtualContatos = '';
+  let contatoIdCounter = 0;
+
+  function adicionarContatos(id, osc) {
+    oscAtualContatos = osc;
+    document.getElementById('oscNomeContatos').textContent = osc;
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('modalContatos'));
+    modal.show();
+    
+    // Limpar formulário e blocos
+    document.getElementById('formNovoContato').reset();
+    document.getElementById('contatosContainer').innerHTML = '';
+    contatoIdCounter = 0;
+    
+    // Adicionar primeiro bloco
+    adicionarBlocoContato();
+    
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Carregar contatos
+    carregarContatos(osc);
+  }
+
+  function adicionarBlocoContato() {
+    contatoIdCounter++;
+    const id = contatoIdCounter;
+    
+    const html = `
+      <div class="card mb-2" id="blocoContato_${id}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>Contato #${id}</strong>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removerBlocoContato(${id})" title="Remover">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">Tipo *</label>
+              <select class="form-select form-select-sm" id="tipo_${id}" required onchange="ajustarMascaraBloco(${id})">
+                <option value="">-- Selecione --</option>
+                <option value="E-mail Institucional">E-mail Institucional</option>
+                <option value="E-mail Pessoal">E-mail Pessoal</option>
+                <option value="Telefone Institucional">Telefone Institucional</option>
+                <option value="Telefone Pessoal">Telefone Pessoal</option>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Informação *</label>
+              <input type="text" class="form-control form-control-sm" id="info_${id}" required>
+              <small class="text-muted" id="hint_${id}">Selecione o tipo</small>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Status *</label>
+              <select class="form-select form-select-sm" id="status_${id}" required>
+                <option value="Ativo" selected>Ativo</option>
+                <option value="Inativo">Inativo</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.getElementById('contatosContainer').insertAdjacentHTML('beforeend', html);
+  }
+
+  function removerBlocoContato(id) {
+    const bloco = document.getElementById('blocoContato_' + id);
+    if (bloco) bloco.remove();
+    
+    // Renumerar blocos restantes
+    const blocos = document.querySelectorAll('[id^="blocoContato_"]');
+    blocos.forEach((bloco, index) => {
+      const strong = bloco.querySelector('strong');
+      if (strong) strong.textContent = 'Contato #' + (index + 1);
+    });
+  }
+
+  function ajustarMascaraBloco(id) {
+    const tipoSelect = document.getElementById('tipo_' + id);
+    const infoInput = document.getElementById('info_' + id);
+    const hint = document.getElementById('hint_' + id);
+    
+    const tipo = tipoSelect.value;
+    
+    // Remover máscara anterior
+    infoInput.value = '';
+    infoInput.removeAttribute('inputmode');
+    infoInput.removeAttribute('maxlength');
+    infoInput.type = 'text';
+    
+    if (tipo.includes('E-mail')) {
+      infoInput.type = 'email';
+      infoInput.placeholder = 'exemplo@dominio.com';
+      hint.textContent = 'Digite um e-mail válido';
+    } else if (tipo.includes('Telefone')) {
+      infoInput.inputMode = 'tel';
+      infoInput.placeholder = '(11) 98888-8888';
+      infoInput.maxLength = 15;
+      hint.textContent = 'Formato: (XX) XXXXX-XXXX';
+      
+      // Aplicar máscara de telefone
+      infoInput.addEventListener('input', function(e) {
+        let valor = e.target.value.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.substring(0, 11);
+        
+        if (valor.length >= 11) {
+          valor = valor.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+        } else if (valor.length >= 7) {
+          valor = valor.replace(/^(\d{2})(\d{4,5})(\d{0,4}).*/, '($1) $2-$3');
+        } else if (valor.length >= 3) {
+          valor = valor.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+        } else if (valor.length >= 1) {
+          valor = valor.replace(/^(\d*)/, '($1');
+        }
+        
+        e.target.value = valor;
+      });
+    } else {
+      hint.textContent = 'Selecione o tipo';
+      infoInput.placeholder = '';
+    }
+  }
+
+  function carregarContatos(osc) {
+    const listaContatos = document.getElementById('listaContatos');
+    listaContatos.innerHTML = '<div class="text-center"><div class="spinner-border text-info" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
+    
+    fetch('/parcerias/contatos/' + encodeURIComponent(osc))
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          listaContatos.innerHTML = '<div class="alert alert-danger">❌ Erro: ' + data.error + '</div>';
+          return;
+        }
+        
+        if (data.contatos.length === 0) {
+          listaContatos.innerHTML = '<div class="alert alert-warning"><i class="bi bi-info-circle"></i> Nenhum contato cadastrado ainda. Use o formulário acima para adicionar.</div>';
+          return;
+        }
+        
+        // Criar tabela com os contatos
+        let html = '<div class="table-responsive"><table class="table table-hover table-striped">';
+        html += '<thead class="table-info"><tr>';
+        html += '<th>Nome</th>';
+        html += '<th>Posição</th>';
+        html += '<th>Tipo</th>';
+        html += '<th>Contato</th>';
+        html += '<th>Status</th>';
+        html += '<th>Ações</th>';
+        html += '</tr></thead><tbody>';
+        
+        data.contatos.forEach(contato => {
+          const statusBadge = contato.status === 'Ativo' ? 'bg-success' : 'bg-secondary';
+          const contatoIcon = contato.contato_tipo.includes('E-mail') ? 'bi-envelope' : 'bi-telephone';
+          
+          html += '<tr>';
+          html += '<td><strong>' + contato.contato_nome + '</strong></td>';
+          html += '<td>' + (contato.contato_posicao || '-') + '</td>';
+          html += '<td><span class="badge bg-primary">' + contato.contato_tipo + '</span></td>';
+          html += '<td><i class="bi ' + contatoIcon + '"></i> ' + contato.contato_info + '</td>';
+          html += '<td><span class="badge ' + statusBadge + '">' + contato.status + '</span></td>';
+          html += '<td>';
+          html += '<button class="btn btn-sm btn-warning me-1" onclick="editarContato(' + contato.id + ')" title="Editar"><i class="bi bi-pencil"></i></button>';
+          html += '<button class="btn btn-sm btn-danger" onclick="excluirContato(' + contato.id + ', \'' + contato.contato_nome + '\')" title="Excluir"><i class="bi bi-trash"></i></button>';
+          html += '</td>';
+          html += '</tr>';
+        });
+        
+        html += '</tbody></table></div>';
+        listaContatos.innerHTML = html;
+      })
+      .catch(error => {
+        listaContatos.innerHTML = '<div class="alert alert-danger">❌ Erro ao carregar contatos: ' + error + '</div>';
+      });
+  }
+
+  function ajustarMascara(prefixo) {
+    const tipoSelect = document.getElementById(prefixo + '_contato_tipo');
+    const infoInput = document.getElementById(prefixo + '_contato_info');
+    const hint = document.getElementById('hint_' + prefixo);
+    
+    const tipo = tipoSelect.value;
+    
+    // Remover máscara anterior
+    infoInput.value = '';
+    infoInput.removeAttribute('inputmode');
+    infoInput.removeAttribute('maxlength');
+    infoInput.type = 'text';
+    
+    if (tipo.includes('E-mail')) {
+      infoInput.type = 'email';
+      infoInput.placeholder = 'exemplo@dominio.com';
+      hint.textContent = 'Digite um e-mail válido';
+    } else if (tipo.includes('Telefone')) {
+      infoInput.inputMode = 'tel';
+      infoInput.placeholder = '(11) 98888-8888';
+      infoInput.maxLength = 15;
+      hint.textContent = 'Digite no formato (XX) XXXXX-XXXX';
+      
+      // Aplicar máscara de telefone
+      infoInput.addEventListener('input', function(e) {
+        let valor = e.target.value.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.substring(0, 11);
+        
+        if (valor.length >= 11) {
+          valor = valor.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+        } else if (valor.length >= 7) {
+          valor = valor.replace(/^(\d{2})(\d{4,5})(\d{0,4}).*/, '($1) $2-$3');
+        } else if (valor.length >= 3) {
+          valor = valor.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+        } else if (valor.length >= 1) {
+          valor = valor.replace(/^(\d*)/, '($1');
+        }
+        
+        e.target.value = valor;
+      });
+    } else {
+      hint.textContent = 'Selecione o tipo primeiro';
+      infoInput.placeholder = '';
+    }
+  }
+
+  // Formulário de novo contato
+  document.getElementById('formNovoContato').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Coletar todos os blocos de contato
+    const blocos = document.querySelectorAll('[id^="blocoContato_"]');
+    const contatos = [];
+    
+    blocos.forEach(bloco => {
+      const id = bloco.id.replace('blocoContato_', '');
+      const tipo = document.getElementById('tipo_' + id)?.value;
+      const info = document.getElementById('info_' + id)?.value.trim();
+      const status = document.getElementById('status_' + id)?.value;
+      
+      if (tipo && info) {
+        contatos.push({ tipo, info, status });
+      }
+    });
+    
+    if (contatos.length === 0) {
+      alert('⚠ Adicione pelo menos um tipo de contato!');
+      return;
+    }
+    
+    const dados = {
+      osc: oscAtualContatos,
+      contato_nome: document.getElementById('novo_contato_nome').value.trim(),
+      contato_posicao: document.getElementById('novo_contato_posicao').value.trim(),
+      observacao: document.getElementById('novo_observacao').value.trim(),
+      contatos: contatos
+    };
+    
+    fetch('/parcerias/contatos/criar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(dados)
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert('❌ Erro: ' + data.error);
+      } else {
+        alert('✅ ' + data.message);
+        document.getElementById('formNovoContato').reset();
+        document.getElementById('contatosContainer').innerHTML = '';
+        contatoIdCounter = 0;
+        adicionarBlocoContato();
+        carregarContatos(oscAtualContatos);
+      }
+    })
+    .catch(error => {
+      alert('❌ Erro ao criar contato: ' + error);
+    });
+  });
+
+  function editarContato(id) {
+    // Buscar dados do contato
+    fetch('/parcerias/contatos/' + encodeURIComponent(oscAtualContatos))
+      .then(r => r.json())
+      .then(data => {
+        const contato = data.contatos.find(c => c.id === id);
+        if (!contato) {
+          alert('❌ Contato não encontrado!');
+          return;
+        }
+        
+        // Preencher formulário
+        document.getElementById('edit_contato_id').value = contato.id;
+        document.getElementById('edit_contato_nome').value = contato.contato_nome;
+        document.getElementById('edit_contato_posicao').value = contato.contato_posicao || '';
+        document.getElementById('edit_contato_tipo').value = contato.contato_tipo;
+        document.getElementById('edit_contato_info').value = contato.contato_info;
+        document.getElementById('edit_contato_status').value = contato.status;
+        document.getElementById('edit_observacao').value = contato.observacao || '';
+        
+        // Ajustar máscara
+        ajustarMascara('edit');
+        
+        // Mostrar modal
+        const modal = new bootstrap.Modal(document.getElementById('modalEditarContato'));
+        modal.show();
+      })
+      .catch(error => {
+        alert('❌ Erro ao buscar contato: ' + error);
+      });
+  }
+
+  // Formulário de editar contato
+  document.getElementById('formEditarContato').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('edit_contato_id').value;
+    const dados = {
+      contato_nome: document.getElementById('edit_contato_nome').value.trim(),
+      contato_posicao: document.getElementById('edit_contato_posicao').value.trim(),
+      contato_tipo: document.getElementById('edit_contato_tipo').value,
+      contato_info: document.getElementById('edit_contato_info').value.trim(),
+      status: document.getElementById('edit_contato_status').value,
+      observacao: document.getElementById('edit_observacao').value.trim()
+    };
+    
+    fetch('/parcerias/contatos/editar/' + id, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(dados)
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert('❌ Erro: ' + data.error);
+      } else {
+        alert('✅ ' + data.message);
+        bootstrap.Modal.getInstance(document.getElementById('modalEditarContato')).hide();
+        carregarContatos(oscAtualContatos);
+      }
+    })
+    .catch(error => {
+      alert('❌ Erro ao editar contato: ' + error);
+    });
+  });
+
+  function excluirContato(id, nome) {
+    if (!confirm('⚠ Tem certeza que deseja excluir o contato de:\n"' + nome + '"?')) {
+      return;
+    }
+    
+    fetch('/parcerias/contatos/deletar/' + id, {
+      method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert('❌ Erro: ' + data.error);
+      } else {
+        alert('✅ ' + data.message);
+        carregarContatos(oscAtualContatos);
+      }
+    })
+    .catch(error => {
+      alert('❌ Erro ao excluir contato: ' + error);
+    });
+  }
+</script>
+
+</body>
+</html>
