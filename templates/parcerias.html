@@ -137,6 +137,24 @@
                       </div>
                     </div>
                   </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Endereço</label>
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="endereco_todos" onchange="toggleAllCheckboxes('endereco', this.checked)">
+                        <label class="form-check-label" for="endereco_todos"><strong>Todos</strong></label>
+                      </div>
+                      <hr class="my-1">
+                      <div class="form-check">
+                        <input class="form-check-input endereco-check" type="checkbox" name="filtro_endereco" value="preenchido" id="endereco_preenchido" {% if 'preenchido' in filtro_endereco %}checked{% endif %}>
+                        <label class="form-check-label" for="endereco_preenchido">Preenchido</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input endereco-check" type="checkbox" name="filtro_endereco" value="nao_preenchido" id="endereco_nao_preenchido" {% if 'nao_preenchido' in filtro_endereco %}checked{% endif %}>
+                        <label class="form-check-label" for="endereco_nao_preenchido">Não preenchido</label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -316,6 +334,19 @@
       </div>
     </div>
 
+    <!-- Colunas Opcionais -->
+    <div class="filter-section" style="margin-top: -10px;">
+      <h6 class="mb-2">
+        <i class="bi bi-eye"></i> Colunas Opcionais
+      </h6>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="chk_endereco" onchange="toggleColunaEndereco()">
+        <label class="form-check-label" for="chk_endereco">
+          Endereço
+        </label>
+      </div>
+    </div>
+
     <!-- Tabela de Parcerias -->
     <div class="table-container">
       {% if parcerias %}
@@ -350,6 +381,7 @@
               </th>
               <th class="text-center">SEI de Celebração</th>
               <th class="text-center">SEI de Pagamento</th>
+              <th class="text-center col-endereco" style="display: none;">Endereço</th>
               <th class="text-center">Ações</th>
             </tr>
           </thead>
@@ -392,6 +424,17 @@
                 <td class="text-end">R$ {{ parceria.total_pago|format_brl }}</td>
                 <td class="text-center sei-formatted">{{ parceria.sei_celeb or '-' }}</td>
                 <td class="text-center sei-formatted">{{ parceria.sei_pc or '-' }}</td>
+                <td class="col-endereco" style="display: none;">
+                  {% if parceria.endereco_completo %}
+                    {% if parceria.endereco_completo|length > 100 %}
+                      {{ parceria.endereco_completo[:100] }}...
+                    {% else %}
+                      {{ parceria.endereco_completo }}
+                    {% endif %}
+                  {% else %}
+                    <span class="text-muted">Não preenchido</span>
+                  {% endif %}
+                </td>
                 <td class="text-center">
                   <a class="btn btn-warning btn-action" href="{{ url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
                     <i class="bi bi-pencil"></i> Modificar
@@ -476,6 +519,89 @@
       }
     });
     
+    // Toggle da coluna de endereço
+    function toggleColunaEndereco() {
+      const mostrar = document.getElementById('chk_endereco').checked;
+      const colunas = document.querySelectorAll('.col-endereco');
+      colunas.forEach(col => {
+        col.style.display = mostrar ? '' : 'none';
+      });
+      salvarPreferencias();
+    }
+    
+    // Salvar preferências no localStorage
+    function salvarPreferencias() {
+      const preferencias = {
+        chk_endereco: document.getElementById('chk_endereco').checked,
+        filtro_endereco_preenchido: document.getElementById('endereco_preenchido').checked,
+        filtro_endereco_nao_preenchido: document.getElementById('endereco_nao_preenchido').checked
+      };
+      localStorage.setItem('parcerias_preferencias', JSON.stringify(preferencias));
+    }
+    
+    // Restaurar preferências do localStorage
+    function restaurarPreferencias() {
+      const preferencias = localStorage.getItem('parcerias_preferencias');
+      if (preferencias) {
+        try {
+          const prefs = JSON.parse(preferencias);
+          
+          // Restaurar checkbox de endereço
+          if (prefs.chk_endereco) {
+            document.getElementById('chk_endereco').checked = true;
+            toggleColunaEndereco();
+          }
+          
+          // Restaurar filtros de endereço (apenas se não vieram da URL)
+          const urlParams = new URLSearchParams(window.location.search);
+          const temFiltroEnderecoURL = urlParams.has('filtro_endereco');
+          
+          if (!temFiltroEnderecoURL) {
+            if (prefs.filtro_endereco_preenchido !== undefined) {
+              document.getElementById('endereco_preenchido').checked = prefs.filtro_endereco_preenchido;
+            }
+            if (prefs.filtro_endereco_nao_preenchido !== undefined) {
+              document.getElementById('endereco_nao_preenchido').checked = prefs.filtro_endereco_nao_preenchido;
+            }
+          }
+          
+          // Atualizar checkbox "Todos" de endereço
+          atualizarCheckboxTodosEndereco();
+        } catch (e) {
+          console.error('Erro ao restaurar preferências:', e);
+        }
+      }
+    }
+    
+    // Atualizar checkbox "Todos" de endereço
+    function atualizarCheckboxTodosEndereco() {
+      const checkboxes = document.querySelectorAll('.endereco-check');
+      const todas = Array.from(checkboxes).every(cb => cb.checked);
+      const alguma = Array.from(checkboxes).some(cb => cb.checked);
+      const todosCheckbox = document.getElementById('endereco_todos');
+      
+      if (todosCheckbox) {
+        todosCheckbox.checked = todas;
+        todosCheckbox.indeterminate = alguma && !todas;
+      }
+    }
+    
+    // Adicionar listeners para salvar preferências quando mudar os filtros
+    document.addEventListener('DOMContentLoaded', function() {
+      // Listener para checkboxes de endereço
+      document.querySelectorAll('.endereco-check').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          salvarPreferencias();
+          atualizarCheckboxTodosEndereco();
+        });
+      });
+    });
+    
+    // Restaurar preferências ao carregar a página
+    document.addEventListener('DOMContentLoaded', function() {
+      restaurarPreferencias();
+    });
+    
     function exportarCSV() {
       // Mostrar indicador de carregamento
       const btnExportar = event.target.closest('button');
@@ -485,6 +611,13 @@
       
       // Construir URL com os mesmos parâmetros de filtro da página atual
       const params = new URLSearchParams(window.location.search);
+      
+      // Adicionar parâmetro de endereço se checkbox estiver marcado
+      const incluirEndereco = document.getElementById('chk_endereco').checked;
+      if (incluirEndereco) {
+        params.set('incluir_endereco', 'true');
+      }
+      
       const exportUrl = '{{ url_for("parcerias.exportar_csv") }}' + '?' + params.toString();
       
       // Fazer requisição para a API de exportação

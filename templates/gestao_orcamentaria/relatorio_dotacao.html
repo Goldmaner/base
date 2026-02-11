@@ -192,9 +192,14 @@
             Última atualização: <strong id="ultimaAtualizacao">-</strong>
         </span>
     </div>
-    <button class="btn btn-success" onclick="exportarCSV()">
-        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
-    </button>
+    <div>
+        <button class="btn btn-success" onclick="exportarCSV()">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV (Filtrado)
+        </button>
+        <button class="btn btn-primary" onclick="exportarCSVCompleto()">
+            <i class="bi bi-download me-2"></i>Exportar CSV Completo
+        </button>
+    </div>
 </div>
 
 <!-- Tabela Principal -->
@@ -280,6 +285,13 @@
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
+    }
+
+    // Formatar valor numérico para CSV (formato brasileiro com vírgula)
+    function formatarValorCSV(valor) {
+        const num = parseFloat(valor);
+        if (isNaN(num)) return '0,00';
+        return num.toFixed(2).replace('.', ',');
     }
 
     // Mostrar loading
@@ -467,16 +479,17 @@
             return;
         }
 
-        let csv = 'Dotação Formatada;Código Proj-Ativ;Texto Projeto-Atividade;Cód. Conta;Saldo Dotação;Valor Total Empenhado;Valor Total Pago;Data Atualização\n';
+        const BOM = '\uFEFF';
+        let csv = BOM + 'Dotação Formatada;Código Proj-Ativ;Texto Projeto-Atividade;Cód. Conta;Saldo Dotação;Valor Total Empenhado;Valor Total Pago;Data Atualização\n';
 
         dadosCompletos.forEach(item => {
             csv += `"${item.dotacao_formatada || ''}";`;
             csv += `"${item.cod_proj_atvd_sof || ''}";`;
             csv += `"${item.txt_proj_atvd || ''}";`;
             csv += `"${item.cod_cta_desp || ''}";`;
-            csv += `${item.saldo_dotacao || 0};`;
-            csv += `${item.val_tot_eph || 0};`;
-            csv += `${item.val_tot_pgto_dota || 0};`;
+            csv += `${formatarValorCSV(item.saldo_dotacao || 0)};`;
+            csv += `${formatarValorCSV(item.val_tot_eph || 0)};`;
+            csv += `${formatarValorCSV(item.val_tot_pgto_dota || 0)};`;
             csv += `"${item.criado_em || ''}"\n`;
         });
 
@@ -489,7 +502,7 @@
             csv += `"${item.cod_proj_atvd_sof || ''}";`;
             csv += `"${item.txt_proj_atvd || ''}";`;
             csv += `"${item.cod_cta_desp || ''}";`;
-            csv += `${item.total_saldo || 0};`;
+            csv += `${formatarValorCSV(item.total_saldo || 0)};`;
             csv += `"${item.ultima_atualizacao || ''}"\n`;
         });
 
@@ -503,6 +516,15 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    // Exportar CSV Completo (todos os dados do banco, sem filtros)
+    function exportarCSVCompleto() {
+        if (confirm('Deseja exportar TODOS os dados do banco (sem filtros)?')) {
+            mostrarLoading();
+            window.location.href = '/gestao_orcamentaria/api/dotacoes/csv-completo';
+            setTimeout(esconderLoading, 2000);
+        }
     }
 
     // Carregar dados ao iniciar (com filtro padrão)

@@ -354,6 +354,16 @@
                                     </small>
                                 </div>
                             </div>
+                            <div class="row mt-3">
+                                <div class="col-md-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="mostrar-pastas-existentes" onchange="togglePastasExistentes()">
+                                        <label class="form-check-label fw-bold" for="mostrar-pastas-existentes">
+                                            <i class="bi bi-eye me-1"></i>Mostrar OSCs com pastas existentes
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -684,8 +694,12 @@
                             ? '<span class="badge bg-success ms-2"><i class="bi bi-check-circle me-1"></i>Pasta Existe</span>'
                             : '<span class="badge bg-warning text-dark ms-2"><i class="bi bi-plus-circle me-1"></i>Pasta Nova</span>';
                         
+                        // Classe para controlar visibilidade: ocultar pastas existentes por padrão
+                        const visibilidadeClass = osc.pasta_existe ? 'osc-existente' : 'osc-nova';
+                        const displayStyle = osc.pasta_existe ? 'display: none;' : '';
+                        
                         html += `
-                            <div class="card mb-3">
+                            <div class="card mb-3 ${visibilidadeClass}" style="${displayStyle}">
                                 <div class="card-header" style="background-color: ${osc.pasta_existe ? '#e8f5e9' : '#fff3cd'};">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
@@ -834,6 +848,22 @@
                 console.error('Erro:', error);
                 alert('❌ Erro ao gerar pastas. Verifique o console para detalhes.');
             }
+        }
+        
+        // Função para mostrar/ocultar OSCs com pastas existentes
+        function togglePastasExistentes() {
+            const checkbox = document.getElementById('mostrar-pastas-existentes');
+            const oscExistentes = document.querySelectorAll('.osc-existente');
+            
+            oscExistentes.forEach(card => {
+                if (checkbox.checked) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            console.log(`[DEBUG] Pastas existentes ${checkbox.checked ? 'mostradas' : 'ocultadas'} - Total: ${oscExistentes.length}`);
         }
     </script>
 </body>

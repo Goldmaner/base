@@ -315,9 +315,14 @@
                 </select>
             </div>
         </div>
-        <button class="btn btn-success" onclick="exportarCSV()">
-            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
-        </button>
+        <div>
+            <button class="btn btn-success" onclick="exportarCSV()">
+                <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV (Filtrado)
+            </button>
+            <button class="btn btn-primary" onclick="exportarCSVCompleto()">
+                <i class="bi bi-download me-2"></i>Exportar CSV Completo
+            </button>
+        </div>
     </div>
 
     <!-- Paginação -->
@@ -840,6 +845,15 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    // Exportar CSV Completo (todos os dados do banco, sem filtros)
+    function exportarCSVCompleto() {
+        if (confirm('Deseja exportar TODOS os empenhos do banco (sem filtros)?\n\nIsso pode gerar um arquivo grande.')) {
+            mostrarLoading();
+            window.location.href = '/gestao_orcamentaria/api/empenhos/csv-completo';
+            setTimeout(esconderLoading, 2000);
+        }
     }
 
     // Carregar dados ao iniciar (busca todos)

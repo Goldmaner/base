@@ -249,6 +249,24 @@
               <div class="col-12">
                 <hr>
                 <h6><i class="bi bi-calendar3"></i> Cronograma de Repasses Mensais</h6>
+                
+                <!-- Campo de Cálculo -->
+                <div class="row g-2 mb-3">
+                  <div class="col-md-5">
+                    <label class="form-label"><i class="bi bi-calculator"></i> Campo de Cálculo (Valor Total)</label>
+                    <input type="text" class="form-control input-moeda" id="criar_campo_calculo" 
+                           placeholder="R$ 0,00" oninput="aplicarMascaraMoeda(this)">
+                  </div>
+                  <div class="col-md-7 d-flex align-items-end gap-2">
+                    <button type="button" class="btn btn-success btn-sm" onclick="distribuirValor('criar')">
+                      <i class="bi bi-calculator-fill"></i> Distribuir Valor Igualmente
+                    </button>
+                    <button type="button" class="btn btn-info btn-sm" onclick="reconfigurarMeses('criar')">
+                      <i class="bi bi-arrow-clockwise"></i> Reconfigurar Meses
+                    </button>
+                  </div>
+                </div>
+                
                 <div class="d-flex gap-2 mb-2">
                   <button type="button" class="btn btn-primary btn-sm" onclick="adicionarMes('criar')">
                     <i class="bi bi-plus"></i> Adicionar Mês
@@ -350,6 +368,24 @@
               <div class="col-12">
                 <hr>
                 <h6><i class="bi bi-calendar3"></i> Cronograma de Repasses Mensais</h6>
+                
+                <!-- Campo de Cálculo -->
+                <div class="row g-2 mb-3">
+                  <div class="col-md-5">
+                    <label class="form-label"><i class="bi bi-calculator"></i> Campo de Cálculo (Valor Total)</label>
+                    <input type="text" class="form-control input-moeda" id="editar_campo_calculo" 
+                           placeholder="R$ 0,00" oninput="aplicarMascaraMoeda(this)">
+                  </div>
+                  <div class="col-md-7 d-flex align-items-end gap-2">
+                    <button type="button" class="btn btn-success btn-sm" onclick="distribuirValor('editar')">
+                      <i class="bi bi-calculator-fill"></i> Distribuir Valor Igualmente
+                    </button>
+                    <button type="button" class="btn btn-info btn-sm" onclick="reconfigurarMeses('editar')">
+                      <i class="bi bi-arrow-clockwise"></i> Reconfigurar Meses
+                    </button>
+                  </div>
+                </div>
+                
                 <div class="d-flex gap-2 mb-2">
                   <button type="button" class="btn btn-primary btn-sm" onclick="adicionarMes('editar')">
                     <i class="bi bi-plus"></i> Adicionar Mês
@@ -865,6 +901,87 @@
       inputHidden.value = JSON.stringify(mesesParaEnviar);
       return true;
     }
+    
+    // ==================== NOVAS FUNCIONALIDADES ====================
+    
+    // Distribuir valor total igualmente entre os meses
+    function distribuirValor(modo) {
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      const campoCalculo = document.getElementById(`${modo}_campo_calculo`);
+      
+      if (meses.length === 0) {
+        alert('Adicione pelo menos um mês no cronograma antes de distribuir valores!');
+        return;
+      }
+      
+      const valorTotal = desformatarMoeda(campoCalculo.value);
+      
+      if (!valorTotal || valorTotal <= 0) {
+        alert('Digite um valor total válido no campo de cálculo!');
+        return;
+      }
+      
+      // Dividir igualmente
+      const valorPorMes = valorTotal / meses.length;
+      
+      console.log(`[DEBUG] Distribuindo R$ ${valorTotal.toFixed(2)} em ${meses.length} meses = R$ ${valorPorMes.toFixed(2)} por mês`);
+      
+      // Atualizar todos os meses
+      meses.forEach(mes => {
+        mes.valor = valorPorMes;
+      });
+      
+      renderizarCronograma(modo);
+      
+      // Limpar campo de cálculo após distribuição
+      campoCalculo.value = '';
+    }
+    
+    // Reconfigurar meses sequencialmente baseado no primeiro mês
+    function reconfigurarMeses(modo) {
+      const meses = modo === 'criar' ? mesesCriar : mesesEditar;
+      
+      if (meses.length === 0) {
+        alert('Adicione pelo menos um mês no cronograma antes de reconfigurar!');
+        return;
+      }
+      
+      // Pegar o primeiro mês como base
+      const primeiroMesStr = meses[0].mes; // Formato YYYY-MM
+      const [anoBase, mesBase] = primeiroMesStr.split('-').map(Number);
+      
+      console.log(`[DEBUG] Reconfigurando a partir de: ${primeiroMesStr}`);
+      
+      // Recalcular todos os meses seguintes
+      let anoAtual = anoBase;
+      let mesAtual = mesBase;
+      
+      meses.forEach((mes, index) => {
+        if (index === 0) {
+          // Primeiro mês já está definido pelo usuário
+          return;
+        }
+        
+        // Incrementar mês
+        mesAtual++;
+        
+        if (mesAtual > 12) {
+          mesAtual = 1;
+          anoAtual++;
+        }
+        
+        const mesFormatado = `${anoAtual}-${String(mesAtual).padStart(2, '0')}`;
+        mes.mes = mesFormatado;
+        
+        console.log(`[DEBUG] Mês ${index + 1}: ${mesFormatado}`);
+      });
+      
+      renderizarCronograma(modo);
+      
+      alert(`✅ Meses reconfigurados com sucesso!\n\nInício: ${primeiroMesStr}\nTotal de meses: ${meses.length}`);
+    }
+    
+    // ==================== FIM NOVAS FUNCIONALIDADES ====================
     
     // Confirmar exclusão
     function confirmarDelete(editalNome) {

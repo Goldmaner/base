@@ -88,11 +88,15 @@ def parse_data_br(data_str):
 
 def converter_sei_para_cod_sof(sei_celeb):
     """
-    Converte SEI do formato '6074.2023/0001930-0' para '6074202300019300'
+    Converte SEI do formato '6074.2023/0004039-2' para '6074202300040392'
     Remove pontos, barras e hífens
+    
+    IMPORTANTE: Não remove zeros à esquerda! O valor já está correto no SEI.
+    Exemplo: 6074.2023/0004039-2 → 6074202300040392
     """
     if not sei_celeb:
         return None
+    # Remove apenas os separadores (pontos, barras, hífens)
     return re.sub(r'[.\-/]', '', sei_celeb)
 
 
@@ -935,8 +939,9 @@ def api_listar_parcelas():
             cod_sof = converter_sei_para_cod_sof(sei_celeb)
             
             # Buscar total pago por elemento neste ano
-            chave_elemento_23 = (cod_sof, ano_parcela, '23')
-            chave_elemento_24 = (cod_sof, ano_parcela, '24')
+            # IMPORTANTE: cod_item_desp_sof retorna INT, não STRING
+            chave_elemento_23 = (cod_sof, ano_parcela, 23)
+            chave_elemento_24 = (cod_sof, ano_parcela, 24)
             
             total_pago_23 = pagos_por_elemento.get(chave_elemento_23, 0)
             total_pago_24 = pagos_por_elemento.get(chave_elemento_24, 0)
@@ -969,11 +974,15 @@ def api_listar_parcelas():
                     controle_cascata[chave_controle]['pago_24'] += valor_a_distribuir_24
             
             # Determinar status: PAGO INTEGRAL ou PAGO PARCIAL
+            # IMPORTANTE: Considerar valor_subtraido (glosas/deduções)
+            # Valor Devido = Valor Previsto - Valor Subtraído
+            valor_devido_23 = parcela['valor_elemento_53_23'] - parcela['valor_subtraido']
+            valor_devido_24 = parcela['valor_elemento_53_24']
             valor_pago_total = parcela['valor_pago_23'] + parcela['valor_pago_24']
-            valor_elemento_total = parcela['valor_elemento_53_23'] + parcela['valor_elemento_53_24']
+            valor_devido_total = valor_devido_23 + valor_devido_24
             
             if valor_pago_total > 0:
-                if valor_pago_total >= valor_elemento_total - 0.01:  # Tolerância de 1 centavo
+                if valor_pago_total >= valor_devido_total - 0.01:  # Tolerância de 1 centavo
                     parcela['pago_integral'] = True
                 else:
                     parcela['pago_parcial'] = True

@@ -93,9 +93,15 @@ def api_orcamento_detalhado():
             tipo_termo = partes_termo[0]  # Ex: TCL, TFM
             unidade = partes_termo[4] if len(partes_termo) > 4 else None  # Ex: SESANA, FUMCAD
             
-            # Buscar informações da parceria (OSC, CNPJ, Projeto, SEI Celebração, SEI PC, tipo_termo, final)
+            # Buscar informações da parceria (OSC, CNPJ, Projeto, SEI Celebração, SEI PC, tipo_termo, final, inicio)
             cur.execute("""
-                SELECT osc, cnpj, projeto, sei_celeb, sei_pc, tipo_termo, final
+                SELECT 
+                    osc, cnpj, projeto, sei_celeb, sei_pc, tipo_termo, final, inicio, total_previsto,
+                    CASE 
+                        WHEN final IS NOT NULL AND inicio IS NOT NULL THEN
+                            EXTRACT(YEAR FROM AGE(final, inicio)) * 12 + EXTRACT(MONTH FROM AGE(final, inicio))
+                        ELSE NULL
+                    END as meses_vigencia
                 FROM public.parcerias
                 WHERE numero_termo = %s
             """, (numero_termo,))
@@ -108,6 +114,9 @@ def api_orcamento_detalhado():
             sei_pc = parceria['sei_pc'] if parceria else None
             tipo_contrato = parceria['tipo_termo'] if parceria else None
             data_termino = parceria['final'].strftime('%d/%m/%Y') if parceria and parceria['final'] else None
+            data_inicio = parceria['inicio'].strftime('%d/%m/%Y') if parceria and parceria['inicio'] else None
+            meses_vigencia = int(parceria['meses_vigencia']) if parceria and parceria['meses_vigencia'] is not None else None
+            valor_atualizado = float(parceria['total_previsto']) if parceria and parceria['total_previsto'] is not None else None
             
             # Buscar dotação orçamentária
             # Prioridade 1: Termo + Unidade + OSC
@@ -181,7 +190,10 @@ def api_orcamento_detalhado():
                     'projeto': projeto or '-',
                     'sei_celeb': sei_celeb or '-',
                     'tipo_contrato': tipo_contrato or '-',
+                    'data_inicio': data_inicio or '-',
                     'data_termino': data_termino or '-',
+                    'meses_vigencia': meses_vigencia if meses_vigencia is not None else '-',
+                    'valor_atualizado': valor_atualizado if valor_atualizado is not None else 0,
                     'total_programado': total_programado,
                     'total_projetado': total_projetado,
                     'total_global': total_global
@@ -194,7 +206,11 @@ def api_orcamento_detalhado():
                 edital_nome,
                 dotacao_formatada,
                 projeto_atividade,
-                SUM(valor_mes) as total_projetado
+                SUM(valor_mes) as total_projetado,
+                MIN(nome_mes) as data_inicio,
+                MAX(nome_mes) as data_termino,
+                EXTRACT(YEAR FROM AGE(MAX(nome_mes), MIN(nome_mes))) * 12 + 
+                EXTRACT(MONTH FROM AGE(MAX(nome_mes), MIN(nome_mes))) as meses_vigencia
             FROM gestao_financeira.orcamento_edital_nova
             WHERE EXTRACT(YEAR FROM nome_mes) = %s
             GROUP BY edital_nome, dotacao_formatada, projeto_atividade
@@ -208,6 +224,11 @@ def api_orcamento_detalhado():
             dotacao_formatada = edital['dotacao_formatada']
             projeto_atividade_edital = edital['projeto_atividade']
             total_projetado_edital = float(edital['total_projetado'] or 0)
+            data_inicio_edital = edital['data_inicio'].strftime('%d/%m/%Y') if edital.get('data_inicio') else None
+            data_termino_edital = edital['data_termino'].strftime('%d/%m/%Y') if edital.get('data_termino') else None
+            meses_vigencia_edital = int(edital['meses_vigencia']) if edital.get('meses_vigencia') is not None else None
+            # Para editais, valor_atualizado = soma de valor_mes (igual ao total_projetado)
+            valor_atualizado_edital = total_projetado_edital
             
             # Buscar Programática usando dotacao_formatada na tabela c_geral_dotacoes
             # A dotação contém o projeto-atividade, então buscamos pela dotação completa
@@ -237,7 +258,10 @@ def api_orcamento_detalhado():
                     'projeto': '-',  # ⚡ Editais não têm Projeto
                     'sei_celeb': '-',  # ⚡ Editais não têm SEI Celebração
                     'tipo_contrato': '-',  # ⚡ Editais não têm Tipo de Contrato
-                    'data_termino': '-',  # ⚡ Editais não têm Data de Término
+                    'data_inicio': data_inicio_edital or '-',  # ⚡ Data de Início do edital (MIN(nome_mes))
+                    'data_termino': data_termino_edital or '-',  # ⚡ Data de Término do edital (MAX(nome_mes))
+                    'meses_vigencia': meses_vigencia_edital if meses_vigencia_edital is not None else '-',  # ⚡ Meses de vigência
+                    'valor_atualizado': valor_atualizado_edital,  # ⚡ Valor Atualizado (soma de valor_mes)
                     'total_programado': 0,  # ⚡ Editais NUNCA têm valor programado
                     'total_projetado': total_projetado_edital,
                     'total_global': total_projetado_edital  # Global = Projetado (sem Programado)
@@ -583,6 +607,230 @@ def api_dotacoes():
         cur.close()
 
 
+@gestao_orcamentaria_bp.route('/api/dotacoes/csv-completo')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_dotacoes_csv_completo():
+    """API para exportar CSV completo de todas as dotações"""
+    from flask import Response
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        # Query para buscar TODAS as colunas da tabela
+        query = """
+            SELECT 
+                cod_idt_dota,
+                cod_org_emp,
+                txt_org_emp,
+                cod_unid_orcm_sof,
+                txt_unid_orcm,
+                cod_fcao_govr,
+                txt_fcao_govr,
+                cod_sub_fcao_govr,
+                txt_sub_fcao_govr,
+                cod_pgm_govr,
+                txt_pgm_govr,
+                cod_proj_atvd_sof,
+                txt_proj_atvd,
+                cod_cta_desp,
+                txt_cta_desp,
+                cod_font_rec,
+                txt_font_rec,
+                cod_ex_font_rec,
+                cod_dstn_rec,
+                cod_vinc_rec_pmsp,
+                cod_tip_cred_orcm,
+                ind_actc_redc,
+                ind_cntr_cota_pesl,
+                ind_cota_pesl,
+                ind_dota_lqdd_pago,
+                dt_cria_dota,
+                val_dota_autr,
+                val_tot_cred_splm,
+                val_tot_cred_espc,
+                val_tot_cred_ext,
+                val_tot_redc,
+                orcado_atual,
+                val_tot_cngl,
+                val_tot_bloq_decr,
+                orcado_disponivel,
+                val_sldo_resv_dota,
+                saldo_dotacao,
+                val_tot_eph,
+                val_tot_canc_eph,
+                saldo_empenhado,
+                saldo_reservado,
+                val_tot_lqdc_eph,
+                val_tot_pgto_dota,
+                ind_emnd_orcm,
+                dotacao_formatada,
+                ind_dvda_pubc,
+                ind_lanc_rcta,
+                criado_em
+            FROM gestao_financeira.back_dotacao
+            ORDER BY dotacao_formatada
+        """
+        
+        cur.execute(query)
+        dotacoes = cur.fetchall()
+        
+        # Converter valores monetários
+        def converter_valor(valor_str):
+            if not valor_str:
+                return 0
+            valor_limpo = str(valor_str).replace(',', '.')
+            try:
+                return float(valor_limpo)
+            except:
+                return 0
+        
+        def formatar_valor_csv(valor):
+            """Formatar valor para CSV no formato brasileiro"""
+            num = float(valor) if valor else 0
+            return f"{num:.2f}".replace('.', ',')
+        
+        def formatar_data(data):
+            """Formatar data para CSV"""
+            if not data:
+                return ""
+            try:
+                return data.strftime("%d/%m/%Y %H:%M") if hasattr(data, 'strftime') else str(data)
+            except:
+                return str(data)
+        
+        # Criar CSV com BOM UTF-8
+        csv_lines = []
+        csv_lines.append('\ufeff')  # BOM UTF-8
+        
+        # Cabeçalho com TODAS as colunas
+        cabecalho = [
+            'Código ID Dotação',
+            'Código Órgão Empenhador',
+            'Texto Órgão Empenhador',
+            'Código Unidade Orçamentária SOF',
+            'Texto Unidade Orçamentária',
+            'Código Função Governo',
+            'Texto Função Governo',
+            'Código Sub-Função Governo',
+            'Texto Sub-Função Governo',
+            'Código Programa Governo',
+            'Texto Programa Governo',
+            'Código Projeto-Atividade SOF',
+            'Texto Projeto-Atividade',
+            'Código Conta Despesa',
+            'Texto Conta Despesa',
+            'Código Fonte Recurso',
+            'Texto Fonte Recurso',
+            'Código Exercício Fonte Recurso',
+            'Código Destino Recurso',
+            'Código Vínculo Recurso PMSP',
+            'Código Tipo Crédito Orçamentário',
+            'Indicador ACTC REDC',
+            'Indicador Controle Cota Pessoal',
+            'Indicador Cota Pessoal',
+            'Indicador Dotação Liquidada Paga',
+            'Data Criação Dotação',
+            'Valor Dotação Autorizada',
+            'Valor Total Crédito Suplementar',
+            'Valor Total Crédito Especial',
+            'Valor Total Crédito Extraordinário',
+            'Valor Total Redução',
+            'Orçado Atual',
+            'Valor Total Congelado',
+            'Valor Total Bloqueio Decreto',
+            'Orçado Disponível',
+            'Valor Saldo Reserva Dotação',
+            'Saldo Dotação',
+            'Valor Total Empenhado',
+            'Valor Total Cancelado Empenho',
+            'Saldo Empenhado',
+            'Saldo Reservado',
+            'Valor Total Liquidado Empenho',
+            'Valor Total Pago Dotação',
+            'Indicador Emenda Orçamentária',
+            'Dotação Formatada',
+            'Indicador Dívida Pública',
+            'Indicador Lançamento RCTA',
+            'Criado Em'
+        ]
+        csv_lines.append(';'.join(cabecalho) + '\n')
+        
+        # Dados
+        for d in dotacoes:
+            linha = [
+                f'"{d["cod_idt_dota"] or ""}"',
+                f'"{d["cod_org_emp"] or ""}"',
+                f'"{d["txt_org_emp"] or ""}"',
+                f'"{d["cod_unid_orcm_sof"] or ""}"',
+                f'"{d["txt_unid_orcm"] or ""}"',
+                f'"{d["cod_fcao_govr"] or ""}"',
+                f'"{d["txt_fcao_govr"] or ""}"',
+                f'"{d["cod_sub_fcao_govr"] or ""}"',
+                f'"{d["txt_sub_fcao_govr"] or ""}"',
+                f'"{d["cod_pgm_govr"] or ""}"',
+                f'"{d["txt_pgm_govr"] or ""}"',
+                f'"{d["cod_proj_atvd_sof"] or ""}"',
+                f'"{d["txt_proj_atvd"] or ""}"',
+                f'"{d["cod_cta_desp"] or ""}"',
+                f'"{d["txt_cta_desp"] or ""}"',
+                f'"{d["cod_font_rec"] or ""}"',
+                f'"{d["txt_font_rec"] or ""}"',
+                f'"{d["cod_ex_font_rec"] or ""}"',
+                f'"{d["cod_dstn_rec"] or ""}"',
+                f'"{d["cod_vinc_rec_pmsp"] or ""}"',
+                f'"{d["cod_tip_cred_orcm"] or ""}"',
+                f'"{d["ind_actc_redc"] or ""}"',
+                f'"{d["ind_cntr_cota_pesl"] or ""}"',
+                f'"{d["ind_cota_pesl"] or ""}"',
+                f'"{d["ind_dota_lqdd_pago"] or ""}"',
+                f'"{formatar_data(d["dt_cria_dota"])}"',
+                formatar_valor_csv(converter_valor(d['val_dota_autr'])),
+                formatar_valor_csv(converter_valor(d['val_tot_cred_splm'])),
+                formatar_valor_csv(converter_valor(d['val_tot_cred_espc'])),
+                formatar_valor_csv(converter_valor(d['val_tot_cred_ext'])),
+                formatar_valor_csv(converter_valor(d['val_tot_redc'])),
+                formatar_valor_csv(converter_valor(d['orcado_atual'])),
+                formatar_valor_csv(converter_valor(d['val_tot_cngl'])),
+                formatar_valor_csv(converter_valor(d['val_tot_bloq_decr'])),
+                formatar_valor_csv(converter_valor(d['orcado_disponivel'])),
+                formatar_valor_csv(converter_valor(d['val_sldo_resv_dota'])),
+                formatar_valor_csv(converter_valor(d['saldo_dotacao'])),
+                formatar_valor_csv(converter_valor(d['val_tot_eph'])),
+                formatar_valor_csv(converter_valor(d['val_tot_canc_eph'])),
+                formatar_valor_csv(converter_valor(d['saldo_empenhado'])),
+                formatar_valor_csv(converter_valor(d['saldo_reservado'])),
+                formatar_valor_csv(converter_valor(d['val_tot_lqdc_eph'])),
+                formatar_valor_csv(converter_valor(d['val_tot_pgto_dota'])),
+                f'"{d["ind_emnd_orcm"] or ""}"',
+                f'"{d["dotacao_formatada"] or ""}"',
+                f'"{d["ind_dvda_pubc"] or ""}"',
+                f'"{d["ind_lanc_rcta"] or ""}"',
+                f'"{formatar_data(d["criado_em"])}"'
+            ]
+            csv_lines.append(';'.join(linha) + '\n')
+        
+        csv_content = ''.join(csv_lines)
+        
+        return Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=dotacoes_completo_{__import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                'Content-Type': 'text/csv; charset=utf-8-sig'
+            }
+        )
+    
+    except Exception as e:
+        print(f"Erro em api_dotacoes_csv_completo: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
 @gestao_orcamentaria_bp.route('/api/dotacoes/agrupado-projeto')
 @login_required
 @requires_access('gestao_orcamentaria')
@@ -721,6 +969,82 @@ def api_reservas():
         cur.close()
 
 
+@gestao_orcamentaria_bp.route('/api/reservas/csv-completo')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_reservas_csv_completo():
+    """API para exportar CSV completo de todas as reservas"""
+    from flask import Response
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        # Query para buscar TUDO sem filtros
+        query = """
+            SELECT 
+                cod_resv_dota_sof,
+                dt_efet_resv,
+                dotacao_formatada,
+                hist_resv,
+                vl_saldo_resv
+            FROM gestao_financeira.back_reservas
+            ORDER BY dt_efet_resv DESC, cod_resv_dota_sof DESC
+        """
+        
+        cur.execute(query)
+        reservas = cur.fetchall()
+        
+        # Converter valores monetários
+        def converter_valor(valor_str):
+            if not valor_str:
+                return 0
+            valor_limpo = str(valor_str).replace(',', '.')
+            try:
+                return float(valor_limpo)
+            except:
+                return 0
+        
+        def formatar_valor_csv(valor):
+            """Formatar valor para CSV no formato brasileiro"""
+            num = float(valor) if valor else 0
+            return f"{num:.2f}".replace('.', ',')
+        
+        # Criar CSV com BOM UTF-8
+        csv_lines = []
+        csv_lines.append('\ufeff')  # BOM UTF-8
+        csv_lines.append('Código da Reserva;Data da Reserva;Dotação Formatada;Histórico da Reserva;Saldo de Reservado\n')
+        
+        for r in reservas:
+            linha = [
+                f'"{r["cod_resv_dota_sof"] or ""}"',
+                f'"{r["dt_efet_resv"].strftime("%d/%m/%Y") if r["dt_efet_resv"] else ""}"',
+                f'"{r["dotacao_formatada"] or ""}"',
+                f'"{r["hist_resv"] or ""}"',
+                formatar_valor_csv(converter_valor(r['vl_saldo_resv']))
+            ]
+            csv_lines.append(';'.join(linha) + '\n')
+        
+        csv_content = ''.join(csv_lines)
+        
+        return Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=reservas_completo_{__import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                'Content-Type': 'text/csv; charset=utf-8-sig'
+            }
+        )
+    
+    except Exception as e:
+        print(f"Erro em api_reservas_csv_completo: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
 @gestao_orcamentaria_bp.route('/relatorio-empenhos')
 @requires_access('gestao_orcamentaria')
 def relatorio_empenhos():
@@ -808,6 +1132,94 @@ def api_empenhos():
     
     except Exception as e:
         print(f"Erro em api_empenhos: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@gestao_orcamentaria_bp.route('/api/empenhos/csv-completo')
+@requires_access('gestao_orcamentaria')
+def api_empenhos_csv_completo():
+    """API para exportar CSV completo de todos os empenhos"""
+    from flask import Response
+    try:
+        cur = get_cursor()
+        
+        # Query para buscar TUDO sem filtros
+        query = """
+            SELECT 
+                dt_eph,
+                cod_eph,
+                cod_nro_pcss_sof,
+                txt_obs_eph,
+                val_tot_eph,
+                val_tot_canc_eph,
+                val_tot_lqdc_eph,
+                val_tot_pago_eph,
+                cod_item_desp_sof,
+                nom_rzao_soci_sof,
+                cod_cpf_cnpj_sof,
+                txt_dotacao_fmt
+            FROM gestao_financeira.back_empenhos
+            ORDER BY dt_eph DESC, cod_eph DESC
+        """
+        
+        cur.execute(query)
+        empenhos = cur.fetchall()
+        
+        # Converter valores monetários
+        def converter_valor(valor_str):
+            if not valor_str:
+                return 0
+            try:
+                valor_limpo = str(valor_str).replace(',', '.')
+                return float(valor_limpo)
+            except:
+                return 0
+        
+        def formatar_valor_csv(valor):
+            """Formatar valor para CSV no formato brasileiro"""
+            num = float(valor) if valor else 0
+            return f"{num:.2f}".replace('.', ',')
+        
+        # Criar CSV com BOM UTF-8
+        csv_lines = []
+        csv_lines.append('\ufeff')  # BOM UTF-8
+        csv_lines.append('Data do Empenho;Código;SEI de Celebração;Texto do Empenho;Valor Total;Valor Cancelado;Valor Liquidado;Valor Pago;Cód. Despesa;Razão Social;CNPJ;Dotação Formatada\n')
+        
+        for e in empenhos:
+            linha = [
+                f'"{e["dt_eph"].strftime("%d/%m/%Y") if e["dt_eph"] else ""}"',
+                f'"{e["cod_eph"] or ""}"',
+                f'"{e["cod_nro_pcss_sof"] or ""}"',
+                f'"{(e["txt_obs_eph"] or "").replace(chr(34), chr(34)+chr(34))}"',  # Escapar aspas duplas
+                formatar_valor_csv(converter_valor(e['val_tot_eph'])),
+                formatar_valor_csv(converter_valor(e['val_tot_canc_eph'])),
+                formatar_valor_csv(converter_valor(e['val_tot_lqdc_eph'])),
+                formatar_valor_csv(converter_valor(e['val_tot_pago_eph'])),
+                f'"{e["cod_item_desp_sof"] or ""}"',
+                f'"{(e["nom_rzao_soci_sof"] or "").replace(chr(34), chr(34)+chr(34))}"',
+                f'"{e["cod_cpf_cnpj_sof"] or ""}"',
+                f'"{e["txt_dotacao_fmt"] or ""}"'
+            ]
+            csv_lines.append(';'.join(linha) + '\n')
+        
+        csv_content = ''.join(csv_lines)
+        
+        return Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=empenhos_completo_{__import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                'Content-Type': 'text/csv; charset=utf-8-sig'
+            }
+        )
+    
+    except Exception as e:
+        print(f"Erro em api_empenhos_csv_completo: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500

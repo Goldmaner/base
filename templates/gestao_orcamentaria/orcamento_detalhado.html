@@ -242,6 +242,31 @@
                                 </datalist>
                             </div>
                             <div class="col-md-3">
+                                <label class="form-label">Data de Início</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <select class="form-select form-select-sm" id="filtro_mes_inicio">
+                                            <option value="">Mês</option>
+                                            <option value="01">Janeiro</option>
+                                            <option value="02">Fevereiro</option>
+                                            <option value="03">Março</option>
+                                            <option value="04">Abril</option>
+                                            <option value="05">Maio</option>
+                                            <option value="06">Junho</option>
+                                            <option value="07">Julho</option>
+                                            <option value="08">Agosto</option>
+                                            <option value="09">Setembro</option>
+                                            <option value="10">Outubro</option>
+                                            <option value="11">Novembro</option>
+                                            <option value="12">Dezembro</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_ano_inicio" placeholder="Ano" min="2000" max="2099">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label">Data de Término</label>
                                 <div class="row g-2">
                                     <div class="col-6">
@@ -365,7 +390,10 @@
     <div class="alert alert-light border mb-3">
         <strong><i class="bi bi-eye me-2"></i>Colunas Opcionais:</strong>
         <label class="ms-3"><input type="checkbox" id="chk_tipo_contrato" onchange="atualizarColunasVisiveis()"> Tipo de Contrato</label>
+        <label class="ms-3"><input type="checkbox" id="chk_data_inicio" onchange="atualizarColunasVisiveis()"> Data de Início</label>
         <label class="ms-3"><input type="checkbox" id="chk_data_termino" onchange="atualizarColunasVisiveis()"> Data de Término</label>
+        <label class="ms-3"><input type="checkbox" id="chk_meses_vigencia" onchange="atualizarColunasVisiveis()"> Meses de Vigência</label>
+        <label class="ms-3"><input type="checkbox" id="chk_valor_atualizado" onchange="atualizarColunasVisiveis()"> Valor Atualizado</label>
         <label class="ms-3"><input type="checkbox" id="chk_cnpj" onchange="atualizarColunasVisiveis()"> CNPJ</label>
         <label class="ms-3"><input type="checkbox" id="chk_sei_pc" onchange="atualizarColunasVisiveis()"> SEI de Pgto. / PC</label>
         <label class="ms-3"><input type="checkbox" id="chk_osc" onchange="atualizarColunasVisiveis()"> OSC</label>
@@ -405,7 +433,10 @@
                     <th>Programática</th>
                     <th>Termo ou Edital</th>
                     <th class="col-tipo-contrato" style="display: none;">Tipo de Contrato</th>
+                    <th class="col-data-inicio" style="display: none;">Data de Início</th>
                     <th class="col-data-termino" style="display: none;">Data de Término</th>
+                    <th class="col-meses-vigencia" style="display: none;">Meses de Vigência</th>
+                    <th class="col-valor-atualizado" style="display: none;">Valor Atualizado</th>
                     <th class="col-cnpj" style="display: none;">CNPJ</th>
                     <th class="col-sei-pc" style="display: none;">SEI de Pgto. / PC</th>
                     <th class="col-osc" style="display: none;">OSC</th>
@@ -432,7 +463,10 @@
                 <tr>
                     <th colspan="4" class="text-end">TOTAL GERAL:</th>
                     <th class="col-tipo-contrato" style="display: none;"></th>
+                    <th class="col-data-inicio" style="display: none;"></th>
                     <th class="col-data-termino" style="display: none;"></th>
+                    <th class="col-meses-vigencia" style="display: none;"></th>
+                    <th class="col-valor-atualizado valor-moeda" style="display: none;" id="total_atualizado_footer">R$ 0,00</th>
                     <th class="col-cnpj" style="display: none;"></th>
                     <th class="col-sei-pc" style="display: none;"></th>
                     <th class="col-osc" style="display: none;"></th>
@@ -840,7 +874,10 @@
     // Atualizar visibilidade das colunas opcionais
     function atualizarColunasVisiveis() {
         const mostrarTipoContrato = $('#chk_tipo_contrato').is(':checked');
+        const mostrarDataInicio = $('#chk_data_inicio').is(':checked');
         const mostrarDataTermino = $('#chk_data_termino').is(':checked');
+        const mostrarMesesVigencia = $('#chk_meses_vigencia').is(':checked');
+        const mostrarValorAtualizado = $('#chk_valor_atualizado').is(':checked');
         const mostrarCnpj = $('#chk_cnpj').is(':checked');
         const mostrarSeiPc = $('#chk_sei_pc').is(':checked');
         const mostrarOsc = $('#chk_osc').is(':checked');
@@ -848,7 +885,10 @@
         const mostrarSeiCeleb = $('#chk_sei_celeb').is(':checked');
         
         $('.col-tipo-contrato').toggle(mostrarTipoContrato);
+        $('.col-data-inicio').toggle(mostrarDataInicio);
         $('.col-data-termino').toggle(mostrarDataTermino);
+        $('.col-meses-vigencia').toggle(mostrarMesesVigencia);
+        $('.col-valor-atualizado').toggle(mostrarValorAtualizado);
         $('.col-cnpj').toggle(mostrarCnpj);
         $('.col-sei-pc').toggle(mostrarSeiPc);
         $('.col-osc').toggle(mostrarOsc);
@@ -940,7 +980,10 @@
             
             // Colunas opcionais
             tr.append($('<td>').addClass('col-tipo-contrato').css('display', $('#chk_tipo_contrato').is(':checked') ? '' : 'none').text(item.tipo_contrato || '-'));
+            tr.append($('<td>').addClass('col-data-inicio').css('display', $('#chk_data_inicio').is(':checked') ? '' : 'none').text(item.data_inicio || '-'));
             tr.append($('<td>').addClass('col-data-termino').css('display', $('#chk_data_termino').is(':checked') ? '' : 'none').text(item.data_termino || '-'));
+            tr.append($('<td>').addClass('col-meses-vigencia text-center').css('display', $('#chk_meses_vigencia').is(':checked') ? '' : 'none').text(item.meses_vigencia !== undefined && item.meses_vigencia !== '-' ? item.meses_vigencia : '-'));
+            tr.append($('<td>').addClass('col-valor-atualizado valor-moeda').css('display', $('#chk_valor_atualizado').is(':checked') ? '' : 'none').text(formatarMoeda(item.valor_atualizado || 0)));
             tr.append($('<td>').addClass('col-cnpj').css('display', $('#chk_cnpj').is(':checked') ? '' : 'none').text(item.cnpj || '-'));
             tr.append($('<td>').addClass('col-sei-pc').css('display', $('#chk_sei_pc').is(':checked') ? '' : 'none').text(item.sei_pc || '-'));
             tr.append($('<td>').addClass('col-osc').css('display', $('#chk_osc').is(':checked') ? '' : 'none').text(item.osc || '-'));
@@ -1077,10 +1120,14 @@
         const totalProgramado = dadosFiltrados.reduce((sum, item) => sum + (item.total_programado || 0), 0);
         const totalProjetado = dadosFiltrados.reduce((sum, item) => sum + (item.total_projetado || 0), 0);
         const totalGlobal = totalProgramado + totalProjetado;
+        const totalAtualizado = dadosFiltrados.reduce((sum, item) => sum + (item.valor_atualizado || 0), 0);
         
         const footerRow = $('#tabelaOrcamento tfoot tr');
         footerRow.find('.col-mes-programado').remove();
         footerRow.find('.col-mes-projetado').remove();
+        
+        // Atualizar total de Valor Atualizado no footer
+        $('#total_atualizado_footer').text(formatarMoeda(totalAtualizado));
         
         // Se cronograma PROGRAMADO expandido, adicionar totais mensais
         if (cronogramaProgramadoExpandido) {
@@ -1210,6 +1257,8 @@
             projeto_atividade: $('#filtro_projeto_atividade').val().toLowerCase(),
             programatica: $('#filtro_programatica').val().toLowerCase(),
             tipo_contrato: $('#filtro_tipo_contrato').val().toLowerCase(),
+            mes_inicio: $('#filtro_mes_inicio').val(),
+            ano_inicio: $('#filtro_ano_inicio').val(),
             mes_termino: $('#filtro_mes_termino').val(),
             ano_termino: $('#filtro_ano_termino').val(),
             cnpj: $('#filtro_cnpj').val().toLowerCase(),
@@ -1243,6 +1292,21 @@
             if (filtros.projeto_atividade && !item.projeto_atividade.toLowerCase().includes(filtros.projeto_atividade)) return false;
             if (filtros.programatica && !item.programatica.toLowerCase().includes(filtros.programatica)) return false;
             if (filtros.tipo_contrato && !item.tipo_contrato.toLowerCase().includes(filtros.tipo_contrato)) return false;
+            
+            // Filtro de data de início (suporta mês/ano separados)
+            if (filtros.mes_inicio || filtros.ano_inicio) {
+                if (item.data_inicio && item.data_inicio !== '-') {
+                    // Formato vindo do backend: dd/mm/YYYY
+                    const partes = item.data_inicio.split('/');
+                    const ano = partes[2]; // Ano está na posição 2
+                    const mes = partes[1]; // Mês está na posição 1
+                    
+                    if (filtros.ano_inicio && ano !== String(filtros.ano_inicio).trim()) return false;
+                    if (filtros.mes_inicio && mes !== filtros.mes_inicio) return false;
+                } else {
+                    return false; // Se filtro está ativo mas item não tem data
+                }
+            }
             
             // Filtro de data de término (suporta mês/ano separados)
             if (filtros.mes_termino || filtros.ano_termino) {
@@ -1295,6 +1359,9 @@
         // Limpar autocomplete (inputs com datalist)
         $('#filtro_tipo_contrato, #filtro_osc, #filtro_projeto').val('');
         
+        // Limpar data de início
+        $('#filtro_mes_inicio, #filtro_ano_inicio').val('');
+        
         // Limpar data de término
         $('#filtro_mes_termino, #filtro_ano_termino').val('');
         
@@ -1308,7 +1375,10 @@
         const apenasAnoEColunas = {
             ano_referencia: filtrosSalvos.ano_referencia,
             chk_tipo_contrato: filtrosSalvos.chk_tipo_contrato,
+            chk_data_inicio: filtrosSalvos.chk_data_inicio,
             chk_data_termino: filtrosSalvos.chk_data_termino,
+            chk_meses_vigencia: filtrosSalvos.chk_meses_vigencia,
+            chk_valor_atualizado: filtrosSalvos.chk_valor_atualizado,
             chk_cnpj: filtrosSalvos.chk_cnpj,
             chk_sei_pc: filtrosSalvos.chk_sei_pc,
             chk_osc: filtrosSalvos.chk_osc,
@@ -1351,7 +1421,10 @@
         
         // Adicionar colunas opcionais ao cabeçalho se estiverem visíveis
         if ($('#chk_tipo_contrato').is(':checked')) cabecalho.push('Tipo de Contrato');
+        if ($('#chk_data_inicio').is(':checked')) cabecalho.push('Data de Início');
         if ($('#chk_data_termino').is(':checked')) cabecalho.push('Data de Término');
+        if ($('#chk_meses_vigencia').is(':checked')) cabecalho.push('Meses de Vigência');
+        if ($('#chk_valor_atualizado').is(':checked')) cabecalho.push('Valor Atualizado');
         if ($('#chk_cnpj').is(':checked')) cabecalho.push('CNPJ');
         if ($('#chk_sei_pc').is(':checked')) cabecalho.push('SEI de Pgto. / PC');
         if ($('#chk_osc').is(':checked')) cabecalho.push('OSC');
@@ -1397,7 +1470,10 @@
             
             // Adicionar colunas opcionais se estiverem visíveis
             if ($('#chk_tipo_contrato').is(':checked')) linha.push(item.tipo_contrato || '');
+            if ($('#chk_data_inicio').is(':checked')) linha.push(item.data_inicio || '');
             if ($('#chk_data_termino').is(':checked')) linha.push(item.data_termino || '');
+            if ($('#chk_meses_vigencia').is(':checked')) linha.push(item.meses_vigencia !== undefined && item.meses_vigencia !== '-' ? item.meses_vigencia : '');
+            if ($('#chk_valor_atualizado').is(':checked')) linha.push(formatarMoedaExcel(item.valor_atualizado || 0));
             if ($('#chk_cnpj').is(':checked')) linha.push(item.cnpj || '');
             if ($('#chk_sei_pc').is(':checked')) linha.push(item.sei_pc || '');
             if ($('#chk_osc').is(':checked')) linha.push(item.osc || '');
@@ -1497,6 +1573,8 @@
             projeto_atividade: $('#filtro_projeto_atividade').val(),
             programatica: $('#filtro_programatica').val(),
             tipo_contrato: $('#filtro_tipo_contrato').val(),
+            mes_inicio: $('#filtro_mes_inicio').val(),
+            ano_inicio: $('#filtro_ano_inicio').val(),
             mes_termino: $('#filtro_mes_termino').val(),
             ano_termino: $('#filtro_ano_termino').val(),
             cnpj: $('#filtro_cnpj').val(),
@@ -1515,7 +1593,10 @@
             
             // Checkboxes de colunas
             chk_tipo_contrato: $('#chk_tipo_contrato').is(':checked'),
+            chk_data_inicio: $('#chk_data_inicio').is(':checked'),
             chk_data_termino: $('#chk_data_termino').is(':checked'),
+            chk_meses_vigencia: $('#chk_meses_vigencia').is(':checked'),
+            chk_valor_atualizado: $('#chk_valor_atualizado').is(':checked'),
             chk_cnpj: $('#chk_cnpj').is(':checked'),
             chk_sei_pc: $('#chk_sei_pc').is(':checked'),
             chk_osc: $('#chk_osc').is(':checked'),
@@ -1554,6 +1635,8 @@
             $('#filtro_projeto_atividade').val(filtros.projeto_atividade || '');
             $('#filtro_programatica').val(filtros.programatica || '');
             $('#filtro_tipo_contrato').val(filtros.tipo_contrato || '');
+            $('#filtro_mes_inicio').val(filtros.mes_inicio || '');
+            $('#filtro_ano_inicio').val(filtros.ano_inicio || '');
             $('#filtro_mes_termino').val(filtros.mes_termino || '');
             $('#filtro_ano_termino').val(filtros.ano_termino || '');
             $('#filtro_cnpj').val(filtros.cnpj || '');
@@ -1572,7 +1655,10 @@
             
             // Restaurar checkboxes de colunas
             $('#chk_tipo_contrato').prop('checked', filtros.chk_tipo_contrato || false);
+            $('#chk_data_inicio').prop('checked', filtros.chk_data_inicio || false);
             $('#chk_data_termino').prop('checked', filtros.chk_data_termino || false);
+            $('#chk_meses_vigencia').prop('checked', filtros.chk_meses_vigencia || false);
+            $('#chk_valor_atualizado').prop('checked', filtros.chk_valor_atualizado || false);
             $('#chk_cnpj').prop('checked', filtros.chk_cnpj || false);
             $('#chk_sei_pc').prop('checked', filtros.chk_sei_pc || false);
             $('#chk_osc').prop('checked', filtros.chk_osc || false);
@@ -1585,7 +1671,10 @@
             
             // Aplicar visibilidade das colunas
             $('.col-tipo-contrato').toggle(filtros.chk_tipo_contrato || false);
+            $('.col-data-inicio').toggle(filtros.chk_data_inicio || false);
             $('.col-data-termino').toggle(filtros.chk_data_termino || false);
+            $('.col-meses-vigencia').toggle(filtros.chk_meses_vigencia || false);
+            $('.col-valor-atualizado').toggle(filtros.chk_valor_atualizado || false);
             $('.col-cnpj').toggle(filtros.chk_cnpj || false);
             $('.col-sei-pc').toggle(filtros.chk_sei_pc || false);
             $('.col-osc').toggle(filtros.chk_osc || false);

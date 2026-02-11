@@ -6,7 +6,7 @@ Este script cria um backup completo do banco de dados usando pg_dump.
 As credenciais são lidas automaticamente do arquivo .env
 
 Uso:
-    python scripts/fazer_backup.py
+    python backups/fazer_backup.py
 
 Requisitos:
     - PostgreSQL instalado (pg_dump disponível no PATH)

@@ -454,48 +454,20 @@
         
         <!-- Formulário de Novo Contato -->
         <div class="card mb-3">
-          <div class="card-header bg-primary text-white">
-            <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Adicionar Novo Contato</h6>
+          <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Adicionar Novos Contatos</h6>
+            <button type="button" class="btn btn-sm btn-light" onclick="adicionarBlocoContato()">
+              <i class="bi bi-person-plus"></i> Adicionar Contato
+            </button>
           </div>
           <div class="card-body">
             <form id="formNovoContato">
-              <!-- Campos Únicos -->
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label for="novo_contato_nome" class="form-label">
-                    Nome *
-                    <i class="bi bi-info-circle text-primary" 
-                       data-bs-toggle="tooltip" 
-                       data-bs-placement="right" 
-                       title="Para contatos institucionais, pode usar apenas 'Institucional'"
-                       style="cursor: help;"></i>
-                  </label>
-                  <input type="text" class="form-control" id="novo_contato_nome" required>
-                </div>
-                <div class="col-md-6">
-                  <label for="novo_contato_posicao" class="form-label">Posição</label>
-                  <input type="text" class="form-control" id="novo_contato_posicao" placeholder="Ex: Diretor, Coordenador">
-                </div>
-              </div>
-              
               <!-- Blocos de Contato Dinâmicos -->
-              <div class="border rounded p-3 mb-3 bg-light">
-                <h6 class="mb-3">Tipos de Contato</h6>
-                <div id="contatosContainer"></div>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarBlocoContato()">
-                  <i class="bi bi-plus-circle"></i> Adicionar Tipo de Contato
-                </button>
-              </div>
+              <div id="contatosContainer"></div>
               
-              <!-- Observação -->
-              <div class="mb-3">
-                <label for="novo_observacao" class="form-label">Observação</label>
-                <textarea class="form-control" id="novo_observacao" rows="3" placeholder="Informações adicionais (opcional)"></textarea>
-              </div>
-              
-              <div class="text-end">
+              <div class="text-end mt-3">
                 <button type="submit" class="btn btn-success">
-                  <i class="bi bi-check-circle"></i> Salvar Contato(s)
+                  <i class="bi bi-check-circle"></i> Salvar Todos os Contatos
                 </button>
               </div>
             </form>
@@ -1209,18 +1181,26 @@
     const id = contatoIdCounter;
     
     const html = `
-      <div class="card mb-2" id="blocoContato_${id}">
+      <div class="card mb-3 border-primary" id="blocoContato_${id}">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-person"></i> Contato #${id}</strong>
+          <button type="button" class="btn btn-sm btn-danger" onclick="removerBlocoContato(${id})" title="Remover">
+            <i class="bi bi-trash"></i> Remover
+          </button>
+        </div>
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <strong>Contato #${id}</strong>
-            <button type="button" class="btn btn-sm btn-danger" onclick="removerBlocoContato(${id})" title="Remover">
-              <i class="bi bi-trash"></i>
-            </button>
-          </div>
-          <div class="row g-2">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nome *</label>
+              <input type="text" class="form-control" id="nome_${id}" required placeholder="Nome completo">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Posição</label>
+              <input type="text" class="form-control" id="posicao_${id}" placeholder="Ex: Presidente, Coordenador, etc.">
+            </div>
             <div class="col-md-4">
-              <label class="form-label">Tipo *</label>
-              <select class="form-select form-select-sm" id="tipo_${id}" required onchange="ajustarMascaraBloco(${id})">
+              <label class="form-label">Tipo de Contato *</label>
+              <select class="form-select" id="tipo_${id}" required onchange="ajustarMascaraBloco(${id})">
                 <option value="">-- Selecione --</option>
                 <option value="E-mail Institucional">E-mail Institucional</option>
                 <option value="E-mail Pessoal">E-mail Pessoal</option>
@@ -1229,16 +1209,20 @@
               </select>
             </div>
             <div class="col-md-5">
-              <label class="form-label">Informação *</label>
-              <input type="text" class="form-control form-control-sm" id="info_${id}" required>
+              <label class="form-label">Informação de Contato *</label>
+              <input type="text" class="form-control" id="info_${id}" required>
               <small class="text-muted" id="hint_${id}">Selecione o tipo</small>
             </div>
             <div class="col-md-3">
               <label class="form-label">Status *</label>
-              <select class="form-select form-select-sm" id="status_${id}" required>
+              <select class="form-select" id="status_${id}" required>
                 <option value="Ativo" selected>Ativo</option>
                 <option value="Inativo">Inativo</option>
               </select>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Observação</label>
+              <textarea class="form-control" id="obs_${id}" rows="2" placeholder="Informações adicionais sobre este contato"></textarea>
             </div>
           </div>
         </div>
@@ -1415,25 +1399,32 @@
     
     blocos.forEach(bloco => {
       const id = bloco.id.replace('blocoContato_', '');
+      const nome = document.getElementById('nome_' + id)?.value.trim();
+      const posicao = document.getElementById('posicao_' + id)?.value.trim();
       const tipo = document.getElementById('tipo_' + id)?.value;
       const info = document.getElementById('info_' + id)?.value.trim();
       const status = document.getElementById('status_' + id)?.value;
+      const obs = document.getElementById('obs_' + id)?.value.trim();
       
-      if (tipo && info) {
-        contatos.push({ tipo, info, status });
+      if (nome && tipo && info) {
+        contatos.push({ 
+          nome: nome,
+          posicao: posicao,
+          tipo: tipo, 
+          info: info, 
+          status: status,
+          observacao: obs
+        });
       }
     });
     
     if (contatos.length === 0) {
-      alert('⚠ Adicione pelo menos um tipo de contato!');
+      alert('⚠ Adicione pelo menos um contato válido!');
       return;
     }
     
     const dados = {
       osc: oscAtualContatos,
-      contato_nome: document.getElementById('novo_contato_nome').value.trim(),
-      contato_posicao: document.getElementById('novo_contato_posicao').value.trim(),
-      observacao: document.getElementById('novo_observacao').value.trim(),
       contatos: contatos
     };
     

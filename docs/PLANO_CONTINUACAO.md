@@ -40,6 +40,7 @@
 - Adicionar novos relatórios orçamentários e financeiros.✅
 - Criar pasta dedicada para certidões e atualizações financeiras.✅
 - Aprimorar o uso das pastas dedicadas a certidões, compatibilizando todas as OSCs.
+- Automatizar texto da primeira parcela.
 
 ## 8. Celebração e DGP
 - Desenvolver módulo para celebração de parcerias, com workflow próprio.

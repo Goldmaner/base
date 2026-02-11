@@ -35,6 +35,7 @@ def listar():
     filtro_status = request.args.getlist('filtro_status')  # Multi-seleção
     filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')  # Multi-seleção
     filtro_edital = request.args.getlist('filtro_edital')  # Multi-seleção
+    filtro_endereco = request.args.getlist('filtro_endereco')  # Multi-seleção
     busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
     busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
     data_assinatura_inicio = request.args.get('data_assinatura_inicio', '').strip()
@@ -118,7 +119,16 @@ def listar():
                AND (ps.apostilamento = '-' OR ps.apostilamento IS NULL)
                AND ps.termo_tipo_sei IS NULL
              ORDER BY ps.id ASC
-             LIMIT 1) as data_assinatura_termo
+             LIMIT 1) as data_assinatura_termo,
+            (SELECT STRING_AGG(
+                COALESCE(pe.parceria_logradouro, '') || 
+                CASE WHEN pe.parceria_numero IS NOT NULL 
+                     THEN ', ' || pe.parceria_numero::text 
+                     ELSE '' 
+                END, ' | ')
+             FROM public.parcerias_enderecos pe
+             WHERE pe.numero_termo = p.numero_termo
+             LIMIT 1) as endereco_completo
         FROM Parcerias p
         WHERE 1=1
     """
@@ -209,6 +219,16 @@ def listar():
         placeholders = ','.join(['%s'] * len(filtro_edital))
         query += f" AND p.edital_nome IN ({placeholders})"
         params.extend(filtro_edital)
+    
+    # Filtro por endereço
+    if filtro_endereco:
+        condicoes_endereco = []
+        if 'preenchido' in filtro_endereco:
+            condicoes_endereco.append("EXISTS (SELECT 1 FROM public.parcerias_enderecos pe WHERE pe.numero_termo = p.numero_termo AND (pe.parceria_logradouro IS NOT NULL AND pe.parceria_logradouro != ''))")
+        if 'nao_preenchido' in filtro_endereco:
+            condicoes_endereco.append("NOT EXISTS (SELECT 1 FROM public.parcerias_enderecos pe WHERE pe.numero_termo = p.numero_termo AND (pe.parceria_logradouro IS NOT NULL AND pe.parceria_logradouro != ''))")
+        if condicoes_endereco:
+            query += " AND (" + " OR ".join(condicoes_endereco) + ")"
     
     # Filtro por data de assinatura
     if data_assinatura_inicio:
@@ -1501,7 +1521,16 @@ def exportar_csv():
                  FROM parcerias_pg pg 
                  WHERE pg.numero_termo = p.numero_termo 
                  ORDER BY pg.data_de_criacao DESC 
-                 LIMIT 1) as solicitacao
+                 LIMIT 1) as solicitacao,
+                (SELECT STRING_AGG(
+                    COALESCE(pe.parceria_logradouro, '') || 
+                    CASE WHEN pe.parceria_numero IS NOT NULL 
+                         THEN ', ' || pe.parceria_numero::text 
+                         ELSE '' 
+                    END, ' | ')
+                 FROM public.parcerias_enderecos pe
+                 WHERE pe.numero_termo = p.numero_termo
+                 LIMIT 1) as endereco_completo
             FROM Parcerias p
             WHERE 1=1
         """
@@ -1662,8 +1691,11 @@ def exportar_csv():
         output.write('\ufeff')  # BOM UTF-8
         writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
         
+        # Verificar se coluna de endereço foi solicitada
+        incluir_endereco = request.args.get('incluir_endereco', 'false') == 'true'
+        
         # Cabeçalho do CSV
-        writer.writerow([
+        cabecalho = [
             'Número do Termo',
             'Tipo de Termo',
             'OSC',
@@ -1677,17 +1709,25 @@ def exportar_csv():
             'Meses',
             'Total Previsto',
             'SEI Celebração',
-            'SEI P&C',
+            'SEI P&C'
+        ]
+        
+        if incluir_endereco:
+            cabecalho.append('Endereço')
+        
+        cabecalho.extend([
             'SEI Plano',
             'SEI Orçamento',
             'Transição'
         ])
         
+        writer.writerow(cabecalho)
+        
         # Escrever dados
         for parceria in parcerias:
             total_previsto = float(parceria['total_previsto'] or 0)
             
-            writer.writerow([
+            linha = [
                 parceria['numero_termo'],
                 parceria['tipo_termo'] or '-',
                 parceria['osc'] or '-',
@@ -1701,11 +1741,20 @@ def exportar_csv():
                 parceria['meses'] if parceria['meses'] is not None else '-',
                 f"R$ {total_previsto:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
                 parceria['sei_celeb'] or '-',
-                parceria['sei_pc'] or '-',
+                parceria['sei_pc'] or '-'
+            ]
+            
+            if incluir_endereco:
+                endereco = parceria.get('endereco_completo') or 'Não preenchido'
+                linha.append(endereco)
+            
+            linha.extend([
                 parceria['sei_plano'] or '-',
                 parceria['sei_orcamento'] or '-',
                 'Sim' if parceria['transicao'] else 'Não'
             ])
+            
+            writer.writerow(linha)
         
         # Preparar resposta
         output.seek(0)
@@ -2366,23 +2415,20 @@ def listar_contatos_osc(osc):
 def criar_contato():
     """
     API para criar novo(s) contato(s) de OSC
-    Aceita múltiplos tipos de contato para a mesma pessoa
+    Aceita array de contatos completos, cada um com: nome, posicao, tipo, info, status, observacao
     """
     try:
         data = request.get_json()
         
         osc = data.get('osc', '').strip()
-        contato_nome = data.get('contato_nome', '').strip()
-        contato_posicao = data.get('contato_posicao', '').strip()
-        observacao = data.get('observacao', '').strip()
-        contatos = data.get('contatos', [])  # Array de {tipo, info, status}
+        contatos = data.get('contatos', [])  # Array de contatos completos
         
         # Validações
-        if not osc or not contato_nome:
-            return jsonify({'error': 'Campos obrigatórios: OSC e Nome'}), 400
+        if not osc:
+            return jsonify({'error': 'Campo obrigatório: OSC'}), 400
         
         if not contatos or len(contatos) == 0:
-            return jsonify({'error': 'Adicione pelo menos um tipo de contato'}), 400
+            return jsonify({'error': 'Adicione pelo menos um contato'}), 400
         
         # Pegar d_usuario da sessão
         responsavel = session.get('d_usuario', 'sistema')
@@ -2397,13 +2443,16 @@ def criar_contato():
             RETURNING id
         """
         
-        # Criar um registro para cada tipo de contato
+        # Criar um registro para cada contato
         for contato in contatos:
+            contato_nome = contato.get('nome', '').strip()
+            contato_posicao = contato.get('posicao', '').strip()
             contato_tipo = contato.get('tipo', '').strip()
             contato_info = contato.get('info', '').strip()
             status = contato.get('status', 'Ativo').strip()
+            observacao = contato.get('observacao', '').strip()
             
-            if not contato_tipo or not contato_info:
+            if not contato_nome or not contato_tipo or not contato_info:
                 continue  # Pular contatos incompletos
             
             cur.execute(query, (osc, contato_nome, contato_posicao, contato_tipo, contato_info, status, observacao, responsavel))
@@ -2417,10 +2466,10 @@ def criar_contato():
         get_db().commit()
         cur.close()
         
-        print(f"[SUCESSO] {len(ids_criados)} contato(s) criado(s) para OSC '{osc}': {contato_nome}")
+        print(f"[SUCESSO] {len(ids_criados)} contato(s) criado(s) para OSC '{osc}'")
         
         return jsonify({
-            'message': f'✅ {len(ids_criados)} contato(s) de {contato_nome} adicionado(s) com sucesso!',
+            'message': f'✅ {len(ids_criados)} contato(s) adicionado(s) com sucesso!',
             'ids': ids_criados
         }), 200
         
