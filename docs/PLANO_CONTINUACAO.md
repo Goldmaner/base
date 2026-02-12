@@ -25,6 +25,7 @@
 - Melhorar o dicionário de OSCs, incluindo validação, busca avançada e atualização facilitada.
 - Construção de índice de contatos para OSCs e termos, com table e queries.✅
 - Avaliar possibilidade de integração com o Planner (ou criação de sistema similar) para Alterações.
+- Incluir na mudança de Prorrogação e Valor, alterações do cronograma de desembolso já na ferramenta.
 
 ## 5. Pesquisa de Parcerias
 - Aprimorar a formatação dos resultados e relatórios, tornando-os mais claros e exportáveis.
@@ -71,7 +72,7 @@
 
 ## 14. Preenchimento de dados e sistema
 - Preenchimento de dados de diversas tables.
-- Melhorar senhas, dando a opção do usuário de esquecer senha e refazer.
+- Melhorar senhas, dando a opção do usuário de esquecer senha e refazer.✅
 - Testes automatizados e revisão do código.
 
 ## 15. Listas Suspensas

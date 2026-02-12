@@ -4,6 +4,7 @@ Funções utilitárias e decoradores
 
 from flask import session, redirect, url_for
 from functools import wraps
+from db import get_cursor, get_db
 
 
 def format_sei(sei_number):
@@ -31,10 +32,28 @@ def login_required(f):
     """
     Decorador para proteger rotas que requerem autenticação.
     Redireciona para a página de login se o usuário não estiver autenticado.
+    Atualiza automaticamente a coluna ultima_atividade do usuário.
     """
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("auth.login"))
+        
+        # Atualizar ultima_atividade do usuário
+        try:
+            user_id = session.get("user_id")
+            if user_id:
+                cur = get_cursor()
+                cur.execute("""
+                    UPDATE gestao_pessoas.usuarios 
+                    SET ultima_atividade = NOW() 
+                    WHERE id = %s
+                """, (user_id,))
+                get_db().commit()
+                cur.close()
+        except Exception as e:
+            # Não interromper a execução se falhar atualizar atividade
+            print(f"[AVISO] Falha ao atualizar ultima_atividade: {e}")
+        
         return f(*args, **kwargs)
     return decorated

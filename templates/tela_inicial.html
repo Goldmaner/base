@@ -65,7 +65,16 @@
       </h2>
       <div>
         <small>Logado como: <strong>{{ user['email'] }}</strong></small><br>
-        <small>Tipo: <span class="badge bg-info">{{ user['tipo_usuario'] }}</span></small><br>
+        <small>Tipo: <span class="badge bg-info">{{ user['tipo_usuario'] }}</span></small>
+        {% if user['tipo_usuario'] == 'Agente Público' %}
+        <button type="button" class="btn btn-sm btn-success ms-2" onclick="verUsuariosAtivos()" title="Ver usuários online">
+          <i class="bi bi-people-fill"></i> <span id="badge-usuarios-ativos" class="badge bg-light text-dark">0</span> online
+        </button>
+        {% endif %}
+        <br>
+        <button type="button" class="btn btn-sm btn-outline-primary mt-2 me-2" data-bs-toggle="modal" data-bs-target="#modalAlterarSenha">
+          <i class="bi bi-key"></i> Alterar Senha
+        </button>
         <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-secondary mt-2">Sair</a>
       </div>
     </div>
@@ -980,6 +989,446 @@
         alert('Erro ao resetar senha.');
       }
     }
+    
+    // Verificar se há aviso de sessão ativa
+    async function verificarSessaoAtiva() {
+      try {
+        const response = await fetch('/api/verificar-sessao-ativa');
+        const result = await response.json();
+        
+        if (result.sessao_ativa) {
+          setTimeout(() => {
+            const msg = `⚠️ AVISO DE SESSÃO\n\n` +
+                       `Você já estava logado em outro dispositivo/navegador.\n\n` +
+                       `Sua sessão anterior foi substituída por este novo login.\n\n` +
+                       `Se você não reconhece esta atividade, altere sua senha imediatamente.`;
+            alert(msg);
+          }, 500);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar sessão:', error);
+      }
+    }
+    
+    // Executar verificação ao carregar página
+    document.addEventListener('DOMContentLoaded', function() {
+      verificarSessaoAtiva();
+      
+      // Configurar botões de toggle senha
+      const configurarToggleSenha = function() {
+        const modal = document.getElementById('modalAlterarSenha');
+        const inputGroups = modal.querySelectorAll('.input-group');
+        
+        inputGroups.forEach((group) => {
+          const input = group.querySelector('input[type="password"], input[type="text"]');
+          const button = group.querySelector('button');
+          const icon = button ? button.querySelector('i') : null;
+          
+          if (input && button && icon) {
+            // Garantir que o input seja sempre type="text" e usar CSS para ocultar
+            input.setAttribute('data-password-field', 'true');
+            
+            // Se estiver como password, converter para text e marcar como oculto
+            if (input.type === 'password') {
+              input.type = 'text';
+              input.style.webkitTextSecurity = 'disc';
+              input.style.textSecurity = 'disc';
+              input.setAttribute('data-showing', 'false');
+            }
+            
+            // Clonar botão para remover listeners antigos
+            const buttonClone = button.cloneNode(true);
+            button.parentNode.replaceChild(buttonClone, button);
+            
+            // Adicionar listener
+            buttonClone.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              const iconAtual = buttonClone.querySelector('i');
+              const showing = input.getAttribute('data-showing') === 'true';
+              
+              console.log(`Toggle senha em ${input.id}: ${showing ? 'ocultar' : 'mostrar'}, valor atual: "${input.value}"`);
+              
+              if (showing) {
+                // Ocultar
+                input.style.webkitTextSecurity = 'disc';
+                input.style.textSecurity = 'disc';
+                input.setAttribute('data-showing', 'false');
+                iconAtual.className = 'bi bi-eye';
+              } else {
+                // Mostrar
+                input.style.webkitTextSecurity = 'none';
+                input.style.textSecurity = 'none';
+                input.setAttribute('data-showing', 'true');
+                iconAtual.className = 'bi bi-eye-slash';
+              }
+              
+              console.log(`Depois do toggle: valor="${input.value}"`);
+            });
+          }
+        });
+      };
+      
+      // Configurar quando modal abrir
+      const modalAlterarSenha = document.getElementById('modalAlterarSenha');
+      if (modalAlterarSenha) {
+        modalAlterarSenha.addEventListener('shown.bs.modal', function() {
+          // Resetar campos para password
+          ['senhaAtual', 'novaSenha', 'confirmaSenha'].forEach(id => {
+            const input = document.getElementById(id);
+            const icon = document.getElementById('icon-' + id);
+            if (input && icon) {
+              input.type = 'password';
+              icon.className = 'bi bi-eye';
+            }
+          });
+          
+          // Configurar event listeners
+          configurarToggleSenha();
+        });
+      }
+    });
+
+    // Função para alterar senha
+    window.alterarSenha = async function() {
+      console.log('🔵 INICIANDO alterarSenha()');
+      
+      // Buscar TODOS os inputs no modal PRIMEIRO
+      const modal = document.getElementById('modalAlterarSenha');
+      const todosInputs = modal.querySelectorAll('input');
+      console.log(`🔍 Total de inputs no modal: ${todosInputs.length}`);
+      
+      // Capturar valores DIRETAMENTE do querySelectorAll
+      let senhaAtual = '';
+      let novaSenha = '';
+      let confirmaSenha = '';
+      
+      todosInputs.forEach((input, index) => {
+        console.log(`   Input ${index + 1}: id="${input.id}", type="${input.type}", value="${input.value}"`);
+        
+        if (input.id === 'senhaAtual') {
+          senhaAtual = input.value;
+          console.log(`   ✅ Capturado senhaAtual: "${senhaAtual}"`);
+        } else if (input.id === 'novaSenha') {
+          novaSenha = input.value;
+          console.log(`   ✅ Capturado novaSenha: "${novaSenha}"`);
+        } else if (input.id === 'confirmaSenha') {
+          confirmaSenha = input.value;
+          console.log(`   ✅ Capturado confirmaSenha: "${confirmaSenha}"`);
+        }
+      });
+      
+      const mensagemDiv = document.getElementById('mensagemAlterarSenha');
+
+      console.log('🔐 Valores finais:', {
+        senhaAtual: senhaAtual,
+        novaSenha: novaSenha,
+        confirmaSenha: confirmaSenha
+      });
+
+      // Validações frontend
+      if (!senhaAtual || !novaSenha || !confirmaSenha) {
+        mensagemDiv.className = 'alert alert-warning';
+        mensagemDiv.textContent = 'Por favor, preencha todos os campos.';
+        mensagemDiv.classList.remove('d-none');
+        return;
+      }
+
+      if (novaSenha.length < 6) {
+        mensagemDiv.className = 'alert alert-warning';
+        mensagemDiv.textContent = 'A nova senha deve ter no mínimo 6 caracteres.';
+        mensagemDiv.classList.remove('d-none');
+        return;
+      }
+
+      if (novaSenha !== confirmaSenha) {
+        mensagemDiv.className = 'alert alert-warning';
+        mensagemDiv.textContent = 'A nova senha e a confirmação não coincidem.';
+        mensagemDiv.classList.remove('d-none');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/alterar-minha-senha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            senha_atual: senhaAtual,
+            nova_senha: novaSenha,
+            confirma_senha: confirmaSenha
+          })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          mensagemDiv.className = 'alert alert-success';
+          mensagemDiv.textContent = result.mensagem;
+          mensagemDiv.classList.remove('d-none');
+          
+          // Limpar campos
+          document.getElementById('formAlterarSenha').reset();
+          
+          // Fechar modal após 2 segundos
+          setTimeout(() => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalAlterarSenha'));
+            modal.hide();
+            mensagemDiv.classList.add('d-none');
+          }, 2000);
+        } else {
+          mensagemDiv.className = 'alert alert-danger';
+          mensagemDiv.textContent = result.erro || 'Erro ao alterar senha.';
+          mensagemDiv.classList.remove('d-none');
+        }
+      } catch (error) {
+        console.error('Erro ao alterar senha:', error);
+        mensagemDiv.className = 'alert alert-danger';
+        mensagemDiv.textContent = 'Erro ao conectar com o servidor.';
+        mensagemDiv.classList.remove('d-none');
+      }
+    }
+  </script>
+
+  <!-- Modal de Alterar Senha -->
+  <div class="modal fade" id="modalAlterarSenha" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-key"></i> Alterar Minha Senha</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <form id="formAlterarSenha">
+            <div class="mb-3">
+              <label for="senhaAtual" class="form-label">Senha Atual</label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="senhaAtual" required>
+                <button class="btn btn-outline-secondary" type="button">
+                  <i class="bi bi-eye" id="icon-senhaAtual"></i>
+                </button>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="novaSenha" class="form-label">Nova Senha (mínimo 6 caracteres)</label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="novaSenha" required minlength="6">
+                <button class="btn btn-outline-secondary" type="button">
+                  <i class="bi bi-eye" id="icon-novaSenha"></i>
+                </button>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="confirmaSenha" class="form-label">Confirmar Nova Senha</label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="confirmaSenha" required minlength="6">
+                <button class="btn btn-outline-secondary" type="button">
+                  <i class="bi bi-eye" id="icon-confirmaSenha"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="mensagemAlterarSenha" class="alert d-none"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="alterarSenha()">
+            <i class="bi bi-check-lg"></i> Alterar Senha
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Usuários Ativos -->
+  <div class="modal fade" id="modalUsuariosAtivos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-people-fill"></i> Usuários Online</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <small class="text-muted">
+              <i class="bi bi-info-circle"></i> Mostrando usuários com atividade nos últimos 15 minutos
+            </small>
+          </div>
+          
+          <!-- Filtro por Tipo de Usuário -->
+          <div class="mb-3">
+            <label for="filtroTipoAtivos" class="form-label">
+              <i class="bi bi-funnel"></i> Filtrar por Tipo
+            </label>
+            <select class="form-select" id="filtroTipoAtivos" onchange="filtrarUsuariosAtivos()">
+              <option value="">Todos os tipos</option>
+              <option value="Agente Público">Agente Público</option>
+              <option value="Agente DAC">Agente DAC</option>
+              <option value="Agente DGP">Agente DGP</option>
+              <option value="Agente DP">Agente DP</option>
+              <option value="Externo">Externo</option>
+            </select>
+          </div>
+          
+          <div id="listaUsuariosAtivos">
+            <div class="text-center py-4">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+          <button type="button" class="btn btn-primary" onclick="carregarUsuariosAtivos()">
+            <i class="bi bi-arrow-clockwise"></i> Atualizar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Variável global para armazenar todos os usuários ativos
+    let todosUsuariosAtivos = [];
+
+    // Função para ver usuários ativos
+    function verUsuariosAtivos() {
+      const modal = new bootstrap.Modal(document.getElementById('modalUsuariosAtivos'));
+      modal.show();
+      carregarUsuariosAtivos();
+    }
+
+    // Função para carregar lista de usuários ativos
+    async function carregarUsuariosAtivos() {
+      const lista = document.getElementById('listaUsuariosAtivos');
+      
+      try {
+        lista.innerHTML = `
+          <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Carregando...</span>
+            </div>
+          </div>
+        `;
+        
+        const response = await fetch('/api/usuarios-ativos');
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.erro || 'Erro ao carregar usuários');
+        }
+        
+        // Armazenar todos os usuários
+        todosUsuariosAtivos = data.usuarios || [];
+        
+        // Resetar filtro
+        document.getElementById('filtroTipoAtivos').value = '';
+        
+        // Renderizar lista
+        filtrarUsuariosAtivos();
+        
+      } catch (error) {
+        console.error('Erro ao carregar usuários ativos:', error);
+        lista.innerHTML = `
+          <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i> Erro ao carregar lista: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // Função para filtrar usuários ativos por tipo
+    function filtrarUsuariosAtivos() {
+      const lista = document.getElementById('listaUsuariosAtivos');
+      const filtroTipo = document.getElementById('filtroTipoAtivos').value;
+      
+      // Filtrar usuários
+      const usuariosFiltrados = filtroTipo === '' 
+        ? todosUsuariosAtivos 
+        : todosUsuariosAtivos.filter(user => user.tipo_usuario === filtroTipo);
+      
+      if (usuariosFiltrados.length === 0) {
+        lista.innerHTML = `
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> ${filtroTipo ? 'Nenhum usuário ativo com este tipo.' : 'Nenhum usuário ativo no momento.'}
+          </div>
+        `;
+        return;
+      }
+      
+      // Montar HTML da lista
+      let html = '<div class="list-group">';
+      
+      usuariosFiltrados.forEach(user => {
+        const corBadge = user.segundos_inativo < 60 ? 'success' : user.segundos_inativo < 300 ? 'primary' : 'secondary';
+        const iconeDepartamento = user.d_usuario ? `<small class="text-muted"><i class="bi bi-building"></i> ${user.d_usuario}</small>` : '';
+        
+        html += `
+          <div class="list-group-item">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="mb-1">
+                  <i class="bi bi-person-circle"></i> ${user.email}
+                </h6>
+                <div>
+                  <span class="badge bg-info">${user.tipo_usuario}</span>
+                  ${iconeDepartamento}
+                </div>
+              </div>
+              <div class="text-end">
+                <span class="badge bg-${corBadge}">
+                  <i class="bi bi-clock"></i> ${user.tempo_ativo}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+      
+      // Adicionar contador
+      const total = todosUsuariosAtivos.length;
+      const filtrados = usuariosFiltrados.length;
+      const contador = filtroTipo && filtrados < total 
+        ? `<div class="alert alert-light mt-2 mb-0"><small><i class="bi bi-funnel"></i> Exibindo ${filtrados} de ${total} usuário(s)</small></div>`
+        : `<div class="alert alert-light mt-2 mb-0"><small><i class="bi bi-people"></i> Total: ${total} usuário(s) ativo(s)</small></div>`;
+      
+      lista.innerHTML = html + contador;
+    }
+
+    // Atualizar badge de usuários ativos a cada 30 segundos
+    async function atualizarBadgeUsuariosAtivos() {
+      try {
+        const response = await fetch('/api/usuarios-ativos');
+        const data = await response.json();
+        
+        if (response.ok) {
+          const badge = document.getElementById('badge-usuarios-ativos');
+          if (badge) {
+            badge.textContent = data.total;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar badge:', error);
+      }
+    }
+
+    // Configurar atualização automática do badge
+    document.addEventListener('DOMContentLoaded', function() {
+      const badge = document.getElementById('badge-usuarios-ativos');
+      if (badge) {
+        // Atualizar imediatamente
+        atualizarBadgeUsuariosAtivos();
+        
+        // Atualizar a cada 30 segundos
+        setInterval(atualizarBadgeUsuariosAtivos, 30000);
+      }
+    });
   </script>
 </body>
 </html>

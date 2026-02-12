@@ -912,17 +912,50 @@ def api_listar_parcelas():
             })
         
         # ========================================================================
-        # DISTRIBUIÇÃO EM CASCATA: Valores pagos para parcelas "Encaminhado"
+        # DISTRIBUIÇÃO EM CASCATA: Valores pagos (corrigido para considerar parcelas "Pago")
         # ========================================================================
-        # Separar parcelas "Encaminhado para Pagamento" e ordenar por vigência
-        parcelas_encaminhadas = [r for r in resultado if r['parcela_status'] == 'Encaminhado para Pagamento']
-        parcelas_encaminhadas.sort(key=lambda x: x['vigencia_inicial_raw'] if x['vigencia_inicial_raw'] else datetime(2099, 1, 1).date())
+        # PASSO 1: Processar TODAS as parcelas ordenadas por vigência_inicial
+        # para contabilizar consumo REAL (status "Pago" consome primeiro)
         
-        # Agrupar por (termo, ano) para distribuir valores pagos
         from collections import defaultdict
+        
+        # Separar parcelas por status e ordenar por vigência
+        todas_parcelas_ordenadas = sorted(
+            resultado,
+            key=lambda x: x['vigencia_inicial_raw'] if x['vigencia_inicial_raw'] else datetime(2099, 1, 1).date()
+        )
+        
+        # Controle de valores já consumidos por parcelas "Pago"
+        # Formato: {(numero_termo, ano, elemento): valor_consumido}
+        valores_consumidos = defaultdict(float)
+        
+        # PASSO 2: Contabilizar consumo de parcelas com status "Pago"
+        for parcela in todas_parcelas_ordenadas:
+            if parcela['parcela_status'] != 'Pago':
+                continue
+            
+            vigencia_raw = parcela['vigencia_inicial_raw']
+            if not vigencia_raw:
+                continue
+            
+            ano_parcela = vigencia_raw.year
+            numero_termo = parcela['numero_termo']
+            
+            # Consumir valores proporcionais aos elementos
+            # (parcelas "Pago" já receberam o pagamento, então reduzem o saldo disponível)
+            chave_23 = (numero_termo, ano_parcela, 23)
+            chave_24 = (numero_termo, ano_parcela, 24)
+            
+            valores_consumidos[chave_23] += parcela['valor_elemento_53_23']
+            valores_consumidos[chave_24] += parcela['valor_elemento_53_24']
+        
+        # PASSO 3: Distribuir saldo disponível para parcelas "Encaminhado para Pagamento"
         controle_cascata = defaultdict(lambda: {'pago_23': 0, 'pago_24': 0})
         
-        for parcela in parcelas_encaminhadas:
+        for parcela in todas_parcelas_ordenadas:
+            if parcela['parcela_status'] != 'Encaminhado para Pagamento':
+                continue
+            
             if parcela['tem_pendencia']:
                 continue  # Pular parcelas com inconsistências (amarelo tem prioridade)
             
@@ -931,14 +964,15 @@ def api_listar_parcelas():
                 continue
             
             ano_parcela = vigencia_raw.year
-            sei_celeb = termo_para_sei.get(parcela['numero_termo'])
+            numero_termo = parcela['numero_termo']
+            sei_celeb = termo_para_sei.get(numero_termo)
             
             if not sei_celeb:
                 continue
             
             cod_sof = converter_sei_para_cod_sof(sei_celeb)
             
-            # Buscar total pago por elemento neste ano
+            # Buscar total pago por elemento neste ano (do banco back_empenhos)
             # IMPORTANTE: cod_item_desp_sof retorna INT, não STRING
             chave_elemento_23 = (cod_sof, ano_parcela, 23)
             chave_elemento_24 = (cod_sof, ano_parcela, 24)
@@ -946,13 +980,23 @@ def api_listar_parcelas():
             total_pago_23 = pagos_por_elemento.get(chave_elemento_23, 0)
             total_pago_24 = pagos_por_elemento.get(chave_elemento_24, 0)
             
-            # Chave para controle de cascata (por termo+ano)
-            chave_controle = (parcela['numero_termo'], ano_parcela)
+            # CORREÇÃO CRÍTICA: Subtrair valores já consumidos por parcelas "Pago"
+            chave_consumo_23 = (numero_termo, ano_parcela, 23)
+            chave_consumo_24 = (numero_termo, ano_parcela, 24)
             
-            # Distribuir elemento 23
-            if total_pago_23 > 0:
+            ja_consumido_23 = valores_consumidos[chave_consumo_23]
+            ja_consumido_24 = valores_consumidos[chave_consumo_24]
+            
+            saldo_disponivel_23 = max(0, total_pago_23 - ja_consumido_23)
+            saldo_disponivel_24 = max(0, total_pago_24 - ja_consumido_24)
+            
+            # Chave para controle de cascata entre parcelas "Encaminhado" (por termo+ano)
+            chave_controle = (numero_termo, ano_parcela)
+            
+            # Distribuir elemento 23 (considerando saldo disponível)
+            if saldo_disponivel_23 > 0:
                 ja_distribuido_23 = controle_cascata[chave_controle]['pago_23']
-                restante_23 = total_pago_23 - ja_distribuido_23
+                restante_23 = saldo_disponivel_23 - ja_distribuido_23
                 
                 if restante_23 > 0:
                     valor_elemento_23 = parcela['valor_elemento_53_23']
@@ -961,10 +1005,10 @@ def api_listar_parcelas():
                     parcela['valor_pago_23'] = valor_a_distribuir_23
                     controle_cascata[chave_controle]['pago_23'] += valor_a_distribuir_23
             
-            # Distribuir elemento 24
-            if total_pago_24 > 0:
+            # Distribuir elemento 24 (considerando saldo disponível)
+            if saldo_disponivel_24 > 0:
                 ja_distribuido_24 = controle_cascata[chave_controle]['pago_24']
-                restante_24 = total_pago_24 - ja_distribuido_24
+                restante_24 = saldo_disponivel_24 - ja_distribuido_24
                 
                 if restante_24 > 0:
                     valor_elemento_24 = parcela['valor_elemento_53_24']

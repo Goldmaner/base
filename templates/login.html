@@ -6,10 +6,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Login - Módulo de Análise</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
   <style>
     body { background: #f8f9fa; }
-    .login-container { max-width: 400px; margin: 100px auto; padding: 20px; background: #fff; border-radius: 8px; }
+    .login-container { max-width: 400px; margin: 100px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
     .btn-login { background-color: #0d6efd; width:100%; }
+    .link-resetar { cursor: pointer; color: #0d6efd; text-decoration: underline; font-size: 0.9rem; }
+    .link-resetar:hover { color: #0a58ca; }
   </style>
 </head>
 <body>
@@ -35,7 +38,292 @@
         </div>
         <button type="submit" class="btn btn-primary btn-login">Entrar</button>
       </form>
+      
+      <div class="text-center mt-3">
+        <span class="link-resetar" onclick="abrirModalResetar()">
+          <i class="bi bi-key"></i> Esqueci minha senha / Resetar senha
+        </span>
+      </div>
     </div>
   </div>
+
+  <!-- Modal: Resetar Senha -->
+  <div class="modal fade" id="modalResetarSenha" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">
+            <i class="bi bi-key-fill me-2"></i>Resetar Senha
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <!-- PASSO 1: Solicitar código -->
+          <div id="passo1-solicitar" style="display: block;">
+            <div class="alert alert-info">
+              <small>
+                <strong>📧 Passo 1:</strong><br>
+                Digite seu e-mail para receber um código de reset (válido por 30 minutos)
+              </small>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label fw-bold">E-mail:</label>
+              <input type="email" class="form-control" id="reset-email-solicitar" required>
+            </div>
+            
+            <button type="button" class="btn btn-primary w-100" onclick="solicitarCodigoReset()">
+              <i class="bi bi-envelope me-2"></i>Enviar Código por E-mail
+            </button>
+            
+            <div class="text-center mt-3">
+              <small class="text-muted">Já tem um código? <a href="#" onclick="mostrarPasso2(); return false;">Clique aqui</a></small>
+            </div>
+          </div>
+          
+          <!-- PASSO 2: Inserir código e nova senha -->
+          <div id="passo2-resetar" style="display: none;">
+            <div class="alert alert-success">
+              <small>
+                <strong>✅ Passo 2:</strong><br>
+                Digite o código recebido por e-mail e sua nova senha
+              </small>
+            </div>
+            
+            <form id="formResetarSenha">
+              <div class="mb-3">
+                <label class="form-label fw-bold">E-mail:</label>
+                <input type="email" class="form-control" id="reset-email" required>
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label fw-bold">Código de 6 dígitos:</label>
+                <input type="text" class="form-control form-control-lg text-center" id="reset-token" 
+                       required maxlength="6" pattern="[0-9]{6}"
+                       placeholder="000000"
+                       style="letter-spacing: 8px; font-size: 24px; font-weight: bold;">
+                <small class="text-muted">Código enviado para seu e-mail</small>
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label fw-bold">Nova Senha:</label>
+                <div class="input-group">
+                  <input type="password" class="form-control" id="reset-nova-senha" required minlength="4">
+                  <button class="btn btn-outline-secondary" type="button" onclick="toggleSenha('reset-nova-senha')">
+                    <i class="bi bi-eye" id="icon-reset-nova-senha"></i>
+                  </button>
+                </div>
+                <small class="text-muted">Mínimo 4 caracteres</small>
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label fw-bold">Confirmar Nova Senha:</label>
+                <div class="input-group">
+                  <input type="password" class="form-control" id="reset-confirma-senha" required minlength="4">
+                  <button class="btn btn-outline-secondary" type="button" onclick="toggleSenha('reset-confirma-senha')">
+                    <i class="bi bi-eye" id="icon-reset-confirma-senha"></i>
+                  </button>
+                </div>
+              </div>
+            </form>
+            
+            <button type="button" class="btn btn-primary w-100" onclick="resetarSenhaComToken()">
+              <i class="bi bi-check-circle me-2"></i>Alterar Senha
+            </button>
+            
+            <div class="text-center mt-3">
+              <small class="text-muted">
+                <a href="#" onclick="voltarPasso1(); return false;">
+                  <i class="bi bi-arrow-left me-1"></i>Voltar / Solicitar novo código
+                </a>
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    function abrirModalResetar() {
+      voltarPasso1(); // Resetar para passo 1
+      const modal = new bootstrap.Modal(document.getElementById('modalResetarSenha'));
+      modal.show();
+    }
+    
+    function mostrarPasso2() {
+      document.getElementById('passo1-solicitar').style.display = 'none';
+      document.getElementById('passo2-resetar').style.display = 'block';
+    }
+    
+    function voltarPasso1() {
+      document.getElementById('passo1-solicitar').style.display = 'block';
+      document.getElementById('passo2-resetar').style.display = 'none';
+      document.getElementById('reset-email-solicitar').value = '';
+      document.getElementById('formResetarSenha').reset();
+    }
+    
+    function toggleSenha(inputId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById('icon-' + inputId);
+      
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+      } else {
+        input.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+      }
+    }
+    
+    async function solicitarCodigoReset() {
+      const email = document.getElementById('reset-email-solicitar').value.trim();
+      
+      if (!email) {
+        alert('❌ Digite seu e-mail');
+        return;
+      }
+      
+      try {
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+        
+        const response = await fetch('/api/solicitar-reset-senha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.toLowerCase() })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          // Transferir e-mail para passo 2
+          document.getElementById('reset-email').value = email;
+          
+          alert('✅ ' + result.mensagem + '\n\nVerifique sua caixa de entrada (e spam).');
+          mostrarPasso2();
+        } else {
+          alert('❌ ' + result.erro);
+        }
+        
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-envelope me-2"></i>Enviar Código por E-mail';
+        
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('❌ Erro ao solicitar código. Tente novamente.');
+        event.target.disabled = false;
+        event.target.innerHTML = '<i class="bi bi-envelope me-2"></i>Enviar Código por E-mail';
+      }
+    }
+    
+    async function resetarSenhaComToken() {
+      const email = document.getElementById('reset-email').value.trim();
+      const token = document.getElementById('reset-token').value.trim();
+      const novaSenha = document.getElementById('reset-nova-senha').value;
+      const confirmaSenha = document.getElementById('reset-confirma-senha').value;
+      
+      if (!email || !token || !novaSenha || !confirmaSenha) {
+        alert('❌ Preencha todos os campos');
+        return;
+      }
+      
+      if (token.length !== 6 || !/^\d{6}$/.test(token)) {
+        alert('❌ Código deve ter 6 dígitos numéricos');
+        return;
+      }
+      
+      if (novaSenha !== confirmaSenha) {
+        alert('❌ As senhas não coincidem');
+        return;
+      }
+      
+      if (novaSenha.length < 4) {
+        alert('❌ Senha muito curta. Mínimo 4 caracteres');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/resetar-senha-com-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.toLowerCase(),
+            token: token,
+            nova_senha: novaSenha,
+            confirma_senha: confirmaSenha
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          alert('✅ ' + result.mensagem);
+          bootstrap.Modal.getInstance(document.getElementById('modalResetarSenha')).hide();
+          document.getElementById('formResetarSenha').reset();
+          voltarPasso1();
+        } else {
+          alert('❌ ' + result.erro);
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('❌ Erro ao resetar senha. Tente novamente.');
+      }
+    }
+    
+    // MANTER FUNÇÃO ANTIGA PARA RETROCOMPATIBILIDADE (senha temporária do admin)
+    async function resetarMinhaSenha() {
+      const email = document.getElementById('reset-email').value.trim();
+      const senhaTemp = document.getElementById('reset-senha-temp')?.value || '';
+      const novaSenha = document.getElementById('reset-nova-senha').value;
+      const confirmaSenha = document.getElementById('reset-confirma-senha').value;
+      
+      if (!email || !senhaTemp || !novaSenha || !confirmaSenha) {
+        alert('❌ Preencha todos os campos');
+        return;
+      }
+      
+      if (novaSenha !== confirmaSenha) {
+        alert('❌ As senhas não coincidem');
+        return;
+      }
+      
+      if (novaSenha.length < 4) {
+        alert('❌ Senha muito curta. Mínimo 4 caracteres');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/resetar-minha-senha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.toLowerCase(),
+            senha_temporaria: senhaTemp,
+            nova_senha: novaSenha,
+            confirma_senha: confirmaSenha
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          alert('✅ ' + result.mensagem);
+          bootstrap.Modal.getInstance(document.getElementById('modalResetarSenha')).hide();
+          document.getElementById('formResetarSenha').reset();
+        } else {
+          alert('❌ ' + result.erro);
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('❌ Erro ao resetar senha. Tente novamente.');
+      }
+    }
+  </script>
 </body>
 </html>

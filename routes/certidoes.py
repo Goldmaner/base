@@ -1086,38 +1086,86 @@ def juntar_pdfs(nome_pasta):
         # Buscar dados da OSC
         nome_busca = nome_pasta.replace('_', ' ').lower()
         print(f"[DEBUG PDF] Buscando OSC: {nome_busca}")
+        print(f"[DEBUG PDF] Nome da pasta recebido: {nome_pasta}")
         
-        # Busca simples: primeiras 3 palavras
-        palavras = nome_busca.split()[:3]
+        osc_data = None
         
+        # ========================================
+        # OPÇÃO 2: Buscar diretamente na tabela certidoes pelo OSC
+        # ========================================
+        print(f"[DEBUG PDF] OPÇÃO 2: Buscando em certidoes pelo OSC...")
+        
+        # Tentar busca exata primeiro (com normalização de acentos via unaccent ou similar pattern)
+        palavras_busca = nome_busca.split()
+        
+        # Busca com LIKE para cada palavra (tolerante a acentos)
         cur.execute("""
             SELECT DISTINCT osc, cnpj 
-            FROM public.parcerias 
+            FROM public.certidoes 
             WHERE LOWER(osc) LIKE %s
             LIMIT 1
-        """, [f'%{" ".join(palavras)}%'])
+        """, [f'%{" ".join(palavras_busca)}%'])
         
         osc_data = cur.fetchone()
-        print(f"[DEBUG PDF] Busca 1 - Resultado: {osc_data is not None}")
+        print(f"[DEBUG PDF] OPÇÃO 2 - Resultado: {osc_data is not None}")
         
-        # Se não encontrou, tentar apenas primeira palavra
-        if not osc_data and palavras:
+        # ========================================
+        # OPÇÃO 1: Se não encontrou, buscar em parcerias (fallback)
+        # ========================================
+        if not osc_data:
+            print(f"[DEBUG PDF] OPÇÃO 1: Buscando em parcerias...")
+            palavras = nome_busca.split()[:3]
+            
+            # Busca 1: primeiras 3 palavras
             cur.execute("""
                 SELECT DISTINCT osc, cnpj 
                 FROM public.parcerias 
                 WHERE LOWER(osc) LIKE %s
                 LIMIT 1
-            """, [f'{palavras[0]}%'])
+            """, [f'%{" ".join(palavras)}%'])
+            
             osc_data = cur.fetchone()
-            print(f"[DEBUG PDF] Busca 2 - Resultado: {osc_data is not None}")
+            print(f"[DEBUG PDF] OPÇÃO 1.1 (3 palavras) - Resultado: {osc_data is not None}")
+            
+            # Busca 2: Se não encontrou, tentar apenas primeira palavra
+            if not osc_data and palavras:
+                cur.execute("""
+                    SELECT DISTINCT osc, cnpj 
+                    FROM public.parcerias 
+                    WHERE LOWER(osc) LIKE %s
+                    LIMIT 1
+                """, [f'{palavras[0]}%'])
+                osc_data = cur.fetchone()
+                print(f"[DEBUG PDF] OPÇÃO 1.2 (1ª palavra) - Resultado: {osc_data is not None}")
         
+        # ========================================
+        # OPÇÃO 3: Se não encontrou no banco, tentar ler arquivos físicos da pasta
+        # ========================================
         if not osc_data:
-            print(f"[DEBUG PDF] OSC não encontrada: {nome_busca}")
-            return jsonify({'success': False, 'erro': 'OSC não encontrada'}), 404
+            print(f"[DEBUG PDF] OPÇÃO 3: OSC não encontrada no banco. Tentando ler arquivos físicos da pasta...")
+            pasta_fisica = os.path.join(UPLOAD_FOLDER, nome_pasta)
+            
+            if os.path.exists(pasta_fisica):
+                arquivos_pdf = [f for f in os.listdir(pasta_fisica) if f.lower().endswith('.pdf')]
+                print(f"[DEBUG PDF] OPÇÃO 3 - Pasta existe com {len(arquivos_pdf)} arquivo(s) PDF")
+                
+                if len(arquivos_pdf) > 0:
+                    # Criar osc_data fictício com nome da pasta
+                    osc_data = {
+                        'osc': nome_pasta.replace('_', ' ').title(),
+                        'cnpj': 'Não cadastrado'
+                    }
+                    print(f"[DEBUG PDF] OPÇÃO 3 - Usando arquivos físicos para OSC: {osc_data['osc']}")
+                else:
+                    print(f"[DEBUG PDF] Pasta existe mas não contém PDFs")
+                    return jsonify({'success': False, 'erro': 'Pasta encontrada mas não contém arquivos PDF'}), 404
+            else:
+                print(f"[DEBUG PDF] OSC não encontrada e pasta física não existe: {nome_busca}")
+                return jsonify({'success': False, 'erro': 'OSC não encontrada no banco de dados e pasta física não existe'}), 404
         
-        print(f"[DEBUG PDF] OSC encontrada: {osc_data['osc']}")
+        print(f"[DEBUG PDF] OSC identificada: {osc_data['osc']}")
         
-        # Buscar todas as certidões da OSC
+        # Buscar todas as certidões da OSC no banco
         cur.execute("""
             SELECT 
                 certidao_nome,
@@ -1140,7 +1188,25 @@ def juntar_pdfs(nome_pasta):
         """, [osc_data['osc']])
         
         certidoes = cur.fetchall()
-        print(f"[DEBUG PDF] Certidões encontradas: {len(certidoes)} - {[c['certidao_nome'] for c in certidoes]}")
+        
+        # Se não encontrou no banco, usar arquivos físicos
+        if len(certidoes) == 0:
+            print(f"[DEBUG PDF] Nenhuma certidão no banco. Usando arquivos físicos da pasta...")
+            pasta_fisica = os.path.join(UPLOAD_FOLDER, nome_pasta)
+            arquivos_pdf = sorted([f for f in os.listdir(pasta_fisica) if f.lower().endswith('.pdf')])
+            
+            certidoes = []
+            for arquivo in arquivos_pdf:
+                certidoes.append({
+                    'certidao_nome': arquivo.replace('.pdf', '').replace('_', ' '),
+                    'certidao_path': os.path.join(nome_pasta, arquivo),
+                    'certidao_vencimento': None,  # Sem validação de vencimento
+                    'certidao_status': 'física'
+                })
+            
+            print(f"[DEBUG PDF] Arquivos físicos carregados: {len(certidoes)} - {[c['certidao_nome'] for c in certidoes]}")
+        else:
+            print(f"[DEBUG PDF] Certidões encontradas no banco: {len(certidoes)} - {[c['certidao_nome'] for c in certidoes]}")
         
         # Validar se tem pelo menos 2 certidões
         if len(certidoes) < 2:
@@ -1149,12 +1215,13 @@ def juntar_pdfs(nome_pasta):
                 'erro': f'Apenas {len(certidoes)} certidão cadastrada. É necessário ter pelo menos 2 certidões para gerar o PDF unificado.'
             }), 400
         
-        # Validar se todas estão válidas (não vencidas)
+        # Validar se todas estão válidas (não vencidas) - apenas para certidões cadastradas
         hoje = date.today()
         certidoes_vencidas = []
         
         for cert in certidoes:
-            if cert['certidao_vencimento'] < hoje:
+            # Pular validação se for arquivo físico sem data de vencimento
+            if cert['certidao_vencimento'] is not None and cert['certidao_vencimento'] < hoje:
                 certidoes_vencidas.append(cert['certidao_nome'])
         
         if certidoes_vencidas:
