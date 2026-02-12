@@ -27,3 +27,9 @@ MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'True') == 'True'
 MAIL_USERNAME = os.environ.get('MAIL_USERNAME', '')  # E-mail remetente
 MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')  # Senha do app (não a senha normal)
 MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', os.environ.get('MAIL_USERNAME', 'noreply@exemplo.com'))
+
+# Configuração da API SOF (Sistema Orçamentário e Financeiro)
+# IMPORTANTE: Valores devem estar no arquivo .env (não commitar credenciais no Git!)
+SOF_API_USERNAME = os.environ.get('SOF_API_USERNAME', '')
+SOF_API_PASSWORD = os.environ.get('SOF_API_PASSWORD', '')
+SOF_AUTH_BASE64 = os.environ.get('SOF_AUTH_BASE64', '')

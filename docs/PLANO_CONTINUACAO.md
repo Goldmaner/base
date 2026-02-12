@@ -42,6 +42,7 @@
 - Criar pasta dedicada para certidões e atualizações financeiras.✅
 - Aprimorar o uso das pastas dedicadas a certidões, compatibilizando todas as OSCs.
 - Automatizar texto da primeira parcela.
+- Fazer uma checkbox para tirar os de TCL de COSAN.
 
 ## 8. Celebração e DGP
 - Desenvolver módulo para celebração de parcerias, com workflow próprio.
