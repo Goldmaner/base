@@ -37,6 +37,7 @@ from routes.ferias import ferias_bp
 from routes.editais import editais_bp
 from routes.certidoes import certidoes_bp
 from routes.cents import cents_bp
+from routes.celebracao_parcerias import celebracao_parcerias_bp
 from routes.sof_api import sof_api_bp
 
 
@@ -271,6 +272,7 @@ def create_app():
     app.register_blueprint(editais_bp)
     app.register_blueprint(certidoes_bp)
     app.register_blueprint(cents_bp)
+    app.register_blueprint(celebracao_parcerias_bp)
     app.register_blueprint(sof_api_bp)
     
     # ========================================================================

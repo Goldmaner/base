@@ -433,6 +433,27 @@ TABELAS_CONFIG = {
             'opcoes_status_pg': ['Ativo', 'Inativo', 'Desconhecido']
         }
     },
+    'c_geral_tipos_doc_sei': {
+        'nome': 'Geral: Tipos de Documento SEI',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['tipo_doc', 'descricao', 'status_tipo_doc'],
+        'colunas_obrigatorias': ['tipo_doc'],
+        'labels': {
+            'tipo_doc': 'Tipo de Documento',
+            'descricao': 'Descrição',
+            'status_tipo_doc': 'Status'
+        },
+        'colunas_filtro': ['tipo_doc', 'status_tipo_doc'],
+        'colunas_ordenacao': ['tipo_doc'],
+        'ordem': 'tipo_doc',
+        'tipos_campo': {
+            'tipo_doc': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'status_tipo_doc': 'select',
+            'opcoes_status_tipo_doc': ['Ativo', 'Inativo', 'Em Desuso']
+        }
+    },
     'c_dp_status_edital': {
         'nome': 'DP: Status de Edital',
         'schema': 'categoricas',

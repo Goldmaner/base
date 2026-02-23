@@ -1,0 +1,1720 @@
+<!-- templates/celebracao_parcerias.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Celebração de Parcerias</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .main-container {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Header */
+    .header-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .header-section h3 {
+      font-size: 2rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .header-section small {
+      opacity: 0.9;
+      font-size: 1rem;
+    }
+
+    /* Tabela */
+    .table th {
+      white-space: nowrap;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 12px 8px;
+    }
+    .table td {
+      font-size: 0.85rem;
+      vertical-align: middle;
+      padding: 10px 8px;
+    }
+    .table-hover tbody tr:hover {
+      background-color: #f1f3f5;
+      cursor: pointer;
+    }
+
+    /* Cards */
+    .filtro-card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: all 0.3s ease;
+    }
+    .filtro-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    /* Table responsive */
+    .table-responsive {
+      max-height: 65vh;
+      overflow-y: auto;
+      border-radius: 8px;
+    }
+    .sticky-header th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: #212529;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Badges */
+    .badge {
+      padding: 6px 12px;
+      font-weight: 500;
+      font-size: 0.8rem;
+    }
+
+    /* Botões */
+    .btn {
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 0.85rem;
+    }
+
+    /* Paginação */
+    .pagination {
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* Stats Badge */
+    .stats-badge {
+      background: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      display: inline-block;
+    }
+    .stats-badge i {
+      color: #764ba2;
+      margin-right: 8px;
+    }
+
+    /* Modal header customizado */
+    .card-header-custom {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    /* Autocomplete dropdown */
+    .autocomplete-list {
+      position: absolute;
+      z-index: 1050;
+      background: white;
+      border: 1px solid #dee2e6;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      width: 100%;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .autocomplete-list .autocomplete-item {
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .autocomplete-list .autocomplete-item:hover {
+      background-color: #e9ecef;
+    }
+
+    /* Indicador de filtro por usuário */
+    .user-filter-badge {
+      background: rgba(255,255,255,0.2);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container-fluid main-container">
+
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <!-- CABEÇALHO                                                           -->
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <div class="header-section">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h3 class="mb-2">
+          <i class="bi bi-handshake me-2"></i>
+          Celebração de Parcerias
+        </h3>
+        <small>Gestão de Parcerias — Acompanhamento de termos e celebrações</small>
+        {% if not ver_todos and nome_analista_logado %}
+        <div class="mt-2">
+          <span class="user-filter-badge">
+            <i class="bi bi-person-fill me-1"></i>
+            Exibindo registros de: <strong>{{ nome_analista_logado }}</strong>
+          </span>
+        </div>
+        {% endif %}
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        {% if is_admin %}
+        <button class="btn btn-light" onclick="abrirVisualizacaoGeral()" title="Gerenciar Visualização Geral">
+          <i class="bi bi-eye me-1"></i> Visualização
+        </button>
+        {% endif %}
+        <a href="{{ url_for('celebracao_parcerias.exportar_csv',
+            filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+            filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
+            filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
+            filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
+            filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
+            filtro_status_generico=filtro_status_generico) }}"
+           class="btn btn-light" title="Exportar CSV">
+          <i class="bi bi-download me-1"></i> CSV
+        </a>
+        <a href="{{ url_for('main.index') }}" class="btn btn-outline-light btn-lg">
+          <i class="bi bi-arrow-left me-2"></i> Voltar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <!-- FILTROS (Collapse)                                                  -->
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <div class="card filtro-card mb-4">
+    <div class="card-header bg-gradient d-flex justify-content-between align-items-center py-3"
+         style="background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);">
+      <div>
+        <i class="bi bi-funnel-fill me-2" style="color: #764ba2;"></i>
+        <strong style="color: #333;">Filtros de Busca</strong>
+        {% set filtros_ativos = [] %}
+        {% if filtro_responsavel %}{% set _ = filtros_ativos.append('Responsável') %}{% endif %}
+        {% if filtro_status %}{% set _ = filtros_ativos.append('Status') %}{% endif %}
+        {% if filtro_substatus %}{% set _ = filtros_ativos.append('Substatus') %}{% endif %}
+        {% if filtro_sei %}{% set _ = filtros_ativos.append('SEI') %}{% endif %}
+        {% if filtro_tipo_termo %}{% set _ = filtros_ativos.append('Tipo Termo') %}{% endif %}
+        {% if filtro_osc %}{% set _ = filtros_ativos.append('OSC') %}{% endif %}
+        {% if filtro_projeto %}{% set _ = filtros_ativos.append('Projeto') %}{% endif %}
+        {% if filtro_unidade %}{% set _ = filtros_ativos.append('Unidade') %}{% endif %}
+        {% if filtro_edital %}{% set _ = filtros_ativos.append('Edital') %}{% endif %}
+        {% if filtro_numero_termo %}{% set _ = filtros_ativos.append('Nº Termo') %}{% endif %}
+        {% if filtro_status_generico %}{% set _ = filtros_ativos.append('Status Genérico') %}{% endif %}
+        {% if filtros_ativos %}
+          <span class="badge bg-primary ms-2">{{ filtros_ativos|length }} ativo(s)</span>
+        {% endif %}
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              data-bs-toggle="collapse" data-bs-target="#collapseFiltros">
+        <i class="bi bi-chevron-down"></i>
+      </button>
+    </div>
+    <div class="collapse {% if filtros_ativos %}show{% endif %}" id="collapseFiltros">
+      <div class="card-body">
+        <form method="GET" action="{{ url_for('celebracao_parcerias.index') }}" id="formFiltros">
+          <div class="row g-2">
+            <!-- Linha 1 -->
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Responsável</label>
+              <div class="position-relative">
+                <input type="text" class="form-control form-control-sm autocomplete-input"
+                       name="filtro_responsavel" value="{{ filtro_responsavel }}"
+                       placeholder="Buscar responsável..." data-campo="responsavel"
+                       autocomplete="off">
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Status</label>
+              <select class="form-select form-select-sm" name="filtro_status">
+                <option value="">Todos</option>
+                {% for s in status_list %}
+                <option value="{{ s }}" {% if filtro_status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Substatus</label>
+              <select class="form-select form-select-sm" name="filtro_substatus">
+                <option value="">Todos</option>
+                {% for s in substatus_list %}
+                <option value="{{ s }}" {% if filtro_substatus == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">SEI Celebração</label>
+              <div class="position-relative">
+                <input type="text" class="form-control form-control-sm autocomplete-input"
+                       name="filtro_sei" value="{{ filtro_sei }}"
+                       placeholder="Buscar SEI..." data-campo="sei_celeb"
+                       autocomplete="off">
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Tipo de Termo</label>
+              <select class="form-select form-select-sm" name="filtro_tipo_termo">
+                <option value="">Todos</option>
+                {% for t in tipo_termo_list %}
+                <option value="{{ t }}" {% if filtro_tipo_termo == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">OSC</label>
+              <div class="position-relative">
+                <input type="text" class="form-control form-control-sm autocomplete-input"
+                       name="filtro_osc" value="{{ filtro_osc }}"
+                       placeholder="Buscar OSC..." data-campo="osc"
+                       autocomplete="off">
+              </div>
+            </div>
+
+            <!-- Linha 2 -->
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Projeto</label>
+              <div class="position-relative">
+                <input type="text" class="form-control form-control-sm autocomplete-input"
+                       name="filtro_projeto" value="{{ filtro_projeto }}"
+                       placeholder="Buscar projeto..." data-campo="projeto"
+                       autocomplete="off">
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Unidade Gestora</label>
+              <select class="form-select form-select-sm" name="filtro_unidade">
+                <option value="">Todas</option>
+                {% for u in unidades_list %}
+                <option value="{{ u }}" {% if filtro_unidade == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Edital</label>
+              <div class="position-relative">
+                <input type="text" class="form-control form-control-sm autocomplete-input"
+                       name="filtro_edital" value="{{ filtro_edital }}"
+                       placeholder="Buscar edital..." data-campo="edital_nome"
+                       autocomplete="off">
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Nº Termo</label>
+              <div class="position-relative">
+                <input type="text" class="form-control form-control-sm autocomplete-input"
+                       name="filtro_numero_termo" value="{{ filtro_numero_termo }}"
+                       placeholder="Buscar nº termo..." data-campo="numero_termo"
+                       autocomplete="off">
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Status Genérico</label>
+              <select class="form-select form-select-sm" name="filtro_status_generico">
+                <option value="">Todos</option>
+                {% for sg in status_generico_list %}
+                <option value="{{ sg }}" {% if filtro_status_generico == sg %}selected{% endif %}>{{ sg }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mt-2 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="bi bi-search me-1"></i> Filtrar
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="limparFiltros()">
+              <i class="bi bi-x-circle me-1"></i> Limpar Filtros
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <!-- RESUMO E PAGINAÇÃO SUPERIOR                                        -->
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="stats-badge">
+      <i class="bi bi-database-fill"></i>
+      <strong>{{ total }}</strong> registro(s) encontrado(s)
+      {% if total > 0 %}
+        <span class="text-muted">|</span> Página <strong>{{ page }}</strong> de <strong>{{ total_pages }}</strong>
+      {% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0 text-muted">Exibir:</label>
+      <select class="form-select form-select-sm" style="width:90px;" onchange="mudarPorPagina(this.value)">
+        {% for pp in [10, 20, 50, 100] %}
+        <option value="{{ pp }}" {% if per_page == pp %}selected{% endif %}>{{ pp }}</option>
+        {% endfor %}
+      </select>
+      <span class="text-muted">por página</span>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <!-- TABELA PRINCIPAL                                                    -->
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover table-bordered table-sm mb-0">
+        <thead class="table-dark sticky-header">
+          <tr>
+            <th>Responsável</th>
+            <th>Status</th>
+            <th>Substatus</th>
+            <th>SEI Celebração</th>
+            <th>Tipo de Termo</th>
+            <th>OSC</th>
+            <th>Projeto</th>
+            <th>Unidade Gestora</th>
+            <th class="text-end">Total Previsto</th>
+            <th class="text-center" style="min-width:70px;">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if registros %}
+            {% for r in registros %}
+            <tr>
+              <td>
+                {% if r.responsavel %}
+                  <span class="badge bg-primary">{{ r.responsavel }}</span>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.status %}
+                  <span class="badge bg-info text-dark">{{ r.status }}</span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if r.substatus %}
+                  <span class="badge bg-secondary">{{ r.substatus }}</span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ r.sei_celeb or '-' }}</td>
+              <td>{{ r.tipo_termo or '-' }}</td>
+              <td title="{{ r.osc or '' }}">
+                {{ (r.osc or '-')[:45] }}{% if r.osc and r.osc|length > 45 %}...{% endif %}
+              </td>
+              <td title="{{ r.projeto or '' }}">
+                {{ (r.projeto or '-')[:35] }}{% if r.projeto and r.projeto|length > 35 %}...{% endif %}
+              </td>
+              <td>{{ r.unidade_gestora or '-' }}</td>
+              <td class="text-end">
+                {% if r.total_previsto is not none %}
+                  R$ {{ r.total_previsto | format_brl }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <button class="btn btn-sm btn-info" onclick="verDetalhes({{ r.id }})" title="Ver detalhes">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="10" class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                Nenhum registro encontrado.
+                {% if filtros_ativos %}
+                  <br><a href="{{ url_for('celebracao_parcerias.index') }}">Limpar filtros</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  <!-- PAGINAÇÃO                                                           -->
+  <!-- ═════════════════════════════════════════════════════════════════════ -->
+  {% if total_pages > 1 %}
+  <nav class="mt-3 d-flex justify-content-center">
+    <ul class="pagination pagination-sm">
+      <!-- Anterior -->
+      <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=page-1, per_page=per_page,
+           filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+           filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
+           filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
+           filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
+           filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
+           filtro_status_generico=filtro_status_generico) }}">
+          <i class="bi bi-chevron-left"></i> Anterior
+        </a>
+      </li>
+
+      {% set start_page = [1, page - 2]|max %}
+      {% set end_page = [total_pages, start_page + 4]|min %}
+
+      {% if start_page > 1 %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=1, per_page=per_page,
+             filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+             filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
+             filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
+             filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
+             filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
+             filtro_status_generico=filtro_status_generico) }}">1</a>
+        </li>
+        {% if start_page > 2 %}
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+      {% endif %}
+
+      {% for p in range(start_page, end_page + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=p, per_page=per_page,
+             filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+             filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
+             filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
+             filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
+             filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
+             filtro_status_generico=filtro_status_generico) }}">{{ p }}</a>
+        </li>
+      {% endfor %}
+
+      {% if end_page < total_pages %}
+        {% if end_page < total_pages - 1 %}
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=total_pages, per_page=per_page,
+             filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+             filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
+             filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
+             filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
+             filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
+             filtro_status_generico=filtro_status_generico) }}">{{ total_pages }}</a>
+        </li>
+      {% endif %}
+
+      <!-- Próximo -->
+      <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=page+1, per_page=per_page,
+           filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+           filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
+           filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
+           filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
+           filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
+           filtro_status_generico=filtro_status_generico) }}">
+          Próximo <i class="bi bi-chevron-right"></i>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- MODAL: Detalhes do Registro                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1" aria-labelledby="modalDetalhesLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header card-header-custom">
+        <h5 class="modal-title" id="modalDetalhesLabel">
+          <i class="bi bi-pencil-square me-2"></i> Editar Registro
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="detalhesConteudo">
+          <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Carregando...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-success" id="btnSalvarRegistro" style="display:none" onclick="salvarRegistro()">
+          <i class="bi bi-check-circle me-1"></i> Salvar Alterações
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- MODAL: Visualização Geral (admin)                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalVisualizacao" tabindex="-1" aria-labelledby="modalVisualizacaoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header card-header-custom">
+        <h5 class="modal-title" id="modalVisualizacaoLabel">
+          <i class="bi bi-eye me-2"></i> Gerenciar Visualização Geral
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-1"></i>
+          Marque os analistas que podem ver <strong>todos</strong> os registros de Celebração de Parcerias,
+          independentemente de serem responsáveis. Analistas não marcados verão apenas seus próprios registros.
+        </div>
+        <div id="listaVisualizacao">
+          <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Carregando...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="salvarVisualizacaoGeral()">
+          <i class="bi bi-check-circle me-1"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SCRIPTS                                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>// ── Variáveis de listas (do servidor) ──────────────────────────────────────
+const RESPONSAVEIS_NOMES = {{ responsaveis | map(attribute='nome_analista') | list | tojson }};
+const STATUS_LIST        = {{ status_list | tojson }};
+const STATUS_GEN_MAP     = {{ status_generico_map | tojson }};
+const STATUS_IDS         = {{ status_ids | tojson }};
+const SUBSTATUS_LIST     = {{ substatus_list | tojson }};
+const SUBSTATUS_LIMITES  = {{ substatus_limites | tojson }};
+const TIPO_TERMO_LIST    = {{ tipo_termo_list | tojson }};
+const UNIDADES_LIST      = {{ unidades_list | tojson }};
+const STATUS_GEN_LIST    = {{ status_generico_list | tojson }};
+const EDITAIS_LIST       = {{ editais_list | tojson }};
+const NOME_PG_LIST       = {{ nome_pg_list | tojson }};
+const LEI_LIST           = {{ lei_list | tojson }};
+const REGIONALIZACAO_MAP = {{ regionalizacao_map | tojson }};
+// IDs de status que exigem data de assinatura preenchida
+const STATUS_NEED_ASSINATURA = new Set([15, 16, 17, 18, 19, 20]);
+
+// ── Cache de filtros (localStorage) ────────────────────────────────────────
+const FILTRO_KEY = 'celebracao_parcerias_filtros';
+const FILTRO_DEFAULT = { filtro_status_generico: 'Em celebração' };
+const FILTRO_PARAMS = [
+  'filtro_responsavel', 'filtro_status', 'filtro_substatus',
+  'filtro_sei', 'filtro_tipo_termo', 'filtro_osc', 'filtro_projeto',
+  'filtro_unidade', 'filtro_edital', 'filtro_numero_termo', 'filtro_status_generico'
+];
+
+document.addEventListener('DOMContentLoaded', function() {
+  const url = new URL(window.location.href);
+
+  // Se o usuário clicou em 'Limpar Filtros', limpa o cache e não redireciona
+  if (sessionStorage.getItem('celebracao_cleared') === '1') {
+    sessionStorage.removeItem('celebracao_cleared');
+    localStorage.removeItem(FILTRO_KEY);
+    return;
+  }
+
+  const filtrosNaURL = FILTRO_PARAMS.filter(
+    p => url.searchParams.get(p) && url.searchParams.get(p).trim() !== ''
+  );
+
+  if (filtrosNaURL.length > 0) {
+    // Salva os filtros ativos no localStorage
+    const toSave = {};
+    FILTRO_PARAMS.forEach(p => {
+      const v = url.searchParams.get(p) || '';
+      if (v.trim()) toSave[p] = v;
+    });
+    localStorage.setItem(FILTRO_KEY, JSON.stringify(toSave));
+  } else {
+    // Carrega do localStorage ou aplica o default
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(FILTRO_KEY) || '{}'); } catch(e) {}
+    const merged = Object.assign({}, FILTRO_DEFAULT, saved);
+    const hasAny = Object.values(merged).some(v => v && v.trim() !== '');
+    if (hasAny) {
+      url.searchParams.set('page', '1');
+      Object.entries(merged).forEach(([k, v]) => {
+        if (v && v.trim()) url.searchParams.set(k, v);
+      });
+      window.location.href = url.toString();
+    }
+  }
+
+  // Esconder botão salvar quando o modal fechar
+  document.getElementById('modalDetalhes').addEventListener('hidden.bs.modal', function() {
+    const btn = document.getElementById('btnSalvarRegistro');
+    if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações'; }
+    currentEditId = null;
+  });
+});
+
+function limparFiltros() {
+  sessionStorage.setItem('celebracao_cleared', '1');
+  window.location.href = '{{ url_for("celebracao_parcerias.index") }}';
+}
+// ── Paginação ─────────────────────────────────────────────────────────────
+function mudarPorPagina(valor) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('per_page', valor);
+  url.searchParams.set('page', '1');
+  window.location.href = url.toString();
+}
+
+// ── Editar registro (modal) ───────────────────────────────────────────────
+let currentEditId = null;
+
+function verDetalhes(id) {
+  currentEditId = id;
+  const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
+  const conteudo = document.getElementById('detalhesConteudo');
+  const btnSalvar = document.getElementById('btnSalvarRegistro');
+
+  document.getElementById('modalDetalhesLabel').innerHTML =
+    `<i class="bi bi-pencil-square me-2"></i> Editar Registro #${id}`;
+
+  conteudo.innerHTML = `
+    <div class="text-center py-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Carregando...</span>
+      </div>
+    </div>`;
+  btnSalvar.style.display = 'none';
+  modal.show();
+
+  fetch(`/celebracao-parcerias/detalhe/${id}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) {
+        conteudo.innerHTML = `<div class="alert alert-danger">${data.erro}</div>`;
+        return;
+      }
+      conteudo.innerHTML = montarFormularioEdicao(data.registro);
+      btnSalvar.style.display = '';
+      // Validar SEI e construir Nº Termo com dados existentes
+      const seiEl = document.getElementById('edit_sei_celeb');
+      if (seiEl && seiEl.value) validarSEI(seiEl);
+      const cnpjEl2 = document.getElementById('edit_cnpj');
+      if (cnpjEl2 && cnpjEl2.value) validarCNPJ(cnpjEl2);
+      rebuildNumeroTermo();
+      // Inicializar Status Genérico e filtro de substatus com base no status atual
+      const statusEl = document.getElementById('edit_status');
+      if (statusEl) aoMudarStatus(statusEl.value);
+      // Ativar auto-detecção de Lei ao mudar data de início
+      const inicioElLei = document.getElementById('edit_inicio');
+      if (inicioElLei) inicioElLei.addEventListener('change', () => autoDetectarLei(false));
+      // Auto-detectar Lei na abertura (somente se lei estiver vazia)
+      autoDetectarLei(false);
+      // Carregar endereços de execução do projeto
+      carregarEnderecos(id);
+      // Ativar tooltips Bootstrap no modal
+      conteudo.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+    })
+    .catch(err => {
+      conteudo.innerHTML = `<div class="alert alert-danger">Erro ao carregar detalhes: ${err}</div>`;
+    });
+}
+
+function salvarRegistro() {
+  if (!currentEditId) return;
+  const form = document.getElementById('formEditarRegistro');
+  if (!form) return;
+
+  const btnSalvar = document.getElementById('btnSalvarRegistro');
+  btnSalvar.disabled = true;
+  btnSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Salvando...';
+
+  // Sync múltiplos responsáveis antes de coletar o form
+  sincronizarResponsaveis();
+
+  // Validar CNPJ antes de salvar
+  const cnpjSave = document.getElementById('edit_cnpj');
+  if (cnpjSave && cnpjSave.value) {
+    const reCnpj = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
+    if (!reCnpj.test(cnpjSave.value)) {
+      cnpjSave.style.borderColor = '#ffc107';
+      cnpjSave.style.backgroundColor = '#fffef0';
+      const w = document.getElementById('cnpj_warn');
+      if (w) w.style.display = '';
+      btnSalvar.disabled = false;
+      btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+      cnpjSave.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
+
+  // Validar: status do grupo "Celebrado" (ids 15-20) exige data de assinatura
+  const _statusEl = document.getElementById('edit_status');
+  const _statusId = _statusEl ? (STATUS_IDS[_statusEl.value] || 0) : 0;
+  if (STATUS_NEED_ASSINATURA.has(_statusId)) {
+    const assEl = document.getElementById('edit_assinatura');
+    if (!assEl || !assEl.value) {
+      if (assEl) { assEl.style.borderColor = '#dc3545'; assEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      btnSalvar.disabled = false;
+      btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+      document.getElementById('detalhesConteudo').insertAdjacentHTML('afterbegin', `
+        <div class="alert alert-warning alert-dismissible mb-3" role="alert">
+          <i class="bi bi-exclamation-triangle me-1"></i> O status <strong>${_statusEl.value}</strong> exige o preenchimento da <strong>Data de Assinatura</strong>.
+          <button class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`);
+      return;
+    }
+  }
+
+  // Validar: assinatura e início não podem estar a mais de 6 meses de hoje
+  const _inicioVal = (document.getElementById('edit_inicio') || {}).value || '';
+  const _assVal    = (document.getElementById('edit_assinatura') || {}).value || '';
+  if (_dataFora6Meses(_inicioVal) || _dataFora6Meses(_assVal)) {
+    const _badEl = _dataFora6Meses(_inicioVal)
+      ? document.getElementById('edit_inicio')
+      : document.getElementById('edit_assinatura');
+    if (_badEl) { _badEl.style.borderColor = '#dc3545'; _badEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    btnSalvar.disabled = false;
+    btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+    document.getElementById('detalhesConteudo').insertAdjacentHTML('afterbegin', `
+      <div class="alert alert-warning alert-dismissible mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle me-1"></i> As datas de <strong>Assinatura</strong> e <strong>Início</strong> não podem estar a mais de <strong>6 meses</strong> da data de hoje.
+        <button class="btn-close" data-bs-dismiss="alert"></button>
+      </div>`);
+    return;
+  }
+
+  const data = {};
+  form.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.name) data[el.name] = el.value;
+  });
+
+  // Converter total_previsto de formato BR (454.998,56) para decimal (454998.56)
+  if (data.total_previsto) {
+    data.total_previsto = data.total_previsto.replace(/\./g, '').replace(',', '.');
+  }
+  // Incluir endereços de execução do projeto
+  data.enderecos = coletarEnderecos();
+
+  fetch(`/celebracao-parcerias/editar/${currentEditId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        document.getElementById('detalhesConteudo').insertAdjacentHTML('afterbegin', `
+          <div class="alert alert-success alert-dismissible mb-3" role="alert">
+            <i class="bi bi-check-circle me-1"></i> ${res.mensagem}
+            <button class="btn-close" data-bs-dismiss="alert"></button>
+          </div>`);
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        document.getElementById('detalhesConteudo').insertAdjacentHTML('afterbegin', `
+          <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+            <i class="bi bi-exclamation-circle me-1"></i> Erro: ${res.erro}
+            <button class="btn-close" data-bs-dismiss="alert"></button>
+          </div>`);
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+      }
+    })
+    .catch(err => {
+      alert('Erro: ' + err);
+      btnSalvar.disabled = false;
+      btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+    });
+}
+
+function montarFormularioEdicao(r) {
+  function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function opts(lista, valor) {
+    let html = '<option value="">-- Selecione --</option>';
+    const v = valor || '';
+    const all = [...lista];
+    if (v && !all.includes(v)) all.unshift(v);
+    all.forEach(o => {
+      const sel = o === v ? ' selected' : '';
+      html += `<option value="${esc(o)}"${sel}>${esc(o)}</option>`;
+    });
+    return html;
+  }
+  function txt(campo, valor, extra = '') {
+    return `<input type="text" class="form-control form-control-sm" id="edit_${campo}" name="${campo}" value="${esc(valor)}" ${extra}>`;
+  }
+  function num(campo, valor, step = '1') {
+    const v = (valor !== null && valor !== undefined) ? valor : '';
+    return `<input type="number" step="${step}" class="form-control form-control-sm" id="edit_${campo}" name="${campo}" value="${v}">`;
+  }
+  function dat(campo, valor) {
+    return `<input type="date" class="form-control form-control-sm" id="edit_${campo}" name="${campo}" value="${esc(valor)}">`;
+  }
+  function sel(campo, lista, valor) {
+    return `<select class="form-select form-select-sm" id="edit_${campo}" name="${campo}">${opts(lista, valor)}</select>`;
+  }
+  function fld(label, inputHTML, colMd = 4) {
+    return `<div class="col-md-${colMd}">
+      <label class="form-label fw-bold text-muted mb-1 small">${label}</label>
+      ${inputHTML}
+    </div>`;
+  }
+  function sec(icon, title) {
+    return `<div class="col-12">
+      <h6 class="text-primary fw-bold border-bottom pb-2 mt-3">
+        <i class="bi bi-${icon} me-1"></i> ${title}
+      </h6>
+    </div>`;
+  }
+
+  // Campo CNPJ com máscara, validação e botão de busca de OSC
+  function cnpjField(valor) {
+    const v = esc(valor);
+    return `<div class="input-group input-group-sm">
+        <input type="text" class="form-control form-control-sm" id="edit_cnpj" name="cnpj"
+          value="${v}" placeholder="00.000.000/0000-00" maxlength="18"
+          oninput="formatarCNPJ(this)" onblur="validarCNPJ(this)">
+        <button class="btn btn-outline-secondary btn-sm" type="button"
+          onclick="buscarOSCporCNPJ()" title="Buscar OSC por este CNPJ">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
+      <div id="cnpj_warn" class="small mt-1 text-warning" style="display:none;">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>Formato esperado: 00.000.000/0000-00
+      </div>`;
+  }
+
+  // Campo OSC com tooltip de padronização
+  const OSC_TOOLTIP = `Padrão de nomenclatura:
+• Com acrônimo: AACC: Associação de Apoio à Criança com Câncer
+• Com designação: A Alternativa - Associação de Assistência ao Excepcional
+• Sem acrônimo: Ação Comunitária Senhor Santo Cristo
+Preposições em minúsculo, demais termos com Maiúscula inicial.`;
+
+  function oscField(valor) {
+    return `<div class="input-group input-group-sm" id="osc_group">
+        <input type="text" class="form-control form-control-sm" id="edit_osc" name="osc"
+          value="${esc(valor)}" placeholder="Nome da OSC">
+        <span class="input-group-text" style="cursor:help;"
+          data-bs-toggle="tooltip" data-bs-placement="top"
+          title="${esc(OSC_TOOLTIP)}" id="osc_tip">
+          <i class="bi bi-info-circle text-primary"></i>
+        </span>
+      </div>
+      <div id="osc_lookup_result" class="mt-1" style="display:none;"></div>`;
+  }
+
+  // Campo Responsável: múltiplos, via checkboxes + hidden input
+  function responsavelField(valor) {
+    const selecionados = (valor || '').split(';').map(v => v.trim()).filter(v => v);
+    let checks = RESPONSAVEIS_NOMES.map(nome => {
+      const checked = selecionados.includes(nome) ? 'checked' : '';
+      return `<div class="form-check form-check-inline">
+          <input class="form-check-input resp-check" type="checkbox"
+            value="${esc(nome)}" id="resp_${esc(nome).replace(/[^a-zA-Z0-9]/g,'_')}"
+            ${checked} onchange="sincronizarResponsaveis()">
+          <label class="form-check-label small"
+            for="resp_${esc(nome).replace(/[^a-zA-Z0-9]/g,'_')}">${esc(nome)}</label>
+        </div>`;
+    }).join('');
+    return `<div class="border rounded p-2" style="max-height:110px;overflow-y:auto;background:#fff;">
+        ${checks || '<span class="text-muted small">Nenhum analista cadastrado</span>'}
+      </div>
+      <input type="hidden" id="edit_responsavel" name="responsavel" value="${esc(valor || '')}">`;
+  }
+
+  // Campo SEI com máscara e validação (definido localmente — formatarSEI/validarSEI são globais)
+  function seiField(valor) {
+    const v = esc(valor);
+    return `<input type="text" class="form-control form-control-sm" id="edit_sei_celeb" name="sei_celeb"
+        value="${v}" placeholder="0000.0000/0000000-0" maxlength="20"
+        oninput="formatarSEI(this)" onblur="validarSEI(this)">
+      <div id="sei_celeb_warn" class="small mt-1 text-warning" style="display:none;">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>Formato esperado: 0000.0000/0000000-0
+      </div>`;
+  }
+
+  // Campo Nº Termo: somente leitura, auto-construído
+  function numeroTermoField(valor) {
+    return `<input type="text" class="form-control form-control-sm" id="edit_numero_termo" name="numero_termo"
+        value="${esc(valor)}" readonly style="background:#f0f0f0;cursor:not-allowed;"
+        placeholder="Gerado automaticamente">`;
+  }
+
+  // Campo Substatus: múltiplos, filtrados pelo status id vs substatus_limite
+  function substatusField(statusAtual, valorAtual) {
+    const selecionados = (valorAtual || '').split(';').map(v => v.trim()).filter(v => v);
+    const statusId = STATUS_IDS[statusAtual] || 0;
+    // só mostra substatus cujo limite >= statusId (quando statusId > 0)
+    const disponiveis = SUBSTATUS_LIST.filter(s =>
+      statusId === 0 || (SUBSTATUS_LIMITES[s] || 0) >= statusId
+    );
+    let checks = disponiveis.map(sub => {
+      const checked = selecionados.includes(sub) ? 'checked' : '';
+      const safeId = 'sub_' + sub.replace(/[^a-zA-Z0-9]/g,'_');
+      return `<div class="form-check">
+          <input class="form-check-input substatus-check" type="checkbox"
+            value="${esc(sub)}" id="${safeId}"
+            ${checked} onchange="sincronizarSubstatus()">
+          <label class="form-check-label small" for="${safeId}">${esc(sub)}</label>
+        </div>`;
+    }).join('');
+    if (!checks) checks = '<span class="text-muted small">Nenhum substatus disponível para este status.</span>';
+    return `<div class="border rounded p-2" style="max-height:130px;overflow-y:auto;background:#fff;" id="substatus_box">
+        ${checks}
+      </div>
+      <input type="hidden" id="edit_substatus" name="substatus" value="${esc(valorAtual || '')}">`;
+  }
+
+  return `<form id="formEditarRegistro">
+    <div class="row g-2">
+      ${sec('card-heading', 'Identificação')}
+      <div class="col-md-1">
+        <label class="form-label fw-bold text-muted mb-1 small">ID</label>
+        <p class="form-control-plaintext form-control-sm fw-bold">${r.id}</p>
+      </div>
+      ${fld('SEI Celebração', seiField(r.sei_celeb))}
+      ${fld('Nº Termo', numeroTermoField(r.numero_termo))}
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Numeração do Termo</label>
+        <input type="number" class="form-control form-control-sm" id="edit_numeracao_termo"
+          name="numeracao_termo" value="${(r.numeracao_termo !== null && r.numeracao_termo !== undefined) ? r.numeracao_termo : ''}"
+          min="1" max="999" step="1" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,3)"
+          onchange="rebuildNumeroTermo()">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Tipo de Termo</label>
+        <select class="form-select form-select-sm" id="edit_tipo_termo" name="tipo_termo"
+          onchange="rebuildNumeroTermo()">${opts(TIPO_TERMO_LIST, r.tipo_termo)}</select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Edital</label>
+        <select class="form-select form-select-sm" id="edit_edital_nome" name="edital_nome"
+          onchange="rebuildNumeroTermo()">${opts(EDITAIS_LIST, r.edital_nome)}</select>
+      </div>
+
+      ${sec('building', 'OSC e Projeto')}
+      ${fld('CNPJ', cnpjField(r.cnpj), 3)}
+      <div class="col-md-6">
+        <label class="form-label fw-bold text-muted mb-1 small">OSC</label>
+        ${oscField(r.osc)}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-bold text-muted mb-1 small">Responsável(eis)</label>
+        ${responsavelField(r.responsavel)}
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-bold text-muted mb-1 small">Projeto</label>
+        <input type="text" class="form-control form-control-sm" id="edit_projeto" name="projeto" value="${esc(r.projeto)}">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-bold text-muted mb-1 small">
+          Endereço Sede
+          <span style="cursor:help;" data-bs-toggle="tooltip" data-bs-placement="top"
+            title="Esta informação constará no cabeçalho do Termo de Parceria quando firmado.">
+            <i class="bi bi-info-circle text-primary ms-1"></i>
+          </span>
+        </label>
+        <input type="text" class="form-control form-control-sm" id="edit_endereco_sede" name="endereco_sede" value="${esc(r.endereco_sede)}">
+      </div>
+
+      ${sec('flag', 'Status')}
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Status</label>
+        <select class="form-select form-select-sm" id="edit_status" name="status"
+          onchange="aoMudarStatus(this.value)">${opts(STATUS_LIST, r.status)}</select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">
+          Status Genérico
+          <small class="text-muted fw-normal">(automático)</small>
+        </label>
+        <input type="text" class="form-control form-control-sm" id="edit_status_generico"
+          name="status_generico" value="${esc(r.status_generico)}"
+          readonly style="background:#f0f0f0;cursor:not-allowed;">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">
+          Nome PG
+          <small class="text-muted fw-normal">(Pessoa Gestora)</small>
+        </label>
+        <select class="form-select form-select-sm" id="edit_nome_pg" name="nome_pg">${opts(NOME_PG_LIST, r.nome_pg)}</select>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-bold text-muted mb-1 small">Substatus</label>
+        ${substatusField(r.status, r.substatus)}
+      </div>
+
+      ${sec('currency-dollar', 'Financeiro')}
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Total Previsto (R$)</label>
+        <input type="text" class="form-control form-control-sm" id="edit_total_previsto"
+          name="total_previsto" value="${brMoney(r.total_previsto)}"
+          onblur="formatarTotalPrevisto(this)" placeholder="Ex: 454.998,56">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">
+          Conta
+          <span style="cursor:help;" data-bs-toggle="tooltip" data-bs-placement="top"
+            title="Informe agência e conta corrente. Ex: 001 / 12345-6">
+            <i class="bi bi-info-circle text-primary ms-1"></i>
+          </span>
+        </label>
+        <input type="text" class="form-control form-control-sm" id="edit_conta"
+          name="conta" value="${esc(r.conta)}"
+          placeholder="Ex: 001 / 12345-6 (agência / conta)">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">
+          Lei / Portaria
+          <button type="button" class="btn btn-outline-success btn-sm py-0 ms-1" style="font-size:0.7rem;"
+            onclick="autoDetectarLei(true)" title="Detectar portaria automaticamente">
+            <i class="bi bi-lightning-charge"></i> Auto
+          </button>
+        </label>
+        <select class="form-select form-select-sm" id="edit_lei" name="lei">${opts(LEI_LIST, r.lei)}</select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Unidade Gestora</label>
+        <select class="form-select form-select-sm" id="edit_unidade_gestora" name="unidade_gestora"
+          onchange="rebuildNumeroTermo()">${opts(UNIDADES_LIST, r.unidade_gestora)}</select>
+      </div>
+
+      ${sec('calendar3', 'Datas e Vigência')}
+      ${fld('Meses', `<input type="number" step="1" min="0" class="form-control form-control-sm" id="edit_meses" name="meses" value="${r.meses ?? ''}" onchange="calcularDataFinal()">`, 2)}
+      ${fld('Dias', `<input type="number" step="1" min="0" class="form-control form-control-sm" id="edit_dias" name="dias" value="${r.dias ?? ''}" onchange="calcularDataFinal()">`, 2)}
+      <div class="col-md-2">
+        <label class="form-label fw-bold text-muted mb-1 small">Início</label>
+        <input type="date" class="form-control form-control-sm" id="edit_inicio"
+          name="inicio" value="${esc(r.inicio)}"
+          onchange="rebuildNumeroTermo(); autoDetectarLei(false); calcularDataFinal();">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold text-muted mb-1 small">
+          Final
+          <small class="text-muted fw-normal">(auto)</small>
+        </label>
+        <input type="date" class="form-control form-control-sm" id="edit_final"
+          name="final" value="${esc(r.final)}"
+          style="background:#f0f0f0;" title="Calculado automaticamente a partir de Início + Meses + Dias">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold text-muted mb-1 small">Assinatura</label>
+        <input type="date" class="form-control form-control-sm" id="edit_assinatura"
+          name="assinatura" value="${esc(r.assinatura)}" onchange="rebuildNumeroTermo()">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold text-muted mb-1 small">Secretaria</label>
+        <select class="form-select form-select-sm" id="edit_celebracao_secretaria" name="celebracao_secretaria"
+          onchange="rebuildNumeroTermo()">
+          ${['SMDHC','SMADS','SME'].map(o => `<option value="${o}"${r.celebracao_secretaria===o?' selected':''}>${o}</option>`).join('')}
+        </select>
+      </div>
+
+      ${sec('chat-left-text', 'Observações')}
+      <div class="col-12">
+        <textarea class="form-control form-control-sm" id="edit_observacoes" name="observacoes" rows="4">${esc(r.observacoes)}</textarea>
+      </div>
+
+      ${sec('geo-alt', 'Endereços de Execução do Projeto')}
+      <div class="col-12">
+        ${r.sei_celeb
+          ? `<div class="form-check mb-2">
+               <input class="form-check-input" type="checkbox" id="projeto_online_check"
+                 onchange="toggleProjetoOnline(this)">
+               <label class="form-check-label small fw-bold" for="projeto_online_check">
+                 <i class="bi bi-wifi me-1"></i> O projeto é integralmente online
+               </label>
+             </div>
+             <div id="enderecos_exec_container" class="mb-2"></div>
+             <button type="button" id="btn_add_endereco" class="btn btn-outline-success btn-sm" onclick="adicionarEnderecoExec({})">
+               <i class="bi bi-plus-circle me-1"></i> Adicionar Endereço
+             </button>`
+          : `<div class="alert alert-warning py-2 mb-0">
+               <i class="bi bi-exclamation-triangle me-1"></i>
+               Preencha o campo <strong>SEI Celebração</strong> e salve antes de adicionar endereços.
+             </div>`
+        }
+      </div>
+    </div>
+  </form>`;
+}
+
+// Sincroniza os checkboxes no hidden input de responsavel
+function sincronizarResponsaveis() {
+  const form = document.getElementById('formEditarRegistro');
+  if (!form) return;
+  const checks = form.querySelectorAll('.resp-check:checked');
+  const vals = Array.from(checks).map(cb => cb.value).filter(v => v);
+  const hidden = document.getElementById('edit_responsavel');
+  if (hidden) hidden.value = vals.join(';');
+}
+
+// ── Substatus: sincronizar hidden input ───────────────────────────────────
+function sincronizarSubstatus() {
+  const checks = document.querySelectorAll('#substatus_box .substatus-check:checked');
+  const vals = Array.from(checks).map(cb => cb.value).filter(v => v);
+  const hidden = document.getElementById('edit_substatus');
+  if (hidden) hidden.value = vals.join(';');
+}
+
+// ── Status: ao mudar, atualiza Status Genérico e filtra Substatus ─────────
+function aoMudarStatus(statusVal) {
+  // Preencher Status Genérico automaticamente (readonly)
+  const sgEl = document.getElementById('edit_status_generico');
+  if (sgEl) sgEl.value = STATUS_GEN_MAP[statusVal] || '';
+  // Reconstruir caixas de substatus para o novo status
+  const box = document.getElementById('substatus_box');
+  if (!box) return;
+  const statusId = STATUS_IDS[statusVal] || 0;
+  const hiddenAtual = document.getElementById('edit_substatus');
+  const selecionados = hiddenAtual ? hiddenAtual.value.split(';').map(v => v.trim()).filter(v => v) : [];
+  let html = '';
+  SUBSTATUS_LIST.forEach(sub => {
+    const limite = SUBSTATUS_LIMITES[sub] || 0;
+    if (statusId === 0 || limite < statusId) return; // não disponível para este status
+    const safeId = 'sub_' + sub.replace(/[^a-zA-Z0-9]/g,'_');
+    const checked = selecionados.includes(sub) ? 'checked' : '';
+    html += `<div class="form-check">
+      <input class="form-check-input substatus-check" type="checkbox"
+        value="${sub}" id="${safeId}" ${checked} onchange="sincronizarSubstatus()">
+      <label class="form-check-label small" for="${safeId}">${sub}</label>
+    </div>`;
+  });
+  box.innerHTML = html || '<span class="text-muted small">Nenhum substatus disponível para este status.</span>';
+  sincronizarSubstatus();
+}
+
+// ── Calcular data final automaticamente ───────────────────────────────────
+function calcularDataFinal() {
+  const inicioEl = document.getElementById('edit_inicio');
+  const mesesEl  = document.getElementById('edit_meses');
+  const diasEl   = document.getElementById('edit_dias');
+  const finalEl  = document.getElementById('edit_final');
+  if (!inicioEl || !finalEl || !inicioEl.value) { if (finalEl) finalEl.value = ''; return; }
+  const meses = parseInt(mesesEl?.value) || 0;
+  const dias  = parseInt(diasEl?.value)  || 0;
+  if (meses === 0 && dias === 0) { finalEl.value = ''; return; }
+  const d = new Date(inicioEl.value + 'T00:00:00');
+  d.setMonth(d.getMonth() + meses);
+  d.setDate(d.getDate() + dias - 1);
+  const y  = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  finalEl.value = `${y}-${mm}-${dd}`;
+}
+
+// ── Endereços de Execução do Projeto ──────────────────────────────────────
+let contadorEndExec = 0;
+
+function adicionarEnderecoExec(dados) {
+  const container = document.getElementById('enderecos_exec_container');
+  if (!container) return;
+  contadorEndExec++;
+  const uid  = 'end_' + contadorEndExec;
+  const logr = (dados.parceria_logradouro  || '').replace(/"/g, '&quot;');
+  const comp = (dados.parceria_complemento || '').replace(/"/g, '&quot;');
+  const cep  = (dados.parceria_cep         || '').replace(/"/g, '&quot;');
+  const obs  = (dados.observacao           || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const num  =  dados.parceria_numero      || '';
+  const div  = document.createElement('div');
+  div.className   = 'endereco-exec-item border rounded p-3 mb-2';
+  div.dataset.uid = uid;
+  div.innerHTML   = `
+    <div class="d-flex justify-content-between mb-2">
+      <h6 class="mb-0 small fw-bold text-muted">Endereço #${contadorEndExec}</h6>
+      <button type="button" class="btn btn-sm btn-outline-danger py-0"
+        onclick="removerEnderecoExec('${uid}')"><i class="bi bi-trash"></i></button>
+    </div>
+    <div class="row g-2">
+      <div class="col-md-8"><label class="form-label small mb-0">Logradouro</label>
+        <input type="text" class="form-control form-control-sm ee-logradouro" value="${logr}"></div>
+      <div class="col-md-4"><label class="form-label small mb-0">Número</label>
+        <input type="number" class="form-control form-control-sm ee-numero" value="${num}"></div>
+      <div class="col-md-6"><label class="form-label small mb-0">Complemento</label>
+        <input type="text" class="form-control form-control-sm ee-complemento" value="${comp}"></div>
+      <div class="col-md-6"><label class="form-label small mb-0">CEP</label>
+        <input type="text" class="form-control form-control-sm ee-cep" value="${cep}" placeholder="00000-000"></div>
+      <div class="col-12"><label class="form-label small mb-0">Distrito</label>
+        <select class="form-select form-select-sm ee-dist-sel" id="dist_${uid}"></select></div>
+      <div class="col-md-6"><label class="form-label small mb-0">Subprefeitura <span class="text-muted fw-normal">(auto)</span></label>
+        <input type="text" class="form-control form-control-sm ee-subprefeitura" readonly style="background:#f8f9fa;" placeholder="—"></div>
+      <div class="col-md-6"><label class="form-label small mb-0">Região <span class="text-muted fw-normal">(auto)</span></label>
+        <input type="text" class="form-control form-control-sm ee-regiao" readonly style="background:#f8f9fa;" placeholder="—"></div>
+      <div class="col-12"><label class="form-label small mb-0">Observação</label>
+        <textarea class="form-control form-control-sm ee-observacao" rows="2">${obs}</textarea></div>
+    </div>`;
+  container.appendChild(div);
+  // CEP mask
+  div.querySelector('.ee-cep').addEventListener('input', function(e) {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 5) v = v.slice(0, 5) + '-' + v.slice(5, 8);
+    e.target.value = v;
+  });
+  // Select2 para distrito
+  const sel = div.querySelector('.ee-dist-sel');
+  $(sel).select2({
+    theme: 'bootstrap-5', width: '100%',
+    ajax: {
+      url: '/celebracao-parcerias/api/distritos', dataType: 'json', delay: 250,
+      data: function(p) { return { q: p.term }; },
+      processResults: function(r) { return { results: r }; }, cache: true
+    },
+    placeholder: 'Digite para buscar distrito...', allowClear: true, minimumInputLength: 0
+  });
+  // Auto-fill subprefeitura/região ao selecionar distrito
+  $(sel).on('select2:select select2:clear', function() {
+    const distVal = $(this).val();
+    const sub = div.querySelector('.ee-subprefeitura');
+    const reg = div.querySelector('.ee-regiao');
+    const info = distVal && REGIONALIZACAO_MAP[distVal];
+    if (sub) sub.value = info ? (info.subprefeitura || '') : '';
+    if (reg) reg.value = info ? (info.regiao || '') : '';
+  });
+  if (dados.parceria_distrito) {
+    const opt = new Option(dados.parceria_distrito, dados.parceria_distrito, true, true);
+    $(sel).append(opt).trigger('change');
+    // Preencher subprefeitura/região ao carregar dados existentes
+    const info = REGIONALIZACAO_MAP[dados.parceria_distrito];
+    if (info) {
+      const sub = div.querySelector('.ee-subprefeitura');
+      const reg = div.querySelector('.ee-regiao');
+      if (sub) sub.value = info.subprefeitura || '';
+      if (reg) reg.value = info.regiao || '';
+    }
+  }
+}
+
+function removerEnderecoExec(uid) {
+  const el = document.querySelector(`[data-uid="${uid}"]`);
+  if (el) el.remove();
+}
+
+function coletarEnderecos() {
+  // Se projeto online, retorna registro especial
+  const onlineChk = document.getElementById('projeto_online_check');
+  if (onlineChk && onlineChk.checked) return [{ observacao: 'Online' }];
+  const result = [];
+  document.querySelectorAll('.endereco-exec-item').forEach(item => {
+    const sel = item.querySelector('.ee-dist-sel');
+    const distText = sel?.options[sel.selectedIndex]?.text || '';
+    result.push({
+      parceria_logradouro:  item.querySelector('.ee-logradouro')?.value  || '',
+      parceria_numero:      item.querySelector('.ee-numero')?.value       || '',
+      parceria_complemento: item.querySelector('.ee-complemento')?.value  || '',
+      parceria_cep:         item.querySelector('.ee-cep')?.value          || '',
+      parceria_distrito:    distText,
+      observacao:           item.querySelector('.ee-observacao')?.value   || ''
+    });
+  });
+  return result;
+}
+
+async function carregarEnderecos(recordId) {
+  const container = document.getElementById('enderecos_exec_container');
+  if (!container) return;
+  contadorEndExec = 0;
+  container.innerHTML = '';
+  try {
+    const resp = await fetch(`/celebracao-parcerias/enderecos/${recordId}`);
+    const d = await resp.json();
+    if (d.success && d.enderecos && d.enderecos.length) {
+      // Detectar projeto online: registro único com observacao='Online' e sem logradouro
+      const isOnline = d.enderecos.length === 1 &&
+        d.enderecos[0].observacao === 'Online' &&
+        !d.enderecos[0].parceria_logradouro;
+      const chk = document.getElementById('projeto_online_check');
+      if (isOnline && chk) {
+        chk.checked = true;
+        toggleProjetoOnline(chk);
+      } else {
+        d.enderecos.forEach(enc => adicionarEnderecoExec(enc));
+      }
+    }
+  } catch(e) { console.warn('carregarEnderecos:', e); }
+}
+
+// ── Projeto online: toggle da seção de endereços ──────────────────────────
+function toggleProjetoOnline(chk) {
+  const container = document.getElementById('enderecos_exec_container');
+  const btnAdd    = document.getElementById('btn_add_endereco');
+  if (chk.checked) {
+    if (container) { container.innerHTML = ''; }
+    if (btnAdd) { btnAdd.style.display = 'none'; }
+  } else {
+    if (btnAdd) { btnAdd.style.display = ''; }
+  }
+}
+
+// ── Validação: data está a mais de 6 meses de hoje? ───────────────────────
+function _dataFora6Meses(ds) {
+  if (!ds) return false;
+  const d = new Date(ds + 'T00:00:00');
+  const h = new Date(); h.setHours(0, 0, 0, 0);
+  const l1 = new Date(h); l1.setMonth(l1.getMonth() - 6);
+  const l2 = new Date(h); l2.setMonth(l2.getMonth() + 6);
+  return d < l1 || d > l2;
+}
+
+// ── Total Previsto: formatação monetária BR ───────────────────────────────
+function brMoney(v) {
+  if (v === null || v === undefined || v === '') return '';
+  const n = parseFloat(String(v).replace(',', '.'));
+  if (isNaN(n)) return '';
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatarTotalPrevisto(input) {
+  const raw = input.value.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(raw);
+  if (!isNaN(n)) {
+    input.value = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+}
+
+// ── Lei: auto-detecção via /api/portaria-automatica ───────────────────────
+async function autoDetectarLei(forcar) {
+  const leiEl = document.getElementById('edit_lei');
+  if (!leiEl) return;
+  // Não sobrescreve valor existente, a não ser que forçado pelo botão
+  if (!forcar && leiEl.value) return;
+  const numeroTermo = (document.getElementById('edit_numero_termo') || {}).value || '';
+  const inicio = (document.getElementById('edit_inicio') || {}).value || '';
+  if (!numeroTermo || !inicio) return;
+  try {
+    const resp = await fetch('/api/portaria-automatica', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data_inicio: inicio, numero_termo: numeroTermo })
+    });
+    const d = await resp.json();
+    if (d.portaria) {
+      leiEl.value = d.portaria;
+      leiEl.style.borderColor = '#28a745';
+      setTimeout(() => { leiEl.style.borderColor = ''; }, 2000);
+    }
+  } catch(e) { console.warn('autoDetectarLei:', e); }
+}
+
+// ── CNPJ: máscara e validação ──────────────────────────────────────────────
+function formatarCNPJ(input) {
+  let d = input.value.replace(/[^\d]/g, '').slice(0, 14);
+  let out = '';
+  if (d.length > 0)  out  = d.slice(0, Math.min(2, d.length));
+  if (d.length > 2)  out += '.' + d.slice(2, Math.min(5, d.length));
+  if (d.length > 5)  out += '.' + d.slice(5, Math.min(8, d.length));
+  if (d.length > 8)  out += '/' + d.slice(8, Math.min(12, d.length));
+  if (d.length > 12) out += '-' + d.slice(12, 14);
+  input.value = out;
+  validarCNPJ(input);
+}
+
+function validarCNPJ(input) {
+  const re = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
+  const warn = document.getElementById('cnpj_warn');
+  if (!input.value || re.test(input.value)) {
+    input.style.borderColor = '';
+    input.style.backgroundColor = '';
+    if (warn) warn.style.display = 'none';
+  } else {
+    input.style.borderColor = '#ffc107';
+    input.style.backgroundColor = '#fffef0';
+    if (warn) warn.style.display = '';
+  }
+}
+
+// ── CNPJ → OSC lookup ─────────────────────────────────────────────────────
+function buscarOSCporCNPJ() {
+  const cnpjEl = document.getElementById('edit_cnpj');
+  const oscEl  = document.getElementById('edit_osc');
+  const resultDiv = document.getElementById('osc_lookup_result');
+  if (!cnpjEl || !oscEl || !resultDiv) return;
+
+  const cnpj = cnpjEl.value.trim();
+  if (!cnpj) { resultDiv.style.display = 'none'; return; }
+
+  const re = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
+  if (!re.test(cnpj)) {
+    resultDiv.style.display = '';
+    resultDiv.innerHTML = '<span class="text-warning small"><i class="bi bi-exclamation-triangle-fill me-1"></i>Digite um CNPJ válido antes de buscar.</span>';
+    return;
+  }
+
+  resultDiv.style.display = '';
+  resultDiv.innerHTML = '<span class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Buscando...</span>';
+
+  fetch(`/celebracao-parcerias/cnpj-lookup?cnpj=${encodeURIComponent(cnpj)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) {
+        resultDiv.innerHTML = `<span class="text-danger small"><i class="bi bi-x-circle me-1"></i>${data.erro}</span>`;
+        return;
+      }
+      if (data.resultados.length === 0) {
+        resultDiv.innerHTML = '<span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Nenhuma OSC encontrada para este CNPJ.</span>';
+        return;
+      }
+      if (data.resultados.length === 1) {
+        oscEl.value = data.resultados[0];
+        resultDiv.innerHTML = `<span class="text-success small"><i class="bi bi-check-circle me-1"></i>OSC preenchida automaticamente.</span>`;
+        setTimeout(() => { resultDiv.style.display = 'none'; }, 2500);
+        return;
+      }
+      // Múltiplos resultados: mostrar opções
+      let btns = data.resultados.map(nome =>
+        `<button type="button" class="btn btn-outline-secondary btn-sm me-1 mb-1"
+          onclick="document.getElementById('edit_osc').value=this.dataset.nome; document.getElementById('osc_lookup_result').style.display='none';"
+          data-nome="${nome.replace(/"/g,'&quot;')}">${nome}</button>`
+      ).join('');
+      resultDiv.innerHTML = `<div class="small text-muted mb-1"><i class="bi bi-list-ul me-1"></i>Múltiplos registros encontrados. Escolha:</div>${btns}`;
+    })
+    .catch(err => {
+      resultDiv.innerHTML = `<span class="text-danger small">Erro: ${err}</span>`;
+    });
+}
+
+// ── SEI: máscara automática e validação ────────────────────────────────────
+function formatarSEI(input) {
+  let digits = input.value.replace(/[^\d]/g, '').slice(0, 16);
+  let out = '';
+  if (digits.length > 0)  out  = digits.slice(0, Math.min(4, digits.length));
+  if (digits.length > 4)  out += '.' + digits.slice(4, Math.min(8,  digits.length));
+  if (digits.length > 8)  out += '/' + digits.slice(8, Math.min(15, digits.length));
+  if (digits.length > 15) out += '-' + digits.slice(15, 16);
+  input.value = out;
+  validarSEI(input);
+}
+
+function validarSEI(input) {
+  const re = /^\d{4}\.\d{4}\/\d{6,7}-\d$/;
+  const warn = document.getElementById('sei_celeb_warn');
+  if (!input.value || re.test(input.value)) {
+    input.style.borderColor = '';
+    input.style.backgroundColor = '';
+    if (warn) warn.style.display = 'none';
+  } else {
+    input.style.borderColor = '#ffc107';
+    input.style.backgroundColor = '#fffef0';
+    if (warn) warn.style.display = '';
+  }
+}
+
+// ── Nº Termo: auto-construção ──────────────────────────────────────────────
+function rebuildNumeroTermo() {
+  const tipo      = document.getElementById('edit_tipo_termo')?.value || '';
+  const numStr    = document.getElementById('edit_numeracao_termo')?.value || '';
+  const assin     = document.getElementById('edit_assinatura')?.value || '';
+  const secretaria = document.getElementById('edit_celebracao_secretaria')?.value.trim() || '';
+  const edital    = document.getElementById('edit_edital_nome')?.value || '';
+  const unidade   = document.getElementById('edit_unidade_gestora')?.value.trim() || '';
+  const campo     = document.getElementById('edit_numero_termo');
+  if (!campo) return;
+
+  if (!tipo || !numStr || !assin || !secretaria) {
+    campo.value = '';
+    return;
+  }
+
+  const prefixMap = { 'Acordo de Cooperação': 'ACP', 'Colaboração': 'TCL', 'Fomento': 'TFM' };
+  const prefix = prefixMap[tipo] || tipo;
+
+  const numInt = parseInt(numStr, 10);
+  if (isNaN(numInt) || numInt < 1) { campo.value = ''; return; }
+  const numPad = String(numInt).padStart(3, '0');
+
+  const ano = assin.substring(0, 4);
+
+  const editalUp = edital.toUpperCase();
+  let ultimaParte = unidade;
+  if (editalUp.includes('FUMCAD')) ultimaParte = 'FUMCAD';
+  else if (editalUp.includes('FMID')) ultimaParte = 'FMID';
+
+  campo.value = `${prefix}/${numPad}/${ano}/${secretaria}${ultimaParte ? '/' + ultimaParte : ''}`;
+}
+
+
+
+
+// ── Autocomplete ──────────────────────────────────────────────────────────
+let autocompleteTimeout = null;
+
+document.querySelectorAll('.autocomplete-input').forEach(input => {
+  input.addEventListener('input', function() {
+    const campo = this.dataset.campo;
+    const valor = this.value.trim();
+
+    // Remover dropdown anterior
+    const existente = this.parentElement.querySelector('.autocomplete-list');
+    if (existente) existente.remove();
+
+    if (valor.length < 2) return;
+
+    clearTimeout(autocompleteTimeout);
+    autocompleteTimeout = setTimeout(() => {
+      fetch(`/celebracao-parcerias/sugestoes/${campo}?q=${encodeURIComponent(valor)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success || data.valores.length === 0) return;
+
+          const lista = document.createElement('div');
+          lista.className = 'autocomplete-list';
+
+          data.valores.forEach(v => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.textContent = v;
+            item.addEventListener('click', () => {
+              input.value = v;
+              lista.remove();
+            });
+            lista.appendChild(item);
+          });
+
+          input.parentElement.appendChild(lista);
+        })
+        .catch(() => {});
+    }, 300);
+  });
+
+  // Fechar dropdown ao sair do campo
+  input.addEventListener('blur', function() {
+    setTimeout(() => {
+      const existente = this.parentElement.querySelector('.autocomplete-list');
+      if (existente) existente.remove();
+    }, 200);
+  });
+});
+
+
+// ── Visualização Geral (admin) ────────────────────────────────────────────
+function abrirVisualizacaoGeral() {
+  const modal = new bootstrap.Modal(document.getElementById('modalVisualizacao'));
+  const container = document.getElementById('listaVisualizacao');
+
+  container.innerHTML = `
+    <div class="text-center py-3">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Carregando...</span>
+      </div>
+    </div>`;
+
+  modal.show();
+
+  fetch('/celebracao-parcerias/visualizacao-geral')
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) {
+        container.innerHTML = `<div class="alert alert-danger">${data.erro}</div>`;
+        return;
+      }
+
+      if (data.analistas.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">Nenhum analista DGP cadastrado.</div>';
+        return;
+      }
+
+      let html = '<div class="list-group">';
+      data.analistas.forEach(a => {
+        const checked = a.visualizacao_geral ? 'checked' : '';
+        const statusBadge = a.status === 'Ativo'
+          ? '<span class="badge bg-success ms-2">Ativo</span>'
+          : '<span class="badge bg-secondary ms-2">Inativo</span>';
+
+        html += `
+          <label class="list-group-item d-flex align-items-center gap-3" style="cursor:pointer;">
+            <input type="checkbox" class="form-check-input flex-shrink-0"
+                   data-analista-id="${a.id}" ${checked}
+                   style="width:1.2em; height:1.2em;">
+            <div>
+              <strong>${a.nome_analista}</strong>
+              ${statusBadge}
+              <br><small class="text-muted">RF: ${a.rf || '-'}</small>
+            </div>
+          </label>`;
+      });
+      html += '</div>';
+
+      container.innerHTML = html;
+    })
+    .catch(err => {
+      container.innerHTML = `<div class="alert alert-danger">Erro: ${err}</div>`;
+    });
+}
+
+function salvarVisualizacaoGeral() {
+  const checkboxes = document.querySelectorAll('#listaVisualizacao input[type="checkbox"]');
+  const analistas = [];
+
+  checkboxes.forEach(cb => {
+    analistas.push({
+      id: parseInt(cb.dataset.analistaId),
+      visualizacao_geral: cb.checked
+    });
+  });
+
+  fetch('/celebracao-parcerias/visualizacao-geral', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ analistas })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        alert('Visualização geral atualizada com sucesso!');
+        bootstrap.Modal.getInstance(document.getElementById('modalVisualizacao')).hide();
+      } else {
+        alert('Erro: ' + data.erro);
+      }
+    })
+    .catch(err => alert('Erro: ' + err));
+}
+
+</script>
+</body>
+</html>

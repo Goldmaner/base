@@ -1089,25 +1089,64 @@ def juntar_pdfs(nome_pasta):
         print(f"[DEBUG PDF] Nome da pasta recebido: {nome_pasta}")
         
         osc_data = None
+        certidoes_por_path = None
         
         # ========================================
-        # OPÇÃO 2: Buscar diretamente na tabela certidoes pelo OSC
+        # OPÇÃO 0: Buscar diretamente pelo certidao_path (mais confiável)
         # ========================================
-        print(f"[DEBUG PDF] OPÇÃO 2: Buscando em certidoes pelo OSC...")
-        
-        # Tentar busca exata primeiro (com normalização de acentos via unaccent ou similar pattern)
-        palavras_busca = nome_busca.split()
-        
-        # Busca com LIKE para cada palavra (tolerante a acentos)
+        print(f"[DEBUG PDF] OPÇÃO 0: Buscando em certidoes pelo path da pasta...")
         cur.execute("""
             SELECT DISTINCT osc, cnpj 
             FROM public.certidoes 
-            WHERE LOWER(osc) LIKE %s
+            WHERE certidao_path LIKE %s
             LIMIT 1
-        """, [f'%{" ".join(palavras_busca)}%'])
+        """, [f'{nome_pasta}/%'])
         
         osc_data = cur.fetchone()
-        print(f"[DEBUG PDF] OPÇÃO 2 - Resultado: {osc_data is not None}")
+        print(f"[DEBUG PDF] OPÇÃO 0 - Resultado: {osc_data is not None}")
+        
+        if osc_data:
+            # Buscar todas as certidões diretamente pelo path (evita confusão de nome)
+            cur.execute("""
+                SELECT 
+                    certidao_nome,
+                    certidao_path,
+                    certidao_vencimento,
+                    certidao_status
+                FROM public.certidoes
+                WHERE certidao_path LIKE %s
+                ORDER BY 
+                    CASE certidao_nome
+                        WHEN 'CNPJ' THEN 1
+                        WHEN 'CND' THEN 2
+                        WHEN 'CNDT' THEN 3
+                        WHEN 'CRF' THEN 4
+                        WHEN 'CADIN Municipal' THEN 5
+                        WHEN 'CTM' THEN 6
+                        WHEN 'CENTS' THEN 7
+                        ELSE 8
+                    END
+            """, [f'{nome_pasta}/%'])
+            certidoes_por_path = cur.fetchall()
+            print(f"[DEBUG PDF] OPÇÃO 0 - Certidões por path: {len(certidoes_por_path)} - {[c['certidao_nome'] for c in certidoes_por_path]}")
+        
+        # ========================================
+        # OPÇÃO 2: Buscar diretamente na tabela certidoes pelo OSC (fallback)
+        # ========================================
+        if not osc_data:
+            print(f"[DEBUG PDF] OPÇÃO 2: Buscando em certidoes pelo OSC...")
+            
+            palavras_busca = nome_busca.split()
+            
+            cur.execute("""
+                SELECT DISTINCT osc, cnpj 
+                FROM public.certidoes 
+                WHERE LOWER(osc) LIKE %s
+                LIMIT 1
+            """, [f'%{" ".join(palavras_busca)}%'])
+            
+            osc_data = cur.fetchone()
+            print(f"[DEBUG PDF] OPÇÃO 2 - Resultado: {osc_data is not None}")
         
         # ========================================
         # OPÇÃO 1: Se não encontrou, buscar em parcerias (fallback)
@@ -1117,26 +1156,27 @@ def juntar_pdfs(nome_pasta):
             palavras = nome_busca.split()[:3]
             
             # Busca 1: primeiras 3 palavras
-            cur.execute("""
-                SELECT DISTINCT osc, cnpj 
-                FROM public.parcerias 
-                WHERE LOWER(osc) LIKE %s
-                LIMIT 1
-            """, [f'%{" ".join(palavras)}%'])
-            
-            osc_data = cur.fetchone()
-            print(f"[DEBUG PDF] OPÇÃO 1.1 (3 palavras) - Resultado: {osc_data is not None}")
-            
-            # Busca 2: Se não encontrou, tentar apenas primeira palavra
-            if not osc_data and palavras:
+            if len(palavras) >= 3:
                 cur.execute("""
                     SELECT DISTINCT osc, cnpj 
                     FROM public.parcerias 
                     WHERE LOWER(osc) LIKE %s
                     LIMIT 1
-                """, [f'{palavras[0]}%'])
+                """, [f'%{" ".join(palavras)}%'])
+                
                 osc_data = cur.fetchone()
-                print(f"[DEBUG PDF] OPÇÃO 1.2 (1ª palavra) - Resultado: {osc_data is not None}")
+                print(f"[DEBUG PDF] OPÇÃO 1.1 (3 palavras) - Resultado: {osc_data is not None}")
+            
+            # Busca 2: Se não encontrou, tentar com todas as palavras (sem fallback para 1ª palavra)
+            if not osc_data and len(palavras) >= 2:
+                cur.execute("""
+                    SELECT DISTINCT osc, cnpj 
+                    FROM public.parcerias 
+                    WHERE LOWER(osc) LIKE %s AND LOWER(osc) LIKE %s
+                    LIMIT 1
+                """, [f'%{palavras[0]}%', f'%{palavras[-1]}%'])
+                osc_data = cur.fetchone()
+                print(f"[DEBUG PDF] OPÇÃO 1.2 (1ª e última palavra) - Resultado: {osc_data is not None}")
         
         # ========================================
         # OPÇÃO 3: Se não encontrou no banco, tentar ler arquivos físicos da pasta
@@ -1165,29 +1205,33 @@ def juntar_pdfs(nome_pasta):
         
         print(f"[DEBUG PDF] OSC identificada: {osc_data['osc']}")
         
-        # Buscar todas as certidões da OSC no banco
-        cur.execute("""
-            SELECT 
-                certidao_nome,
-                certidao_path,
-                certidao_vencimento,
-                certidao_status
-            FROM public.certidoes
-            WHERE osc = %s
-            ORDER BY 
-                CASE certidao_nome
-                    WHEN 'CNPJ' THEN 1
-                    WHEN 'CND' THEN 2
-                    WHEN 'CNDT' THEN 3
-                    WHEN 'CRF' THEN 4
-                    WHEN 'CADIN Municipal' THEN 5
-                    WHEN 'CTM' THEN 6
-                    WHEN 'CENTS' THEN 7
-                    ELSE 8
-                END
-        """, [osc_data['osc']])
-        
-        certidoes = cur.fetchall()
+        # Se já temos certidões por path (OPÇÃO 0), usar diretamente
+        if certidoes_por_path is not None:
+            certidoes = certidoes_por_path
+        else:
+            # Buscar todas as certidões da OSC no banco pelo nome da OSC
+            cur.execute("""
+                SELECT 
+                    certidao_nome,
+                    certidao_path,
+                    certidao_vencimento,
+                    certidao_status
+                FROM public.certidoes
+                WHERE osc = %s
+                ORDER BY 
+                    CASE certidao_nome
+                        WHEN 'CNPJ' THEN 1
+                        WHEN 'CND' THEN 2
+                        WHEN 'CNDT' THEN 3
+                        WHEN 'CRF' THEN 4
+                        WHEN 'CADIN Municipal' THEN 5
+                        WHEN 'CTM' THEN 6
+                        WHEN 'CENTS' THEN 7
+                        ELSE 8
+                    END
+            """, [osc_data['osc']])
+            
+            certidoes = cur.fetchall()
         
         # Se não encontrou no banco, usar arquivos físicos
         if len(certidoes) == 0:

@@ -2942,10 +2942,15 @@
             
             // Se é primeiro mês da parcela (0, 3, 6...)
             if (mesNaParcela === 0) {
-                // Verificar se os próximos 2 meses estão no mesmo ano
+                // Verificar se os próximos 2 meses estão no mesmo ano (teoricamente)
                 const proximoMes2 = new Date(anoAtual, mesAtual - 1 + 2, 1);
                 if (proximoMes2.getFullYear() > anoAtual) {
-                    return `${parcelaIdx + 1}ª Parcela Parcial`;
+                    // Verificar se realmente existem linhas no próximo ano para esse trimestre
+                    // Primeiro índice do próximo ano neste trimestre: parcelaIdx*3 + (13 - mesAtual)
+                    const primeiroIndexProximoAno = parcelaIdx * 3 + (13 - mesAtual);
+                    if (primeiroIndexProximoAno < totalMeses) {
+                        return `${parcelaIdx + 1}ª Parcela Parcial`;
+                    }
                 }
                 return `${parcelaIdx + 1}ª Parcela`;
             } else {
@@ -2965,18 +2970,27 @@
             const mesAtual = mes;
             const anoAtual = ano;
             
-            // Verificar se cruza ano
+            // Verificar se cruza ano (teoricamente)
             const inicioSemestre = new Date(anoAtual, mesAtual - 1 - mesNaParcela, 1);
             const fimSemestre = new Date(anoAtual, mesAtual - 1 + (5 - mesNaParcela), 1);
             
             const anoInicio = inicioSemestre.getFullYear();
             const anoFim = fimSemestre.getFullYear();
             
-            // Se o semestre cruza o ano
+            // Se o semestre cruza o ano (teoricamente)
             if (anoInicio !== anoFim) {
-                // Meses do ano anterior = Parcial
+                // Meses do ano anterior = candidato a Parcial
                 if (anoAtual === anoInicio) {
-                    return `${parcelaIdx + 1}ª Parcela Parcial`;
+                    // Verificar se realmente existem linhas no próximo ano para esse semestre.
+                    // O semestre começa em mesInicioSemestre; meses no ano corrente = 12 - mesInicioSemestre + 1 = 13 - mesInicioSemestre.
+                    // Portanto o primeiro índice do próximo ano neste semestre = parcelaIdx*6 + (13 - mesInicioSemestre).
+                    const mesInicioSemestre = inicioSemestre.getMonth() + 1; // 1-based
+                    const primeiroIndexProximoAno = parcelaIdx * 6 + (13 - mesInicioSemestre);
+                    if (primeiroIndexProximoAno < totalMeses) {
+                        return `${parcelaIdx + 1}ª Parcela Parcial`;
+                    }
+                    // Semestre é cortado antes de cruzar o ano → parcela normal
+                    return `${parcelaIdx + 1}ª Parcela`;
                 }
                 // Meses do ano seguinte = Complementar
                 else {

@@ -7,8 +7,12 @@ REM e salva na pasta 'backups' com timestamp no nome do arquivo.
 REM
 REM Requisitos:
 REM - PostgreSQL instalado (pg_dump disponivel no PATH)
-REM - Variavel PGPASSWORD configurada ou senha informada manualmente
+REM - Arquivo .env configurado com DB_PASSWORD
 REM ========================================================================
+
+REM Obter diretorio do script (resolve problema de caminhos relativos)
+set SCRIPT_DIR=%~dp0
+cd /d "%SCRIPT_DIR%.."
 
 echo.
 echo ========================================
@@ -16,31 +20,42 @@ echo  BACKUP DO BANCO DE DADOS FAF
 echo ========================================
 echo.
 
-REM Configuracoes do banco de dados
-set DB_HOST=localhost
-set DB_PORT=5432
-set DB_NAME=projeto_parcerias
-set DB_USER=postgres
+REM Carregar senha do arquivo .env se existir
+if exist ".env" (
+    for /f "usebackq tokens=1,2 delims==" %%a in (".env") do (
+        if "%%a"=="DB_PASSWORD" set DB_PASSWORD=%%b
+        if "%%a"=="DB_HOST" set DB_HOST=%%b
+        if "%%a"=="DB_PORT" set DB_PORT=%%b
+        if "%%a"=="DB_DATABASE" set DB_NAME=%%b
+        if "%%a"=="DB_USER" set DB_USER=%%b
+    )
+)
+
+REM Configuracoes do banco de dados (usar valores do .env ou padroes)
+if not defined DB_HOST set DB_HOST=localhost
+if not defined DB_PORT set DB_PORT=5432
+if not defined DB_NAME set DB_NAME=projeto_parcerias
+if not defined DB_USER set DB_USER=postgres
+
+REM Configurar senha do PostgreSQL
+if defined DB_PASSWORD set PGPASSWORD=%DB_PASSWORD%
 
 REM Gerar timestamp no formato YYYYMMDD_HHMMSS
 for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set datetime=%%I
 set TIMESTAMP=%datetime:~0,4%%datetime:~4,2%%datetime:~6,2%_%datetime:~8,2%%datetime:~10,2%%datetime:~12,2%
 
-REM Nome do arquivo de backup
-set BACKUP_FILE=backups\backup_faf_%TIMESTAMP%.sql
+REM Nome do arquivo de backup (usar caminho absoluto)
+set BACKUP_FILE=%SCRIPT_DIR%backup_faf_%TIMESTAMP%.sql
 
 echo [INFO] Iniciando backup do banco de dados...
+echo [INFO] Diretorio de trabalho: %CD%
 echo [INFO] Banco: %DB_NAME%
 echo [INFO] Host: %DB_HOST%:%DB_PORT%
 echo [INFO] Usuario: %DB_USER%
 echo [INFO] Arquivo destino: %BACKUP_FILE%
 echo.
 
-REM Verificar se a pasta backups existe
-if not exist "backups" (
-    echo [INFO] Criando pasta backups...
-    mkdir backups
-)
+REM A pasta backups ja existe (script esta dentro dela)
 
 REM Executar pg_dump
 REM Opcoes:
@@ -93,9 +108,12 @@ if %ERRORLEVEL% EQU 0 (
     echo   - Permissoes insuficientes
     echo.
     echo Solucao para senha:
-    echo   set PGPASSWORD=sua_senha
-    echo   fazer_backup.bat
+    echo   Configure DB_PASSWORD no arquivo .env
     echo.
 )
 
-pause
+REM Remover variavel PGPASSWORD por seguranca
+set PGPASSWORD=
+
+REM Nao usar pause quando executado automaticamente
+if "%1"=="" pause

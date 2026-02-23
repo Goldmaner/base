@@ -178,12 +178,12 @@
         </div>
         
         <!-- Seção: Gestão de Parcerias -->
-        {% if is_admin or 'cents' in user_acessos %}
+        {% if is_admin or 'cents' in user_acessos or 'celebracao_parcerias' in user_acessos %}
         <div class="accordion-item">
           <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGP">
               <i class="bi bi-building me-2"></i> Gestão de Parcerias
-              <span class="badge bg-purple section-badge" style="background-color:#764ba2;">1</span>
+              <span class="badge bg-purple section-badge" style="background-color:#764ba2;">2</span>
             </button>
           </h2>
           <div id="collapseGP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
@@ -193,6 +193,13 @@
                 <div class="col-md-6">
                   <a href="{{ url_for('cents.index') }}" class="btn btn-module" style="background-color:#764ba2;">
                     <i class="bi bi-file-earmark-medical"></i> CENTS
+                  </a>
+                </div>
+                {% endif %}
+                {% if is_admin or 'celebracao_parcerias' in user_acessos %}
+                <div class="col-md-6">
+                  <a href="{{ url_for('celebracao_parcerias.index') }}" class="btn btn-module" style="background-color:#764ba2;">
+                    <i class="bi bi-people-fill"></i> Celebração de Parcerias
                   </a>
                 </div>
                 {% endif %}
@@ -728,6 +735,7 @@
         
         // Gestão de Parcerias
         { id: 'cents', nome: 'CENTS', grupo: 'Gestão de Parcerias' },
+        { id: 'celebracao_parcerias', nome: 'Celebração de Parcerias', grupo: 'Gestão de Parcerias' },
         
         // Departamento de Parcerias
         { id: 'editais', nome: 'Edital', grupo: 'Departamento de Parcerias' },

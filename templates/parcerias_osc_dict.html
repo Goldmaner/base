@@ -37,7 +37,12 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 <div class="header-section">
 <div class="d-flex justify-content-between align-items-center">
 <h1><i class="bi bi-building text-primary"></i> Dicionário de OSCs</h1>
-<a href="{{ url_for('parcerias.listar') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar</a>
+<div>
+    <button class="btn btn-success me-2" onclick="exportarCSV()" title="Exportar todas as OSCs para CSV" id="btnExportarCSV">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+    </button>
+    <a href="{{ url_for('parcerias.listar') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar</a>
+</div>
 </div>
 </div>
 <div class="info-box">
@@ -1208,6 +1213,60 @@ function excluirContato(id, nome) {
     .catch(error => {
         alert('❌ Erro ao excluir contato: ' + error);
     });
+}
+
+// ============================================================================
+// EXPORTAR CSV
+// ============================================================================
+
+function exportarCSV() {
+    if (!confirm('📊 Deseja exportar TODAS as OSCs para CSV?\n\nIsso pode levar alguns segundos...')) {
+        return;
+    }
+    
+    // Mostrar indicador de carregamento
+    const btn = event.target.closest('button');
+    const htmlOriginal = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Exportando...';
+    
+    fetch('/parcerias/exportar-oscs-csv')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao exportar CSV');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Criar link temporário para download
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            // Nome do arquivo com timestamp
+            const dataHora = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `oscs_dicionario_${dataHora}.csv`;
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            // Limpar
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            // Restaurar botão
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal;
+            
+            alert('✅ CSV exportado com sucesso!');
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('❌ Erro ao exportar CSV: ' + error.message);
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal;
+        });
 }
 </script>
 </body>

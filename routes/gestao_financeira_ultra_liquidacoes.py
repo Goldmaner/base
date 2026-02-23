@@ -1382,6 +1382,7 @@ def api_exportar_csv():
                 ul.observacoes,
                 p.osc,
                 p.cnpj,
+                p.projeto,
                 p.sei_celeb,
                 p.sei_pc
             FROM gestao_financeira.ultra_liquidacoes ul
@@ -1404,7 +1405,7 @@ def api_exportar_csv():
             'Valor Elemento 53/23', 'Valor Elemento 53/24', 'Valor Previsto',
             'Valor Subtraído', 'Valor Encaminhado', 'Valor Pago',
             'Status', 'Status Secundário', 'Data Pagamento', 'Observações',
-            'OSC', 'CNPJ', 'Processo Celebração', 'Processo PGTO/PC'
+            'OSC', 'CNPJ', 'Projeto', 'Processo Celebração', 'Processo PGTO/PC'
         ])
         
         # Dados
@@ -1427,6 +1428,7 @@ def api_exportar_csv():
                 p['observacoes'] or '',
                 p['osc'] or '',
                 p['cnpj'] or '',
+                p['projeto'] or '',
                 p['sei_celeb'] or '',
                 p['sei_pc'] or ''
             ])

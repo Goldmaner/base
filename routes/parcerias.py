@@ -2199,6 +2199,86 @@ def dicionario_oscs():
         return redirect(url_for('parcerias.listar'))
 
 
+@parcerias_bp.route('/exportar-oscs-csv')
+@login_required
+def exportar_oscs_csv():
+    """
+    Exporta TODAS as OSCs únicas com CNPJ para arquivo CSV
+    Disponível para usuários autenticados
+    """
+    try:
+        cur = get_cursor()
+        
+        # Buscar TODAS as OSCs únicas com CNPJ (sem paginação)
+        # Agrupa por CNPJ quando disponível, pega o nome mais recente
+        query = """
+            SELECT 
+                MAX(osc) as osc,
+                MAX(cnpj) as cnpj,
+                COUNT(DISTINCT CASE WHEN fonte = 'parcerias' THEN numero_termo END) as total_termos,
+                COUNT(DISTINCT CASE WHEN fonte = 'cents' THEN id_cents END) as total_cents
+            FROM (
+                SELECT osc, numero_termo, NULL::integer as id_cents, cnpj, 'parcerias' as fonte
+                FROM public.Parcerias
+                WHERE osc IS NOT NULL AND osc != ''
+                
+                UNION ALL
+                
+                SELECT osc, NULL as numero_termo, id as id_cents, osc_cnpj as cnpj, 'cents' as fonte
+                FROM celebracao.gestao_cents
+                WHERE osc IS NOT NULL AND osc != ''
+            ) combined
+            GROUP BY COALESCE(cnpj, osc)
+            ORDER BY MAX(osc)
+        """
+        
+        cur.execute(query)
+        oscs = cur.fetchall()
+        cur.close()
+        
+        # Gerar CSV com BOM UTF-8 para Excel
+        import io
+        output = io.StringIO()
+        output.write('\ufeff')  # BOM UTF-8
+        
+        # Cabeçalho
+        output.write('Nome da OSC;CNPJ;Total de Termos;Total CENTS\n')
+        
+        # Dados
+        for osc in oscs:
+            nome = (osc['osc'] or '').replace(';', ',').replace('\n', ' ').replace('\r', ' ')
+            cnpj = osc['cnpj'] or ''
+            total_termos = osc['total_termos'] or 0
+            total_cents = osc['total_cents'] or 0
+            
+            # Formatar CNPJ como texto para evitar notação científica
+            if cnpj:
+                cnpj_formatado = f'="{cnpj}"'
+            else:
+                cnpj_formatado = ''
+            
+            output.write(f'{nome};{cnpj_formatado};{total_termos};{total_cents}\n')
+        
+        # Preparar resposta
+        csv_data = output.getvalue()
+        output.close()
+        
+        # Retornar arquivo CSV
+        from flask import make_response
+        response = make_response(csv_data)
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=oscs_dicionario.csv'
+        
+        return response
+        
+    except Exception as e:
+        print(f"[ERRO] Erro ao exportar OSCs para CSV: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Erro ao exportar CSV: {str(e)}'}), 500
+
+
+
 @parcerias_bp.route("/buscar-oscs", methods=["GET"])
 @login_required
 @requires_access('parcerias')

@@ -26,6 +26,7 @@
 - Construção de índice de contatos para OSCs e termos, com table e queries.✅
 - Avaliar possibilidade de integração com o Planner (ou criação de sistema similar) para Alterações.
 - Incluir na mudança de Prorrogação e Valor, alterações do cronograma de desembolso já na ferramenta.
+- Colocar o valor_pago em public.parcerias, a soma dos valores pagos em ultra_liquidacoes.
 
 ## 5. Pesquisa de Parcerias
 - Aprimorar a formatação dos resultados e relatórios, tornando-os mais claros e exportáveis.
@@ -43,6 +44,7 @@
 - Aprimorar o uso das pastas dedicadas a certidões, compatibilizando todas as OSCs.
 - Automatizar texto da primeira parcela.
 - Fazer uma checkbox para tirar os de TCL de COSAN.
+- Fazer um relatório completo do que está encaminhado para pagamento, pagos e atrasados.
 
 ## 8. Celebração e DGP
 - Desenvolver módulo para celebração de parcerias, com workflow próprio.
