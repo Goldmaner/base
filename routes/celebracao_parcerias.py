@@ -185,8 +185,49 @@ def index():
 
     # Registros
     cur.execute(f"""
-        SELECT *
-        FROM celebracao.celebracao_parcerias
+        SELECT cp.*,
+            CASE
+                WHEN TRIM(LOWER(cp.edital_nome)) = 'sem edital (emenda parlamentar)'
+                     AND TRIM(cp.sei_celeb) != ''
+                     AND cp.sei_celeb IS NOT NULL
+                THEN (
+                    SELECT CASE
+                        WHEN COUNT(*) = 0 THEN 'none'
+                        WHEN COUNT(*) FILTER (WHERE TRIM(ce.disponibilidade_orcamentaria) = 'Emenda Disponível') = COUNT(*) THEN 'all_available'
+                        WHEN COUNT(*) FILTER (WHERE TRIM(ce.disponibilidade_orcamentaria) = 'Emenda Disponível') > 0 THEN 'mixed'
+                        ELSE 'none'
+                    END
+                    FROM celebracao.celebracao_emendas ce
+                    WHERE TRIM(ce.sei_celeb) = TRIM(cp.sei_celeb)
+                )
+                ELSE 'none'
+            END AS emenda_disp_status,
+            CASE
+                WHEN TRIM(LOWER(cp.edital_nome)) = 'sem edital (emenda parlamentar)'
+                     AND TRIM(cp.sei_celeb) != ''
+                     AND cp.sei_celeb IS NOT NULL
+                THEN (
+                    SELECT json_agg(json_build_object(
+                        'sei_orc', ce.sei_orcamentario,
+                        'disp', ce.disponibilidade_orcamentaria
+                    ) ORDER BY ce.id)
+                    FROM celebracao.celebracao_emendas ce
+                    WHERE TRIM(ce.sei_celeb) = TRIM(cp.sei_celeb)
+                )
+                ELSE NULL
+            END AS emenda_disp_detail,
+            CASE
+                WHEN TRIM(LOWER(cp.edital_nome)) = 'sem edital (emenda parlamentar)'
+                     AND TRIM(cp.sei_celeb) != ''
+                     AND cp.sei_celeb IS NOT NULL
+                THEN (
+                    SELECT COALESCE(SUM(pe.valor), 0)
+                    FROM public.parcerias_emendas pe
+                    WHERE TRIM(pe.sei_celeb) = TRIM(cp.sei_celeb)
+                )
+                ELSE NULL
+            END AS emenda_total_valor
+        FROM celebracao.celebracao_parcerias cp
         {where_clause}
         ORDER BY id DESC
         LIMIT %s OFFSET %s
@@ -263,12 +304,11 @@ def index():
     """)
     nome_pg_list = [r['nome_pg'] for r in cur.fetchall()]
 
-    # Lei / legislação aplicável
-    cur.execute("""
-        SELECT lei FROM categoricas.c_geral_legislacao
-        ORDER BY lei
-    """)
-    lei_list = [r['lei'] for r in cur.fetchall()]
+    # Lei / legislação aplicável (fixo)
+    lei_list = [
+        'Portaria nº 021/SMDHC/2023',
+        'Portaria nº 090/SMDHC/2023',
+    ]
 
     # Regionalizacao: mapa distrito -> subprefeitura + regiao
     cur.execute("""
@@ -498,6 +538,68 @@ def atualizar_visualizacao_geral():
         return jsonify({'success': False, 'erro': str(e)}), 500
 
 
+# ── Criar novo registro ────────────────────────────────────────────────────────
+
+@celebracao_parcerias_bp.route("/criar", methods=["POST"])
+@login_required
+@requires_access('celebracao_parcerias')
+def criar():
+    """Cria um novo registro de Celebração de Parcerias"""
+    cur = get_cursor()
+    db = get_db()
+    try:
+        data = request.get_json()
+
+        def s(campo):
+            v = data.get(campo, '')
+            return str(v).strip() if v and str(v).strip() else None
+        def i(campo):
+            v = data.get(campo)
+            if v is None or str(v).strip() == '': return None
+            try: return int(float(str(v)))
+            except: return None
+        def d(campo):
+            v = s(campo)
+            if not v: return None
+            try: return datetime.strptime(v, '%Y-%m-%d').date()
+            except: return None
+        def dec(campo):
+            v = data.get(campo)
+            if v is None or str(v).strip() == '': return None
+            try: return Decimal(str(v).replace(',', '.'))
+            except: return None
+
+        cur.execute("""
+            INSERT INTO celebracao.celebracao_parcerias
+                (edital_nome, unidade_gestora, tipo_termo, sei_celeb,
+                 osc, cnpj, status, substatus, projeto, endereco_sede,
+                 meses, dias, total_previsto, conta, lei, observacoes,
+                 numeracao_termo, inicio, final, assinatura,
+                 nome_pg, celebracao_secretaria, status_generico, numero_termo,
+                 responsavel)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s)
+            RETURNING id
+        """, [
+            s('edital_nome'), s('unidade_gestora'), s('tipo_termo'), s('sei_celeb'),
+            s('osc'), s('cnpj'), s('status'), s('substatus'), s('projeto'), s('endereco_sede'),
+            i('meses'), i('dias'), dec('total_previsto'), s('conta'), s('lei'), s('observacoes'),
+            i('numeracao_termo'), d('inicio'), d('final'), d('assinatura'),
+            s('nome_pg'), s('celebracao_secretaria'), s('status_generico'), s('numero_termo'),
+            s('responsavel')
+        ])
+        new_id = cur.fetchone()['id']
+        db.commit()
+        print(f"[CELEBRAÇÃO] Novo registro #{new_id} criado por {session.get('email')}")
+        return jsonify({'success': True, 'id': new_id, 'mensagem': f'Parceria #{new_id} criada com sucesso!'})
+
+    except Exception as e:
+        db.rollback()
+        print(f"[ERRO CELEBRAÇÃO] Erro ao criar registro: {e}")
+        return jsonify({'success': False, 'erro': str(e)}), 500
+
+
 # ── Editar registro ────────────────────────────────────────────────────────────
 
 @celebracao_parcerias_bp.route("/editar/<int:id>", methods=["PUT"])
@@ -610,6 +712,76 @@ def editar(id):
                     vs('observacao')
                 ])
 
+        # ── Salvar informações adicionais da parceria ──
+        infos = data.get('infos_adicionais')
+        if sei_celeb_val and infos is not None:
+            def vi_ia(f):
+                v = infos.get(f)
+                try: return int(v) if v is not None and str(v).strip() != '' else None
+                except: return None
+            def vs_ia(f):
+                v = infos.get(f)
+                return str(v).strip() or None if v else None
+            cur.execute("""
+                SELECT id FROM celebracao.celebracao_parcerias_infos_adicionais
+                WHERE sei_celeb = %s
+            """, [sei_celeb_val])
+            exists_ia = cur.fetchone()
+            if exists_ia:
+                cur.execute("""
+                    UPDATE celebracao.celebracao_parcerias_infos_adicionais SET
+                        parceria_responsavel_legal       = %s,
+                        parceria_objeto                  = %s,
+                        parceria_beneficiarios_diretos   = %s,
+                        parceria_beneficiarios_indiretos = %s,
+                        parceria_justificativa_projeto   = %s,
+                        parceria_abrangencia_projeto     = %s,
+                        atualizado_em                    = NOW()
+                    WHERE sei_celeb = %s
+                """, [
+                    vs_ia('parceria_responsavel_legal'),
+                    vs_ia('parceria_objeto'),
+                    vi_ia('parceria_beneficiarios_diretos'),
+                    vi_ia('parceria_beneficiarios_indiretos'),
+                    vs_ia('parceria_justificativa_projeto'),
+                    vs_ia('parceria_abrangencia_projeto'),
+                    sei_celeb_val,
+                ])
+            else:
+                cur.execute("""
+                    INSERT INTO celebracao.celebracao_parcerias_infos_adicionais
+                        (sei_celeb, parceria_responsavel_legal, parceria_objeto,
+                         parceria_beneficiarios_diretos, parceria_beneficiarios_indiretos,
+                         parceria_justificativa_projeto, parceria_abrangencia_projeto)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, [
+                    sei_celeb_val,
+                    vs_ia('parceria_responsavel_legal'),
+                    vs_ia('parceria_objeto'),
+                    vi_ia('parceria_beneficiarios_diretos'),
+                    vi_ia('parceria_beneficiarios_indiretos'),
+                    vs_ia('parceria_justificativa_projeto'),
+                    vs_ia('parceria_abrangencia_projeto'),
+                ])
+
+        # ── Salvar SEI de documentos ──
+        sei_docs = data.get('sei_docs', [])
+        if sei_celeb_val:
+            cur.execute(
+                "DELETE FROM celebracao.celebracao_parcerias_sei WHERE sei_celeb = %s",
+                [sei_celeb_val]
+            )
+            for doc in sei_docs:
+                def vsd(f): return str(doc.get(f, '') or '').strip() or None
+                tipo_doc = vsd('termo_tipo_sei')
+                num_doc  = vsd('termo_sei_doc')
+                if tipo_doc or num_doc:
+                    cur.execute("""
+                        INSERT INTO celebracao.celebracao_parcerias_sei
+                            (sei_celeb, termo_sei_doc, termo_tipo_sei, created_por)
+                        VALUES (%s, %s, %s, %s)
+                    """, [sei_celeb_val, num_doc, tipo_doc, session.get('email')])
+
         db.commit()
         print(f"[CELEBRAÇÃO] Registro #{id} atualizado por {session.get('email')}")
         return jsonify({'success': True, 'mensagem': 'Registro atualizado com sucesso!'})
@@ -642,6 +814,58 @@ def listar_enderecos(id):
     """, [sei])
     enderecos = [dict(r) for r in cur.fetchall()]
     return jsonify({'success': True, 'enderecos': enderecos})
+
+
+# ── Informações adicionais da parceria (por id do registro) ────────────────────────────
+
+@celebracao_parcerias_bp.route("/infos-adicionais/<int:id>", methods=["GET"])
+@login_required
+@requires_access('celebracao_parcerias')
+def listar_infos_adicionais(id):
+    """Retorna as informações adicionais de uma parceria (por sei_celeb)"""
+    cur = get_cursor()
+    cur.execute("SELECT sei_celeb FROM celebracao.celebracao_parcerias WHERE id = %s", [id])
+    row = cur.fetchone()
+    if not row or not row['sei_celeb']:
+        return jsonify({'success': True, 'infos': {}, 'sem_sei': True})
+    sei = row['sei_celeb']
+    cur.execute("""
+        SELECT parceria_responsavel_legal, parceria_objeto,
+               parceria_beneficiarios_diretos, parceria_beneficiarios_indiretos,
+               parceria_justificativa_projeto, parceria_abrangencia_projeto
+        FROM celebracao.celebracao_parcerias_infos_adicionais
+        WHERE sei_celeb = %s
+    """, [sei])
+    row2 = cur.fetchone()
+    return jsonify({'success': True, 'infos': dict(row2) if row2 else {}})
+
+
+# ── Documentos SEI (por id do registro) ───────────────────────────────────────────────
+
+@celebracao_parcerias_bp.route("/sei-docs/<int:id>", methods=["GET"])
+@login_required
+@requires_access('celebracao_parcerias')
+def listar_sei_docs(id):
+    """Retorna os documentos SEI vinculados a um registro"""
+    cur = get_cursor()
+    cur.execute("SELECT sei_celeb FROM celebracao.celebracao_parcerias WHERE id = %s", [id])
+    row = cur.fetchone()
+    if not row or not row['sei_celeb']:
+        return jsonify({'success': True, 'sei_docs': [], 'sem_sei': True})
+    sei = row['sei_celeb']
+    cur.execute("""
+        SELECT id, termo_sei_doc, termo_tipo_sei, created_por, created_at
+        FROM celebracao.celebracao_parcerias_sei
+        WHERE sei_celeb = %s
+        ORDER BY id
+    """, [sei])
+    sei_docs = []
+    for r in cur.fetchall():
+        row2 = dict(r)
+        if row2.get('created_at'):
+            row2['created_at'] = row2['created_at'].strftime('%d/%m/%Y %H:%M')
+        sei_docs.append(row2)
+    return jsonify({'success': True, 'sei_docs': sei_docs})
 
 
 # ── API Distritos (para Select2 nos endereços) ─────────────────────────────────────
@@ -757,3 +981,60 @@ def sugestoes(campo):
 
     valores = [r[campo] for r in cur.fetchall()]
     return jsonify({'success': True, 'valores': valores})
+
+
+# ── API: Emendas por SEI Celebração ──────────────────────────────────────────
+
+@celebracao_parcerias_bp.route("/api/emendas-por-sei", methods=["GET"])
+@login_required
+@requires_access('celebracao_parcerias')
+def api_emendas_por_sei():
+    sei        = request.args.get('sei_celeb', '').strip()
+    projeto_fb = request.args.get('projeto', '').strip()   # vínculo secundário
+
+    sei_eff = sei if sei and sei != '-' else ''
+    usar_projeto = not sei_eff and bool(projeto_fb)
+
+    if not sei_eff and not projeto_fb:
+        return jsonify({'emendas': [], 'projeto': None, 'vereadores': [], 'total_valor': 0, 'multiplos': False, 'vinculo': None})
+
+    cur = get_cursor()
+
+    if usar_projeto:
+        cur.execute("""
+            SELECT sei_orcamentario, projeto
+            FROM celebracao.celebracao_emendas
+            WHERE unaccent(LOWER(projeto)) = unaccent(LOWER(%s))
+            ORDER BY id
+        """, [projeto_fb])
+        emendas = [dict(r) for r in cur.fetchall()]
+        cur.execute("""
+            SELECT vereador_nome, valor
+            FROM public.parcerias_emendas
+            WHERE unaccent(LOWER(observacoes)) = unaccent(LOWER(%s))
+        """, [projeto_fb])
+    else:
+        cur.execute("""
+            SELECT sei_orcamentario, projeto
+            FROM celebracao.celebracao_emendas
+            WHERE sei_celeb = %s
+            ORDER BY id
+        """, [sei_eff])
+        emendas = [dict(r) for r in cur.fetchall()]
+        cur.execute("""
+            SELECT vereador_nome, valor
+            FROM public.parcerias_emendas
+            WHERE sei_celeb = %s
+        """, [sei_eff])
+
+    pe = cur.fetchall()
+    vereadores = [r['vereador_nome'] for r in pe if r['vereador_nome']]
+    total = float(sum(r['valor'] or 0 for r in pe))
+    return jsonify({
+        'emendas': emendas,
+        'projeto': emendas[0]['projeto'] if emendas else None,
+        'vereadores': vereadores,
+        'total_valor': total,
+        'multiplos': len(emendas) > 1,
+        'vinculo': 'projeto' if usar_projeto else 'sei_celeb'
+    })

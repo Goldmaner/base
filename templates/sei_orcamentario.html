@@ -1,0 +1,834 @@
+<!-- templates/sei_orcamentario.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gerenciamento de SEI Orçamentário</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+  <style>
+    body { background-color: #f8f9fa; padding: 20px; }
+    .main-container { max-width: 100%; margin: 0 auto; padding: 0 20px; }
+
+    .header-section {
+      background: linear-gradient(135deg, #1a6b3c 0%, #2e9e5b 100%);
+      color: white;
+      padding: 40px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .header-section h3 { font-size: 2rem; font-weight: 600; margin-bottom: 10px; }
+    .header-section small { opacity: 0.9; font-size: 1rem; }
+
+    .table th {
+      white-space: nowrap;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 10px 8px;
+      background-color: #f8f9fa;
+    }
+    .table td {
+      font-size: 0.82rem;
+      padding: 8px;
+      vertical-align: middle;
+    }
+    .table-hover tbody tr:hover { background-color: #f0f7ff; cursor: default; }
+
+    .filter-row input, .filter-row select {
+      font-size: 0.78rem;
+      padding: 3px 6px;
+      height: 28px;
+    }
+    .filter-row th { padding: 4px 8px; background-color: #e9ecef; }
+
+    .badge-disp { font-size: 0.72rem; }
+    .truncate-cell { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .modal-header { padding: 1rem 1.25rem 0.75rem; }
+    .modal-footer { padding: 0.75rem 1.25rem; }
+    .form-label { font-size: 0.82rem; font-weight: 600; color: #6c757d; margin-bottom: 3px; }
+    .form-control, .form-select { font-size: 0.85rem; }
+
+    .btn-action { padding: 3px 8px; font-size: 0.78rem; }
+
+    .stat-card {
+      border-radius: 10px;
+      padding: 16px 20px;
+      color: white;
+      font-weight: 600;
+    }
+    .stat-label { font-size: 0.75rem; opacity: 0.85; }
+    .stat-value { font-size: 1.6rem; }
+  </style>
+</head>
+<body>
+<div class="main-container">
+
+  <!-- ── Cabeçalho ── -->
+  <div class="header-section">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <h3><i class="bi bi-file-earmark-text me-2"></i>SEI Orçamentário</h3>
+        <small>Gerenciamento de emendas e disponibilidade orçamentária</small>
+      </div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <button class="btn btn-light" onclick="abrirNovo()" title="Adicionar novo registro">
+          <i class="bi bi-plus-circle me-1"></i> Novo SEI
+        </button>
+        <a href="{{ url_for('celebracao_parcerias.index') }}" class="btn btn-outline-light">
+          <i class="bi bi-arrow-left me-1"></i> Voltar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Cards de resumo ── -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:linear-gradient(135deg,#667eea,#764ba2);">
+        <div class="stat-label">Total de Registros</div>
+        <div class="stat-value" id="statTotal">{{ registros|length }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:linear-gradient(135deg,#11998e,#38ef7d);">
+        <div class="stat-label">Emenda Disponível</div>
+        <div class="stat-value" id="statDisp">
+          {{ registros | selectattr('disponibilidade_orcamentaria','equalto','Emenda Disponível') | list | length }}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:linear-gradient(135deg,#f46b45,#eea849);">
+        <div class="stat-label">Valor não Disponível</div>
+        <div class="stat-value">
+          {{ registros | selectattr('disponibilidade_orcamentaria','equalto','Valor não Disponível') | list | length }}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:linear-gradient(135deg,#4e54c8,#8f94fb);">
+        <div class="stat-label">Exercício Encerrado</div>
+        <div class="stat-value">
+          {{ registros | selectattr('disponibilidade_orcamentaria','equalto','Exercício Orçamentário Encerrado') | list | length }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tabela ── -->
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <span class="fw-bold"><i class="bi bi-table me-1"></i> Registros</span>
+      <div class="d-flex gap-2 align-items-center">
+        <input type="text" id="buscaRapida" class="form-control form-control-sm" style="width:200px;"
+               placeholder="Busca rápida…" oninput="filtrarTabela()">
+        <span class="badge bg-secondary" id="badgeCount">{{ registros|length }}</span>
+        <button class="btn btn-outline-secondary btn-sm" onclick="limparFiltros()" title="Limpar filtros">
+          <i class="bi bi-x-circle me-1"></i> Limpar
+        </button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-bordered mb-0" id="tabelaSEI">
+          <thead>
+            <tr>
+              <th>SEI Orçamentário</th>
+              <th>SEI Celebração</th>
+              <th>Projeto</th>
+              <th>Nº Memorando</th>
+              <th>Nº Consulta</th>
+              <th>Disponibilidade</th>
+              <th>Status</th>
+              <th>Vereador</th>
+              <th>Valor (R$)</th>
+              <th>Informações</th>
+              <th style="width:80px;">Ações</th>
+            </tr>
+            <!-- Filtros por coluna -->
+            <tr class="filter-row">
+              <th><input type="text" class="form-control" id="fSeiOrc"   oninput="filtrarTabela()" placeholder="Filtrar…"
+                         value="{{ filtro_sei_orc }}"></th>
+              <th><input type="text" class="form-control" id="fSeiCeleb" oninput="filtrarTabela()" placeholder="Filtrar…"
+                         value="{{ filtro_sei_celeb }}"></th>
+              <th><input type="text" class="form-control" id="fProjeto"  oninput="filtrarTabela()" placeholder="Filtrar…"
+                         value="{{ filtro_projeto }}"></th>
+              <th><input type="text" class="form-control" id="fMemo"     oninput="filtrarTabela()" placeholder="Filtrar…"
+                         value="{{ filtro_memorando }}"></th>
+              <th><input type="text" class="form-control" id="fConsulta" oninput="filtrarTabela()" placeholder="Filtrar…"
+                         value="{{ filtro_consulta }}"></th>
+              <th>
+                <select class="form-select" id="fDisp" onchange="filtrarTabela()">
+                  <option value="">Todos</option>
+                  {% for o in disponibilidade_opts %}
+                  <option value="{{ o }}" {% if filtro_disp == o %}selected{% endif %}>{{ o }}</option>
+                  {% endfor %}
+                </select>
+              </th>
+              <th>
+                <select class="form-select" id="fStatus" onchange="filtrarTabela()">
+                  <option value="">Todos</option>
+                  {% for o in emenda_status_opts %}
+                  <option value="{{ o }}" {% if filtro_status == o %}selected{% endif %}>{{ o }}</option>
+                  {% endfor %}
+                </select>
+              </th>
+              <th><input type="text" class="form-control" id="fVereador" oninput="filtrarTabela()" placeholder="Filtrar…"
+                         value="{{ filtro_vereador }}"></th>
+              <th>
+                <div class="d-flex gap-1">
+                  <input type="text" class="form-control" id="fValMin" oninput="filtrarTabela()" placeholder="Min"
+                         value="{{ filtro_valor_min }}" style="width:60px;">
+                  <input type="text" class="form-control" id="fValMax" oninput="filtrarTabela()" placeholder="Max"
+                         value="{{ filtro_valor_max }}" style="width:60px;">
+                </div>
+              </th>
+              <th><input type="text" class="form-control" id="fInfo" oninput="filtrarTabela()" placeholder="Filtrar…"></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbodySEI">
+            {% for r in registros %}
+            {% set cest = r.ce_status or 'Aguardando aceite' %}
+            <tr data-id="{{ r.id }}"
+                data-seiorc="{{ r.sei_orcamentario or '' }}"
+                data-seiceleb="{{ r.sei_celeb or '' }}"
+                data-projeto="{{ r.projeto or '' }}"
+                data-memo="{{ r.numero_memorando or '' }}"
+                data-consulta="{{ r.numero_consulta or '' }}"
+                data-disp="{{ r.disponibilidade_orcamentaria or '' }}"
+                data-cestatus="{{ r.ce_status or '' }}"
+                data-vereador="{{ r.vereador_nome or '' }}"
+                data-valor="{{ r.valor or '' }}"
+                data-info="{{ r.observacoes or '' }}"
+                data-json="{{ r | tojson | e }}"
+                {% set disp = r.disponibilidade_orcamentaria or '' %}
+                {% if disp == 'Exercício Orçamentário Encerrado' %}style="--bs-table-bg:#ffe0b2;"
+                {% elif cest == 'Aceita' %}style="--bs-table-bg:#d4edda;"
+                {% elif cest == 'Não aceita' %}style="--bs-table-bg:#fff3e0;"
+                {% elif cest == 'Processo vinculado' %}style="--bs-table-bg:#c8e6c9;"
+                {% endif %}>
+              <td class="fw-semibold text-primary">{{ r.sei_orcamentario or '—' }}</td>
+              <td>{{ r.sei_celeb or '—' }}</td>
+              <td class="truncate-cell" title="{{ r.projeto or '' }}">{{ r.projeto or '—' }}</td>
+              <td>{{ r.numero_memorando or '—' }}</td>
+              <td>{{ r.numero_consulta or '—' }}</td>
+              <td>
+                {% set disp = r.disponibilidade_orcamentaria or 'Não Informado' %}
+                {% if disp == 'Emenda Disponível' %}
+                  <span class="badge bg-success badge-disp">{{ disp }}</span>
+                {% elif disp == 'Valor não Disponível' %}
+                  <span class="badge bg-warning text-dark badge-disp">{{ disp }}</span>
+                {% elif disp == 'Exercício Orçamentário Encerrado' %}
+                  <span class="badge bg-secondary badge-disp">{{ disp }}</span>
+                {% else %}
+                  <span class="badge bg-light text-dark badge-disp">{{ disp }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if cest == 'Não aceita' %}
+                  <span class="badge" style="background:#ff9800">Não aceita</span>
+                {% elif cest == 'Aceita' %}
+                  <span class="badge" style="background:#81c784;color:#1b5e20">Aceita</span>
+                {% elif cest == 'Processo vinculado' %}
+                  <span class="badge bg-success">Processo vinculado</span>
+                {% else %}
+                  <span class="badge bg-light text-dark border">Aguardando aceite</span>
+                {% endif %}
+              </td>
+              <td>{{ r.vereador_nome or '—' }}</td>
+              <td class="text-end">
+                {% if r.valor is not none %}
+                  R$ {{ '{:,.2f}'.format(r.valor).replace(',','X').replace('.',',').replace('X','.') }}
+                {% else %}—{% endif %}
+              </td>
+              <td class="truncate-cell" title="{{ r.observacoes or '' }}">{{ r.observacoes or '—' }}</td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary btn-action"
+                        onclick='abrirEditar(this)' data-row='{{ r | tojson | e }}'
+                        title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-action ms-1"
+                        onclick="confirmarExcluir({{ r.id }}, '{{ r.sei_orcamentario | e }}')"
+                        title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="11" class="text-center text-muted py-4">Nenhum registro encontrado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- card -->
+
+</div><!-- main-container -->
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Novo SEI Orçamentário
+════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalNovo" tabindex="-1" aria-labelledby="modalNovoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="modalNovoLabel">
+          <i class="bi bi-plus-circle me-2"></i> Novo SEI Orçamentário
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="alertNovo"></div>
+        <form id="formNovo">
+          <div class="row g-3">
+            <!-- Grupo 1: identificação -->
+            <div class="col-12">
+              <h6 class="text-success fw-bold border-bottom pb-1 mb-2">
+                <i class="bi bi-card-heading me-1"></i> Identificação
+              </h6>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">SEI Orçamentário <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="n_sei_orc" name="sei_orcamentario"
+                     placeholder="Ex: 1234.5678/9012345-6">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">SEI Celebração</label>
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" id="n_sei_celeb_criar"
+                       onchange="toggleSeiCelebCriar('n', this)">
+                <label class="form-check-label small text-muted" for="n_sei_celeb_criar">A ser criado</label>
+              </div>
+              <input type="text" class="form-control form-control-sm" id="n_sei_celeb" name="sei_celeb"
+                     placeholder="Ex: 1234.5678/9012345-6" oninput="formatarSEIInput(this)"
+                     onblur="aoMudarSeiCelebNovo()">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Disponibilidade</label>
+              <select class="form-select form-select-sm" id="n_disp" name="disponibilidade_orcamentaria">
+                {% for o in disponibilidade_opts %}
+                <option value="{{ o }}">{{ o }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Status</label>
+              <select class="form-select form-select-sm" id="n_ce_status" name="ce_status">
+                {% for o in emenda_status_opts %}
+                <option value="{{ o }}">{{ o }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Projeto</label>
+              <input type="text" class="form-control form-control-sm" id="n_projeto" name="projeto">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Nº Memorando</label>
+              <input type="number" class="form-control form-control-sm" id="n_memo" name="numero_memorando" min="0">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Nº Consulta</label>
+              <input type="number" class="form-control form-control-sm" id="n_consulta" name="numero_consulta" min="0">
+            </div>
+
+            <!-- Grupo 2: emenda -->
+            <div class="col-12 mt-2">
+              <h6 class="text-success fw-bold border-bottom pb-1 mb-2">
+                <i class="bi bi-person-badge me-1"></i> Emenda Parlamentar
+              </h6>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Vereador</label>
+              <select class="form-select form-select-sm select2-vereador" id="n_vereador" name="vereador_nome">
+                <option value="">-- Selecione --</option>
+                {% for v in vereadores %}
+                <option value="{{ v }}">{{ v }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Valor (R$)</label>
+              <input type="text" class="form-control form-control-sm" id="n_valor" name="valor"
+                     placeholder="Ex: 150.000,00" onblur="formatarValorBR(this)">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Informações / Observações</label>
+              <textarea class="form-control form-control-sm" id="n_obs" name="observacoes" rows="3"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="btnSalvarNovo" onclick="salvarNovo()">
+          <i class="bi bi-plus-circle me-1"></i> Criar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Editar SEI Orçamentário
+════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalEditar" tabindex="-1" aria-labelledby="modalEditarLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalEditarLabel">
+          <i class="bi bi-pencil me-2"></i> Editar SEI Orçamentário
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="alertEditar"></div>
+        <div class="alert alert-info py-2 small mb-3">
+          <i class="bi bi-info-circle me-1"></i>
+          Edição altera apenas os dados de <strong>identificação</strong>.
+          Para atualizar vereador/valor, exclua e recrie o registro.
+        </div>
+        <input type="hidden" id="e_id">
+        <form id="formEditar">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">SEI Orçamentário <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="e_sei_orc" name="sei_orcamentario">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">SEI Celebração</label>
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" id="e_sei_celeb_criar"
+                       onchange="toggleSeiCelebCriar('e', this)">
+                <label class="form-check-label small text-muted" for="e_sei_celeb_criar">A ser criado</label>
+              </div>
+              <input type="text" class="form-control form-control-sm" id="e_sei_celeb" name="sei_celeb">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Disponibilidade</label>
+              <select class="form-select form-select-sm" id="e_disp" name="disponibilidade_orcamentaria">
+                {% for o in disponibilidade_opts %}
+                <option value="{{ o }}">{{ o }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Status</label>
+              <select class="form-select form-select-sm" id="e_ce_status" name="ce_status">
+                {% for o in emenda_status_opts %}
+                <option value="{{ o }}">{{ o }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Projeto</label>
+              <input type="text" class="form-control form-control-sm" id="e_projeto" name="projeto">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Nº Memorando</label>
+              <input type="number" class="form-control form-control-sm" id="e_memo" name="numero_memorando" min="0">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Nº Consulta</label>
+              <input type="number" class="form-control form-control-sm" id="e_consulta" name="numero_consulta" min="0">
+            </div>
+            <!-- Exibição (read-only) dos dados da emenda -->
+            <div class="col-12 mt-2">
+              <h6 class="text-secondary fw-bold border-bottom pb-1 mb-2">
+                <i class="bi bi-person-badge me-1"></i> Emenda Parlamentar <small class="fw-normal">(somente leitura)</small>
+              </h6>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Vereador</label>
+              <input type="text" class="form-control form-control-sm" id="e_vereador" readonly style="background:#f0f0f0;">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Valor (R$)</label>
+              <input type="text" class="form-control form-control-sm" id="e_valor" readonly style="background:#f0f0f0;">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Informações</label>
+              <input type="text" class="form-control form-control-sm" id="e_obs" readonly style="background:#f0f0f0;">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnSalvarEditar" onclick="salvarEditar()">
+          <i class="bi bi-save me-1"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmação de exclusão
+════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalExcluir" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white py-2">
+        <h6 class="modal-title"><i class="bi bi-exclamation-triangle me-1"></i> Confirmar Exclusão</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-1">Deseja excluir o SEI:</p>
+        <strong id="excluirSeiLabel" class="text-danger"></strong>
+        <p class="text-muted small mt-2 mb-0">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-danger btn-sm" id="btnConfirmarExcluir">
+          <i class="bi bi-trash me-1"></i> Excluir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Scripts ── -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+// ── Inicialização Select2 ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+  $('.select2-vereador').select2({
+    theme: 'bootstrap-5',
+    placeholder: 'Digite para buscar…',
+    allowClear: true,
+    width: '100%',
+  });
+});
+
+// ── Formatação ────────────────────────────────────────────────────────────
+function formatarValorBR(el) {
+  let v = el.value.replace(/[^\d,]/g, '').replace(',', '.');
+  const num = parseFloat(v);
+  if (!isNaN(num)) {
+    el.value = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+}
+
+function valorBRtoFloat(s) {
+  if (!s) return null;
+  return parseFloat(s.replace(/\./g, '').replace(',', '.')) || null;
+}
+
+// ── Auto-memorando e “A ser criado” ─────────────────────────────────────
+async function buscarProximoMemo(seiCeleb) {
+  const url = seiCeleb && seiCeleb !== 'A ser criado'
+    ? `/sei-orcamentario/api/proximo-memorando?sei_celeb=${encodeURIComponent(seiCeleb)}`
+    : '/sei-orcamentario/api/proximo-memorando';
+  try {
+    const res = await fetch(url);
+    const d = await res.json();
+    return d.success ? d.numero : null;
+  } catch (e) { return null; }
+}
+
+function toggleSeiCelebCriar(prefix, chk) {
+  const input = document.getElementById(`${prefix}_sei_celeb`);
+  if (!input) return;
+  if (chk.checked) {
+    input.dataset.prev = input.value;
+    input.value = 'A ser criado';
+    input.disabled = true;
+    input.style.background = '#f0f0f0';
+  } else {
+    input.value = input.dataset.prev || '';
+    input.disabled = false;
+    input.style.background = '';
+    if (prefix === 'n') aoMudarSeiCelebNovo();
+  }
+}
+
+let _memoTimeout = null;
+function aoMudarSeiCelebNovo() {
+  clearTimeout(_memoTimeout);
+  _memoTimeout = setTimeout(async () => {
+    const sei = document.getElementById('n_sei_celeb')?.value.trim() || '';
+    if (sei === 'A ser criado') return;
+    const memo = await buscarProximoMemo(sei);
+    const memoEl = document.getElementById('n_memo');
+    if (memoEl && memo !== null) memoEl.value = memo;
+  }, 600);
+}
+
+// ── Filtro em tempo real (client-side) ────────────────────────────────────
+function filtrarTabela() {
+  const fSeiOrc   = (document.getElementById('fSeiOrc')?.value   || '').toLowerCase();
+  const fSeiCeleb = (document.getElementById('fSeiCeleb')?.value || '').toLowerCase();
+  const fProjeto  = (document.getElementById('fProjeto')?.value  || '').toLowerCase();
+  const fMemo     = (document.getElementById('fMemo')?.value     || '').toLowerCase();
+  const fConsulta = (document.getElementById('fConsulta')?.value || '').toLowerCase();
+  const fDisp     = (document.getElementById('fDisp')?.value     || '');
+  const fVereador = (document.getElementById('fVereador')?.value || '').toLowerCase();
+  const fValMin   = valorBRtoFloat(document.getElementById('fValMin')?.value || '');
+  const fValMax   = valorBRtoFloat(document.getElementById('fValMax')?.value || '');
+  const fInfo     = (document.getElementById('fInfo')?.value     || '').toLowerCase();
+  const fStatus   = (document.getElementById('fStatus')?.value   || '');
+  const buscaRap  = (document.getElementById('buscaRapida')?.value || '').toLowerCase();
+
+  const rows = document.querySelectorAll('#tbodySEI tr[data-id]');
+  let visible = 0;
+
+  rows.forEach(tr => {
+    const d = tr.dataset;
+    const valor = d.valor ? parseFloat(d.valor) : null;
+
+    let ok =
+      d.seiorc.toLowerCase().includes(fSeiOrc) &&
+      d.seiceleb.toLowerCase().includes(fSeiCeleb) &&
+      d.projeto.toLowerCase().includes(fProjeto) &&
+      d.memo.toLowerCase().includes(fMemo) &&
+      d.consulta.toLowerCase().includes(fConsulta) &&
+      (fDisp === '' || d.disp === fDisp) &&
+      (fStatus === '' || d.cestatus === fStatus) &&
+      d.vereador.toLowerCase().includes(fVereador) &&
+      d.info.toLowerCase().includes(fInfo);
+
+    if (ok && fValMin !== null) ok = ok && valor !== null && valor >= fValMin;
+    if (ok && fValMax !== null) ok = ok && valor !== null && valor <= fValMax;
+
+    if (ok && buscaRap) {
+      const txt = tr.textContent.toLowerCase();
+      ok = txt.includes(buscaRap);
+    }
+
+    tr.style.display = ok ? '' : 'none';
+    if (ok) visible++;
+  });
+
+  document.getElementById('badgeCount').textContent = visible;
+}
+
+function limparFiltros() {
+  ['fSeiOrc','fSeiCeleb','fProjeto','fMemo','fConsulta','fVereador','fValMin','fValMax','fInfo','buscaRapida']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const fDisp = document.getElementById('fDisp');
+  if (fDisp) fDisp.value = '';
+  const fStatus = document.getElementById('fStatus');
+  if (fStatus) fStatus.value = '';
+  filtrarTabela();
+}
+
+// ── Modal Novo ────────────────────────────────────────────────────────────
+async function abrirNovo() {
+  document.getElementById('alertNovo').innerHTML = '';
+  document.getElementById('formNovo').reset();
+  try { $('#n_vereador').val(null).trigger('change'); } catch(e) {}
+  // Reset "A ser criado" checkbox
+  const chk = document.getElementById('n_sei_celeb_criar');
+  const seiInput = document.getElementById('n_sei_celeb');
+  if (chk) { chk.checked = false; }
+  if (seiInput) { seiInput.disabled = false; seiInput.style.background = ''; }
+  const btn = document.getElementById('btnSalvarNovo');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar';
+  new bootstrap.Modal(document.getElementById('modalNovo')).show();
+  // Auto-fill with next memo number
+  const memo = await buscarProximoMemo('');
+  const memoEl = document.getElementById('n_memo');
+  if (memoEl && memo !== null) memoEl.value = memo;
+}
+
+async function salvarNovo() {
+  const alertEl = document.getElementById('alertNovo');
+  alertEl.innerHTML = '';
+  const btn = document.getElementById('btnSalvarNovo');
+
+  const seiOrc = document.getElementById('n_sei_orc').value.trim();
+  if (!seiOrc) {
+    document.getElementById('n_sei_orc').style.borderColor = '#dc3545';
+    alertEl.innerHTML = '<div class="alert alert-danger py-2 small">SEI Orçamentário é obrigatório.</div>';
+    return;
+  }
+  document.getElementById('n_sei_orc').style.borderColor = '';
+
+  const valorRaw = document.getElementById('n_valor').value.trim();
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Criando…';
+
+  const payload = {
+    sei_orcamentario:           seiOrc,
+    sei_celeb:                  document.getElementById('n_sei_celeb_criar')?.checked
+                                  ? 'A ser criado'
+                                  : document.getElementById('n_sei_celeb').value.trim(),
+    projeto:                    document.getElementById('n_projeto').value.trim(),
+    numero_memorando:           document.getElementById('n_memo').value.trim(),
+    numero_consulta:            document.getElementById('n_consulta').value.trim(),
+    disponibilidade_orcamentaria: document.getElementById('n_disp').value,
+    vereador_nome:              document.getElementById('n_vereador').value,
+    valor:                      valorRaw,
+    ce_status:                  document.getElementById('n_ce_status')?.value || 'Aguardando aceite',
+    observacoes:                document.getElementById('n_obs').value.trim(),
+  };
+
+  try {
+    const res = await fetch('/sei-orcamentario/criar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      alertEl.innerHTML = `<div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i>${data.mensagem}</div>`;
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      alertEl.innerHTML = `<div class="alert alert-danger py-2 small"><i class="bi bi-x-circle me-1"></i>${data.erro}</div>`;
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar';
+    }
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-danger py-2 small">Erro de comunicação: ${e}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar';
+  }
+}
+
+// ── Modal Editar ──────────────────────────────────────────────────────────
+function abrirEditar(btnEl) {
+  let row;
+  try { row = JSON.parse(btnEl.getAttribute('data-row')); } catch(e) { return; }
+
+  document.getElementById('alertEditar').innerHTML = '';
+  document.getElementById('e_id').value         = row.id;
+  document.getElementById('e_sei_orc').value    = row.sei_orcamentario || '';
+  document.getElementById('e_sei_celeb').value  = row.sei_celeb || '';
+  document.getElementById('e_projeto').value    = row.projeto || '';
+  document.getElementById('e_memo').value       = row.numero_memorando || '';
+  document.getElementById('e_consulta').value   = row.numero_consulta || '';
+
+  // Disponibilidade
+  const dispSel = document.getElementById('e_disp');
+  dispSel.value = row.disponibilidade_orcamentaria || 'Não Informado';
+
+  // Status
+  const ceStatus = document.getElementById('e_ce_status');
+  if (ceStatus) ceStatus.value = row.ce_status || 'Aguardando aceite';
+
+  // "A ser criado" checkbox
+  const eSeiInput = document.getElementById('e_sei_celeb');
+  const eChk = document.getElementById('e_sei_celeb_criar');
+  if (row.sei_celeb === 'A ser criado') {
+    if (eChk) { eChk.checked = true; }
+    if (eSeiInput) { eSeiInput.disabled = true; eSeiInput.style.background = '#f0f0f0'; }
+  } else {
+    if (eChk) { eChk.checked = false; }
+    if (eSeiInput) { eSeiInput.disabled = false; eSeiInput.style.background = ''; }
+  }
+
+  // Somente leitura
+  document.getElementById('e_vereador').value = row.vereador_nome || '—';
+  document.getElementById('e_obs').value      = row.observacoes || '';
+
+  // Valor formatado
+  if (row.valor !== null && row.valor !== undefined) {
+    document.getElementById('e_valor').value =
+      parseFloat(row.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  } else {
+    document.getElementById('e_valor').value = '';
+  }
+
+  const btn = document.getElementById('btnSalvarEditar');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-save me-1"></i> Salvar';
+
+  new bootstrap.Modal(document.getElementById('modalEditar')).show();
+}
+
+async function salvarEditar() {
+  const alertEl = document.getElementById('alertEditar');
+  alertEl.innerHTML = '';
+  const btn = document.getElementById('btnSalvarEditar');
+
+  const id     = document.getElementById('e_id').value;
+  const seiOrc = document.getElementById('e_sei_orc').value.trim();
+  if (!seiOrc) {
+    document.getElementById('e_sei_orc').style.borderColor = '#dc3545';
+    alertEl.innerHTML = '<div class="alert alert-danger py-2 small">SEI Orçamentário é obrigatório.</div>';
+    return;
+  }
+  document.getElementById('e_sei_orc').style.borderColor = '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Salvando…';
+
+  const payload = {
+    sei_orcamentario:               seiOrc,
+    sei_celeb:                      document.getElementById('e_sei_celeb_criar')?.checked
+                                      ? 'A ser criado'
+                                      : document.getElementById('e_sei_celeb').value.trim(),
+    projeto:                        document.getElementById('e_projeto').value.trim(),
+    numero_memorando:               document.getElementById('e_memo').value.trim(),
+    numero_consulta:                document.getElementById('e_consulta').value.trim(),
+    disponibilidade_orcamentaria:   document.getElementById('e_disp').value,
+    ce_status:                      document.getElementById('e_ce_status')?.value || 'Aguardando aceite',
+  };
+
+  try {
+    const res = await fetch(`/sei-orcamentario/editar/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      alertEl.innerHTML = `<div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i>${data.mensagem}</div>`;
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      alertEl.innerHTML = `<div class="alert alert-danger py-2 small"><i class="bi bi-x-circle me-1"></i>${data.erro}</div>`;
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-save me-1"></i> Salvar';
+    }
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-danger py-2 small">Erro: ${e}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-save me-1"></i> Salvar';
+  }
+}
+
+// ── Modal Excluir ─────────────────────────────────────────────────────────
+let _excluirId = null;
+
+function confirmarExcluir(id, seiOrc) {
+  _excluirId = id;
+  document.getElementById('excluirSeiLabel').textContent = seiOrc;
+  new bootstrap.Modal(document.getElementById('modalExcluir')).show();
+}
+
+document.getElementById('btnConfirmarExcluir').addEventListener('click', async function () {
+  if (!_excluirId) return;
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+  try {
+    const res  = await fetch(`/sei-orcamentario/excluir/${_excluirId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      window.location.reload();
+    } else {
+      alert('Erro ao excluir: ' + data.erro);
+      this.disabled = false;
+      this.innerHTML = '<i class="bi bi-trash me-1"></i> Excluir';
+    }
+  } catch(e) {
+    alert('Erro: ' + e);
+    this.disabled = false;
+    this.innerHTML = '<i class="bi bi-trash me-1"></i> Excluir';
+  }
+});
+</script>
+</body>
+</html>

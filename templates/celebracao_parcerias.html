@@ -56,6 +56,14 @@
       cursor: pointer;
     }
 
+    /* Textarea auto-expansível */
+    textarea.auto-resize {
+      overflow: hidden;
+      resize: none;
+      min-height: 72px;
+      transition: height 0.1s ease;
+    }
+
     /* Cards */
     .filtro-card {
       border: none;
@@ -196,6 +204,12 @@
           <i class="bi bi-eye me-1"></i> Visualização
         </button>
         {% endif %}
+        <a href="{{ url_for('sei_orcamentario.index') }}" class="btn btn-outline-light" title="Gerenciamento de SEI Orçamentário">
+          <i class="bi bi-file-earmark-text me-1"></i> SEI Orçamentário
+        </a>
+        <button class="btn btn-success" onclick="abrirNovaParc()" title="Adicionar nova parceria">
+          <i class="bi bi-plus-circle me-1"></i> Nova Parceria
+        </button>
         <a href="{{ url_for('celebracao_parcerias.exportar_csv',
             filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
             filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
@@ -408,7 +422,8 @@
         <tbody>
           {% if registros %}
             {% for r in registros %}
-            <tr>
+            {% set edisp = r.emenda_disp_status or 'none' %}
+            <tr{% if edisp == 'all_available' %} style="--bs-table-bg:#dbeeff;"{% elif edisp == 'mixed' %} style="--bs-table-bg:#f0f8ff;"{% endif %}{% if edisp == 'mixed' and r.emenda_disp_detail %} data-bs-toggle="tooltip" data-bs-placement="top" title="{% for e in r.emenda_disp_detail %}{{ e.sei_orc }}: {{ e.disp }}{% if not loop.last %} | {% endif %}{% endfor %}{% if r.emenda_total_valor %} · Total: R$ {{ r.emenda_total_valor | format_brl }}{% endif %}"{% endif %}>
               <td>
                 {% if r.responsavel %}
                   <span class="badge bg-primary">{{ r.responsavel }}</span>
@@ -449,6 +464,11 @@
               <td class="text-center">
                 <button class="btn btn-sm btn-info" onclick="verDetalhes({{ r.id }})" title="Ver detalhes">
                   <i class="bi bi-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary ms-1"
+                  onclick="abrirContatosOSC('{{ r.osc | e }}')" title="Contatos da OSC"
+                  {% if not r.osc %}disabled{% endif %}>
+                  <i class="bi bi-person-lines-fill"></i>
                 </button>
               </td>
             </tr>
@@ -582,6 +602,31 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- MODAL: Nova Parceria                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalNovaParc" tabindex="-1" aria-labelledby="modalNovaParcLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header card-header-custom">
+        <h5 class="modal-title" id="modalNovaParcLabel">
+          <i class="bi bi-plus-circle me-2"></i> Adicionar Nova Parceria
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="novaParcConteudo"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="btnSalvarNova" onclick="salvarNovaParc()">
+          <i class="bi bi-plus-circle me-1"></i> Criar Parceria
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- MODAL: Visualização Geral (admin)                                     -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalVisualizacao" tabindex="-1" aria-labelledby="modalVisualizacaoLabel" aria-hidden="true">
@@ -638,6 +683,7 @@ const EDITAIS_LIST       = {{ editais_list | tojson }};
 const NOME_PG_LIST       = {{ nome_pg_list | tojson }};
 const LEI_LIST           = {{ lei_list | tojson }};
 const REGIONALIZACAO_MAP = {{ regionalizacao_map | tojson }};
+const SEI_TIPO_OPTIONS   = ['Termo Base', 'Plano de Trabalho', 'Orçamento Anual', 'Proposta Técnico-Orçamentário', 'Memória de Cálculo', 'Minuta de Termo', 'Despacho Autorizatório'];
 // IDs de status que exigem data de assinatura preenchida
 const STATUS_NEED_ASSINATURA = new Set([15, 16, 17, 18, 19, 20]);
 
@@ -693,6 +739,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btn) { btn.style.display = 'none'; btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações'; }
     currentEditId = null;
   });
+
+  // Inicializar tooltips na tabela (linhas com emenda mista)
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
 });
 
 function limparFiltros() {
@@ -753,8 +802,14 @@ function verDetalhes(id) {
       autoDetectarLei(false);
       // Carregar endereços de execução do projeto
       carregarEnderecos(id);
+      // Carregar documentos SEI do registro
+      carregarSEIDocs(id);
+      // Carregar informações adicionais
+      carregarInfosAdicionais(id);
       // Ativar tooltips Bootstrap no modal
       conteudo.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+      // Mostrar secção de emenda se aplicável
+      verificarEditalEmenda('edit');
     })
     .catch(err => {
       conteudo.innerHTML = `<div class="alert alert-danger">Erro ao carregar detalhes: ${err}</div>`;
@@ -825,6 +880,72 @@ function salvarRegistro() {
     return;
   }
 
+  // ── Campos obrigatórios sempre ───────────────────────────────────────────────
+  const _alwaysReq = [
+    { id: 'edit_sei_celeb',   label: 'SEI Celebração' },
+    { id: 'edit_tipo_termo',  label: 'Tipo de Termo' },
+    { id: 'edit_edital_nome', label: 'Edital' },
+    { id: 'edit_cnpj',        label: 'CNPJ' },
+    { id: 'edit_osc',         label: 'OSC' },
+    { id: 'edit_responsavel', label: 'Responsável(eis)' },
+    { id: 'edit_projeto',     label: 'Projeto' },
+    { id: 'edit_status',      label: 'Status' },
+  ];
+  // Limpar bordas vermelhas anteriores dos campos req
+  _alwaysReq.forEach(f => { const el = document.getElementById(f.id); if (el) el.style.borderColor = ''; });
+  const _missingAlways = _alwaysReq.filter(f => {
+    const el = document.getElementById(f.id);
+    return !el || !el.value.trim();
+  });
+  if (_missingAlways.length > 0) {
+    _missingAlways.forEach(f => { const el = document.getElementById(f.id); if (el) { el.style.borderColor = '#dc3545'; el.style.boxShadow = '0 0 0 0.2rem rgba(220,53,69,.25)'; } });
+    btnSalvar.disabled = false;
+    btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+    document.getElementById('detalhesConteudo').insertAdjacentHTML('afterbegin', `
+      <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+        <i class="bi bi-x-circle me-1"></i> Campos obrigatórios não preenchidos: <strong>${_missingAlways.map(f => f.label).join(', ')}</strong>.
+        <button class="btn-close" data-bs-dismiss="alert"></button>
+      </div>`);
+    document.getElementById(_missingAlways[0].id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  // ── Quando status genérico = Celebrado: TODOS os campos obrigatórios (exceto Substatus) ──
+  const _sgValCeleb = (document.getElementById('edit_status_generico') || {}).value || '';
+  if (_sgValCeleb === 'Celebrado') {
+    const _celebReq = [
+      { id: 'edit_numeracao_termo',         label: 'Numeração do Termo' },
+      { id: 'edit_unidade_gestora',          label: 'Unidade Gestora' },
+      { id: 'edit_endereco_sede',            label: 'Endereço Sede' },
+      { id: 'edit_meses',                    label: 'Meses' },
+      { id: 'edit_inicio',                   label: 'Início' },
+      { id: 'edit_assinatura',               label: 'Assinatura' },
+      { id: 'edit_celebracao_secretaria',    label: 'Secretaria' },
+      { id: 'edit_total_previsto',           label: 'Total Previsto' },
+      { id: 'edit_conta',                    label: 'Conta' },
+      { id: 'edit_lei',                      label: 'Lei' },
+      { id: 'edit_nome_pg',                  label: 'Nome PG' },
+      { id: 'edit_observacoes',              label: 'Observações' },
+    ];
+    _celebReq.forEach(f => { const el = document.getElementById(f.id); if (el) el.style.borderColor = ''; });
+    const _missingCeleb = _celebReq.filter(f => {
+      const el = document.getElementById(f.id);
+      return !el || !el.value.trim();
+    });
+    if (_missingCeleb.length > 0) {
+      _missingCeleb.forEach(f => { const el = document.getElementById(f.id); if (el) { el.style.borderColor = '#dc3545'; el.style.boxShadow = '0 0 0 0.2rem rgba(220,53,69,.25)'; } });
+      btnSalvar.disabled = false;
+      btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+      document.getElementById('detalhesConteudo').insertAdjacentHTML('afterbegin', `
+        <div class="alert alert-warning alert-dismissible mb-3" role="alert">
+          <i class="bi bi-exclamation-triangle me-1"></i> Status <strong>Celebrado</strong> exige todos os campos preenchidos. Faltam: <strong>${_missingCeleb.map(f => f.label).join(', ')}</strong>.
+          <button class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`);
+      document.getElementById(_missingCeleb[0].id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
+
   const data = {};
   form.querySelectorAll('input, select, textarea').forEach(el => {
     if (el.name) data[el.name] = el.value;
@@ -836,6 +957,23 @@ function salvarRegistro() {
   }
   // Incluir endereços de execução do projeto
   data.enderecos = coletarEnderecos();
+
+  // Validar e coletar documentos SEI (sem duplicatas de tipo)
+  const seiDocs = coletarSEIDocs();
+  if (seiDocs === null) {
+    btnSalvar.disabled = false;
+    btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+    document.getElementById('detalhesConteudo').insertAdjacentHTML('afterbegin', `
+      <div class="alert alert-warning alert-dismissible mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle me-1"></i> Existem <strong>tipos de documento SEI duplicados</strong>. Cada tipo só pode aparecer uma vez.
+        <button class="btn-close" data-bs-dismiss="alert"></button>
+      </div>`);
+    return;
+  }
+  data.sei_docs = seiDocs;
+
+  // Coletar informações adicionais
+  data.infos_adicionais = coletarInfosAdicionais();
 
   fetch(`/celebracao-parcerias/editar/${currentEditId}`, {
     method: 'PUT',
@@ -950,21 +1088,21 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
       <div id="osc_lookup_result" class="mt-1" style="display:none;"></div>`;
   }
 
-  // Campo Responsável: múltiplos, via checkboxes + hidden input
+  // Campo Responsável: múltiplos, via pill-buttons (btn-check) + hidden input
   function responsavelField(valor) {
     const selecionados = (valor || '').split(';').map(v => v.trim()).filter(v => v);
-    let checks = RESPONSAVEIS_NOMES.map(nome => {
+    let pills = RESPONSAVEIS_NOMES.map(nome => {
+      const safeId = 'resp_' + esc(nome).replace(/[^a-zA-Z0-9]/g,'_');
       const checked = selecionados.includes(nome) ? 'checked' : '';
-      return `<div class="form-check form-check-inline">
-          <input class="form-check-input resp-check" type="checkbox"
-            value="${esc(nome)}" id="resp_${esc(nome).replace(/[^a-zA-Z0-9]/g,'_')}"
+      return `<span>
+          <input class="btn-check resp-check" type="checkbox"
+            value="${esc(nome)}" id="${safeId}" autocomplete="off"
             ${checked} onchange="sincronizarResponsaveis()">
-          <label class="form-check-label small"
-            for="resp_${esc(nome).replace(/[^a-zA-Z0-9]/g,'_')}">${esc(nome)}</label>
-        </div>`;
+          <label class="btn btn-sm btn-outline-primary" for="${safeId}">${esc(nome)}</label>
+        </span>`;
     }).join('');
-    return `<div class="border rounded p-2" style="max-height:110px;overflow-y:auto;background:#fff;">
-        ${checks || '<span class="text-muted small">Nenhum analista cadastrado</span>'}
+    return `<div class="resp-picker d-flex flex-wrap gap-2 border rounded p-2" style="background:#fff;min-height:46px;">
+        ${pills || '<span class="text-muted small align-self-center">Nenhum analista cadastrado</span>'}
       </div>
       <input type="hidden" id="edit_responsavel" name="responsavel" value="${esc(valor || '')}">`;
   }
@@ -1036,7 +1174,27 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
       <div class="col-md-4">
         <label class="form-label fw-bold text-muted mb-1 small">Edital</label>
         <select class="form-select form-select-sm" id="edit_edital_nome" name="edital_nome"
-          onchange="rebuildNumeroTermo()">${opts(EDITAIS_LIST, r.edital_nome)}</select>
+          onchange="rebuildNumeroTermo(); verificarEditalEmenda('edit')">${opts(EDITAIS_LIST, r.edital_nome)}</select>
+      </div>
+
+      ${/* ── Seção Emenda Parlamentar (edit) ── */''}<div class="col-12" id="sec_emenda_edit" style="display:none;">
+        <h6 class="text-warning fw-bold border-bottom pb-2 mt-2">
+          <i class="bi bi-cash-coin me-1"></i> Informações de Emenda Parlamentar
+        </h6>
+        <div id="alerta_emenda_edit" class="mb-2"></div>
+        <div class="row g-2">
+          <div class="col-md-5">
+            <label class="form-label fw-bold text-muted mb-1 small">SEI Orçamentário</label>
+            <select class="form-select form-select-sm" id="edit_sei_orcamentario"
+              onchange="aoSelecionarSEIorc('edit')">
+              <option value="">-- Selecione --</option>
+            </select>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label fw-bold text-muted mb-1 small">Vereadores vinculados</label>
+            <input type="text" class="form-control form-control-sm" id="edit_vereadores_info" readonly style="background:#f0f0f0;">
+          </div>
+        </div>
       </div>
 
       ${sec('building', 'OSC e Projeto')}
@@ -1045,7 +1203,7 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
         <label class="form-label fw-bold text-muted mb-1 small">OSC</label>
         ${oscField(r.osc)}
       </div>
-      <div class="col-md-3">
+      <div class="col-12">
         <label class="form-label fw-bold text-muted mb-1 small">Responsável(eis)</label>
         ${responsavelField(r.responsavel)}
       </div>
@@ -1182,6 +1340,31 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
              </div>`
         }
       </div>
+
+      ${sec('file-earmark-text', 'Informações de SEI')}
+      <div class="col-12">
+        ${r.sei_celeb
+          ? `<div id="sei_docs_container" class="mb-2"></div>
+             <button type="button" class="btn btn-outline-primary btn-sm" onclick="adicionarSEIDoc({})">
+               <i class="bi bi-plus-circle me-1"></i> Adicionar Documento SEI
+             </button>`
+          : `<div class="alert alert-warning py-2 mb-0">
+               <i class="bi bi-exclamation-triangle me-1"></i>
+               Preencha o campo <strong>SEI Celebração</strong> e salve antes de adicionar documentos SEI.
+             </div>`
+        }
+      </div>
+
+      ${sec('info-circle', 'Informações Adicionais da Parceria')}
+      <div class="col-12">
+        ${r.sei_celeb
+          ? `<div id="infos_adicionais_container"></div>`
+          : `<div class="alert alert-warning py-2 mb-0">
+               <i class="bi bi-exclamation-triangle me-1"></i>
+               Preencha o campo <strong>SEI Celebração</strong> e salve antes de preencher informações adicionais.
+             </div>`
+        }
+      </div>
     </div>
   </form>`;
 }
@@ -1308,14 +1491,19 @@ function adicionarEnderecoExec(dados) {
     },
     placeholder: 'Digite para buscar distrito...', allowClear: true, minimumInputLength: 0
   });
-  // Auto-fill subprefeitura/região ao selecionar distrito
-  $(sel).on('select2:select select2:clear', function() {
-    const distVal = $(this).val();
+  // Auto-fill subprefeitura/região ao selecionar distrito (usa .text do evento, não .val())
+  $(sel).on('select2:select', function(e) {
+    const distText = e.params?.data?.text || '';
     const sub = div.querySelector('.ee-subprefeitura');
     const reg = div.querySelector('.ee-regiao');
-    const info = distVal && REGIONALIZACAO_MAP[distVal];
+    const info = REGIONALIZACAO_MAP[distText];
     if (sub) sub.value = info ? (info.subprefeitura || '') : '';
     if (reg) reg.value = info ? (info.regiao || '') : '';
+  }).on('select2:clear', function() {
+    const sub = div.querySelector('.ee-subprefeitura');
+    const reg = div.querySelector('.ee-regiao');
+    if (sub) sub.value = '';
+    if (reg) reg.value = '';
   });
   if (dados.parceria_distrito) {
     const opt = new Option(dados.parceria_distrito, dados.parceria_distrito, true, true);
@@ -1380,6 +1568,191 @@ async function carregarEnderecos(recordId) {
   } catch(e) { console.warn('carregarEnderecos:', e); }
 }
 
+// ── Informações de SEI ────────────────────────────────────────────────────
+let contadorSEIDocs = 0;
+
+function adicionarSEIDoc(dados) {
+  const container = document.getElementById('sei_docs_container');
+  if (!container) return;
+  contadorSEIDocs++;
+  const uid     = 'sei_' + contadorSEIDocs;
+  const tipoVal  = dados.termo_tipo_sei || 'Termo Base';
+  const docVal   = (dados.termo_sei_doc || '').replace(/"/g, '&quot;');
+  const criado   = dados.created_por
+    ? `<small class="text-muted ms-2">por ${dados.created_por}${dados.created_at ? ' em ' + dados.created_at : ''}</small>`
+    : '';
+  const div = document.createElement('div');
+  div.className   = 'sei-doc-item border rounded p-3 mb-2';
+  div.dataset.uid = uid;
+  div.innerHTML   = `
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <h6 class="mb-0 small fw-bold text-muted">Documento SEI #${contadorSEIDocs}${criado}</h6>
+      <button type="button" class="btn btn-sm btn-outline-danger py-0"
+        onclick="removerSEIDoc('${uid}')"><i class="bi bi-trash"></i></button>
+    </div>
+    <div class="row g-2">
+      <div class="col-md-5">
+        <label class="form-label small mb-0">Tipo do Documento</label>
+        <select class="form-select form-select-sm sd-tipo">
+          ${SEI_TIPO_OPTIONS.map(t => `<option value="${t}"${t === tipoVal ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="col-md-7">
+        <label class="form-label small mb-0">SEI do Documento</label>
+        <input type="text" class="form-control form-control-sm sd-doc"
+          placeholder="Ex: 0123456789" maxlength="15" value="${docVal}">
+      </div>
+    </div>`;
+  container.appendChild(div);
+}
+
+function removerSEIDoc(uid) {
+  const el = document.querySelector(`.sei-doc-item[data-uid="${uid}"]`);
+  if (el) el.remove();
+}
+
+function coletarSEIDocs() {
+  const result = [];
+  const tiposSeen = new Set();
+  let hasDuplicate = false;
+  document.querySelectorAll('.sei-doc-item').forEach(item => {
+    const tipoEl = item.querySelector('.sd-tipo');
+    const tipo   = tipoEl?.value || '';
+    const doc    = item.querySelector('.sd-doc')?.value.trim() || '';
+    if (tiposSeen.has(tipo)) {
+      hasDuplicate = true;
+      if (tipoEl) tipoEl.style.borderColor = '#dc3545';
+    } else {
+      tiposSeen.add(tipo);
+      if (tipoEl) tipoEl.style.borderColor = '';
+    }
+    result.push({ termo_tipo_sei: tipo, termo_sei_doc: doc });
+  });
+  if (hasDuplicate) return null; // sinal de erro de validação
+  return result;
+}
+
+async function carregarSEIDocs(recordId) {
+  const container = document.getElementById('sei_docs_container');
+  if (!container) return;
+  contadorSEIDocs = 0;
+  container.innerHTML = '';
+  try {
+    const resp = await fetch(`/celebracao-parcerias/sei-docs/${recordId}`);
+    const d = await resp.json();
+    if (d.success && d.sei_docs && d.sei_docs.length) {
+      d.sei_docs.forEach(doc => adicionarSEIDoc(doc));
+    }
+  } catch(e) { console.warn('carregarSEIDocs:', e); }
+}
+
+// ── Informações Adicionais da Parceria ────────────────────────────────────
+function renderInfosAdicionais(info) {
+  const container = document.getElementById('infos_adicionais_container');
+  if (!container) return;
+  // Responsáveis legais: array de nomes separados por ponto-e-vírgula
+  const resps = (info.parceria_responsavel_legal || '').split(';').map(s => s.trim()).filter(Boolean);
+  const respsHtml = resps.map((nome, i) => `
+    <div class="input-group input-group-sm mb-1 resp-legal-row" data-idx="${i}">
+      <input type="text" class="form-control form-control-sm resp-legal-input"
+        value="${nome.replace(/"/g, '&quot;')}" placeholder="Nome completo do responsável legal">
+      <button type="button" class="btn btn-outline-danger" onclick="this.closest('.resp-legal-row').remove()">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>`).join('');
+  container.innerHTML = `
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label small fw-bold mb-1">
+          Responsável(is) Legal(is)
+          <i class="bi bi-question-circle text-muted ms-1" data-bs-toggle="tooltip"
+            title="Nome(s) completo(s) que constará(ão) no termo. Adicione um por linha."></i>
+        </label>
+        <div id="resp_legal_list" class="mb-1">${respsHtml}</div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="adicionarRespLegal()">
+          <i class="bi bi-plus-circle me-1"></i> Adicionar Responsável Legal
+        </button>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-bold mb-1">Beneficiários Diretos</label>
+        <input type="number" min="0" step="1" class="form-control form-control-sm"
+          id="ia_benef_diretos" value="${info.parceria_beneficiarios_diretos ?? ''}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-bold mb-1">Beneficiários Indiretos</label>
+        <input type="number" min="0" step="1" class="form-control form-control-sm"
+          id="ia_benef_indiretos" value="${info.parceria_beneficiarios_indiretos ?? ''}">
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-bold mb-1">Objeto</label>
+        <textarea class="form-control form-control-sm auto-resize" id="ia_objeto" rows="3"
+          placeholder="Descreva o objeto da parceria..."
+          oninput="autoResize(this)">${(info.parceria_objeto || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-bold mb-1">Justificativa do Projeto</label>
+        <textarea class="form-control form-control-sm auto-resize" id="ia_justificativa" rows="3"
+          placeholder="Descreva a justificativa..."
+          oninput="autoResize(this)">${(info.parceria_justificativa_projeto || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-bold mb-1">Abrangência do Projeto</label>
+        <textarea class="form-control form-control-sm auto-resize" id="ia_abrangencia" rows="3"
+          placeholder="Descreva a abrangência..."
+          oninput="autoResize(this)">${(info.parceria_abrangencia_projeto || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      </div>
+    </div>`;
+  // Reativar tooltips e ajustar tamanho dos textareas conforme conteúdo
+  container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+  autoResizeAll(container);
+}
+
+function adicionarRespLegal() {
+  const list = document.getElementById('resp_legal_list');
+  if (!list) return;
+  const idx = list.querySelectorAll('.resp-legal-row').length;
+  const div = document.createElement('div');
+  div.className = 'input-group input-group-sm mb-1 resp-legal-row';
+  div.dataset.idx = idx;
+  div.innerHTML = `
+    <input type="text" class="form-control form-control-sm resp-legal-input"
+      placeholder="Nome completo do responsável legal">
+    <button type="button" class="btn btn-outline-danger" onclick="this.closest('.resp-legal-row').remove()">
+      <i class="bi bi-x"></i>
+    </button>`;
+  list.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function coletarInfosAdicionais() {
+  const container = document.getElementById('infos_adicionais_container');
+  if (!container) return null;
+  const resps = Array.from(container.querySelectorAll('.resp-legal-input'))
+    .map(el => el.value.trim()).filter(Boolean);
+  return {
+    parceria_responsavel_legal:    resps.join(';') || null,
+    parceria_beneficiarios_diretos:   parseInt(document.getElementById('ia_benef_diretos')?.value)  || null,
+    parceria_beneficiarios_indiretos: parseInt(document.getElementById('ia_benef_indiretos')?.value) || null,
+    parceria_objeto:                  document.getElementById('ia_objeto')?.value.trim()         || null,
+    parceria_justificativa_projeto:   document.getElementById('ia_justificativa')?.value.trim()  || null,
+    parceria_abrangencia_projeto:     document.getElementById('ia_abrangencia')?.value.trim()    || null,
+  };
+}
+
+async function carregarInfosAdicionais(recordId) {
+  const container = document.getElementById('infos_adicionais_container');
+  if (!container) return;
+  container.innerHTML = '<span class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Carregando...</span>';
+  try {
+    const resp = await fetch(`/celebracao-parcerias/infos-adicionais/${recordId}`);
+    const d = await resp.json();
+    renderInfosAdicionais(d.success ? (d.infos || {}) : {});
+  } catch(e) {
+    console.warn('carregarInfosAdicionais:', e);
+    renderInfosAdicionais({});
+  }
+}
+
 // ── Projeto online: toggle da seção de endereços ──────────────────────────
 function toggleProjetoOnline(chk) {
   const container = document.getElementById('enderecos_exec_container');
@@ -1416,6 +1789,77 @@ function formatarTotalPrevisto(input) {
   if (!isNaN(n)) {
     input.value = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+}
+
+// ── Emenda Parlamentar ──────────────────────────────────────────────────────
+const EMENDA_EDITAL_NAME = 'Sem Edital (Emenda Parlamentar)';
+
+async function verificarEditalEmenda(prefix) {
+  const editId = prefix === 'edit' ? 'edit_edital_nome' : 'new_edital_nome';
+  const edital = document.getElementById(editId)?.value || '';
+  const sec = document.getElementById(`sec_emenda_${prefix}`);
+  if (!sec) return;
+  if (edital !== EMENDA_EDITAL_NAME) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+
+  const seiId  = prefix === 'edit' ? 'edit_sei_celeb' : 'new_sei_celeb';
+  const projId = prefix === 'edit' ? 'edit_projeto'   : 'new_projeto';
+  const sei    = document.getElementById(seiId)?.value.trim() || '';
+  const seiEff = sei && sei !== '-' ? sei : '';
+  const projeto = document.getElementById(projId)?.value.trim() || '';
+
+  const alertEl = document.getElementById(`alerta_emenda_${prefix}`);
+  if (!seiEff && !projeto) {
+    alertEl.innerHTML = '<div class="alert alert-warning py-1 small mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>Preencha o SEI Celebração ou o Projeto para carregar as informações de emenda.</div>';
+    return;
+  }
+
+  alertEl.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Carregando...</div>';
+  try {
+    const url = seiEff
+      ? `/celebracao-parcerias/api/emendas-por-sei?sei_celeb=${encodeURIComponent(seiEff)}`
+      : `/celebracao-parcerias/api/emendas-por-sei?projeto=${encodeURIComponent(projeto)}`;
+    const res = await fetch(url);
+    const d = await res.json();
+    const sel = document.getElementById(`${prefix}_sei_orcamentario`);
+    sel.innerHTML = '<option value="">-- Selecione --</option>';
+    d.emendas.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.sei_orcamentario;
+      opt.textContent = e.sei_orcamentario;
+      sel.appendChild(opt);
+    });
+    document.getElementById(`${prefix}_vereadores_info`).value = d.vereadores.join(', ') || '—';
+    if (d.projeto) {
+      const projEl = document.getElementById(projId);
+      if (projEl && !projEl.value) projEl.value = d.projeto;
+    }
+    if (d.total_valor > 0) {
+      const totId = prefix === 'edit' ? 'edit_total_previsto' : 'new_total_previsto';
+      const totEl = document.getElementById(totId);
+      if (totEl) totEl.value = d.total_valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    }
+    if (d.emendas.length === 0) {
+      const msg = d.vinculo === 'projeto'
+        ? 'Nenhum SEI Orçamentário vinculado a este Projeto.'
+        : 'Nenhum SEI Orçamentário vinculado a este SEI Celebração.';
+      alertEl.innerHTML = `<div class="alert alert-warning py-1 small mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>${msg}</div>`;
+    } else if (d.multiplos) {
+      const via = d.vinculo === 'projeto' ? 'projeto' : 'SEI Celebração';
+      alertEl.innerHTML = `<div class="alert alert-info py-1 small mb-0"><i class="bi bi-info-circle me-1"></i>Há <strong>${d.emendas.length}</strong> processos orçamentários vinculados via <em>${via}</em>. Verifique se todos foram acrescidos.</div>`;
+    } else {
+      const via = d.vinculo === 'projeto' ? ' <span class="badge bg-secondary" style="font-size:0.7rem;">vínculo por projeto</span>' : '';
+      alertEl.innerHTML = via ? `<div class="text-muted small">${via}</div>` : '';
+    }
+    if (d.emendas.length === 1) sel.value = d.emendas[0].sei_orcamentario;
+  } catch (err) {
+    document.getElementById(`alerta_emenda_${prefix}`).innerHTML =
+      '<div class="alert alert-danger py-1 small mb-0">Erro ao carregar emendas.</div>';
+  }
+}
+
+function aoSelecionarSEIorc(prefix) {
+  /* futuro: auto-preencher projeto conforme SEI Orçamentário selecionado */
 }
 
 // ── Lei: auto-detecção via /api/portaria-automatica ───────────────────────
@@ -1546,6 +1990,356 @@ function validarSEI(input) {
 }
 
 // ── Nº Termo: auto-construção ──────────────────────────────────────────────
+// ── Auto-resize para textareas ──────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+function autoResizeAll(root) {
+  (root || document).querySelectorAll('textarea.auto-resize').forEach(autoResize);
+}
+
+// ── Nova Parceria ─────────────────────────────────────────────────────────
+function abrirNovaParc() {
+  const modal = new bootstrap.Modal(document.getElementById('modalNovaParc'));
+  document.getElementById('novaParcConteudo').innerHTML = montarFormularioNovo();
+  rebuildNumeroTermoNovo();
+  document.getElementById('novaParcConteudo').querySelectorAll('[data-bs-toggle="tooltip"]')
+    .forEach(el => new bootstrap.Tooltip(el));
+  const btnNova = document.getElementById('btnSalvarNova');
+  if (btnNova) { btnNova.disabled = false; btnNova.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar Parceria'; }
+  modal.show();
+}
+
+function montarFormularioNovo() {
+  function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function opts(lista, selecionado) {
+    let html = '<option value="">-- Selecione --</option>';
+    lista.forEach(o => { html += `<option value="${esc(o)}"${o===selecionado?' selected':''}>${esc(o)}</option>`; });
+    return html;
+  }
+  function fld(label, inputHTML, colMd=4) {
+    return `<div class="col-md-${colMd}"><label class="form-label fw-bold text-muted mb-1 small">${label}</label>${inputHTML}</div>`;
+  }
+  function sec(icon, title) {
+    return `<div class="col-12"><h6 class="text-primary fw-bold border-bottom pb-2 mt-3"><i class="bi bi-${icon} me-1"></i> ${title}</h6></div>`;
+  }
+
+  const respChecks = RESPONSAVEIS_NOMES.map(nome => {
+    const safeId = 'newresp_' + esc(nome).replace(/[^a-zA-Z0-9]/g,'_');
+    return `<span>
+      <input class="btn-check new-resp-check" type="checkbox" value="${esc(nome)}"
+        id="${safeId}" autocomplete="off" onchange="sincronizarResponsaveisNovo()">
+      <label class="btn btn-sm btn-outline-primary" for="${safeId}">${esc(nome)}</label>
+    </span>`;
+  }).join('');
+
+  return `<form id="formNovaParc">
+    <div class="row g-2">
+      ${sec('card-heading', 'Identificação')}
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">SEI Celebração</label>
+        <input type="text" class="form-control form-control-sm" id="new_sei_celeb" name="sei_celeb"
+          placeholder="0000.0000/0000000-0" maxlength="20" oninput="formatarSEI(this)">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Tipo de Termo</label>
+        <select class="form-select form-select-sm" id="new_tipo_termo" name="tipo_termo"
+          onchange="rebuildNumeroTermoNovo()">${opts(TIPO_TERMO_LIST,'')}</select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Edital</label>
+        <select class="form-select form-select-sm" id="new_edital_nome" name="edital_nome"
+          onchange="rebuildNumeroTermoNovo(); verificarEditalEmenda('new')">${opts(EDITAIS_LIST,'')}</select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-bold text-muted mb-1 small">Numeração do Termo</label>
+        <input type="number" class="form-control form-control-sm" id="new_numeracao_termo" name="numeracao_termo"
+          min="1" max="999" step="1" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,3)"
+          onchange="rebuildNumeroTermoNovo()">
+      </div>
+      <div class="col-md-5">
+        <label class="form-label fw-bold text-muted mb-1 small">Nº Termo <small class="text-muted fw-normal">(auto)</small></label>
+        <input type="text" class="form-control form-control-sm" id="new_numero_termo" name="numero_termo"
+          readonly style="background:#f0f0f0;" placeholder="Gerado automaticamente">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Unidade Gestora</label>
+        <select class="form-select form-select-sm" id="new_unidade_gestora" name="unidade_gestora"
+          onchange="rebuildNumeroTermoNovo()">${opts(UNIDADES_LIST,'')}</select>
+      </div>
+
+      ${/* ── Seção Emenda Parlamentar (new) ── */''}<div class="col-12" id="sec_emenda_new" style="display:none;">
+        <h6 class="text-warning fw-bold border-bottom pb-2 mt-2">
+          <i class="bi bi-cash-coin me-1"></i> Informações de Emenda Parlamentar
+        </h6>
+        <div id="alerta_emenda_new" class="mb-2"></div>
+        <div class="row g-2">
+          <div class="col-md-5">
+            <label class="form-label fw-bold text-muted mb-1 small">SEI Orçamentário</label>
+            <select class="form-select form-select-sm" id="new_sei_orcamentario"
+              onchange="aoSelecionarSEIorc('new')">
+              <option value="">-- Selecione --</option>
+            </select>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label fw-bold text-muted mb-1 small">Vereadores vinculados</label>
+            <input type="text" class="form-control form-control-sm" id="new_vereadores_info" readonly style="background:#f0f0f0;">
+          </div>
+        </div>
+      </div>
+
+      ${sec('building', 'OSC e Projeto')}
+      ${fld('CNPJ', `<div class="input-group input-group-sm">
+        <input type="text" class="form-control form-control-sm" id="new_cnpj" name="cnpj"
+          placeholder="00.000.000/0000-00" maxlength="18" oninput="formatarCNPJ(this)">
+        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="buscarOSCporCNPJNovo()" title="Buscar OSC"><i class="bi bi-search"></i></button>
+      </div>
+      <div id="new_cnpj_warn" class="small mt-1 text-warning" style="display:none;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Formato: 00.000.000/0000-00</div>`, 3)}
+      <div class="col-md-6">
+        <label class="form-label fw-bold text-muted mb-1 small">OSC</label>
+        <input type="text" class="form-control form-control-sm" id="new_osc" name="osc" placeholder="Nome da OSC">
+        <div id="new_osc_lookup" class="mt-1" style="display:none;"></div>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-bold text-muted mb-1 small">Responsável(eis)</label>
+        <div class="resp-picker d-flex flex-wrap gap-2 border rounded p-2" style="background:#fff;min-height:46px;">
+          ${respChecks || '<span class="text-muted small align-self-center">Nenhum analista</span>'}
+        </div>
+        <input type="hidden" id="new_responsavel" name="responsavel" value="">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-bold text-muted mb-1 small">Projeto</label>
+        <input type="text" class="form-control form-control-sm" id="new_projeto" name="projeto">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-bold text-muted mb-1 small">Endereço Sede</label>
+        <input type="text" class="form-control form-control-sm" id="new_endereco_sede" name="endereco_sede">
+      </div>
+
+      ${sec('flag', 'Status')}
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Status</label>
+        <select class="form-select form-select-sm" id="new_status" name="status"
+          onchange="aoMudarStatusNovo(this.value)">${opts(STATUS_LIST,'')}</select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Status Genérico <small class="text-muted fw-normal">(auto)</small></label>
+        <input type="text" class="form-control form-control-sm" id="new_status_generico" name="status_generico"
+          readonly style="background:#f0f0f0;">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Nome PG</label>
+        <select class="form-select form-select-sm" id="new_nome_pg" name="nome_pg">${opts(NOME_PG_LIST,'')}</select>
+      </div>
+
+      ${sec('calendar3', 'Datas e Vigência')}
+      ${fld('Meses', `<input type="number" step="1" min="0" class="form-control form-control-sm" id="new_meses" name="meses" onchange="calcularDataFinalNovo()">`, 2)}
+      ${fld('Dias',  `<input type="number" step="1" min="0" class="form-control form-control-sm" id="new_dias"  name="dias"  onchange="calcularDataFinalNovo()">`, 2)}
+      <div class="col-md-2">
+        <label class="form-label fw-bold text-muted mb-1 small">Início</label>
+        <input type="date" class="form-control form-control-sm" id="new_inicio" name="inicio"
+          onchange="rebuildNumeroTermoNovo(); calcularDataFinalNovo();">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold text-muted mb-1 small">Final <small class="text-muted fw-normal">(auto)</small></label>
+        <input type="date" class="form-control form-control-sm" id="new_final" name="final" readonly style="background:#f0f0f0;">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold text-muted mb-1 small">Assinatura</label>
+        <input type="date" class="form-control form-control-sm" id="new_assinatura" name="assinatura"
+          onchange="rebuildNumeroTermoNovo()">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-bold text-muted mb-1 small">Secretaria</label>
+        <select class="form-select form-select-sm" id="new_celebracao_secretaria" name="celebracao_secretaria"
+          onchange="rebuildNumeroTermoNovo()">
+          ${['SMDHC','SMADS','SME'].map(o=>`<option value="${o}">${o}</option>`).join('')}
+        </select>
+      </div>
+
+      ${sec('cash', 'Financeiro')}
+      ${fld('Total Previsto', `<input type="text" class="form-control form-control-sm" id="new_total_previsto" name="total_previsto" placeholder="Ex: 454.998,56" onblur="formatarTotalPrevisto(this)">`, 4)}
+      ${fld('Conta', `<input type="text" class="form-control form-control-sm" id="new_conta" name="conta" placeholder="Ex: 001 / 12345-6">`, 4)}
+      <div class="col-md-4">
+        <label class="form-label fw-bold text-muted mb-1 small">Lei</label>
+        <select class="form-select form-select-sm" id="new_lei" name="lei">${opts(LEI_LIST,'')}</select>
+      </div>
+
+      ${sec('chat-left-text', 'Observações')}
+      <div class="col-12">
+        <textarea class="form-control form-control-sm" id="new_observacoes" name="observacoes" rows="3"></textarea>
+      </div>
+      <div class="col-12">
+        <div class="alert alert-info py-2 mt-2 mb-0 small">
+          <i class="bi bi-info-circle me-1"></i>
+          Após criar, abra o registro para preencher <strong>Endereços de Execução</strong>, <strong>SEI de Documentos</strong> e <strong>Informações Adicionais</strong>.
+        </div>
+      </div>
+    </div>
+  </form>`;
+}
+
+function aoMudarStatusNovo(statusVal) {
+  const sgEl = document.getElementById('new_status_generico');
+  if (sgEl) sgEl.value = STATUS_GEN_MAP[statusVal] || '';
+}
+
+function calcularDataFinalNovo() {
+  const inicioEl = document.getElementById('new_inicio');
+  const mesesEl  = document.getElementById('new_meses');
+  const diasEl   = document.getElementById('new_dias');
+  const finalEl  = document.getElementById('new_final');
+  if (!inicioEl || !finalEl || !inicioEl.value) { if (finalEl) finalEl.value = ''; return; }
+  const meses = parseInt(mesesEl?.value) || 0;
+  const dias  = parseInt(diasEl?.value)  || 0;
+  if (meses === 0 && dias === 0) { finalEl.value = ''; return; }
+  const d = new Date(inicioEl.value + 'T00:00:00');
+  d.setMonth(d.getMonth() + meses);
+  d.setDate(d.getDate() + dias - 1);
+  finalEl.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function rebuildNumeroTermoNovo() {
+  const tipo      = document.getElementById('new_tipo_termo')?.value || '';
+  const numStr    = document.getElementById('new_numeracao_termo')?.value || '';
+  const assin     = document.getElementById('new_assinatura')?.value || '';
+  const secretaria = document.getElementById('new_celebracao_secretaria')?.value.trim() || '';
+  const edital    = document.getElementById('new_edital_nome')?.value || '';
+  const unidade   = document.getElementById('new_unidade_gestora')?.value.trim() || '';
+  const campo     = document.getElementById('new_numero_termo');
+  if (!campo) return;
+  if (!tipo || !numStr || !assin || !secretaria) { campo.value = ''; return; }
+  const prefixMap = { 'Acordo de Cooperação': 'ACP', 'Colaboração': 'TCL', 'Fomento': 'TFM' };
+  const prefix = prefixMap[tipo] || tipo;
+  const numInt = parseInt(numStr, 10);
+  if (isNaN(numInt) || numInt < 1) { campo.value = ''; return; }
+  const numPad = String(numInt).padStart(3, '0');
+  const ano = assin.substring(0, 4);
+  const editalUp = edital.toUpperCase();
+  let ultimaParte = unidade;
+  if (editalUp.includes('FUMCAD')) ultimaParte = 'FUMCAD';
+  else if (editalUp.includes('FMID')) ultimaParte = 'FMID';
+  campo.value = `${prefix}/${numPad}/${ano}/${secretaria}${ultimaParte ? '/' + ultimaParte : ''}`;
+}
+
+function sincronizarResponsaveisNovo() {
+  const checks = document.querySelectorAll('.new-resp-check:checked');
+  const hidden = document.getElementById('new_responsavel');
+  if (hidden) hidden.value = Array.from(checks).map(cb => cb.value).filter(Boolean).join(';');
+}
+
+function buscarOSCporCNPJNovo() {
+  const cnpjEl = document.getElementById('new_cnpj');
+  const oscEl  = document.getElementById('new_osc');
+  const resultDiv = document.getElementById('new_osc_lookup');
+  if (!cnpjEl || !oscEl || !resultDiv) return;
+  const cnpj = cnpjEl.value.trim();
+  if (!cnpj) return;
+  const re = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
+  if (!re.test(cnpj)) {
+    resultDiv.style.display = '';
+    resultDiv.innerHTML = '<span class="text-warning small"><i class="bi bi-exclamation-triangle-fill me-1"></i>CNPJ inválido.</span>';
+    return;
+  }
+  resultDiv.style.display = '';
+  resultDiv.innerHTML = '<span class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Buscando...</span>';
+  fetch(`/celebracao-parcerias/cnpj-lookup?cnpj=${encodeURIComponent(cnpj)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success || !data.resultados.length) {
+        resultDiv.innerHTML = '<span class="text-muted small">Nenhuma OSC encontrada.</span>';
+        return;
+      }
+      if (data.resultados.length === 1) {
+        oscEl.value = data.resultados[0];
+        resultDiv.innerHTML = '<span class="text-success small"><i class="bi bi-check-circle me-1"></i>OSC preenchida.</span>';
+        setTimeout(() => { resultDiv.style.display = 'none'; }, 2500);
+        return;
+      }
+      const btns = data.resultados.map(nome =>
+        `<button type="button" class="btn btn-outline-secondary btn-sm me-1 mb-1"
+          onclick="document.getElementById('new_osc').value=this.dataset.nome; document.getElementById('new_osc_lookup').style.display='none';"
+          data-nome="${nome.replace(/"/g,'&quot;')}">${nome}</button>`
+      ).join('');
+      resultDiv.innerHTML = `<div class="small text-muted mb-1">Escolha:</div>${btns}`;
+    });
+}
+
+async function salvarNovaParc() {
+  const form = document.getElementById('formNovaParc');
+  if (!form) return;
+  const btnSalvar = document.getElementById('btnSalvarNova');
+  btnSalvar.disabled = true;
+  btnSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Criando...';
+
+  sincronizarResponsaveisNovo();
+
+  // Validar campos obrigatórios
+  const _reqNova = [
+    { id: 'new_sei_celeb',   label: 'SEI Celebração' },
+    { id: 'new_tipo_termo',  label: 'Tipo de Termo' },
+    { id: 'new_edital_nome', label: 'Edital' },
+    { id: 'new_cnpj',        label: 'CNPJ' },
+    { id: 'new_osc',         label: 'OSC' },
+    { id: 'new_responsavel', label: 'Responsável(eis)' },
+    { id: 'new_projeto',     label: 'Projeto' },
+    { id: 'new_status',      label: 'Status' },
+  ];
+  _reqNova.forEach(f => { const el = document.getElementById(f.id); if (el) el.style.borderColor = ''; });
+  const _missingNova = _reqNova.filter(f => { const el = document.getElementById(f.id); return !el || !el.value.trim(); });
+  if (_missingNova.length > 0) {
+    _missingNova.forEach(f => { const el = document.getElementById(f.id); if (el) { el.style.borderColor = '#dc3545'; el.style.boxShadow = '0 0 0 0.2rem rgba(220,53,69,.25)'; } });
+    btnSalvar.disabled = false;
+    btnSalvar.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar Parceria';
+    document.getElementById('novaParcConteudo').insertAdjacentHTML('afterbegin', `
+      <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+        <i class="bi bi-x-circle me-1"></i> Campos obrigatórios: <strong>${_missingNova.map(f => f.label).join(', ')}</strong>.
+        <button class="btn-close" data-bs-dismiss="alert"></button>
+      </div>`);
+    document.getElementById(_missingNova[0].id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  const data = {};
+  form.querySelectorAll('input, select, textarea').forEach(el => { if (el.name) data[el.name] = el.value; });
+  if (data.total_previsto) data.total_previsto = data.total_previsto.replace(/\./g,'').replace(',','.');
+
+  fetch('/celebracao-parcerias/criar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        document.getElementById('novaParcConteudo').insertAdjacentHTML('afterbegin', `
+          <div class="alert alert-success alert-dismissible mb-3" role="alert">
+            <i class="bi bi-check-circle me-1"></i> ${res.mensagem}
+            <button class="btn-close" data-bs-dismiss="alert"></button>
+          </div>`);
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        document.getElementById('novaParcConteudo').insertAdjacentHTML('afterbegin', `
+          <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+            <i class="bi bi-exclamation-circle me-1"></i> Erro: ${res.erro}
+            <button class="btn-close" data-bs-dismiss="alert"></button>
+          </div>`);
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar Parceria';
+      }
+    })
+    .catch(err => {
+      btnSalvar.disabled = false;
+      btnSalvar.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar Parceria';
+      alert('Erro: ' + err);
+    });
+}
+
+// ── Número do Termo (editar) ──────────────────────────────────────────────
 function rebuildNumeroTermo() {
   const tipo      = document.getElementById('edit_tipo_termo')?.value || '';
   const numStr    = document.getElementById('edit_numeracao_termo')?.value || '';
@@ -1715,6 +2509,237 @@ function salvarVisualizacaoGeral() {
     .catch(err => alert('Erro: ' + err));
 }
 
+// ── Contatos da OSC ─────────────────────────────────────────────────────────
+let _contatosOscAtual = '';
+
+function abrirContatosOSC(osc) {
+  if (!osc) return;
+  _contatosOscAtual = osc;
+  document.getElementById('modalContatosOscTitulo').textContent = osc;
+  document.getElementById('contatosOscLista').innerHTML =
+    '<div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-1"></span>Carregando...</div>';
+  document.getElementById('formNovoContatoCeleb').style.display = 'none';
+  document.getElementById('formEditarContatoCeleb').style.display = 'none';
+  document.getElementById('btnMostrarFormNovoContato').style.display = '';
+  const modal = new bootstrap.Modal(document.getElementById('modalContatosOsc'));
+  modal.show();
+  carregarContatosCeleb(osc);
+}
+
+async function carregarContatosCeleb(osc) {
+  try {
+    const res = await fetch(`/parcerias/contatos/${encodeURIComponent(osc)}`);
+    const d = await res.json();
+    const lista = document.getElementById('contatosOscLista');
+    if (!d.contatos || d.contatos.length === 0) {
+      lista.innerHTML = '<p class="text-muted small text-center py-2">Nenhum contato cadastrado.</p>';
+      return;
+    }
+    lista.innerHTML = d.contatos.map(c => `
+      <div class="border rounded p-2 mb-2 ${c.status === 'Inativo' ? 'opacity-50' : ''}">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="flex-grow-1">
+            <strong>${c.contato_nome || '—'}</strong>
+            ${c.contato_posicao ? `<span class="text-muted small ms-1">· ${c.contato_posicao}</span>` : ''}
+            <br>
+            <span class="badge bg-secondary me-1">${c.contato_tipo || '—'}</span>
+            <span class="small">${c.contato_info || '—'}</span>
+            ${c.observacao ? `<br><span class="text-muted small fst-italic">${c.observacao}</span>` : ''}
+          </div>
+          <div class="d-flex gap-1 flex-shrink-0">
+            <button class="btn btn-sm btn-outline-primary" style="padding:1px 6px;" onclick="editarContatoCeleb(${c.id},'${(c.contato_nome||'').replace(/'/g,"\\'")}','${(c.contato_posicao||'').replace(/'/g,"\\'")}','${(c.contato_tipo||'').replace(/'/g,"\\'")}','${(c.contato_info||'').replace(/'/g,"\\'")}','${c.status||''}','${(c.observacao||'').replace(/'/g,"\\'")}')">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" style="padding:1px 6px;" onclick="deletarContatoCeleb(${c.id})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    document.getElementById('contatosOscLista').innerHTML =
+      '<div class="alert alert-danger py-1 small">Erro ao carregar contatos.</div>';
+  }
+}
+
+function editarContatoCeleb(id, nome, posicao, tipo, info, status, obs) {
+  document.getElementById('formNovoContatoCeleb').style.display = 'none';
+  const frm = document.getElementById('formEditarContatoCeleb');
+  frm.style.display = '';
+  frm.dataset.id = id;
+  document.getElementById('ec_nome').value = nome;
+  document.getElementById('ec_posicao').value = posicao;
+  document.getElementById('ec_tipo').value = tipo;
+  document.getElementById('ec_info').value = info;
+  document.getElementById('ec_status').value = status;
+  document.getElementById('ec_obs').value = obs;
+}
+
+async function salvarEditarContatoCeleb() {
+  const frm = document.getElementById('formEditarContatoCeleb');
+  const id = frm.dataset.id;
+  const body = {
+    contato_nome: document.getElementById('ec_nome').value.trim(),
+    contato_posicao: document.getElementById('ec_posicao').value.trim(),
+    contato_tipo: document.getElementById('ec_tipo').value,
+    contato_info: document.getElementById('ec_info').value.trim(),
+    status: document.getElementById('ec_status').value,
+    observacao: document.getElementById('ec_obs').value.trim()
+  };
+  if (!body.contato_nome) { alert('Informe o nome do contato.'); return; }
+  try {
+    const res = await fetch(`/parcerias/contatos/editar/${id}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const d = await res.json();
+    if (res.ok) {
+      frm.style.display = 'none';
+      carregarContatosCeleb(_contatosOscAtual);
+    } else { alert(d.error || d.erro || 'Erro ao salvar.'); }
+  } catch (err) { alert('Erro: ' + err); }
+}
+
+async function deletarContatoCeleb(id) {
+  if (!confirm('Excluir este contato?')) return;
+  try {
+    const res = await fetch(`/parcerias/contatos/deletar/${id}`, { method: 'POST' });
+    const d = await res.json();
+    if (res.ok) carregarContatosCeleb(_contatosOscAtual);
+    else alert(d.error || d.erro || 'Erro ao excluir.');
+  } catch (err) { alert('Erro: ' + err); }
+}
+
+async function salvarNovoContatoCeleb() {
+  const body = {
+    osc: _contatosOscAtual,
+    contatos: [{
+      nome: document.getElementById('nc_nome').value.trim(),
+      posicao: document.getElementById('nc_posicao').value.trim(),
+      tipo: document.getElementById('nc_tipo').value,
+      info: document.getElementById('nc_info').value.trim(),
+      status: document.getElementById('nc_status').value,
+      observacao: document.getElementById('nc_obs').value.trim()
+    }]
+  };
+  if (!body.contatos[0].nome) { alert('Informe o nome do contato.'); return; }
+  try {
+    const res = await fetch('/parcerias/contatos/criar', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const d = await res.json();
+    if (res.ok) {
+      document.getElementById('formNovoContatoCeleb').style.display = 'none';
+      document.getElementById('btnMostrarFormNovoContato').style.display = '';
+      ['nc_nome','nc_posicao','nc_info','nc_obs'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('nc_tipo').value = 'E-mail';
+      document.getElementById('nc_status').value = 'Ativo';
+      carregarContatosCeleb(_contatosOscAtual);
+    } else { alert(d.error || d.erro || 'Erro ao criar contato.'); }
+  } catch (err) { alert('Erro: ' + err); }
+}
+
 </script>
+
+<!-- Modal: Contatos da OSC -->
+<div class="modal fade" id="modalContatosOsc" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2 text-secondary"></i><span id="modalContatosOscTitulo"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="contatosOscLista"></div>
+
+        <!-- Form: Editar contato -->
+        <div id="formEditarContatoCeleb" style="display:none;" class="border rounded p-3 mb-3 bg-light">
+          <h6 class="text-primary fw-bold mb-3"><i class="bi bi-pencil me-1"></i>Editar Contato</h6>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold mb-1">Nome *</label>
+              <input type="text" class="form-control form-control-sm" id="ec_nome">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold mb-1">Posição/Cargo</label>
+              <input type="text" class="form-control form-control-sm" id="ec_posicao">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold mb-1">Tipo</label>
+              <select class="form-select form-select-sm" id="ec_tipo">
+                <option>E-mail</option><option>Telefone Fixo</option><option>Telefone Celular</option>
+                <option>WhatsApp</option><option>Outro</option>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small fw-bold mb-1">Informação</label>
+              <input type="text" class="form-control form-control-sm" id="ec_info">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-bold mb-1">Status</label>
+              <select class="form-select form-select-sm" id="ec_status">
+                <option>Ativo</option><option>Inativo</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-bold mb-1">Observação</label>
+              <input type="text" class="form-control form-control-sm" id="ec_obs">
+            </div>
+          </div>
+          <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-sm btn-primary" onclick="salvarEditarContatoCeleb()"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+            <button class="btn btn-sm btn-secondary" onclick="document.getElementById('formEditarContatoCeleb').style.display='none'">Cancelar</button>
+          </div>
+        </div>
+
+        <!-- Botão: Mostrar form novo contato -->
+        <button id="btnMostrarFormNovoContato" class="btn btn-sm btn-outline-success w-100 mt-2"
+          onclick="this.style.display='none'; document.getElementById('formNovoContatoCeleb').style.display='';">
+          <i class="bi bi-plus-circle me-1"></i>Adicionar Contato
+        </button>
+
+        <!-- Form: Novo contato -->
+        <div id="formNovoContatoCeleb" style="display:none;" class="border rounded p-3 mt-2 bg-light">
+          <h6 class="text-success fw-bold mb-3"><i class="bi bi-plus-circle me-1"></i>Novo Contato</h6>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold mb-1">Nome *</label>
+              <input type="text" class="form-control form-control-sm" id="nc_nome">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold mb-1">Posição/Cargo</label>
+              <input type="text" class="form-control form-control-sm" id="nc_posicao">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold mb-1">Tipo</label>
+              <select class="form-select form-select-sm" id="nc_tipo">
+                <option>E-mail</option><option>Telefone Fixo</option><option>Telefone Celular</option>
+                <option>WhatsApp</option><option>Outro</option>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small fw-bold mb-1">Informação</label>
+              <input type="text" class="form-control form-control-sm" id="nc_info">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-bold mb-1">Status</label>
+              <select class="form-select form-select-sm" id="nc_status">
+                <option>Ativo</option><option>Inativo</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-bold mb-1">Observação</label>
+              <input type="text" class="form-control form-control-sm" id="nc_obs">
+            </div>
+          </div>
+          <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-sm btn-success" onclick="salvarNovoContatoCeleb()"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+            <button class="btn btn-sm btn-secondary" onclick="document.getElementById('formNovoContatoCeleb').style.display='none'; document.getElementById('btnMostrarFormNovoContato').style.display='';">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
