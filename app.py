@@ -9,6 +9,7 @@ from config import SECRET_KEY, DEBUG
 from db import close_db, get_db
 from utils import format_sei
 import time
+import json
 from threading import Thread
 
 # Importar blueprints
@@ -175,13 +176,15 @@ def salvar_log_atividade(dados, app_instance):
                 INSERT INTO gestao_pessoas.log_atividades (
                     usuario_nome, usuario_email, tipo_usuario,
                     acao_tipo, acao_categoria, acao_endpoint, acao_metodo,
+                    recurso_tipo, recurso_id,
                     status_codigo, sucesso, ip_address, user_agent, duracao_ms,
-                    created_at
+                    detalhes, created_at
                 ) VALUES (
                     %(usuario_nome)s, %(usuario_email)s, %(tipo_usuario)s,
                     %(acao_tipo)s, %(acao_categoria)s, %(acao_endpoint)s, %(acao_metodo)s,
+                    %(recurso_tipo)s, %(recurso_id)s,
                     %(status_codigo)s, %(sucesso)s, %(ip_address)s, %(user_agent)s, %(duracao_ms)s,
-                    NOW()
+                    %(detalhes)s, NOW()
                 )
             """, dados)
             
@@ -316,11 +319,14 @@ def create_app():
                     'acao_metodo': request.method,
                     'acao_tipo': mapear_acao_tipo(request.method, request.path),
                     'acao_categoria': identificar_categoria(request.path),
+                    'recurso_tipo': g.get('log_recurso_tipo'),
+                    'recurso_id': str(g.get('log_recurso_id')) if g.get('log_recurso_id') else None,
                     'status_codigo': response.status_code,
                     'sucesso': response.status_code < 400,
                     'ip_address': (request.remote_addr or 'unknown')[:45],  # IPv6 = 45 chars
                     'user_agent': (request.user_agent.string or '')[:500],  # Limitar a 500 chars
-                    'duracao_ms': duracao_ms
+                    'duracao_ms': duracao_ms,
+                    'detalhes': json.dumps(g.get('log_detalhes'), ensure_ascii=False) if g.get('log_detalhes') else None
                 }
                 
                 # CRÍTICO: Salvar log em thread daemon separada

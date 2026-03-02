@@ -155,6 +155,28 @@ TABELAS_CONFIG = {
         'labels': {'nome_setor': 'Nome do Setor'},
         'ordem': 'nome_setor'
     },
+    'c_dac_parcela_andamento_status': {
+        'nome': 'DAC: Status de Parcela em Andamento',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['status_parcela', 'descricao', 'status_status'],
+        'colunas_obrigatorias': ['status_parcela'],
+        'labels': {
+            'status_parcela': 'Status da Parcela',
+            'descricao': 'Descrição',
+            'status_status': 'Status do Status'
+        },
+        'colunas_filtro': ['status_parcela', 'status_status'],
+        'ordem': 'status_parcela',
+        'tipos_campo': {
+            'status_parcela': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'status_status': 'select',
+            'opcoes_status_status': ['ativo', 'inativo']
+        },
+        'inline_edit': True,
+        'inline_columns': ['status_status']
+    },
     'c_dgp_analistas': {
         'nome': 'DGP: Agentes DGP',
         'schema': 'categoricas',
@@ -195,6 +217,59 @@ TABELAS_CONFIG = {
         },
         'inline_edit': True,
         'inline_columns': ['status_status']
+    },
+    'c_dgp_celebracao_status': {
+        'nome': 'DGP/Celebração: Status de Celebração',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['status_novo', 'status_antigo', 'descricao', 'status_status', 'status_generico'],
+        'colunas_obrigatorias': ['status_novo'],
+        'labels': {
+            'status_novo': 'Status Novo',
+            'status_antigo': 'Status Antigo',
+            'descricao': 'Descrição',
+            'status_status': 'Status do Status',
+            'status_generico': 'Status Genérico'
+        },
+        'colunas_filtro': ['status_novo', 'status_antigo', 'status_status', 'status_generico'],
+        'ordem': 'id',
+        'tipos_campo': {
+            'status_novo': 'text',
+            'status_antigo': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'status_status': 'select',
+            'opcoes_status_status': ['ativo', 'inativo'],
+            'status_generico': 'select_dinamico',
+            'query_status_generico': "SELECT DISTINCT status_generico FROM categoricas.c_dgp_celebracao_status WHERE status_generico IS NOT NULL AND status_generico != '' ORDER BY status_generico"
+        },
+        'inline_edit': True,
+        'inline_columns': ['status_status']
+    },
+    'c_dgp_celebracao_substatus': {
+        'nome': 'DGP/Celebração: Substatus de Celebração',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['substatus', 'responsabilidade_status', 'descricao', 'substatus_limite', 'substatus_status'],
+        'colunas_obrigatorias': ['substatus'],
+        'labels': {
+            'substatus': 'Substatus',
+            'responsabilidade_status': 'Responsabilidade do Status',
+            'descricao': 'Descrição',
+            'substatus_limite': 'Limite (ID Status)',
+            'substatus_status': 'Status do Substatus'
+        },
+        'colunas_filtro': ['substatus', 'responsabilidade_status', 'substatus_status'],
+        'ordem': 'substatus',
+        'tipos_campo': {
+            'substatus': 'text',
+            'responsabilidade_status': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'substatus_limite': 'number',
+            'substatus_status': 'select',
+            'opcoes_substatus_status': ['ativo', 'inativo']
+        },
+        'inline_edit': True,
+        'inline_columns': ['substatus_status']
     },
     'c_alt_instrumento': {
         'nome': 'DGP/ALT: Instrumentos Jurídicos para Alterações de Contrato',
@@ -843,6 +918,32 @@ TABELAS_CONFIG = {
             'rows_condicoes_osc': 5
         }
     },
+    'c_geral_regionalizacao': {
+        'nome': 'Geral: Regionalização',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['codigo_distrital', 'distrito', 'codigo_subprefeitura', 'subprefeitura', 'codigo_regiao', 'regiao'],
+        'labels': {
+            'codigo_distrital': 'Código Distrital',
+            'distrito': 'Distrito',
+            'codigo_subprefeitura': 'Código de Subprefeitura',
+            'subprefeitura': 'Subprefeitura',
+            'codigo_regiao': 'Código de Região',
+            'regiao': 'Região'
+        },
+        'colunas_filtro': ['distrito', 'subprefeitura', 'regiao'],
+        'colunas_ordenacao': ['distrito', 'subprefeitura', 'regiao'],
+        'ordem': 'distrito',
+        'tipos_campo': {
+            'codigo_distrital': 'text',
+            'distrito': 'text',
+            'codigo_subprefeitura': 'text',
+            'subprefeitura': 'select_dinamico',
+            'query_subprefeitura': 'SELECT DISTINCT subprefeitura FROM categoricas.c_geral_regionalizacao WHERE subprefeitura IS NOT NULL ORDER BY subprefeitura',
+            'codigo_regiao': 'text',
+            'regiao': 'select_dinamico',
+            'query_regiao': 'SELECT DISTINCT regiao FROM categoricas.c_geral_regionalizacao WHERE regiao IS NOT NULL ORDER BY regiao'
+        }
+    },
     'c_dac_tipos_parcelas': {
         'nome': 'DAC: Tipos de Parcelas',
         'schema': 'categoricas',
@@ -1132,6 +1233,18 @@ def criar_registro(tabela):
         if tabela == 'c_alt_normas':
             from flask import session
             dados['usuario_registro'] = session.get('email', 'sistema')
+
+        # Auto-popular created_por e created_em para tabelas de celebração
+        if tabela == 'c_dgp_celebracao_status':
+            from flask import session as _sess
+            dados['created_por'] = _sess.get('email', 'sistema')
+            from datetime import datetime as _dt
+            dados['created_em'] = _dt.now()
+        if tabela == 'c_dgp_celebracao_substatus':
+            from flask import session as _sess
+            dados['created_por'] = _sess.get('email', 'sistema')
+            from datetime import datetime as _dt
+            dados['created_at'] = _dt.now()
         
         # Montar query de inserção apenas com campos enviados
         colunas_a_inserir = [col for col in config['colunas_editaveis'] if col in dados]
@@ -1139,6 +1252,16 @@ def criar_registro(tabela):
         # Adicionar usuario_registro se for c_alt_normas
         if tabela == 'c_alt_normas' and 'usuario_registro' in dados:
             colunas_a_inserir.append('usuario_registro')
+
+        # Adicionar campos auto-populados para tabelas de celebração
+        if tabela == 'c_dgp_celebracao_status':
+            for _ac in ['created_por', 'created_em']:
+                if _ac in dados and _ac not in colunas_a_inserir:
+                    colunas_a_inserir.append(_ac)
+        if tabela == 'c_dgp_celebracao_substatus':
+            for _ac in ['created_por', 'created_at']:
+                if _ac in dados and _ac not in colunas_a_inserir:
+                    colunas_a_inserir.append(_ac)
         
         placeholders = ', '.join(['%s'] * len(colunas_a_inserir))
         
@@ -1210,6 +1333,28 @@ def atualizar_registro(tabela, id):
         if not colunas_validas:
             return jsonify({'erro': 'Nenhum campo válido para atualizar'}), 400
         
+        # ── Capturar valores antigos para cascata (status/substatus celebração) ──
+        status_antigo_valor = None
+        status_generico_antigo = None
+        substatus_antigo_valor = None
+
+        if tabela == 'c_dgp_celebracao_status' and ('status_novo' in campos_a_atualizar or 'status_generico' in campos_a_atualizar):
+            cur = get_cursor()
+            cur.execute(f"SELECT status_novo, status_generico FROM {schema}.{tabela} WHERE id = %s", (id,))
+            _row_old = cur.fetchone()
+            if _row_old:
+                status_antigo_valor = _row_old['status_novo']
+                status_generico_antigo = _row_old['status_generico']
+            cur.close()
+
+        if tabela == 'c_dgp_celebracao_substatus' and 'substatus' in campos_a_atualizar:
+            cur = get_cursor()
+            cur.execute(f"SELECT substatus FROM {schema}.{tabela} WHERE id = %s", (id,))
+            _row_old = cur.fetchone()
+            if _row_old:
+                substatus_antigo_valor = _row_old['substatus']
+            cur.close()
+
         set_clause = ', '.join([f"{col} = %s" for col in colunas_validas])
         valores.append(id)
         
@@ -1232,7 +1377,53 @@ def atualizar_registro(tabela, id):
                 """
                 resultado_update = execute_query(query_parcerias, (campos_a_atualizar.get('nome_pg'), nome_antigo))
                 print(f"[INFO] Atualizado responsavel_pg de '{nome_antigo}' para '{campos_a_atualizar.get('nome_pg')}' em parcerias_analises")
-            
+
+            # ── Cascata: c_dgp_celebracao_status → celebracao.celebracao_parcerias ──
+            if tabela == 'c_dgp_celebracao_status':
+                novo_status = campos_a_atualizar.get('status_novo')
+                novo_generico = campos_a_atualizar.get('status_generico')
+
+                # Se status_novo mudou, renomear em celebracao_parcerias
+                if novo_status and status_antigo_valor and novo_status != status_antigo_valor:
+                    execute_query("""
+                        UPDATE celebracao.celebracao_parcerias
+                        SET status = %s
+                        WHERE status = %s
+                    """, (novo_status, status_antigo_valor))
+                    print(f"[CASCATA] Status renomeado: '{status_antigo_valor}' → '{novo_status}' em celebracao_parcerias")
+
+                # Se status_generico mudou, atualizar celebracao_parcerias para registros com este status
+                if novo_generico and novo_generico != status_generico_antigo:
+                    # Determinar qual é o status_novo atual (pode ter mudado acima)
+                    chave_status = novo_status if novo_status else status_antigo_valor
+                    if chave_status:
+                        execute_query("""
+                            UPDATE celebracao.celebracao_parcerias
+                            SET status_generico = %s
+                            WHERE status = %s
+                        """, (novo_generico, chave_status))
+                        print(f"[CASCATA] Status genérico atualizado para '{novo_generico}' onde status = '{chave_status}'")
+
+            # ── Cascata: c_dgp_celebracao_substatus → celebracao.celebracao_parcerias ──
+            if tabela == 'c_dgp_celebracao_substatus':
+                novo_substatus = campos_a_atualizar.get('substatus')
+                if novo_substatus and substatus_antigo_valor and novo_substatus != substatus_antigo_valor:
+                    # Substituir dentro de valores separados por ponto-e-vírgula
+                    execute_query("""
+                        UPDATE celebracao.celebracao_parcerias
+                        SET substatus = array_to_string(
+                            ARRAY(
+                                SELECT CASE
+                                    WHEN TRIM(elem) = %s THEN %s
+                                    ELSE TRIM(elem)
+                                END
+                                FROM unnest(string_to_array(substatus, ';')) AS elem
+                            ), ';'
+                        )
+                        WHERE substatus LIKE '%%' || %s || '%%'
+                    """, (substatus_antigo_valor, novo_substatus, substatus_antigo_valor))
+                    print(f"[CASCATA] Substatus substituído: '{substatus_antigo_valor}' → '{novo_substatus}' em celebracao_parcerias")
+
             return jsonify({
                 'sucesso': True,
                 'mensagem': 'Registro atualizado com sucesso'

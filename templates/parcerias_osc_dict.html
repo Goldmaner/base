@@ -27,7 +27,9 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 .action-bar { position: sticky; bottom: 0; background: linear-gradient(to right, #667eea, #764ba2); padding: 1rem; border-radius: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: none; z-index: 1000; }
 .action-bar.show { display: flex; }
 .contador-selecao { background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 4px; color: white; font-weight: bold; }
-.badge.bg-success:hover { background-color: #157347 !important; transform: scale(1.05); transition: all 0.2s; cursor: pointer; }
+.badge.bg-success:hover, .badge.bg-warning:hover { background-color: inherit !important; filter: brightness(0.88); transform: scale(1.05); transition: all 0.2s; cursor: pointer; }
+.badge.bg-success { cursor: pointer; }
+.badge.bg-warning.badge-termos { cursor: pointer; }
 .modal-body .table { margin-bottom: 0; }
 .table-success { background-color: #d1e7dd !important; }
 </style>
@@ -138,11 +140,18 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 <td><span class="badge bg-secondary">{{ osc_item.cnpj_exemplo or 'N/A' }}</span></td>
 <td class="text-center">
     {% if osc_item.total_termos > 0 %}
-        <span class="badge bg-success badge-termos" 
+        <span class="badge bg-success badge-termos"
             data-osc="{{ osc_item.osc }}"
             data-total-termos="{{ osc_item.total_termos }}"
-            title="Clique para ver os termos">
-            <i class="bi bi-list-ul"></i> {{ osc_item.total_termos }}
+            title="Clique para ver os termos{% if osc_item.total_celeb > 0 %} (+ {{ osc_item.total_celeb }} em celebração){% endif %}">
+            <i class="bi bi-list-ul"></i> {{ osc_item.total_termos }}{% if osc_item.total_celeb > 0 %} <i class="bi bi-pen-fill" title="+ em celebração"></i>{% endif %}
+        </span>
+    {% elif osc_item.total_celeb > 0 %}
+        <span class="badge bg-warning text-dark badge-termos"
+            data-osc="{{ osc_item.osc }}"
+            data-total-termos="0"
+            title="Clique para ver termos em celebração ({{ osc_item.total_celeb }})">
+            <i class="bi bi-pen"></i> Celebração
         </span>
     {% elif osc_item.total_cents > 0 %}
         <span class="badge bg-info" title="OSC exclusiva de CENTS">
@@ -293,7 +302,8 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
                         </div>
                         <div class="col-md-6">
                             <label for="edit_contato_posicao" class="form-label">Posição</label>
-                            <input type="text" class="form-control" id="edit_contato_posicao">
+                            <input type="text" class="form-control" id="edit_contato_posicao"
+                              list="cargos-datalist-dict" placeholder="Ex: Presidente, Responsável...">
                         </div>
                         <div class="col-md-6">
                             <label for="edit_contato_tipo" class="form-label">Tipo de Contato *</label>
@@ -390,21 +400,53 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 // Variável para armazenar timeout de busca
 let timeoutBusca = null;
 
+// Função auxiliar para montar tabela de termos
+function montarTabelaTermos(termos, colorClass, tituloSecao, extraColHeader, extraColFn) {
+    let html = '<div class="mb-1"><span class="badge ' + colorClass + ' px-3 py-2">' + tituloSecao + '</span></div>';
+    html += '<div class="table-responsive mb-3"><table class="table table-hover table-striped table-sm">';
+    html += '<thead class="' + colorClass.replace('bg-', 'table-') + '"><tr>';
+    if (extraColHeader) html += '<th style="width:18%">' + extraColHeader + '</th>';
+    html += '<th style="width:22%"><i class="bi bi-file-text"></i> Número do Termo</th>';
+    html += '<th style="width:13%"><i class="bi bi-tag"></i> Tipo</th>';
+    html += '<th style="width:22%"><i class="bi bi-folder"></i> Projeto</th>';
+    html += '<th style="width:10%" class="text-center"><i class="bi bi-calendar"></i> Início</th>';
+    html += '<th style="width:10%" class="text-center"><i class="bi bi-calendar-check"></i> Término</th>';
+    html += '<th style="width:15%" class="text-end"><i class="bi bi-currency-dollar"></i> Valor Previsto</th>';
+    html += '</tr></thead><tbody>';
+
+    let total = 0;
+    termos.forEach(t => {
+        total += t.total_previsto;
+        html += '<tr>';
+        if (extraColFn) html += '<td>' + extraColFn(t) + '</td>';
+        html += '<td><strong>' + (t.numero_termo || '-') + '</strong></td>';
+        html += '<td><span class="badge bg-secondary">' + (t.tipo_termo || '-') + '</span></td>';
+        html += '<td>' + (t.projeto || '-') + '</td>';
+        html += '<td class="text-center">' + t.inicio + '</td>';
+        html += '<td class="text-center">' + t.final + '</td>';
+        html += '<td class="text-end">R$ ' + t.total_previsto.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</td>';
+        html += '</tr>';
+    });
+
+    const cols = extraColHeader ? 7 : 6;
+    html += '</tbody><tfoot class="table-secondary"><tr>';
+    html += '<th colspan="' + (cols - 1) + '">TOTAL PREVISTO</th>';
+    html += '<th class="text-end"><strong>R$ ' + total.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</strong></th>';
+    html += '</tr></tfoot></table></div>';
+    return html;
+}
+
 // Função para ver termos de uma OSC
 function verTermos(osc, totalTermos) {
-    // Atualizar informações do modal
     document.getElementById('oscNome').textContent = osc;
     document.getElementById('totalTermos').textContent = totalTermos;
     
-    // Mostrar modal
     const modal = new bootstrap.Modal(document.getElementById('modalTermos'));
     modal.show();
     
-    // Resetar conteúdo
     const listaTermos = document.getElementById('listaTermos');
     listaTermos.innerHTML = '<div class="text-center"><div class="spinner-border text-success" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
     
-    // Buscar termos do backend
     fetch('/parcerias/termos-por-osc/' + encodeURIComponent(osc))
         .then(r => r.json())
         .then(data => {
@@ -413,43 +455,36 @@ function verTermos(osc, totalTermos) {
                 return;
             }
             
-            if (data.termos.length === 0) {
+            const temTermos = data.termos && data.termos.length > 0;
+            const temCeleb  = data.termos_celeb && data.termos_celeb.length > 0;
+            
+            if (!temTermos && !temCeleb) {
                 listaTermos.innerHTML = '<div class="alert alert-warning">Nenhum termo encontrado.</div>';
                 return;
             }
             
-            // Criar tabela com os termos
-            let html = '<table class="table table-hover table-striped">';
-            html += '<thead class="table-success"><tr>';
-            html += '<th style="width: 25%"><i class="bi bi-file-text"></i> Número do Termo</th>';
-            html += '<th style="width: 15%"><i class="bi bi-tag"></i> Tipo</th>';
-            html += '<th style="width: 25%"><i class="bi bi-folder"></i> Projeto</th>';
-            html += '<th style="width: 10%" class="text-center"><i class="bi bi-calendar"></i> Início</th>';
-            html += '<th style="width: 10%" class="text-center"><i class="bi bi-calendar-check"></i> Término</th>';
-            html += '<th style="width: 15%" class="text-end"><i class="bi bi-currency-dollar"></i> Valor Previsto</th>';
-            html += '</tr></thead><tbody>';
+            let html = '';
             
-            let valorGrandTotal = 0;
+            // ── Termos celebrados (public.Parcerias) ──
+            if (temTermos) {
+                html += montarTabelaTermos(
+                    data.termos,
+                    'bg-success',
+                    '<i class="bi bi-check-circle"></i> Termos Celebrados',
+                    null, null
+                );
+            }
             
-            data.termos.forEach(termo => {
-                valorGrandTotal += termo.total_previsto;
-                
-                html += '<tr>';
-                html += '<td><strong>' + termo.numero_termo + '</strong></td>';
-                html += '<td><span class="badge bg-info">' + (termo.tipo_termo || '-') + '</span></td>';
-                html += '<td>' + (termo.projeto || '-') + '</td>';
-                html += '<td class="text-center">' + termo.inicio + '</td>';
-                html += '<td class="text-center">' + termo.final + '</td>';
-                html += '<td class="text-end">R$ ' + termo.total_previsto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>';
-                html += '</tr>';
-            });
-            
-            html += '</tbody>';
-            html += '<tfoot class="table-secondary"><tr>';
-            html += '<th colspan="5">TOTAL PREVISTO</th>';
-            html += '<th class="text-end"><strong>R$ ' + valorGrandTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</strong></th>';
-            html += '</tr></tfoot>';
-            html += '</table>';
+            // ── Termos em celebração (celebracao.celebracao_parcerias) ──
+            if (temCeleb) {
+                html += montarTabelaTermos(
+                    data.termos_celeb,
+                    'bg-warning text-dark',
+                    '<i class="bi bi-pen"></i> Termos em Celebração',
+                    '<i class="bi bi-info-circle"></i> Status',
+                    t => '<span class="badge bg-secondary">' + (t.status_generico || '-') + '</span>'
+                );
+            }
             
             listaTermos.innerHTML = html;
         })
@@ -550,16 +585,24 @@ function realizarBuscaGlobal(termo) {
             // Renderizar resultados
             let html = '';
             data.oscs.forEach(osc => {
+                let badgeHtml;
+                if (osc.total_termos > 0) {
+                    const celSuffix = osc.total_celeb > 0 ? ' <i class="bi bi-pen-fill"></i>' : '';
+                    const celTitle = osc.total_celeb > 0 ? ` (+ ${osc.total_celeb} em celebração)` : '';
+                    badgeHtml = `<span class="badge bg-success badge-termos" data-osc="${osc.osc}" data-total-termos="${osc.total_termos}" title="Clique para ver os termos${celTitle}"><i class="bi bi-list-ul"></i> ${osc.total_termos}${celSuffix}</span>`;
+                } else if (osc.total_celeb > 0) {
+                    badgeHtml = `<span class="badge bg-warning text-dark badge-termos" data-osc="${osc.osc}" data-total-termos="0" title="Clique para ver termos em celebração (${osc.total_celeb})"><i class="bi bi-pen"></i> Celebração</span>`;
+                } else if (osc.total_cents > 0) {
+                    badgeHtml = `<span class="badge bg-info" title="OSC exclusiva de CENTS"><i class="bi bi-award"></i> CENTS</span>`;
+                } else {
+                    badgeHtml = `<span class="badge bg-secondary">0</span>`;
+                }
                 html += `
                 <tr data-original-osc="${osc.osc}">
                     <td class="text-center"><input type="checkbox" class="checkbox-alteracao checkbox-linha" disabled></td>
                     <td><input type="text" class="osc-input" value="${osc.osc}" data-original="${osc.osc}"></td>
                     <td><span class="badge bg-secondary">${osc.cnpj_exemplo || 'N/A'}</span></td>
-                    <td class="text-center">
-                        <span class="badge bg-success badge-termos" data-osc="${osc.osc}" data-total-termos="${osc.total_termos}" title="Clique para ver os termos">
-                            <i class="bi bi-list-ul"></i> ${osc.total_termos}
-                        </span>
-                    </td>
+                    <td class="text-center">${badgeHtml}</td>
                     <td class="text-center">
                         <button class="btn btn-primary btn-sm btn-salvar me-1" onclick="salvarOSC(this)" title="Salvar alterações"><i class="bi bi-check-lg"></i> Salvar</button>
                         <button class="btn btn-info btn-sm" onclick="gerenciarContatos('${osc.osc}')" title="Gerenciar contatos"><i class="bi bi-person-lines-fill"></i> Contatos</button>
@@ -868,7 +911,8 @@ function adicionarBlocoContato() {
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Posição</label>
-                        <input type="text" class="form-control" id="posicao_${id}" placeholder="Ex: Presidente, Coordenador, etc.">
+                        <input type="text" class="form-control" id="posicao_${id}"
+                          list="cargos-datalist-dict" placeholder="Ex: Presidente, Coordenador, etc.">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Tipo de Contato *</label>
@@ -1269,5 +1313,19 @@ function exportarCSV() {
         });
 }
 </script>
+<!-- Datalist para Posição/Cargo (contatos) -->
+<datalist id="cargos-datalist-dict">
+  <option value="Responsável">
+  <option value="Presidente">
+  <option value="Vice-Presidente">
+  <option value="Representante Legal">
+  <option value="Coordenador">
+  <option value="Diretor Executivo">
+  <option value="Secretário">
+  <option value="Tesoureiro">
+  <option value="Institucional">
+  <option value="Gestor">
+</datalist>
+
 </body>
 </html>

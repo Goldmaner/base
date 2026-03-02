@@ -188,8 +188,9 @@
                 <th style="width: 15%;">Código da Reserva</th>
                 <th style="width: 12%;">Data da Reserva</th>
                 <th style="width: 20%;">Dotação Formatada</th>
-                <th style="width: 38%;">Histórico da Reserva</th>
-                <th style="width: 15%;">Saldo de Reservado</th>
+                <th style="width: 30%;">Histórico da Reserva</th>
+                <th style="width: 12%;">Valor Reservado</th>
+                <th style="width: 11%;">Saldo de Reserva</th>
             </tr>
         </thead>
         <tbody id="corpoTabela">
@@ -203,6 +204,7 @@
         <tfoot class="table-secondary">
             <tr>
                 <th colspan="4" class="text-end">SUBTOTAL:</th>
+                <th class="text-end valor-moeda" id="subtotal_valor_reservado">R$ 0,00</th>
                 <th class="text-end valor-moeda" id="subtotal_saldo">R$ 0,00</th>
             </tr>
         </tfoot>
@@ -295,6 +297,7 @@
 
         dadosCompletos.forEach(item => {
             const saldoClass = item.vl_saldo_resv >= 0 ? 'valor-positivo' : 'valor-negativo';
+            const reservadoClass = item.valor_reservado >= 0 ? 'valor-positivo' : 'valor-negativo';
 
             const row = `
                 <tr>
@@ -302,15 +305,18 @@
                     <td class="text-center">${item.dt_efet_resv || '-'}</td>
                     <td>${item.dotacao_formatada || '-'}</td>
                     <td><small>${item.hist_resv || '-'}</small></td>
+                    <td class="text-end ${reservadoClass}">${formatarMoeda(item.valor_reservado)}</td>
                     <td class="text-end ${saldoClass}">${formatarMoeda(item.vl_saldo_resv)}</td>
                 </tr>
             `;
             tbody.append(row);
         });
         
-        // Calcular e atualizar subtotal
+        // Calcular e atualizar subtotais
         const subtotalSaldo = dadosCompletos.reduce((sum, item) => sum + (item.vl_saldo_resv || 0), 0);
+        const subtotalReservado = dadosCompletos.reduce((sum, item) => sum + (item.valor_reservado || 0), 0);
         $('#subtotal_saldo').text(formatarMoeda(subtotalSaldo));
+        $('#subtotal_valor_reservado').text(formatarMoeda(subtotalReservado));
     }
 
     // Exportar para CSV
@@ -320,13 +326,14 @@
             return;
         }
 
-        let csv = 'Código da Reserva;Data da Reserva;Dotação Formatada;Histórico da Reserva;Saldo de Reservado\n';
+        let csv = 'Código da Reserva;Data da Reserva;Dotação Formatada;Histórico da Reserva;Valor Reservado;Saldo de Reserva\n';
 
         dadosCompletos.forEach(item => {
             csv += `${item.cod_resv_dota_sof || ''};`;
             csv += `"${item.dt_efet_resv || ''}";`;
             csv += `"${item.dotacao_formatada || ''}";`;
             csv += `"${item.hist_resv || ''}";`;
+            csv += `${item.valor_reservado || 0};`;
             csv += `${item.vl_saldo_resv || 0}\n`;
         });
 

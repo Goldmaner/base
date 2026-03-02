@@ -517,7 +517,8 @@
             </div>
             <div class="col-md-6">
               <label for="edit_contato_posicao" class="form-label">Posição</label>
-              <input type="text" class="form-control" id="edit_contato_posicao">
+              <input type="text" class="form-control" id="edit_contato_posicao"
+                list="cargos-datalist-cents" placeholder="Ex: Presidente, Responsável...">
             </div>
             <div class="col-md-6">
               <label for="edit_contato_tipo" class="form-label">Tipo de Contato *</label>
@@ -1196,7 +1197,8 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Posição</label>
-              <input type="text" class="form-control" id="posicao_${id}" placeholder="Ex: Presidente, Coordenador, etc.">
+              <input type="text" class="form-control" id="posicao_${id}"
+                list="cargos-datalist-cents" placeholder="Ex: Presidente, Coordenador, etc.">
             </div>
             <div class="col-md-4">
               <label class="form-label">Tipo de Contato *</label>
@@ -1539,6 +1541,20 @@
     });
   }
 </script>
+
+<!-- Datalist para Posição/Cargo (contatos) -->
+<datalist id="cargos-datalist-cents">
+  <option value="Responsável">
+  <option value="Presidente">
+  <option value="Vice-Presidente">
+  <option value="Representante Legal">
+  <option value="Coordenador">
+  <option value="Diretor Executivo">
+  <option value="Secretário">
+  <option value="Tesoureiro">
+  <option value="Institucional">
+  <option value="Gestor">
+</datalist>
 
 </body>
 </html>

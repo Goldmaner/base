@@ -68,7 +68,7 @@ def obter_filtro_usuario(cur):
         FROM categoricas.c_dgp_analistas
         WHERE REGEXP_REPLACE(LOWER(COALESCE(rf,'')), '[^0-9]', '', 'g')
               LIKE %s || '%%'
-          AND status = 'Ativo'
+          AND status = TRUE
         LIMIT 1
     """, (rf_norm,))
     row = cur.fetchone()
@@ -129,8 +129,10 @@ def construir_where(filtros_vals, nome_analista_filtro=None):
             conditions.append(f"{coluna} <= %s")
             params.append(valor)
 
-    # Filtro por responsável do usuário logado (se aplicável)
-    if nome_analista_filtro:
+    # Filtro por responsável do usuário logado — só aplica se o usuário
+    # não escolheu explicitamente um responsável diferente no formulário
+    filtro_responsavel_manual = filtros_vals.get('filtro_responsavel', '').strip()
+    if nome_analista_filtro and not filtro_responsavel_manual:
         conditions.append(
             "unaccent(LOWER(COALESCE(responsavel,''))) = unaccent(LOWER(%s))"
         )
@@ -198,7 +200,9 @@ def index():
                         ELSE 'none'
                     END
                     FROM celebracao.celebracao_emendas ce
-                    WHERE TRIM(ce.sei_celeb) = TRIM(cp.sei_celeb)
+                    WHERE ce.sei_celeb IS NOT NULL
+                      AND REGEXP_REPLACE(ce.sei_celeb, '[^0-9]', '', 'g')
+                        = REGEXP_REPLACE(cp.sei_celeb, '[^0-9]', '', 'g')
                 )
                 ELSE 'none'
             END AS emenda_disp_status,
@@ -212,7 +216,9 @@ def index():
                         'disp', ce.disponibilidade_orcamentaria
                     ) ORDER BY ce.id)
                     FROM celebracao.celebracao_emendas ce
-                    WHERE TRIM(ce.sei_celeb) = TRIM(cp.sei_celeb)
+                    WHERE ce.sei_celeb IS NOT NULL
+                      AND REGEXP_REPLACE(ce.sei_celeb, '[^0-9]', '', 'g')
+                        = REGEXP_REPLACE(cp.sei_celeb, '[^0-9]', '', 'g')
                 )
                 ELSE NULL
             END AS emenda_disp_detail,
@@ -223,7 +229,9 @@ def index():
                 THEN (
                     SELECT COALESCE(SUM(pe.valor), 0)
                     FROM public.parcerias_emendas pe
-                    WHERE TRIM(pe.sei_celeb) = TRIM(cp.sei_celeb)
+                    WHERE pe.sei_celeb IS NOT NULL
+                      AND REGEXP_REPLACE(pe.sei_celeb, '[^0-9]', '', 'g')
+                        = REGEXP_REPLACE(cp.sei_celeb, '[^0-9]', '', 'g')
                 )
                 ELSE NULL
             END AS emenda_total_valor
@@ -882,13 +890,13 @@ def api_distritos():
             SELECT DISTINCT codigo_distrital, distrito
             FROM categoricas.c_geral_regionalizacao
             WHERE distrito ILIKE %s
-            ORDER BY distrito LIMIT 60
+            ORDER BY distrito
         """, (f'%{q}%',))
     else:
         cur.execute("""
             SELECT DISTINCT codigo_distrital, distrito
             FROM categoricas.c_geral_regionalizacao
-            ORDER BY distrito LIMIT 60
+            ORDER BY distrito
         """)
     rows = cur.fetchall()
     resultado = [{'id': r['codigo_distrital'], 'text': r['distrito']} for r in rows]

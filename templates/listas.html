@@ -353,12 +353,15 @@
           btnEditar.title = 'Editar';
           tdAcoes.appendChild(btnEditar);
           
-          const btnExcluir = document.createElement('button');
-          btnExcluir.className = 'btn btn-sm btn-danger';
-          btnExcluir.onclick = () => excluirRegistro(registro.id);
-          btnExcluir.innerHTML = '<i class="bi bi-trash"></i>';
-          btnExcluir.title = 'Excluir';
-          tdAcoes.appendChild(btnExcluir);
+          const _tabelasSemExclusao = ['c_dgp_celebracao_status', 'c_dgp_celebracao_substatus'];
+          if (!_tabelasSemExclusao.includes(tabelaAtual)) {
+            const btnExcluir = document.createElement('button');
+            btnExcluir.className = 'btn btn-sm btn-danger';
+            btnExcluir.onclick = () => excluirRegistro(registro.id);
+            btnExcluir.innerHTML = '<i class="bi bi-trash"></i>';
+            btnExcluir.title = 'Excluir';
+            tdAcoes.appendChild(btnExcluir);
+          }
           
           tr.appendChild(tdAcoes);
 

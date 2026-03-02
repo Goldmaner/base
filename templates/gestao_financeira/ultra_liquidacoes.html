@@ -363,6 +363,10 @@
     <!-- Colunas Expandidas -->
     <div class="colunas-expandidas">
         <strong><i class="bi bi-eye me-2"></i>Colunas Adicionais:</strong>
+        <label><input type="checkbox" id="chk_status_sec" checked onchange="atualizarColunas()"> Status Sec.</label>
+        <label><input type="checkbox" id="chk_53_23" checked onchange="atualizarColunas()"> Valor 53/23</label>
+        <label><input type="checkbox" id="chk_53_24" checked onchange="atualizarColunas()"> Valor 53/24</label>
+        <label><input type="checkbox" id="chk_andamento" onchange="atualizarColunas()"> Andamento <small class="text-muted">(Encaminhado)</small></label>
         <label><input type="checkbox" id="chk_osc" onchange="atualizarColunas()"> OSC</label>
         <label><input type="checkbox" id="chk_cnpj" onchange="atualizarColunas()"> CNPJ</label>
         <label><input type="checkbox" id="chk_projeto" onchange="atualizarColunas()"> Projeto</label>
@@ -554,14 +558,15 @@
                     <th>Número do Termo</th>
                     <th>Tipo Parcela</th>
                     <th>Nº Parcela</th>
-                    <th>Valor 53/23</th>
-                    <th>Valor 53/24</th>
+                    <th class="col-53-23">Valor 53/23</th>
+                    <th class="col-53-24">Valor 53/24</th>
                     <th>Valor Previsto</th>
                     <th>Subtraído / Glosado</th>
                     <th>Encaminhado</th>
                     <th>Pago</th>
                     <th>Status</th>
-                    <th>Status Sec.</th>
+                    <th class="col-status-sec">Status Sec.</th>
+                    <th class="col-andamento" style="display:none;">Andamento</th>
                     <th>Data Pgto</th>
                     <th>Observações</th>
                     <th class="col-osc" style="display: none;">OSC</th>
@@ -773,6 +778,39 @@
                         <div class="col-md-12">
                             <label class="form-label">Observações</label>
                             <textarea class="form-control" id="edit_observacoes" rows="3"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mt-1" id="div_parcela_andamento" style="display:none;">
+                        <div class="col-md-12">
+                            <label class="form-label">
+                                <i class="bi bi-tag me-1 text-primary"></i>
+                                Status de Andamento
+                                <small class="text-muted">(visível apenas quando status é "Encaminhado para Pagamento")</small>
+                            </label>
+                            <select class="form-select" id="edit_parcela_andamento">
+                                <option value="">- Sem andamento -</option>
+                            </select>
+                            <!-- Histórico de alterações do andamento -->
+                            <div id="historico_andamento_container" class="mt-3" style="display:none;">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <i class="bi bi-clock-history text-secondary"></i>
+                                    <small class="fw-bold text-secondary">Histórico de alterações</small>
+                                </div>
+                                <div class="table-responsive" style="max-height:200px; overflow-y:auto;">
+                                    <table class="table table-sm table-striped table-bordered mb-0" style="font-size:0.8rem;">
+                                        <thead class="table-secondary" style="position:sticky;top:0;">
+                                            <tr>
+                                                <th style="white-space:nowrap;">Data / Hora</th>
+                                                <th style="white-space:nowrap;">Usuário</th>
+                                                <th>De</th>
+                                                <th>Para</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="corpo_historico_andamento"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -1473,18 +1511,39 @@
             thDataPgto.text('Data Pgto');
         }
         
+        // Mostrar/ocultar coluna Andamento (apenas na aba Encaminhado E se checkbox marcado)
+        const andamentoVisivel = secao === 'encaminhado' && $('#chk_andamento').is(':checked');
+        $('.col-andamento').css('display', andamentoVisivel ? '' : 'none');
+        
         salvarFiltros(); // ⚡ NOVO: Salvar seção ativa
         carregarDados();
     }
     
     // Atualizar colunas expandidas
     function atualizarColunas() {
+        const mostrarStatusSec = document.getElementById('chk_status_sec').checked;
+        const mostrar5323 = document.getElementById('chk_53_23').checked;
+        const mostrar5324 = document.getElementById('chk_53_24').checked;
+        const mostrarAndamento = document.getElementById('chk_andamento').checked;
         const mostrarOsc = document.getElementById('chk_osc').checked;
         const mostrarCnpj = document.getElementById('chk_cnpj').checked;
         const mostrarProjeto = document.getElementById('chk_projeto').checked;
         const mostrarSeiCeleb = document.getElementById('chk_sei_celeb').checked;
         const mostrarSeiPc = document.getElementById('chk_sei_pc').checked;
         
+        document.querySelectorAll('.col-status-sec').forEach(el => {
+            el.style.display = mostrarStatusSec ? '' : 'none';
+        });
+        document.querySelectorAll('.col-53-23').forEach(el => {
+            el.style.display = mostrar5323 ? '' : 'none';
+        });
+        document.querySelectorAll('.col-53-24').forEach(el => {
+            el.style.display = mostrar5324 ? '' : 'none';
+        });
+        // Andamento só visível se checkbox marcado E seção for Encaminhado
+        document.querySelectorAll('.col-andamento').forEach(el => {
+            el.style.display = (mostrarAndamento && secaoAtual === 'encaminhado') ? '' : 'none';
+        });
         document.querySelectorAll('.col-osc').forEach(el => {
             el.style.display = mostrarOsc ? '' : 'none';
         });
@@ -1852,14 +1911,16 @@
             tr.append($('<td>').text(parcela.numero_termo));
             tr.append($('<td>').text(parcela.parcela_tipo));
             tr.append($('<td>').text(parcela.parcela_numero));
-            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_elemento_53_23)));
-            tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_elemento_53_24)));
+            tr.append($('<td>').addClass('col-53-23 valor-moeda').css('display', document.getElementById('chk_53_23').checked ? '' : 'none').text(formatarMoeda(parcela.valor_elemento_53_23)));
+            tr.append($('<td>').addClass('col-53-24 valor-moeda').css('display', document.getElementById('chk_53_24').checked ? '' : 'none').text(formatarMoeda(parcela.valor_elemento_53_24)));
             tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_previsto)));
             tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_subtraido)));
             tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_encaminhado)));
             tr.append($('<td>').addClass('valor-moeda').text(formatarMoeda(parcela.valor_pago)));
             tr.append($('<td>').text(parcela.parcela_status));
-            tr.append($('<td>').text(parcela.parcela_status_secundario || '-'));
+            tr.append($('<td>').addClass('col-status-sec').css('display', document.getElementById('chk_status_sec').checked ? '' : 'none').text(parcela.parcela_status_secundario || '-'));
+            // Coluna Andamento (só visível em Encaminhado para Pagamento E checkbox marcado)
+            tr.append($('<td>').addClass('col-andamento').css('display', secaoAtual === 'encaminhado' && document.getElementById('chk_andamento').checked ? '' : 'none').text(parcela.parcela_andamento || '-'));
             tr.append($('<td>').text(parcela.data_pagamento || '-'));
             tr.append($('<td>').text(truncarTexto(parcela.observacoes, 50)));
             
@@ -2252,6 +2313,41 @@
                     $('#edit_data_pagamento').val(converterDataParaInput(dados.data_pagamento));
                     $('#edit_observacoes').val(dados.observacoes);
                     
+                    // Preencher campo de andamento
+                    const selectAndamento = $('#edit_parcela_andamento');
+                    selectAndamento.empty().append('<option value="">- Sem andamento -</option>');
+                    if (dados.opcoes_andamento && dados.opcoes_andamento.length > 0) {
+                        dados.opcoes_andamento.forEach(function(op) {
+                            selectAndamento.append($('<option>').val(op).text(op));
+                        });
+                    }
+                    selectAndamento.val(dados.parcela_andamento || '');
+                    $('#div_parcela_andamento').toggle(dados.parcela_status === 'Encaminhado para Pagamento');
+                    
+                    // Preencher histórico de andamento
+                    const hist = dados.historico_andamento || [];
+                    const corpoHist = $('#corpo_historico_andamento').empty();
+                    if (hist.length > 0) {
+                        hist.forEach(function(h) {
+                            corpoHist.append(
+                                $('<tr>').append(
+                                    $('<td>').css('white-space', 'nowrap').text(h.data_hora),
+                                    $('<td>').css('white-space', 'nowrap').text(h.usuario || '-'),
+                                    $('<td>').text(h.andamento_de || '—'),
+                                    $('<td>').text(h.andamento_para || '—')
+                                )
+                            );
+                        });
+                        $('#historico_andamento_container').show();
+                    } else {
+                        $('#historico_andamento_container').hide();
+                    }
+                    
+                    // Atualizar visibilidade ao mudar o status
+                    $('#edit_parcela_status').off('change.andamento').on('change.andamento', function() {
+                        $('#div_parcela_andamento').toggle($(this).val() === 'Encaminhado para Pagamento');
+                    });
+                    
                     // Preencher select de tipos (individual)
                     const selectTipo = $('#edit_parcela_tipo');
                     selectTipo.empty().append('<option value="">Selecione...</option>');
@@ -2382,6 +2478,7 @@
             valor_pago: parseMoedaBR($('#edit_valor_pago').val()),
             parcela_status: $('#edit_parcela_status').val(),
             parcela_status_secundario: $('#edit_parcela_status_secundario').val(),
+            parcela_andamento: $('#edit_parcela_andamento').val(),
             data_pagamento: converterInputParaData($('#edit_data_pagamento').val()),
             observacoes: observacoes
         };
@@ -6442,6 +6539,10 @@
             vig_final_ano: $('#filtro_vig_final_ano').val(),
             
             // Checkboxes de colunas
+            chk_status_sec: $('#chk_status_sec').is(':checked'),
+            chk_53_23: $('#chk_53_23').is(':checked'),
+            chk_53_24: $('#chk_53_24').is(':checked'),
+            chk_andamento: $('#chk_andamento').is(':checked'),
             chk_osc: $('#chk_osc').is(':checked'),
             chk_cnpj: $('#chk_cnpj').is(':checked'),
             chk_projeto: $('#chk_projeto').is(':checked'),
@@ -6490,7 +6591,11 @@
             $('#filtro_vig_final_mes').val(filtros.vig_final_mes || '');
             $('#filtro_vig_final_ano').val(filtros.vig_final_ano || '');
             
-            // Restaurar checkboxes de colunas
+            // Restaurar checkboxes de colunas (novos: default true para status_sec, 53_23, 53_24)
+            $('#chk_status_sec').prop('checked', filtros.chk_status_sec !== false);
+            $('#chk_53_23').prop('checked', filtros.chk_53_23 !== false);
+            $('#chk_53_24').prop('checked', filtros.chk_53_24 !== false);
+            $('#chk_andamento').prop('checked', filtros.chk_andamento || false);
             $('#chk_osc').prop('checked', filtros.chk_osc || false);
             $('#chk_cnpj').prop('checked', filtros.chk_cnpj || false);
             $('#chk_projeto').prop('checked', filtros.chk_projeto || false);
@@ -6498,6 +6603,15 @@
             $('#chk_sei_pc').prop('checked', filtros.chk_sei_pc || false);
             
             // Aplicar visibilidade das colunas
+            document.querySelectorAll('.col-status-sec').forEach(el => {
+                el.style.display = filtros.chk_status_sec !== false ? '' : 'none';
+            });
+            document.querySelectorAll('.col-53-23').forEach(el => {
+                el.style.display = filtros.chk_53_23 !== false ? '' : 'none';
+            });
+            document.querySelectorAll('.col-53-24').forEach(el => {
+                el.style.display = filtros.chk_53_24 !== false ? '' : 'none';
+            });
             document.querySelectorAll('.col-osc').forEach(el => {
                 el.style.display = filtros.chk_osc ? '' : 'none';
             });
@@ -6524,7 +6638,19 @@
                 if (tabAtiva) {
                     tabAtiva.classList.add('active');
                 }
+                
+                // Atualizar texto da coluna Data Pgto
+                const thDataPgto = $('#tabelaParcelas thead th:contains("Data")').filter(function() {
+                    return $(this).text().includes('Pgto') || $(this).text().includes('Encaminhamento');
+                });
+                thDataPgto.text(filtros.secao === 'encaminhado' ? 'Data de Encaminhamento' : 'Data Pgto');
             }
+            
+            // Aplicar visibilidade da coluna Andamento (depende de seção + checkbox)
+            const andamentoVisivel = secaoAtual === 'encaminhado' && (filtros.chk_andamento || false);
+            document.querySelectorAll('.col-andamento').forEach(el => {
+                el.style.display = andamentoVisivel ? '' : 'none';
+            });
             
             console.log('✅ Filtros restaurados com sucesso');
         } catch (e) {

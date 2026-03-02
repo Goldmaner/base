@@ -357,6 +357,28 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Total Pago</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_pago_min" placeholder="Mínimo" step="0.01">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_pago_max" placeholder="Máximo" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Total Comprometido</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_comprometido_min" placeholder="Mínimo" step="0.01">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" id="filtro_comprometido_max" placeholder="Máximo" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -399,6 +421,10 @@
         <label class="ms-3"><input type="checkbox" id="chk_osc" onchange="atualizarColunasVisiveis()"> OSC</label>
         <label class="ms-3"><input type="checkbox" id="chk_projeto" onchange="atualizarColunasVisiveis()"> Projeto</label>
         <label class="ms-3"><input type="checkbox" id="chk_sei_celeb" onchange="atualizarColunasVisiveis()"> SEI de Celebração</label>
+        <label class="ms-3"><input type="checkbox" id="chk_total_pago" onchange="atualizarColunasVisiveis()"> Total Pago</label>
+        <label class="ms-3"><input type="checkbox" id="chk_total_comprometido" onchange="atualizarColunasVisiveis()"> Total Comprometido</label>
+        <label class="ms-3"><input type="checkbox" id="chk_total_disponivel" onchange="atualizarColunasVisiveis()"> Total Disponível</label>
+        <label class="ms-3"><input type="checkbox" id="chk_valor_residual" onchange="atualizarColunasVisiveis()"> Valor Residual</label>
     </div>
     
     <!-- Totais do Orçamento -->
@@ -454,6 +480,21 @@
                         Total Global
                         <i class="bi bi-calendar3" id="icone-cronograma-global"></i>
                     </th>
+                    <th onclick="toggleCronogramaPago()" class="col-total-pago" style="display:none; cursor: pointer; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color:white;" title="Clique para expandir cronograma mensal (Pago)">
+                        Total Pago
+                        <i class="bi bi-calendar3" id="icone-cronograma-pago"></i>
+                    </th>
+                    <th onclick="toggleCronogramaComprometido()" class="col-total-comprometido" style="display:none; cursor: pointer; background: linear-gradient(135deg, #fd7e14 0%, #e55a00 100%); color:white;" title="Clique para expandir cronograma mensal (Comprometido)">
+                        Total Comprometido
+                        <i class="bi bi-calendar3" id="icone-cronograma-comprometido"></i>
+                    </th>
+                    <th onclick="toggleCronogramaDisponivel()" class="col-total-disponivel" style="display:none; cursor: pointer; background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); color:white;" title="Clique para expandir distribuição mensal do valor disponível (back_reservas)">
+                        Total Disponível
+                        <i class="bi bi-calendar3" id="icone-cronograma-disponivel"></i>
+                    </th>
+                    <th class="col-valor-residual" style="display:none; background: linear-gradient(135deg, #198754 0%, #146c43 100%); color:white;" title="Residual = Disponível &minus; Global (exibido apenas quando Disponível &gt; Global)">
+                        Valor Residual
+                    </th>
                 </tr>
             </thead>
             <tbody id="corpoTabela">
@@ -473,7 +514,7 @@
                     <th class="col-projeto" style="display: none;"></th>
                     <th class="col-sei-celeb" style="display: none;"></th>
                     <th class="valor-moeda" id="total_programado_footer">R$ 0,00</th>
-                    <th class="valor-moeda" id="total_projetado_footer">R$ 0,00</th>                    <th class="valor-moeda bg-success bg-opacity-50" id="total_global_footer">R$ 0,00</th>                </tr>
+                    <th class="valor-moeda" id="total_projetado_footer">R$ 0,00</th>                    <th class="valor-moeda bg-success bg-opacity-50" id="total_global_footer">R$ 0,00</th>                    <th class="valor-moeda bg-danger bg-opacity-25 col-total-pago" style="display:none;" id="total_pago_footer">R$ 0,00</th>                    <th class="valor-moeda col-total-comprometido" style="display:none; background:#ffe5cc;" id="total_comprometido_footer">R$ 0,00</th>                    <th class="valor-moeda col-total-disponivel" style="display:none; background:#d1e7ff;" id="total_disponivel_footer">R$ 0,00</th>                    <th class="valor-moeda col-valor-residual" style="display:none; background:#d1e7dd;" id="total_residual_footer">-</th>                </tr>
             </tfoot>
         </table>
     </div>
@@ -500,9 +541,18 @@
     let cronogramaProgramadoExpandido = false;
     let cronogramaProjetadoExpandido = false;
     let cronogramaGlobalExpandido = false;
+    let cronogramaPagoExpandido = false;
     let dadosCronograma = {};
+    let dadosCronogramaPago = {};
+    let cronogramaComprometidoExpandido = false;
+    let dadosCronogramaComprometido = {};
+    let dadosCronogramaPagoDetalhado = {};        // {termo: {meses:{mes:float}, highlighted:[mes]}}
+    let dadosCronogramaComprometidoDetalhado = {}; // idem para Comprometido
     let modoDetalhado = false;
     let dadosCronogramaDetalhado = {};
+    // Cache das celebrações — persiste entre reloads do cronograma
+    let cronogramaCelebracoes = {};
+    let cronogramaDisponivelExpandido = false;
     
     // Configurar toastr
     toastr.options = {
@@ -585,6 +635,216 @@
         }
     }
     
+    // Toggle do cronograma de Pago
+    function toggleCronogramaPago() {
+        cronogramaPagoExpandido = !cronogramaPagoExpandido;
+        
+        if (cronogramaPagoExpandido) {
+            $('#icone-cronograma-pago').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
+            carregarCronogramaPago();
+        } else {
+            $('#icone-cronograma-pago').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
+            renderizarTabela();
+        }
+    }
+    
+    // Toggle do cronograma de Comprometido
+    function toggleCronogramaComprometido() {
+        cronogramaComprometidoExpandido = !cronogramaComprometidoExpandido;
+        
+        if (cronogramaComprometidoExpandido) {
+            $('#icone-cronograma-comprometido').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
+            carregarCronogramaComprometido();
+        } else {
+            $('#icone-cronograma-comprometido').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
+            renderizarTabela();
+        }
+    }
+
+    // Toggle do cronograma de Disponível
+    function toggleCronogramaDisponivel() {
+        cronogramaDisponivelExpandido = !cronogramaDisponivelExpandido;
+        if (cronogramaDisponivelExpandido) {
+            $('#icone-cronograma-disponivel').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
+            const temDadosNormal = Object.keys((dadosCronograma.projetados || {})).length > 0 ||
+                                   Object.keys((dadosCronograma.programados || {})).length > 0;
+            const temDadosDetalhado = Object.keys(dadosCronogramaDetalhado).length > 0;
+            const temDados = modoDetalhado ? temDadosDetalhado : temDadosNormal;
+            if (!temDados) {
+                if (modoDetalhado) { carregarCronogramaDetalhado(); }
+                else { carregarCronogramaMensal(); }
+            } else {
+                renderizarTabela();
+            }
+        } else {
+            $('#icone-cronograma-disponivel').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
+            renderizarTabela();
+        }
+    }
+
+    // Obter cronograma mensal global (programado + projetado) para um item → {1..12: valor}
+    function getMonthlyGlobalForItem(item) {
+        const result = {};
+        for (let m = 1; m <= 12; m++) result[m] = 0;
+        if (modoDetalhado) {
+            const det = dadosCronogramaDetalhado[item.numero_termo] || {};
+            for (const mes in det) {
+                const m = parseInt(mes);
+                const entry = det[mes];
+                result[m] = (entry && entry.valor !== undefined ? entry.valor : (parseFloat(entry) || 0));
+            }
+        } else {
+            const prog = (dadosCronograma.programados || {})[item.numero_termo] || {};
+            const proj = (dadosCronograma.projetados || {})[item.numero_termo] || {};
+            for (let m = 1; m <= 12; m++) {
+                result[m] = (prog[m] || 0) + (proj[m] || 0);
+            }
+        }
+        return result;
+    }
+
+    // Distribuir totalDisponivel pelos meses do cronograma (fill-from-start)
+    // - disponivel < global: últimas parcelas ficam a 0 (não cobertas)
+    // - disponivel > global: último mês com valor recebe o excedente (highlighted)
+    function calcularDisponivelMensal(totalDisponivel, cronogramaMensal) {
+        let remaining = totalDisponivel;
+        const meses = {};
+        const highlighted = [];
+        for (let m = 1; m <= 12; m++) {
+            const scheduled = cronogramaMensal[m] || 0;
+            if (scheduled === 0) { meses[m] = 0; continue; }
+            if (remaining <= 0) {
+                meses[m] = 0;
+            } else if (remaining >= scheduled) {
+                meses[m] = scheduled;
+                remaining -= scheduled;
+            } else {
+                meses[m] = remaining;
+                remaining = 0;
+            }
+        }
+        if (remaining > 0) {
+            for (let m = 12; m >= 1; m--) {
+                if ((cronogramaMensal[m] || 0) > 0) {
+                    meses[m] = (cronogramaMensal[m] || 0) + remaining;
+                    highlighted.push(m);
+                    break;
+                }
+            }
+        }
+        return { meses, highlighted };
+    }
+
+    // Carregar dados do cronograma de PAGO
+    function carregarCronogramaPago() {
+        const ano = $('#ano_referencia').val();
+        if (!ano) {
+            toastr.error('Por favor, selecione um ano de referência');
+            return;
+        }
+        $.ajax({
+            url: '/gestao_orcamentaria/api/cronograma-pago',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                if (response.success) {
+                    dadosCronogramaPago = response.dados_pago || {};
+                    // Se modo detalhado ativo, carregar distribuição mensal detalhada
+                    if (modoDetalhado) {
+                        carregarCronogramaPagoDetalhado();
+                    } else {
+                        renderizarTabela();
+                        toastr.success('Cronograma de pagamentos carregado!');
+                    }
+                } else {
+                    toastr.error('Erro ao carregar cronograma pago: ' + response.error);
+                    renderizarTabela();
+                }
+            },
+            error: function(xhr) {
+                toastr.error('Erro ao carregar cronograma pago: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                renderizarTabela();
+            }
+        });
+    }
+
+    // Carregar distribuição detalhada de PAGO (via ultra_liquidacoes_cronograma)
+    function carregarCronogramaPagoDetalhado() {
+        const ano = $('#ano_referencia').val();
+        $.ajax({
+            url: '/gestao_orcamentaria/api/cronograma-pago-detalhado',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                if (response.success) {
+                    dadosCronogramaPagoDetalhado = response.dados || {};
+                    console.log('[DEBUG PAGO DETALHADO] Dados:', dadosCronogramaPagoDetalhado);
+                }
+                renderizarTabela();
+                toastr.success('Cronograma pago (modo detalhado) carregado!');
+            },
+            error: function() {
+                renderizarTabela();
+                toastr.warning('Cronograma pago detalhado não disponível, usando modo simples.');
+            }
+        });
+    }
+    
+    // Carregar dados do cronograma de COMPROMETIDO
+    function carregarCronogramaComprometido() {
+        const ano = $('#ano_referencia').val();
+        if (!ano) {
+            toastr.error('Por favor, selecione um ano de referência');
+            return;
+        }
+        $.ajax({
+            url: '/gestao_orcamentaria/api/cronograma-comprometido',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                if (response.success) {
+                    dadosCronogramaComprometido = response.dados_comprometido || {};
+                    // Se modo detalhado ativo, carregar distribuição mensal detalhada
+                    if (modoDetalhado) {
+                        carregarCronogramaComprometidoDetalhado();
+                    } else {
+                        renderizarTabela();
+                        toastr.success('Cronograma de comprometidos carregado!');
+                    }
+                } else {
+                    toastr.error('Erro ao carregar cronograma comprometido: ' + response.error);
+                    renderizarTabela();
+                }
+            },
+            error: function(xhr) {
+                toastr.error('Erro ao carregar cronograma comprometido: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                renderizarTabela();
+            }
+        });
+    }
+
+    // Carregar distribuição detalhada de COMPROMETIDO (via ultra_liquidacoes_cronograma)
+    function carregarCronogramaComprometidoDetalhado() {
+        const ano = $('#ano_referencia').val();
+        $.ajax({
+            url: '/gestao_orcamentaria/api/cronograma-comprometido-detalhado',
+            method: 'GET',
+            data: { ano_referencia: ano },
+            success: function(response) {
+                if (response.success) {
+                    dadosCronogramaComprometidoDetalhado = response.dados || {};
+                    console.log('[DEBUG COMPROMETIDO DETALHADO] Dados:', dadosCronogramaComprometidoDetalhado);
+                }
+                renderizarTabela();
+                toastr.success('Cronograma comprometido (modo detalhado) carregado!');
+            },
+            error: function() {
+                renderizarTabela();
+                toastr.warning('Cronograma comprometido detalhado não disponível, usando modo simples.');
+            }
+        });
+    }
+    
     // Alternar entre modo normal e modo detalhado
     function alternarModoCronograma() {
         modoDetalhado = $('#chk_cronograma_detalhado').is(':checked');
@@ -599,6 +859,24 @@
             } else {
                 carregarCronogramaMensal();
                 toastr.info('Modo Cronograma Normal ativado');
+            }
+        }
+
+        // Se pago ou comprometido estiverem expandidos, recarregar no modo correto
+        if (cronogramaPagoExpandido) {
+            if (modoDetalhado) {
+                carregarCronogramaPagoDetalhado();
+            } else {
+                dadosCronogramaPagoDetalhado = {};
+                renderizarTabela();
+            }
+        }
+        if (cronogramaComprometidoExpandido) {
+            if (modoDetalhado) {
+                carregarCronogramaComprometidoDetalhado();
+            } else {
+                dadosCronogramaComprometidoDetalhado = {};
+                renderizarTabela();
             }
         }
         
@@ -626,6 +904,9 @@
                         programados: response.dados_programados || {},
                         projetados: response.dados_projetados || {}
                     };
+                    
+                    // Re-mesclar celebrações (não vêm do endpoint cronograma-mensal)
+                    Object.assign(dadosCronograma.projetados, cronogramaCelebracoes);
                     
                     // Agora carregar dados dos EDITAIS
                     carregarCronogramaEditais();
@@ -662,8 +943,13 @@
                         dadosCronograma.projetados[editalNome] = dadosEditais[editalNome];
                     }
                     
-                    renderizarTabela();
-                    toastr.success('Cronograma mensal carregado (termos + editais)!');
+                    // Se cronograma pago está expandido, recarregar pago (pode ter mudado o ano)
+                    if (cronogramaPagoExpandido) {
+                        carregarCronogramaPago();
+                    } else {
+                        renderizarTabela();
+                        toastr.success('Cronograma mensal carregado (termos + editais)!');
+                    }
                 } else {
                     toastr.error('Erro ao carregar cronograma de editais: ' + response.error);
                     // Mesmo com erro, renderizar o que já foi carregado
@@ -697,8 +983,9 @@
                     console.log('[DEBUG CRONOGRAMA DETALHADO] Dados dos termos recebidos:', response);
                     dadosCronogramaDetalhado = response.dados || {};
                     
-                    // Agora carregar dados dos EDITAIS (mesma fonte para modo detalhado)
-                    carregarCronogramaEditaisDetalhado();
+                    // Carregar cronograma mensal (projetados de termos + editais + celebrações)
+                    // carregarCronogramaMensal já chama renderizarTabela ao final
+                    carregarCronogramaMensal();
                 } else {
                     toastr.error('Erro ao carregar cronograma detalhado: ' + response.error);
                 }
@@ -777,6 +1064,24 @@
                 if (response.success) {
                     dadosCompletos = response.dados;
                     dadosFiltrados = [...dadosCompletos];
+                    
+                    // ⚡ Guardar cronograma de celebrações no cache global e mesclar
+                    cronogramaCelebracoes = {};
+                    if (response.cronograma_celebracoes) {
+                        const cronCeleb = response.cronograma_celebracoes;
+                        for (const termoNome in cronCeleb) {
+                            // Converter chaves string → int (backend envia "2": valor)
+                            const mesesObj = {};
+                            for (const mes in cronCeleb[termoNome]) {
+                                mesesObj[parseInt(mes)] = cronCeleb[termoNome][mes];
+                            }
+                            cronogramaCelebracoes[termoNome] = mesesObj;
+                        }
+                        // Mesclar agora no dadosCronograma (caso cronograma já esteja aberto)
+                        if (!dadosCronograma.projetados) dadosCronograma.projetados = {};
+                        Object.assign(dadosCronograma.projetados, cronogramaCelebracoes);
+                        console.log('[DEBUG] Cronograma de celebrações guardado:', Object.keys(cronogramaCelebracoes).length, 'termos');
+                    }
                     
                     if (dadosCompletos.length === 0) {
                         $('#sem-dados').show();
@@ -883,6 +1188,7 @@
         const mostrarOsc = $('#chk_osc').is(':checked');
         const mostrarProjeto = $('#chk_projeto').is(':checked');
         const mostrarSeiCeleb = $('#chk_sei_celeb').is(':checked');
+        const mostrarTotalPago = $('#chk_total_pago').is(':checked');
         
         $('.col-tipo-contrato').toggle(mostrarTipoContrato);
         $('.col-data-inicio').toggle(mostrarDataInicio);
@@ -894,6 +1200,13 @@
         $('.col-osc').toggle(mostrarOsc);
         $('.col-projeto').toggle(mostrarProjeto);
         $('.col-sei-celeb').toggle(mostrarSeiCeleb);
+        const mostrarTotalComprometido = $('#chk_total_comprometido').is(':checked');
+        const mostrarTotalDisponivel = $('#chk_total_disponivel').is(':checked');
+        const mostrarValorResidual = $('#chk_valor_residual').is(':checked');
+        $('.col-total-pago').toggle(mostrarTotalPago);
+        $('.col-total-comprometido').toggle(mostrarTotalComprometido);
+        $('.col-total-disponivel').toggle(mostrarTotalDisponivel);
+        $('.col-valor-residual').toggle(mostrarValorResidual);
         
         salvarFiltros(); // ⚡ NOVO: Salvar estado das colunas
     }
@@ -925,6 +1238,9 @@
         thead.find('.col-mes-programado').remove();
         thead.find('.col-mes-projetado').remove();
         thead.find('.col-mes-global').remove();
+        thead.find('.col-mes-pago').remove();
+        thead.find('.col-mes-comprometido').remove();
+        thead.find('.col-mes-disponivel').remove();
         
         // Se cronograma PROGRAMADO expandido, adicionar 12 colunas antes de "Total Programado"
         if (cronogramaProgramadoExpandido) {
@@ -966,8 +1282,53 @@
         }
         
         // Habilitar scroll horizontal se algum cronograma expandido
-        if (cronogramaProgramadoExpandido || cronogramaProjetadoExpandido || cronogramaGlobalExpandido) {
+        if (cronogramaProgramadoExpandido || cronogramaProjetadoExpandido || cronogramaGlobalExpandido || cronogramaPagoExpandido || cronogramaComprometidoExpandido || cronogramaDisponivelExpandido) {
             $('.table-responsive').css('overflow-x', 'auto');
+        }
+        
+        // Se cronograma PAGO expandido, adicionar 12 colunas antes de "Total Pago" no thead
+        if (cronogramaPagoExpandido && $('#chk_total_pago').is(':checked')) {
+            const thPago = thead.find('th.col-total-pago');
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            meses.forEach(function(mes, index) {
+                const thMes = $('<th>').addClass('col-mes-pago').text(mes + ' 💰').css({
+                    'min-width': '120px',
+                    'background': 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
+                    'color': 'white',
+                    'font-size': '0.85rem'
+                }).attr('title', 'Pago: ' + mes);
+                thMes.insertBefore(thPago);
+            });
+        }
+        
+        // Se cronograma COMPROMETIDO expandido, adicionar 12 colunas antes de "Total Comprometido" no thead
+        if (cronogramaComprometidoExpandido && $('#chk_total_comprometido').is(':checked')) {
+            const thComprometido = thead.find('th.col-total-comprometido');
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            meses.forEach(function(mes) {
+                const thMes = $('<th>').addClass('col-mes-comprometido').text(mes + ' 🔴').css({
+                    'min-width': '120px',
+                    'background': 'linear-gradient(135deg, #fd7e14 0%, #e8650a 100%)',
+                    'color': 'white',
+                    'font-size': '0.85rem'
+                }).attr('title', 'Comprometido: ' + mes);
+                thMes.insertBefore(thComprometido);
+            });
+        }
+
+        // Se cronograma DISPONÍVEL expandido, adicionar 12 colunas antes de "Total Disponível" no thead
+        if (cronogramaDisponivelExpandido && $('#chk_total_disponivel').is(':checked')) {
+            const thDisponivel = thead.find('th.col-total-disponivel');
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            meses.forEach(function(mes) {
+                const thMes = $('<th>').addClass('col-mes-disponivel').text(mes + ' 🔵').css({
+                    'min-width': '120px',
+                    'background': 'linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%)',
+                    'color': 'white',
+                    'font-size': '0.85rem'
+                }).attr('title', 'Disponível: ' + mes);
+                thMes.insertBefore(thDisponivel);
+            });
         }
         
         dadosFiltrados.forEach(function(item) {
@@ -1032,13 +1393,15 @@
             
             // Se cronograma GLOBAL expandido, adicionar 12 colunas de valores mensais ANTES de Total Global
             if (cronogramaGlobalExpandido) {
-                // MODO DETALHADO: Usa dados da tabela ultra_liquidacoes_cronograma
+                // MODO DETALHADO: Usa dados da tabela ultra_liquidacoes_cronograma (programado)
+                // mais projetados de dadosCronograma (termos projetados + editais + celebrações)
                 if (modoDetalhado) {
                     const cronogramaDetalhado = dadosCronogramaDetalhado[item.numero_termo] || {};
                     
                     for (let mes = 1; mes <= 12; mes++) {
                         const dadosMes = cronogramaDetalhado[mes] || { valor: 0, parcelas: [] };
-                        const valorMes = dadosMes.valor;
+                        const valorProjetadoMes = dadosCronograma.projetados?.[item.numero_termo]?.[mes] || 0;
+                        const valorMes = (dadosMes.valor || 0) + valorProjetadoMes;
                         const parcelas = dadosMes.parcelas || [];
                         
                         const tdMes = $('<td>').addClass('valor-moeda col-mes-global');
@@ -1113,6 +1476,113 @@
             const totalGlobal = (item.total_programado || 0) + (item.total_projetado || 0);
             tr.append($('<td>').addClass('valor-moeda bg-success bg-opacity-10').text(formatarMoeda(totalGlobal)));
             
+            // Se cronograma PAGO expandido, adicionar 12 colunas de valores mensais ANTES de Total Pago
+            if (cronogramaPagoExpandido && $('#chk_total_pago').is(':checked')) {
+                const pagoDetalhado = modoDetalhado ? (dadosCronogramaPagoDetalhado[item.numero_termo] || null) : null;
+                const pagoSimples = dadosCronogramaPago[item.numero_termo] || {};
+                const pagoHighlighted = pagoDetalhado ? (pagoDetalhado.highlighted || []) : [];
+                for (let mes = 1; mes <= 12; mes++) {
+                    const valorMes = pagoDetalhado
+                        ? (pagoDetalhado.meses[mes] || 0)
+                        : (pagoSimples[mes] || 0);
+                    const isHighlighted = pagoHighlighted.includes(mes);
+                    const tdMes = $('<td>').addClass('valor-moeda col-mes-pago')
+                        .text(formatarMoeda(valorMes))
+                        .css({
+                            'background': isHighlighted ? '#ff6b6b' :
+                                          valorMes > 0 ? '#f8d7da' : '#fff',
+                            'font-weight': valorMes > 0 ? '600' : 'normal',
+                            'color': isHighlighted ? '#fff' : ''
+                        });
+                    if (isHighlighted) {
+                        tdMes.attr('title', 'Valor pago excede o cronograma previsto para este mês');
+                    }
+                    tr.append(tdMes);
+                }
+            }
+            
+            // Adicionar Total Pago (opcional)
+            tr.append($('<td>').addClass('valor-moeda bg-danger bg-opacity-10 col-total-pago')
+                .css('display', $('#chk_total_pago').is(':checked') ? '' : 'none')
+                .text(formatarMoeda(item.total_pago || 0)));
+            
+            // Se cronograma COMPROMETIDO expandido, adicionar 12 colunas mensais ANTES de Total Comprometido
+            if (cronogramaComprometidoExpandido && $('#chk_total_comprometido').is(':checked')) {
+                const compDetalhado = modoDetalhado ? (dadosCronogramaComprometidoDetalhado[item.numero_termo] || null) : null;
+                const compSimples = dadosCronogramaComprometido[item.numero_termo] || {};
+                const compHighlighted = compDetalhado ? (compDetalhado.highlighted || []) : [];
+                for (let mes = 1; mes <= 12; mes++) {
+                    const valorMes = compDetalhado
+                        ? (compDetalhado.meses[mes] || 0)
+                        : (compSimples[mes] || 0);
+                    const isHighlighted = compHighlighted.includes(mes);
+                    const tdMes = $('<td>').addClass('valor-moeda col-mes-comprometido')
+                        .text(formatarMoeda(valorMes))
+                        .css({
+                            'background': isHighlighted ? '#e65c00' :
+                                          valorMes > 0 ? '#fff3e0' : '#fff',
+                            'font-weight': valorMes > 0 ? '600' : 'normal',
+                            'color': isHighlighted ? '#fff' : ''
+                        });
+                    if (isHighlighted) {
+                        tdMes.attr('title', 'Valor comprometido excede o cronograma previsto para este mês');
+                    }
+                    tr.append(tdMes);
+                }
+            }
+            
+            // Adicionar Total Comprometido (opcional)
+            tr.append($('<td>').addClass('valor-moeda col-total-comprometido')
+                .css({
+                    'display': $('#chk_total_comprometido').is(':checked') ? '' : 'none',
+                    'background': '#fff3e0'
+                })
+                .text(formatarMoeda(item.total_comprometido || 0)));
+
+            // Se cronograma DISPONÍVEL expandido, adicionar 12 colunas mensais ANTES de Total Disponível
+            if (cronogramaDisponivelExpandido && $('#chk_total_disponivel').is(':checked')) {
+                const totalDispItem = item.total_disponivel || 0;
+                const cronogramaMensal = getMonthlyGlobalForItem(item);
+                const { meses: mesesDisp, highlighted: dispHighlighted } = calcularDisponivelMensal(totalDispItem, cronogramaMensal);
+                for (let mes = 1; mes <= 12; mes++) {
+                    const valorMes = mesesDisp[mes] || 0;
+                    const isHighlighted = dispHighlighted.includes(mes);
+                    const cronogramaVal = cronogramaMensal[mes] || 0;
+                    let bgColor = '#fff';
+                    if (isHighlighted) bgColor = '#0a58ca';
+                    else if (valorMes > 0) bgColor = '#cfe2ff';
+                    else if (cronogramaVal > 0 && valorMes === 0) bgColor = '#f8d7da';
+                    const tdMes = $('<td>').addClass('valor-moeda col-mes-disponivel')
+                        .text(formatarMoeda(valorMes))
+                        .css({
+                            'background': bgColor,
+                            'font-weight': valorMes > 0 ? '600' : 'normal',
+                            'color': isHighlighted ? '#fff' : ''
+                        });
+                    if (isHighlighted) tdMes.attr('title', 'Valor disponível excede o cronograma — excedente');
+                    else if (cronogramaVal > 0 && valorMes === 0) tdMes.attr('title', 'Parcela não coberta pelo disponível');
+                    tr.append(tdMes);
+                }
+            }
+
+            // Adicionar Total Disponível (opcional)
+            tr.append($('<td>').addClass('valor-moeda col-total-disponivel')
+                .css({
+                    'display': $('#chk_total_disponivel').is(':checked') ? '' : 'none',
+                    'background': '#d1e7ff'
+                })
+                .text(formatarMoeda(item.total_disponivel || 0)));
+
+            // Adicionar Valor Residual (opcional) — só exibe quando disponível > global
+            const valorResidualItem = item.valor_residual || 0;
+            tr.append($('<td>').addClass('valor-moeda col-valor-residual')
+                .css({
+                    'display': $('#chk_valor_residual').is(':checked') ? '' : 'none',
+                    'background': valorResidualItem > 0 ? '#d1e7dd' : '#fff',
+                    'color': valorResidualItem > 0 ? '#0a3622' : '#6c757d'
+                })
+                .text(valorResidualItem > 0 ? formatarMoeda(valorResidualItem) : '-'));
+
             tbody.append(tr);
         });
         
@@ -1125,6 +1595,10 @@
         const footerRow = $('#tabelaOrcamento tfoot tr');
         footerRow.find('.col-mes-programado').remove();
         footerRow.find('.col-mes-projetado').remove();
+        footerRow.find('.col-mes-global').remove();
+        footerRow.find('.col-mes-pago').remove();
+        footerRow.find('.col-mes-comprometido').remove();
+        footerRow.find('.col-mes-disponivel').remove();
         
         // Atualizar total de Valor Atualizado no footer
         $('#total_atualizado_footer').text(formatarMoeda(totalAtualizado));
@@ -1181,7 +1655,7 @@
         if (cronogramaGlobalExpandido) {
             const thGlobal = $('#total_global_footer');
             
-            // MODO DETALHADO: Usa dados da tabela ultra_liquidacoes_cronograma
+            // MODO DETALHADO: Programado (parcelas) + Projetado (termos + editais + celebrações)
             if (modoDetalhado) {
                 for (let mes = 1; mes <= 12; mes++) {
                     let totalMesDetalhado = 0;
@@ -1189,7 +1663,8 @@
                     dadosFiltrados.forEach(function(item) {
                         const cronogramaDetalhado = dadosCronogramaDetalhado[item.numero_termo] || {};
                         const dadosMes = cronogramaDetalhado[mes] || { valor: 0, parcelas: [] };
-                        totalMesDetalhado += dadosMes.valor || 0;
+                        const valorProjetadoMes = dadosCronograma.projetados?.[item.numero_termo]?.[mes] || 0;
+                        totalMesDetalhado += (dadosMes.valor || 0) + valorProjetadoMes;
                     });
                     
                     const thMes = $('<th>').addClass('valor-moeda col-mes-global')
@@ -1198,7 +1673,7 @@
                             'background': totalMesDetalhado > 0 ? '#d1ecf1' : '#f8f9fa',
                             'font-weight': '700'
                         })
-                        .attr('title', 'Modo Detalhado');
+                        .attr('title', 'Modo Detalhado: Programado + Projetado');
                     thMes.insertBefore(thGlobal);
                 }
             }
@@ -1229,6 +1704,86 @@
         }
         
         $('#total_global_footer').text(formatarMoeda(totalGlobal));
+        
+        // Calcular e exibir Total Pago no footer
+        const totalPago = dadosFiltrados.reduce((sum, item) => sum + (item.total_pago || 0), 0);
+        $('#total_pago_footer').text(formatarMoeda(totalPago));
+        
+        // Calcular e exibir Total Comprometido no footer
+        const totalComprometido = dadosFiltrados.reduce((sum, item) => sum + (item.total_comprometido || 0), 0);
+        $('#total_comprometido_footer').text(formatarMoeda(totalComprometido));
+        
+        // Se cronograma PAGO expandido, adicionar totais mensais
+        if (cronogramaPagoExpandido && $('#chk_total_pago').is(':checked')) {
+            const thPagoFooter = $('#total_pago_footer');
+            for (let mes = 1; mes <= 12; mes++) {
+                let totalMesPago = 0;
+                dadosFiltrados.forEach(function(item) {
+                    if (modoDetalhado && dadosCronogramaPagoDetalhado[item.numero_termo]) {
+                        totalMesPago += dadosCronogramaPagoDetalhado[item.numero_termo].meses[mes] || 0;
+                    } else {
+                        const cronogramaPago = dadosCronogramaPago[item.numero_termo] || {};
+                        totalMesPago += cronogramaPago[mes] || 0;
+                    }
+                });
+                const thMes = $('<th>').addClass('valor-moeda col-mes-pago')
+                    .text(formatarMoeda(totalMesPago))
+                    .css({
+                        'background': totalMesPago > 0 ? '#f8d7da' : '#f8f9fa',
+                        'font-weight': '700'
+                    });
+                thMes.insertBefore(thPagoFooter);
+            }
+        }
+        
+        // Se cronograma COMPROMETIDO expandido, adicionar totais mensais
+        if (cronogramaComprometidoExpandido && $('#chk_total_comprometido').is(':checked')) {
+            const thComprometidoFooter = $('#total_comprometido_footer');
+            for (let mes = 1; mes <= 12; mes++) {
+                let totalMesComprometido = 0;
+                dadosFiltrados.forEach(function(item) {
+                    if (modoDetalhado && dadosCronogramaComprometidoDetalhado[item.numero_termo]) {
+                        totalMesComprometido += dadosCronogramaComprometidoDetalhado[item.numero_termo].meses[mes] || 0;
+                    } else {
+                        const cronogramaComprometido = dadosCronogramaComprometido[item.numero_termo] || {};
+                        totalMesComprometido += cronogramaComprometido[mes] || 0;
+                    }
+                });
+                const thMes = $('<th>').addClass('valor-moeda col-mes-comprometido')
+                    .text(formatarMoeda(totalMesComprometido))
+                    .css({
+                        'background': totalMesComprometido > 0 ? '#fff3e0' : '#f8f9fa',
+                        'font-weight': '700'
+                    });
+                thMes.insertBefore(thComprometidoFooter);
+            }
+        }
+
+        // Calcular e exibir Total Disponível e Valor Residual no footer
+        const totalDisponivelFooter = dadosFiltrados.reduce((sum, item) => sum + (item.total_disponivel || 0), 0);
+        $('#total_disponivel_footer').text(formatarMoeda(totalDisponivelFooter));
+        const totalResidualFooter = dadosFiltrados.reduce((sum, item) => sum + (item.valor_residual || 0), 0);
+        $('#total_residual_footer').text(totalResidualFooter > 0 ? formatarMoeda(totalResidualFooter) : '-');
+
+        // Se cronograma DISPONÍVEL expandido, adicionar totais mensais
+        if (cronogramaDisponivelExpandido && $('#chk_total_disponivel').is(':checked')) {
+            const thDisponivelFooter = $('#total_disponivel_footer');
+            for (let mes = 1; mes <= 12; mes++) {
+                let totalMesDisponivel = 0;
+                dadosFiltrados.forEach(function(item) {
+                    const cronogramaMensal = getMonthlyGlobalForItem(item);
+                    const { meses: mesesDisp } = calcularDisponivelMensal(item.total_disponivel || 0, cronogramaMensal);
+                    totalMesDisponivel += mesesDisp[mes] || 0;
+                });
+                const thMes = $('<th>').addClass('valor-moeda col-mes-disponivel')
+                    .text(formatarMoeda(totalMesDisponivel))
+                    .css({
+                        'background': totalMesDisponivel > 0 ? '#cfe2ff' : '#f8f9fa',
+                        'font-weight': '700'
+                    });
+                thMes.insertBefore(thDisponivelFooter);
+            }
+        }
     }
     
     // Atualizar cards de resumo
@@ -1271,7 +1826,11 @@
             projetado_min: $('#filtro_projetado_min').val() === '' ? null : parseFloat($('#filtro_projetado_min').val()),
             projetado_max: $('#filtro_projetado_max').val() === '' ? null : parseFloat($('#filtro_projetado_max').val()),
             global_min: $('#filtro_global_min').val() === '' ? null : parseFloat($('#filtro_global_min').val()),
-            global_max: $('#filtro_global_max').val() === '' ? null : parseFloat($('#filtro_global_max').val())
+            global_max: $('#filtro_global_max').val() === '' ? null : parseFloat($('#filtro_global_max').val()),
+            pago_min: $('#filtro_pago_min').val() === '' ? null : parseFloat($('#filtro_pago_min').val()),
+            pago_max: $('#filtro_pago_max').val() === '' ? null : parseFloat($('#filtro_pago_max').val()),
+            comprometido_min: $('#filtro_comprometido_min').val() === '' ? null : parseFloat($('#filtro_comprometido_min').val()),
+            comprometido_max: $('#filtro_comprometido_max').val() === '' ? null : parseFloat($('#filtro_comprometido_max').val())
         };
         
         // DEBUG: Log dos filtros de valores
@@ -1342,6 +1901,10 @@
             if (filtros.projetado_max !== null && item.total_projetado > filtros.projetado_max) return false;
             if (filtros.global_min !== null && item.total_global < filtros.global_min) return false;
             if (filtros.global_max !== null && item.total_global > filtros.global_max) return false;
+            if (filtros.pago_min !== null && (item.total_pago || 0) < filtros.pago_min) return false;
+            if (filtros.pago_max !== null && (item.total_pago || 0) > filtros.pago_max) return false;
+            if (filtros.comprometido_min !== null && (item.total_comprometido || 0) < filtros.comprometido_min) return false;
+            if (filtros.comprometido_max !== null && (item.total_comprometido || 0) > filtros.comprometido_max) return false;
             
             return true;
         });
@@ -1369,6 +1932,8 @@
         $('#filtro_programado_min, #filtro_programado_max').val('');
         $('#filtro_projetado_min, #filtro_projetado_max').val('');
         $('#filtro_global_min, #filtro_global_max').val('');
+        $('#filtro_pago_min, #filtro_pago_max').val('');
+        $('#filtro_comprometido_min, #filtro_comprometido_max').val('');
         
         // ⚡ NOVO: Remover filtros do localStorage (mantém apenas ano e colunas)
         const filtrosSalvos = JSON.parse(localStorage.getItem('orcamento_detalhado_filtros') || '{}');
@@ -1383,7 +1948,11 @@
             chk_sei_pc: filtrosSalvos.chk_sei_pc,
             chk_osc: filtrosSalvos.chk_osc,
             chk_projeto: filtrosSalvos.chk_projeto,
-            chk_sei_celeb: filtrosSalvos.chk_sei_celeb
+            chk_sei_celeb: filtrosSalvos.chk_sei_celeb,
+            chk_total_pago: filtrosSalvos.chk_total_pago,
+            chk_total_comprometido: filtrosSalvos.chk_total_comprometido,
+            chk_total_disponivel: filtrosSalvos.chk_total_disponivel,
+            chk_valor_residual: filtrosSalvos.chk_valor_residual
         };
         localStorage.setItem('orcamento_detalhado_filtros', JSON.stringify(apenasAnoEColunas));
         
@@ -1458,6 +2027,38 @@
         
         cabecalho.push('Total Global');
         
+        // Se Total Pago visível, adicionar ao cabeçalho
+        if ($('#chk_total_pago').is(':checked')) {
+            if (cronogramaPagoExpandido) {
+                const meses = ['Jan (Pago)', 'Fev (Pago)', 'Mar (Pago)', 'Abr (Pago)', 'Mai (Pago)', 'Jun (Pago)',
+                              'Jul (Pago)', 'Ago (Pago)', 'Set (Pago)', 'Out (Pago)', 'Nov (Pago)', 'Dez (Pago)'];
+                meses.forEach(mes => cabecalho.push(mes));
+            }
+            cabecalho.push('Total Pago');
+        }
+        
+        // Se Total Comprometido visível, adicionar ao cabeçalho
+        if ($('#chk_total_comprometido').is(':checked')) {
+            if (cronogramaComprometidoExpandido) {
+                const meses = ['Jan (Comp)', 'Fev (Comp)', 'Mar (Comp)', 'Abr (Comp)', 'Mai (Comp)', 'Jun (Comp)',
+                              'Jul (Comp)', 'Ago (Comp)', 'Set (Comp)', 'Out (Comp)', 'Nov (Comp)', 'Dez (Comp)'];
+                meses.forEach(mes => cabecalho.push(mes));
+            }
+            cabecalho.push('Total Comprometido');
+        }
+
+        // Se Total Disponível visível, adicionar ao cabeçalho
+        if ($('#chk_total_disponivel').is(':checked')) {
+            if (cronogramaDisponivelExpandido) {
+                const meses = ['Jan (Disp)', 'Fev (Disp)', 'Mar (Disp)', 'Abr (Disp)', 'Mai (Disp)', 'Jun (Disp)',
+                              'Jul (Disp)', 'Ago (Disp)', 'Set (Disp)', 'Out (Disp)', 'Nov (Disp)', 'Dez (Disp)'];
+                meses.forEach(mes => cabecalho.push(mes));
+            }
+            cabecalho.push('Total Disponível');
+        }
+
+        if ($('#chk_valor_residual').is(':checked')) cabecalho.push('Valor Residual');
+        
         const linhas = [cabecalho.join(';')];
         
         dadosFiltrados.forEach(function(item) {
@@ -1529,6 +2130,43 @@
             
             linha.push(formatarMoedaExcel(item.total_global || ((item.total_programado || 0) + (item.total_projetado || 0))));
             
+            // Adicionar Total Pago se visível
+            if ($('#chk_total_pago').is(':checked')) {
+                if (cronogramaPagoExpandido) {
+                    const cronogramaPago = dadosCronogramaPago[item.numero_termo] || {};
+                    for (let mes = 1; mes <= 12; mes++) {
+                        linha.push(formatarMoedaExcel(cronogramaPago[mes] || 0));
+                    }
+                }
+                linha.push(formatarMoedaExcel(item.total_pago || 0));
+            }
+            
+            // Adicionar Total Comprometido se visível
+            if ($('#chk_total_comprometido').is(':checked')) {
+                if (cronogramaComprometidoExpandido) {
+                    const cronogramaComprometido = dadosCronogramaComprometido[item.numero_termo] || {};
+                    for (let mes = 1; mes <= 12; mes++) {
+                        linha.push(formatarMoedaExcel(cronogramaComprometido[mes] || 0));
+                    }
+                }
+                linha.push(formatarMoedaExcel(item.total_comprometido || 0));
+            }
+
+            // Adicionar Total Disponível se visível
+            if ($('#chk_total_disponivel').is(':checked')) {
+                if (cronogramaDisponivelExpandido) {
+                    const cronogramaMensal = getMonthlyGlobalForItem(item);
+                    const { meses: mesesDisp } = calcularDisponivelMensal(item.total_disponivel || 0, cronogramaMensal);
+                    for (let mes = 1; mes <= 12; mes++) {
+                        linha.push(formatarMoedaExcel(mesesDisp[mes] || 0));
+                    }
+                }
+                linha.push(formatarMoedaExcel(item.total_disponivel || 0));
+            }
+
+            if ($('#chk_valor_residual').is(':checked'))
+                linha.push((item.valor_residual || 0) > 0 ? formatarMoedaExcel(item.valor_residual) : '');
+            
             linhas.push(linha.join(';'));
         });
         
@@ -1590,6 +2228,10 @@
             projetado_max: $('#filtro_projetado_max').val(),
             global_min: $('#filtro_global_min').val(),
             global_max: $('#filtro_global_max').val(),
+            pago_min: $('#filtro_pago_min').val(),
+            pago_max: $('#filtro_pago_max').val(),
+            comprometido_min: $('#filtro_comprometido_min').val(),
+            comprometido_max: $('#filtro_comprometido_max').val(),
             
             // Checkboxes de colunas
             chk_tipo_contrato: $('#chk_tipo_contrato').is(':checked'),
@@ -1602,6 +2244,10 @@
             chk_osc: $('#chk_osc').is(':checked'),
             chk_projeto: $('#chk_projeto').is(':checked'),
             chk_sei_celeb: $('#chk_sei_celeb').is(':checked'),
+            chk_total_pago: $('#chk_total_pago').is(':checked'),
+            chk_total_comprometido: $('#chk_total_comprometido').is(':checked'),
+            chk_total_disponivel: $('#chk_total_disponivel').is(':checked'),
+            chk_valor_residual: $('#chk_valor_residual').is(':checked'),
             
             // Modo cronograma detalhado
             chk_cronograma_detalhado: $('#chk_cronograma_detalhado').is(':checked')
@@ -1652,6 +2298,10 @@
             $('#filtro_projetado_max').val(filtros.projetado_max || '');
             $('#filtro_global_min').val(filtros.global_min || '');
             $('#filtro_global_max').val(filtros.global_max || '');
+            $('#filtro_pago_min').val(filtros.pago_min || '');
+            $('#filtro_pago_max').val(filtros.pago_max || '');
+            $('#filtro_comprometido_min').val(filtros.comprometido_min || '');
+            $('#filtro_comprometido_max').val(filtros.comprometido_max || '');
             
             // Restaurar checkboxes de colunas
             $('#chk_tipo_contrato').prop('checked', filtros.chk_tipo_contrato || false);
@@ -1664,6 +2314,10 @@
             $('#chk_osc').prop('checked', filtros.chk_osc || false);
             $('#chk_projeto').prop('checked', filtros.chk_projeto || false);
             $('#chk_sei_celeb').prop('checked', filtros.chk_sei_celeb || false);
+            $('#chk_total_pago').prop('checked', filtros.chk_total_pago || false);
+            $('#chk_total_comprometido').prop('checked', filtros.chk_total_comprometido || false);
+            $('#chk_total_disponivel').prop('checked', filtros.chk_total_disponivel || false);
+            $('#chk_valor_residual').prop('checked', filtros.chk_valor_residual || false);
             
             // Restaurar modo cronograma detalhado
             $('#chk_cronograma_detalhado').prop('checked', filtros.chk_cronograma_detalhado || false);
@@ -1680,6 +2334,10 @@
             $('.col-osc').toggle(filtros.chk_osc || false);
             $('.col-projeto').toggle(filtros.chk_projeto || false);
             $('.col-sei-celeb').toggle(filtros.chk_sei_celeb || false);
+            $('.col-total-pago').toggle(filtros.chk_total_pago || false);
+            $('.col-total-comprometido').toggle(filtros.chk_total_comprometido || false);
+            $('.col-total-disponivel').toggle(filtros.chk_total_disponivel || false);
+            $('.col-valor-residual').toggle(filtros.chk_valor_residual || false);
             
             console.log('✅ Filtros restaurados com sucesso');
             return filtros;

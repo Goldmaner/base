@@ -47,8 +47,8 @@
 - Fazer um relatório completo do que está encaminhado para pagamento, pagos e atrasados.
 
 ## 8. Celebração e DGP
-- Desenvolver módulo para celebração de parcerias, com workflow próprio.
-- Incluir módulo para gestão de CENTS.
+- Desenvolver módulo para celebração de parcerias, com workflow próprio.✅
+- Incluir módulo para gestão de CENTS.✅
 
 ## 9. Editais
 - Criar módulo para cadastro, acompanhamento e publicação de editais.✅
@@ -61,7 +61,7 @@
 - Adicionar demonstrativo de aferição de resultados.
 - Relatório de Execução Financeira no Sistema.
 - Sistema de cadastro de férias dos servidores da DAC.✅
-- Sistema de cadastro de férias dos servidores da DGP e DP.
+- Sistema de cadastro de férias dos servidores da DGP e DP.✅
 - Sistema de folgas, abonos e compromissos para DAC.
 
 ## 12. Uso de IA
@@ -81,3 +81,4 @@
 ## 15. Listas Suspensas
 - Adicionar ramais na lista de coordenadores e pessoas gestoras.
 - Adicionar lista de documentações de Alterações e Processos.
+- Atualizar os nomes. 

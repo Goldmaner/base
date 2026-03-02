@@ -409,7 +409,8 @@
                        onchange="toggleSeiCelebCriar('e', this)">
                 <label class="form-check-label small text-muted" for="e_sei_celeb_criar">A ser criado</label>
               </div>
-              <input type="text" class="form-control form-control-sm" id="e_sei_celeb" name="sei_celeb">
+              <input type="text" class="form-control form-control-sm" id="e_sei_celeb" name="sei_celeb"
+                     placeholder="Ex: 1234.5678/9012345-6" oninput="formatarSEIInput(this)">
             </div>
             <div class="col-md-3">
               <label class="form-label">Disponibilidade</label>
@@ -510,6 +511,18 @@ document.addEventListener('DOMContentLoaded', function () {
     width: '100%',
   });
 });
+
+// ── Máscara SEI: XXXX.XXXX/XXXXXXX-X ───────────────────────────────────
+function formatarSEIInput(el) {
+  if (!el || el.disabled) return;
+  let digits = el.value.replace(/[^\d]/g, '').slice(0, 16);
+  let out = '';
+  if (digits.length > 0)  out  = digits.slice(0, Math.min(4, digits.length));
+  if (digits.length > 4)  out += '.' + digits.slice(4, Math.min(8, digits.length));
+  if (digits.length > 8)  out += '/' + digits.slice(8, Math.min(15, digits.length));
+  if (digits.length > 15) out += '-' + digits.slice(15, 16);
+  el.value = out;
+}
 
 // ── Formatação ────────────────────────────────────────────────────────────
 function formatarValorBR(el) {

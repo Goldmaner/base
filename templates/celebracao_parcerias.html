@@ -683,6 +683,20 @@ const EDITAIS_LIST       = {{ editais_list | tojson }};
 const NOME_PG_LIST       = {{ nome_pg_list | tojson }};
 const LEI_LIST           = {{ lei_list | tojson }};
 const REGIONALIZACAO_MAP = {{ regionalizacao_map | tojson }};
+
+// Cria um <datalist> global com todos os distritos do mapa
+function criarDatalistDistritos() {
+  if (document.getElementById('datalist_distritos')) return;
+  const dl = document.createElement('datalist');
+  dl.id = 'datalist_distritos';
+  Object.keys(REGIONALIZACAO_MAP).sort().forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    dl.appendChild(opt);
+  });
+  document.body.appendChild(dl);
+}
+criarDatalistDistritos();
 const SEI_TIPO_OPTIONS   = ['Termo Base', 'Plano de Trabalho', 'Orçamento Anual', 'Proposta Técnico-Orçamentário', 'Memória de Cálculo', 'Minuta de Termo', 'Despacho Autorizatório'];
 // IDs de status que exigem data de assinatura preenchida
 const STATUS_NEED_ASSINATURA = new Set([15, 16, 17, 18, 19, 20]);
@@ -1465,7 +1479,7 @@ function adicionarEnderecoExec(dados) {
       <div class="col-md-6"><label class="form-label small mb-0">CEP</label>
         <input type="text" class="form-control form-control-sm ee-cep" value="${cep}" placeholder="00000-000"></div>
       <div class="col-12"><label class="form-label small mb-0">Distrito</label>
-        <select class="form-select form-select-sm ee-dist-sel" id="dist_${uid}"></select></div>
+        <input type="text" class="form-control form-control-sm ee-distrito" list="datalist_distritos" placeholder="Digite ou selecione o distrito..." autocomplete="off"></div>
       <div class="col-md-6"><label class="form-label small mb-0">Subprefeitura <span class="text-muted fw-normal">(auto)</span></label>
         <input type="text" class="form-control form-control-sm ee-subprefeitura" readonly style="background:#f8f9fa;" placeholder="—"></div>
       <div class="col-md-6"><label class="form-label small mb-0">Região <span class="text-muted fw-normal">(auto)</span></label>
@@ -1480,34 +1494,18 @@ function adicionarEnderecoExec(dados) {
     if (v.length > 5) v = v.slice(0, 5) + '-' + v.slice(5, 8);
     e.target.value = v;
   });
-  // Select2 para distrito
-  const sel = div.querySelector('.ee-dist-sel');
-  $(sel).select2({
-    theme: 'bootstrap-5', width: '100%',
-    ajax: {
-      url: '/celebracao-parcerias/api/distritos', dataType: 'json', delay: 250,
-      data: function(p) { return { q: p.term }; },
-      processResults: function(r) { return { results: r }; }, cache: true
-    },
-    placeholder: 'Digite para buscar distrito...', allowClear: true, minimumInputLength: 0
-  });
-  // Auto-fill subprefeitura/região ao selecionar distrito (usa .text do evento, não .val())
-  $(sel).on('select2:select', function(e) {
-    const distText = e.params?.data?.text || '';
+  // Auto-fill subprefeitura/região ao digitar/selecionar distrito
+  const distInput = div.querySelector('.ee-distrito');
+  distInput.addEventListener('input', function() {
+    const distText = this.value.trim();
     const sub = div.querySelector('.ee-subprefeitura');
     const reg = div.querySelector('.ee-regiao');
     const info = REGIONALIZACAO_MAP[distText];
     if (sub) sub.value = info ? (info.subprefeitura || '') : '';
     if (reg) reg.value = info ? (info.regiao || '') : '';
-  }).on('select2:clear', function() {
-    const sub = div.querySelector('.ee-subprefeitura');
-    const reg = div.querySelector('.ee-regiao');
-    if (sub) sub.value = '';
-    if (reg) reg.value = '';
   });
   if (dados.parceria_distrito) {
-    const opt = new Option(dados.parceria_distrito, dados.parceria_distrito, true, true);
-    $(sel).append(opt).trigger('change');
+    distInput.value = dados.parceria_distrito;
     // Preencher subprefeitura/região ao carregar dados existentes
     const info = REGIONALIZACAO_MAP[dados.parceria_distrito];
     if (info) {
@@ -1530,8 +1528,7 @@ function coletarEnderecos() {
   if (onlineChk && onlineChk.checked) return [{ observacao: 'Online' }];
   const result = [];
   document.querySelectorAll('.endereco-exec-item').forEach(item => {
-    const sel = item.querySelector('.ee-dist-sel');
-    const distText = sel?.options[sel.selectedIndex]?.text || '';
+    const distText = item.querySelector('.ee-distrito')?.value.trim() || '';
     result.push({
       parceria_logradouro:  item.querySelector('.ee-logradouro')?.value  || '',
       parceria_numero:      item.querySelector('.ee-numero')?.value       || '',
@@ -2609,6 +2606,33 @@ async function deletarContatoCeleb(id) {
   } catch (err) { alert('Erro: ' + err); }
 }
 
+// ── Máscara de telefone nos contatos da celebração ─────────────────────────
+function aplicarMascaraTelCeleb(infoId, tipoId) {
+  const tipo = document.getElementById(tipoId)?.value || '';
+  const input = document.getElementById(infoId);
+  if (!input) return;
+  // Clonar para remover listeners anteriores
+  const novo = input.cloneNode(true);
+  input.parentNode.replaceChild(novo, input);
+  if (!tipo.includes('Telefone') && tipo !== 'WhatsApp') {
+    novo.placeholder = tipo.includes('E-mail') ? 'email@exemplo.com' : '';
+    novo.removeAttribute('maxlength');
+    return;
+  }
+  novo.placeholder = tipo === 'Telefone Fixo' ? '(11) 3333-3333' : '(11) 98888-8888';
+  novo.maxLength = 15;
+  novo.addEventListener('input', function(e) {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 11) v = v.substring(0, 11);
+    if (v.length >= 11)      v = v.replace(/^(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    else if (v.length >= 10) v = v.replace(/^(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    else if (v.length >= 7)  v = v.replace(/^(\d{2})(\d{4,5})(\d{0,4})/, '($1) $2-$3');
+    else if (v.length >= 3)  v = v.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+    else if (v.length >= 1)  v = v.replace(/^(\d*)/, '($1');
+    e.target.value = v;
+  });
+}
+
 async function salvarNovoContatoCeleb() {
   const body = {
     osc: _contatosOscAtual,
@@ -2661,11 +2685,13 @@ async function salvarNovoContatoCeleb() {
             </div>
             <div class="col-md-6">
               <label class="form-label small fw-bold mb-1">Posição/Cargo</label>
-              <input type="text" class="form-control form-control-sm" id="ec_posicao">
+              <input type="text" class="form-control form-control-sm" id="ec_posicao"
+                list="cargos-datalist-celeb" placeholder="Ex: Presidente, Responsável...">
             </div>
             <div class="col-md-4">
               <label class="form-label small fw-bold mb-1">Tipo</label>
-              <select class="form-select form-select-sm" id="ec_tipo">
+              <select class="form-select form-select-sm" id="ec_tipo"
+                onchange="aplicarMascaraTelCeleb('ec_info','ec_tipo')">
                 <option>E-mail</option><option>Telefone Fixo</option><option>Telefone Celular</option>
                 <option>WhatsApp</option><option>Outro</option>
               </select>
@@ -2707,11 +2733,13 @@ async function salvarNovoContatoCeleb() {
             </div>
             <div class="col-md-6">
               <label class="form-label small fw-bold mb-1">Posição/Cargo</label>
-              <input type="text" class="form-control form-control-sm" id="nc_posicao">
+              <input type="text" class="form-control form-control-sm" id="nc_posicao"
+                list="cargos-datalist-celeb" placeholder="Ex: Presidente, Responsável...">
             </div>
             <div class="col-md-4">
               <label class="form-label small fw-bold mb-1">Tipo</label>
-              <select class="form-select form-select-sm" id="nc_tipo">
+              <select class="form-select form-select-sm" id="nc_tipo"
+                onchange="aplicarMascaraTelCeleb('nc_info','nc_tipo')">
                 <option>E-mail</option><option>Telefone Fixo</option><option>Telefone Celular</option>
                 <option>WhatsApp</option><option>Outro</option>
               </select>
@@ -2740,6 +2768,20 @@ async function salvarNovoContatoCeleb() {
     </div>
   </div>
 </div>
+
+<!-- Datalist para Posição/Cargo (contatos) -->
+<datalist id="cargos-datalist-celeb">
+  <option value="Responsável">
+  <option value="Presidente">
+  <option value="Vice-Presidente">
+  <option value="Representante Legal">
+  <option value="Coordenador">
+  <option value="Diretor Executivo">
+  <option value="Secretário">
+  <option value="Tesoureiro">
+  <option value="Institucional">
+  <option value="Gestor">
+</datalist>
 
 </body>
 </html>

@@ -4,7 +4,7 @@ Blueprint para Gestão Financeira - Ultra Liquidações
 Sistema de controle de parcelas com validações e filtros avançados
 """
 
-from flask import Blueprint, render_template, request, jsonify, session
+from flask import Blueprint, render_template, request, jsonify, session, g
 from db import get_db, get_cursor
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
@@ -582,6 +582,7 @@ def api_listar_parcelas():
                     ul.valor_pago,
                     ul.parcela_status,
                     ul.parcela_status_secundario,
+                    ul.parcela_andamento,
                     ul.data_pagamento,
                     ul.observacoes,
                     p.osc,
@@ -665,6 +666,7 @@ def api_listar_parcelas():
                 ul.valor_pago,
                 ul.parcela_status,
                 ul.parcela_status_secundario,
+                ul.parcela_andamento,
                 ul.data_pagamento,
                 ul.observacoes,
                 p.osc,
@@ -892,6 +894,7 @@ def api_listar_parcelas():
                 'valor_pago': float(p['valor_pago'] or 0),
                 'parcela_status': p['parcela_status'] or '',
                 'parcela_status_secundario': p['parcela_status_secundario'] or '',
+                'parcela_andamento': p['parcela_andamento'] or '',
                 'data_pagamento': formatar_data_br(p['data_pagamento']),
                 'observacoes': p['observacoes'] or '',
                 'osc': p['osc'] or '' if mostrar_osc else None,
@@ -930,24 +933,32 @@ def api_listar_parcelas():
         valores_consumidos = defaultdict(float)
         
         # PASSO 2: Contabilizar consumo de parcelas com status "Pago"
-        for parcela in todas_parcelas_ordenadas:
-            if parcela['parcela_status'] != 'Pago':
-                continue
-            
-            vigencia_raw = parcela['vigencia_inicial_raw']
-            if not vigencia_raw:
-                continue
-            
-            ano_parcela = vigencia_raw.year
-            numero_termo = parcela['numero_termo']
-            
-            # Consumir valores proporcionais aos elementos
-            # (parcelas "Pago" já receberam o pagamento, então reduzem o saldo disponível)
-            chave_23 = (numero_termo, ano_parcela, 23)
-            chave_24 = (numero_termo, ano_parcela, 24)
-            
-            valores_consumidos[chave_23] += parcela['valor_elemento_53_23']
-            valores_consumidos[chave_24] += parcela['valor_elemento_53_24']
+        # CRÍTICO: buscar TODAS as parcelas "Pago" do banco, não só as da página atual.
+        # Se o usuário está na aba "Encaminhado", as parcelas "Pago" não estão em `resultado`,
+        # então precisamos de uma query separada para evitar que o saldo seja redistribuído
+        # para parcelas erradas.
+        try:
+            cur.execute("""
+                SELECT numero_termo,
+                       vigencia_inicial,
+                       COALESCE(valor_elemento_53_23, 0) AS valor_23,
+                       COALESCE(valor_elemento_53_24, 0) AS valor_24
+                FROM gestao_financeira.ultra_liquidacoes
+                WHERE LOWER(parcela_status) = 'pago'
+            """)
+            parcelas_pagas_banco = cur.fetchall()
+            for pp in parcelas_pagas_banco:
+                vi = pp['vigencia_inicial']
+                if vi is None:
+                    continue
+                ano_p = vi.year if hasattr(vi, 'year') else int(str(vi)[:4])
+                nt = pp['numero_termo']
+                valores_consumidos[(nt, ano_p, 23)] += float(pp['valor_23'])
+                valores_consumidos[(nt, ano_p, 24)] += float(pp['valor_24'])
+            print(f"[CASCADE] Parcelas pagas carregadas do banco: {len(parcelas_pagas_banco)}, chaves consumidas: {len(valores_consumidos)}")
+        except Exception as e_pagas:
+            print(f"[ERRO CASCADE parcelas_pagas] {e_pagas}")
+            import traceback; traceback.print_exc()
         
         # PASSO 3: Distribuir saldo disponível para parcelas "Encaminhado para Pagamento"
         controle_cascata = defaultdict(lambda: {'pago_23': 0, 'pago_24': 0})
@@ -1118,6 +1129,39 @@ def api_obter_parcela(parcela_id):
         """)
         tipos_parcela = [r['parcela_tipo'] for r in cur.fetchall()]
         
+        # Buscar opções de andamento
+        cur.execute("""
+            SELECT status_parcela
+            FROM categoricas.c_dac_parcela_andamento_status
+            WHERE LOWER(status_status) = 'ativo'
+            ORDER BY status_parcela
+        """)
+        opcoes_andamento = [r['status_parcela'] for r in cur.fetchall()]
+        
+        # Histórico de alterações do status de andamento
+        cur.execute("""
+            SELECT
+                TO_CHAR(created_at, 'DD/MM/YYYY HH24:MI') AS data_hora,
+                usuario_nome,
+                detalhes->'parcela_andamento'->>'de'   AS andamento_de,
+                detalhes->'parcela_andamento'->>'para' AS andamento_para
+            FROM gestao_pessoas.log_atividades
+            WHERE recurso_tipo = 'parcela'
+              AND recurso_id   = %s
+              AND detalhes ? 'parcela_andamento'
+            ORDER BY created_at DESC
+            LIMIT 30
+        """, (str(parcela_id),))
+        historico_andamento = [
+            {
+                'data_hora':      r['data_hora'],
+                'usuario':        r['usuario_nome'],
+                'andamento_de':   r['andamento_de'],
+                'andamento_para': r['andamento_para']
+            }
+            for r in cur.fetchall()
+        ]
+        
         resultado = {
             'id': parcela['id'],
             'vigencia_inicial': formatar_data_br(parcela['vigencia_inicial']),
@@ -1135,6 +1179,9 @@ def api_obter_parcela(parcela_id):
             'data_pagamento': formatar_data_br(parcela['data_pagamento']),
             'observacoes': parcela['observacoes'] or '',
             'parcela_status_secundario': parcela['parcela_status_secundario'] or '',
+            'parcela_andamento': re.sub(r'^\d{2}/\d{2}/\d{4} - ', '', parcela['parcela_andamento'] or ''),
+            'opcoes_andamento': opcoes_andamento,
+            'historico_andamento': historico_andamento,
             'osc': parcela['osc'] or '',
             'cnpj': parcela['cnpj'] or '',
             'sei_celeb': parcela['sei_celeb'] or '',
@@ -1189,9 +1236,72 @@ def api_atualizar_parcela(parcela_id):
         parcela_numero = dados.get('parcela_numero', '')
         parcela_status = dados.get('parcela_status', '')
         parcela_status_secundario = dados.get('parcela_status_secundario', '')
+        parcela_andamento = dados.get('parcela_andamento', '') if dados.get('parcela_status') == 'Encaminhado para Pagamento' else ''
         observacoes = dados.get('observacoes', '')
         
         usuario = session.get('usuario_nome', 'Sistema')
+        
+        # ================================================================
+        # DIFF: Buscar valores atuais para registrar o que mudou no log
+        # ================================================================
+        cur.execute("""
+            SELECT vigencia_inicial, vigencia_final, parcela_tipo, parcela_numero,
+                   valor_elemento_53_23, valor_elemento_53_24, valor_previsto,
+                   valor_subtraido, valor_encaminhado, valor_pago,
+                   parcela_status, parcela_status_secundario, parcela_andamento,
+                   data_pagamento, observacoes
+            FROM gestao_financeira.ultra_liquidacoes WHERE id = %s
+        """, (parcela_id,))
+        atual = cur.fetchone()
+        
+        if atual:
+            def _fmt(v):
+                if v is None or v == '': return None
+                if isinstance(v, Decimal): return str(v)
+                if hasattr(v, 'strftime'): return v.strftime('%d/%m/%Y')
+                return str(v)
+            
+            # Calcular parcela_andamento_salvo com prefixo de data
+            _andamento_base_atual = re.sub(r'^\d{2}/\d{2}/\d{4} - ', '', atual['parcela_andamento'] or '')
+            if parcela_andamento and parcela_andamento != _andamento_base_atual:
+                # Valor mudou: prepõe data de hoje
+                parcela_andamento_salvo = f"{datetime.now().strftime('%d/%m/%Y')} - {parcela_andamento}"
+            elif not parcela_andamento:
+                parcela_andamento_salvo = ''
+            else:
+                # Valor igual: preserva o que está no banco (mantém data original)
+                parcela_andamento_salvo = atual['parcela_andamento'] or ''
+            
+            campos_diff = {
+                'parcela_status':            (_fmt(atual['parcela_status']),            parcela_status or None),
+                'parcela_status_secundario': (_fmt(atual['parcela_status_secundario']), parcela_status_secundario or None),
+                'parcela_andamento':         (_fmt(atual['parcela_andamento']),          parcela_andamento_salvo or None),
+                'valor_previsto':            (_fmt(atual['valor_previsto']),             _fmt(valor_previsto)),
+                'valor_elemento_53_23':      (_fmt(atual['valor_elemento_53_23']),       _fmt(valor_elemento_53_23)),
+                'valor_elemento_53_24':      (_fmt(atual['valor_elemento_53_24']),       _fmt(valor_elemento_53_24)),
+                'valor_subtraido':           (_fmt(atual['valor_subtraido']),            _fmt(valor_subtraido)),
+                'valor_encaminhado':         (_fmt(atual['valor_encaminhado']),          _fmt(valor_encaminhado)),
+                'valor_pago':                (_fmt(atual['valor_pago']),                _fmt(valor_pago)),
+                'data_pagamento':            (_fmt(atual['data_pagamento']),             _fmt(data_pagamento)),
+                'observacoes':               (_fmt(atual['observacoes']),               observacoes or None),
+                'parcela_tipo':              (_fmt(atual['parcela_tipo']),               parcela_tipo or None),
+                'parcela_numero':            (_fmt(atual['parcela_numero']),             parcela_numero or None),
+                'vigencia_inicial':          (_fmt(atual['vigencia_inicial']),           _fmt(vigencia_inicial)),
+                'vigencia_final':            (_fmt(atual['vigencia_final']),             _fmt(vigencia_final)),
+            }
+            
+            diff = {c: {'de': v_ant, 'para': v_nov}
+                    for c, (v_ant, v_nov) in campos_diff.items()
+                    if v_ant != v_nov}
+            
+            if diff:
+                g.log_detalhes = diff
+                g.log_recurso_tipo = 'parcela'
+                g.log_recurso_id = parcela_id
+        else:
+            # Se não achou registro atual (raro), usa o valor limpo
+            parcela_andamento_salvo = f"{datetime.now().strftime('%d/%m/%Y')} - {parcela_andamento}" if parcela_andamento else ''
+        # ================================================================
         
         # Update
         cur.execute("""
@@ -1209,6 +1319,7 @@ def api_atualizar_parcela(parcela_id):
                 valor_pago = %s,
                 parcela_status = %s,
                 parcela_status_secundario = %s,
+                parcela_andamento = %s,
                 data_pagamento = %s,
                 observacoes = %s,
                 atualizado_por = %s,
@@ -1227,6 +1338,7 @@ def api_atualizar_parcela(parcela_id):
             valor_pago,
             parcela_status,
             parcela_status_secundario,
+            parcela_andamento_salvo,
             data_pagamento,
             observacoes,
             usuario,
@@ -1378,6 +1490,7 @@ def api_exportar_csv():
                 ul.valor_pago,
                 ul.parcela_status,
                 ul.parcela_status_secundario,
+                ul.parcela_andamento,
                 ul.data_pagamento,
                 ul.observacoes,
                 p.osc,
@@ -1404,7 +1517,7 @@ def api_exportar_csv():
             'Tipo Parcela', 'Número Parcela', 
             'Valor Elemento 53/23', 'Valor Elemento 53/24', 'Valor Previsto',
             'Valor Subtraído', 'Valor Encaminhado', 'Valor Pago',
-            'Status', 'Status Secundário', 'Data Pagamento', 'Observações',
+            'Status', 'Status Secundário', 'Andamento', 'Data Pagamento', 'Observações',
             'OSC', 'CNPJ', 'Projeto', 'Processo Celebração', 'Processo PGTO/PC'
         ])
         
@@ -1424,6 +1537,7 @@ def api_exportar_csv():
                 formatar_moeda_br(p['valor_pago']),
                 p['parcela_status'] or '',
                 p['parcela_status_secundario'] or '',
+                p['parcela_andamento'] or '',
                 formatar_data_br(p['data_pagamento']),
                 p['observacoes'] or '',
                 p['osc'] or '',

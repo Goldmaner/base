@@ -9,6 +9,8 @@ from db import get_db, get_cursor
 from utils import login_required
 from decorators import requires_access
 import re
+from datetime import date, timedelta
+from dateutil.relativedelta import relativedelta
 
 gestao_orcamentaria_bp = Blueprint('gestao_orcamentaria', __name__, url_prefix='/gestao_orcamentaria')
 
@@ -61,7 +63,9 @@ def api_orcamento_detalhado():
             SELECT 
                 ul.numero_termo,
                 SUM(CASE WHEN ul.parcela_tipo = 'Programada' THEN ul.valor_previsto ELSE 0 END) as total_programado,
-                SUM(CASE WHEN ul.parcela_tipo = 'Projetada' THEN ul.valor_previsto ELSE 0 END) as total_projetado
+                SUM(CASE WHEN ul.parcela_tipo = 'Projetada' THEN ul.valor_previsto ELSE 0 END) as total_projetado,
+                SUM(CASE WHEN ul.parcela_status = 'Pago' THEN ul.valor_previsto ELSE 0 END) as total_pago,
+                SUM(CASE WHEN ul.parcela_status = 'Encaminhado para Pagamento' THEN ul.valor_previsto ELSE 0 END) as total_comprometido
             FROM gestao_financeira.ultra_liquidacoes ul
             WHERE EXTRACT(YEAR FROM ul.vigencia_inicial) = %s
             GROUP BY ul.numero_termo
@@ -81,6 +85,8 @@ def api_orcamento_detalhado():
             total_programado = float(termo['total_programado'] or 0)
             total_projetado = float(termo['total_projetado'] or 0)
             total_global = total_programado + total_projetado
+            total_pago = float(termo['total_pago'] or 0)
+            total_comprometido = float(termo['total_comprometido'] or 0)
             
             # Extrair informações do termo
             # Formato esperado: TCL/055/2023/SMDHC/SESANA
@@ -196,26 +202,38 @@ def api_orcamento_detalhado():
                     'valor_atualizado': valor_atualizado if valor_atualizado is not None else 0,
                     'total_programado': total_programado,
                     'total_projetado': total_projetado,
-                    'total_global': total_global
+                    'total_global': total_global,
+                    'total_pago': total_pago,
+                    'total_comprometido': total_comprometido
                 })
         
         # 3. Buscar EDITAIS da tabela orcamento_edital_nova
         # Editais NUNCA têm valor programado, apenas projetado
+        # Usa subquery para:
+        #   - somar apenas os meses do ano de referência (total_projetado)
+        #   - mas mostrar as datas reais do edital (inicio/termino globais)
+        #   - e calcular meses_vigencia sobre o span total do edital
         cur.execute("""
             SELECT 
                 edital_nome,
                 dotacao_formatada,
                 projeto_atividade,
-                SUM(valor_mes) as total_projetado,
+                SUM(CASE WHEN EXTRACT(YEAR FROM nome_mes) = %(ano)s THEN valor_mes ELSE 0 END) as total_projetado,
+                SUM(valor_mes) as total_edital,
                 MIN(nome_mes) as data_inicio,
                 MAX(nome_mes) as data_termino,
                 EXTRACT(YEAR FROM AGE(MAX(nome_mes), MIN(nome_mes))) * 12 + 
-                EXTRACT(MONTH FROM AGE(MAX(nome_mes), MIN(nome_mes))) as meses_vigencia
+                EXTRACT(MONTH FROM AGE(MAX(nome_mes), MIN(nome_mes))) + 1 as meses_vigencia
             FROM gestao_financeira.orcamento_edital_nova
-            WHERE EXTRACT(YEAR FROM nome_mes) = %s
+            WHERE edital_nome IN (
+                SELECT DISTINCT edital_nome
+                FROM gestao_financeira.orcamento_edital_nova
+                WHERE EXTRACT(YEAR FROM nome_mes) = %(ano)s
+            )
             GROUP BY edital_nome, dotacao_formatada, projeto_atividade
+            HAVING SUM(CASE WHEN EXTRACT(YEAR FROM nome_mes) = %(ano)s THEN valor_mes ELSE 0 END) > 0
             ORDER BY edital_nome
-        """, (ano_referencia,))
+        """, {'ano': ano_referencia})
         
         editais = cur.fetchall()
         
@@ -227,8 +245,8 @@ def api_orcamento_detalhado():
             data_inicio_edital = edital['data_inicio'].strftime('%d/%m/%Y') if edital.get('data_inicio') else None
             data_termino_edital = edital['data_termino'].strftime('%d/%m/%Y') if edital.get('data_termino') else None
             meses_vigencia_edital = int(edital['meses_vigencia']) if edital.get('meses_vigencia') is not None else None
-            # Para editais, valor_atualizado = soma de valor_mes (igual ao total_projetado)
-            valor_atualizado_edital = total_projetado_edital
+            # Para editais, valor_atualizado = soma de todos os meses (span completo do edital)
+            valor_atualizado_edital = float(edital['total_edital'] or 0)
             
             # Buscar Programática usando dotacao_formatada na tabela c_geral_dotacoes
             # A dotação contém o projeto-atividade, então buscamos pela dotação completa
@@ -264,13 +282,231 @@ def api_orcamento_detalhado():
                     'valor_atualizado': valor_atualizado_edital,  # ⚡ Valor Atualizado (soma de valor_mes)
                     'total_programado': 0,  # ⚡ Editais NUNCA têm valor programado
                     'total_projetado': total_projetado_edital,
-                    'total_global': total_projetado_edital  # Global = Projetado (sem Programado)
+                    'total_global': total_projetado_edital,  # Global = Projetado (sem Programado)
+                    'total_pago': 0,  # Editais não têm pagamentos
+                    'total_comprometido': 0  # Editais não têm comprometido
                 })
         
+        # 4. Buscar TERMOS EM CELEBRAÇÃO da tabela celebracao.celebracao_parcerias
+        # Termos em celebração têm valor projetado dinâmico baseado na data atual
+        hoje = date.today()
+        ano_ref_int = int(ano_referencia)
+        
+        cur.execute("""
+            SELECT 
+                id, edital_nome, unidade_gestora, tipo_termo, sei_celeb,
+                osc, cnpj, projeto, meses, dias, total_previsto,
+                inicio, final, status_generico, numero_termo
+            FROM celebracao.celebracao_parcerias
+            WHERE status_generico = 'Em celebração'
+              AND total_previsto IS NOT NULL
+              AND total_previsto > 0
+        """)
+        
+        celebracoes = cur.fetchall()
+        
+        # Cronograma mensal para celebrações (será retornado junto)
+        cronograma_celebracoes = {}
+        
+        for cel in celebracoes:
+            # --- Determinar datas ---
+            data_inicio_cel = cel['inicio']
+            
+            meses_cel = cel['meses'] if cel['meses'] else 12
+            total_previsto = float(cel['total_previsto'] or 0)
+            
+            # --- Calcular projetado mensal dinâmico ---
+            valor_mensal = total_previsto / meses_cel if meses_cel > 0 else 0
+            
+            # Início da projeção (dinâmico):
+            # - Se início real for definido e ainda no futuro → usar ele
+            # - Se início real for definido e já passou → projetar a partir de hoje
+            # - Se início não definido (null):
+            #     - Ano de referência futuro → usar 1º dia desse ano (projetar ano todo)
+            #     - Ano de referência atual → usar 1º dia do mês atual (projetar de hoje)
+            #     - Ano de referência passado → usar hoje (resultará em 0 para anos passados, comportamento esperado)
+            hoje_mes1 = date(hoje.year, hoje.month, 1)
+            if data_inicio_cel:
+                data_proj_inicio = max(data_inicio_cel, hoje_mes1)
+            else:
+                if ano_ref_int > hoje.year:
+                    data_proj_inicio = date(ano_ref_int, 1, 1)
+                else:
+                    data_proj_inicio = hoje_mes1
+            
+            mes_inicio_proj = data_proj_inicio.month
+            ano_inicio_proj = data_proj_inicio.year
+            
+            # Data de início real para exibição (usar data_proj_inicio se início nulo)
+            if not data_inicio_cel:
+                data_inicio_cel = data_proj_inicio
+            
+            # Data de término: início real + meses
+            data_termino_cel = data_inicio_cel + relativedelta(months=meses_cel) - timedelta(days=1)
+            
+            # Calcular quantos meses do projetado caem no ano de referência
+            cronograma_mensal_cel = {}
+            total_projetado_cel = 0
+            
+            for i in range(meses_cel):
+                mes_proj = mes_inicio_proj + i
+                ano_proj = ano_inicio_proj
+                while mes_proj > 12:
+                    mes_proj -= 12
+                    ano_proj += 1
+                
+                if ano_proj == ano_ref_int:
+                    cronograma_mensal_cel[mes_proj] = cronograma_mensal_cel.get(mes_proj, 0) + valor_mensal
+                    total_projetado_cel += valor_mensal
+            
+            # Se não tem valor projetado neste ano, pular
+            if total_projetado_cel <= 0:
+                continue
+            
+            # --- Buscar dotação orçamentária ---
+            tipo_termo_cel = cel['tipo_termo'] or ''
+            unidade_gestora = cel['unidade_gestora'] or ''
+            edital_nome_cel = cel['edital_nome'] or ''
+            
+            # Mapear tipo_termo para condicoes_termo
+            mapa_tipo_termo = {
+                'Fomento': 'TFM',
+                'Colaboração': 'TCL',
+                'Acordo de Cooperação': 'ACO'
+            }
+            condicoes_termo = mapa_tipo_termo.get(tipo_termo_cel, '')
+            
+            # Regra especial: verificar edital_nome para override de unidade
+            condicoes_unidade = unidade_gestora
+            
+            # Se edital_nome contém "FUMCAD" e unidade_gestora é CPCA → usar FUMCAD
+            if 'FUMCAD' in edital_nome_cel.upper() and unidade_gestora.upper() == 'CPCA':
+                condicoes_unidade = 'FUMCAD'
+                condicoes_termo = 'TFM'
+            
+            # Se edital_nome contém "FMID" → usar FMID
+            if 'FMID' in edital_nome_cel.upper():
+                condicoes_unidade = 'FMID'
+                condicoes_termo = 'TFM'
+            
+            dotacao_cel = None
+            programatica_cel = None
+            
+            if condicoes_termo and condicoes_unidade:
+                # Tentar buscar dotação com OSC primeiro
+                if cel['osc']:
+                    cur.execute("""
+                        SELECT dotacao_numero, programa_aplicacao
+                        FROM categoricas.c_geral_dotacoes
+                        WHERE condicoes_termo = %s 
+                          AND condicoes_unidade = %s
+                          AND condicoes_osc = %s
+                        LIMIT 1
+                    """, (condicoes_termo, condicoes_unidade, cel['osc']))
+                    dotacao_row = cur.fetchone()
+                    if dotacao_row:
+                        dotacao_cel = dotacao_row['dotacao_numero']
+                        programatica_cel = dotacao_row['programa_aplicacao']
+                
+                # Se não encontrou com OSC, tentar sem
+                if not dotacao_cel:
+                    cur.execute("""
+                        SELECT dotacao_numero, programa_aplicacao
+                        FROM categoricas.c_geral_dotacoes
+                        WHERE condicoes_termo = %s 
+                          AND condicoes_unidade = %s
+                          AND (condicoes_osc IS NULL OR condicoes_osc = '')
+                        LIMIT 1
+                    """, (condicoes_termo, condicoes_unidade))
+                    dotacao_row = cur.fetchone()
+                    if dotacao_row:
+                        dotacao_cel = dotacao_row['dotacao_numero']
+                        programatica_cel = dotacao_row['programa_aplicacao']
+            
+            # Extrair Projeto-Atividade da dotação
+            projeto_atividade_cel = None
+            if dotacao_cel:
+                partes_dotacao = dotacao_cel.split('.')
+                if len(partes_dotacao) >= 7:
+                    projeto_atividade_cel = partes_dotacao[5] + '.' + partes_dotacao[6]
+            
+            # Formatar datas para exibição
+            data_inicio_fmt = data_inicio_cel.strftime('%d/%m/%Y') if data_inicio_cel else '-'
+            data_termino_fmt = data_termino_cel.strftime('%d/%m/%Y') if data_termino_cel else '-'
+            
+            # Identificador para o cronograma: usar "Termo em celebração" + sei_celeb ou id
+            id_termo_celeb = f"Termo em celebração ({cel['sei_celeb']})" if cel['sei_celeb'] else f"Termo em celebração #{cel['id']}"
+            
+            # Se não identificou dotação, não incluir
+            if not dotacao_cel:
+                continue
+
+            resultado.append({
+                'numero_termo': id_termo_celeb,
+                'dotacao_orcamentaria': dotacao_cel,
+                'projeto_atividade': projeto_atividade_cel or '-',
+                'programatica': programatica_cel or '-',
+                'cnpj': cel['cnpj'] or '-',
+                'sei_pc': '-',  # Termos em celebração não têm SEI PC
+                'osc': cel['osc'] or '-',
+                'projeto': cel['projeto'] or '-',
+                'sei_celeb': cel['sei_celeb'] or '-',
+                'tipo_contrato': tipo_termo_cel or '-',
+                'data_inicio': data_inicio_fmt,
+                'data_termino': data_termino_fmt,
+                'meses_vigencia': meses_cel,
+                'valor_atualizado': total_previsto,
+                'total_programado': 0,  # Celebração NUNCA tem valor programado
+                'total_projetado': round(total_projetado_cel, 2),
+                'total_global': round(total_projetado_cel, 2),
+                'total_pago': 0,  # Termos em celebração ainda não foram pagos
+                'total_comprometido': 0  # Termos em celebração ainda não foram encaminhados
+            })
+            
+            # Salvar cronograma mensal para uso no frontend
+            cronograma_celebracoes[id_termo_celeb] = {
+                str(mes): round(val, 2) for mes, val in cronograma_mensal_cel.items()
+            }
+        
+        # 5. Buscar valor disponível de back_reservas, cruzando pelo SEI de celebração
+        # total_disponivel = (vl_saldo_resv + vl_eph) - total_pago
+        try:
+            cur.execute("""
+                SELECT cod_nro_pcss_sof,
+                       SUM(
+                           REPLACE(vl_saldo_resv::text, ',', '.')::numeric +
+                           REPLACE(vl_eph::text, ',', '.')::numeric
+                       ) as valor_disponivel
+                FROM gestao_financeira.back_reservas
+                GROUP BY cod_nro_pcss_sof
+            """)
+            reservas_rows = cur.fetchall()
+            disponivel_por_sei = {
+                row['cod_nro_pcss_sof'].strip(): float(row['valor_disponivel'] or 0)
+                for row in reservas_rows
+            }
+        except Exception as e_resv:
+            print(f"[ERRO back_reservas] {e_resv}")
+            import traceback; traceback.print_exc()
+            disponivel_por_sei = {}
+
+        # Enriquecer resultado com total_disponivel e valor_residual
+        for item in resultado:
+            sei = item.get('sei_celeb', '-')
+            sei_strip = sei.strip() if sei and sei != '-' else None
+            valor_disponivel = disponivel_por_sei.get(sei_strip, 0) if sei_strip else 0
+            total_pago_item = float(item.get('total_pago') or 0)
+            td = max(valor_disponivel - total_pago_item, 0)
+            item['total_disponivel'] = round(td, 2)
+            total_global_item = item.get('total_global') or 0
+            residual = td - total_global_item
+            item['valor_residual'] = round(residual, 2) if residual > 0 else 0
+
         return jsonify({
             'success': True,
             'dados': resultado,
-            'total_registros': len(resultado)
+            'total_registros': len(resultado),
+            'cronograma_celebracoes': cronograma_celebracoes
         })
     
     except Exception as e:
@@ -281,6 +517,233 @@ def api_orcamento_detalhado():
     
     finally:
         cur.close()
+
+
+@gestao_orcamentaria_bp.route('/api/cronograma-pago')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_cronograma_pago():
+    """API para obter cronograma mensal de valores PAGOS por termo (ano de referência)"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        ano_referencia = request.args.get('ano_referencia')
+        if not ano_referencia:
+            return jsonify({'success': False, 'error': 'Ano de referência não fornecido'}), 400
+        
+        cur.execute("""
+            SELECT
+                numero_termo,
+                EXTRACT(MONTH FROM vigencia_inicial)::int AS mes,
+                SUM(valor_previsto) AS valor
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE parcela_status = 'Pago'
+              AND EXTRACT(YEAR FROM vigencia_inicial) = %s
+            GROUP BY numero_termo, EXTRACT(MONTH FROM vigencia_inicial)
+            ORDER BY numero_termo, mes
+        """, (ano_referencia,))
+        
+        rows = cur.fetchall()
+        
+        dados_pago = {}
+        for row in rows:
+            nt = row['numero_termo']
+            mes = int(row['mes'])
+            valor = float(row['valor'] or 0)
+            if nt not in dados_pago:
+                dados_pago[nt] = {}
+            dados_pago[nt][mes] = dados_pago[nt].get(mes, 0) + valor
+        
+        return jsonify({'success': True, 'dados_pago': dados_pago})
+    
+    except Exception as e:
+        print(f"Erro em api_cronograma_pago: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+@gestao_orcamentaria_bp.route('/api/cronograma-comprometido')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_cronograma_comprometido():
+    """API para obter cronograma mensal de valores COMPROMETIDOS por termo (Encaminhado para Pagamento)"""
+    conn = get_db()
+    cur = get_cursor()
+    
+    try:
+        ano_referencia = request.args.get('ano_referencia')
+        if not ano_referencia:
+            return jsonify({'success': False, 'error': 'Ano de referência não fornecido'}), 400
+        
+        cur.execute("""
+            SELECT
+                numero_termo,
+                EXTRACT(MONTH FROM vigencia_inicial)::int AS mes,
+                SUM(valor_previsto) AS valor
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE parcela_status = 'Encaminhado para Pagamento'
+              AND EXTRACT(YEAR FROM vigencia_inicial) = %s
+            GROUP BY numero_termo, EXTRACT(MONTH FROM vigencia_inicial)
+            ORDER BY numero_termo, mes
+        """, (ano_referencia,))
+        
+        rows = cur.fetchall()
+        
+        dados_comprometido = {}
+        for row in rows:
+            nt = row['numero_termo']
+            mes = int(row['mes'])
+            valor = float(row['valor'] or 0)
+            if nt not in dados_comprometido:
+                dados_comprometido[nt] = {}
+            dados_comprometido[nt][mes] = dados_comprometido[nt].get(mes, 0) + valor
+        
+        return jsonify({'success': True, 'dados_comprometido': dados_comprometido})
+    
+    except Exception as e:
+        print(f"Erro em api_cronograma_comprometido: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    finally:
+        cur.close()
+
+
+def _distribuir_cronograma_por_status(ano_referencia, parcela_status):
+    """
+    Distribui valores de ultra_liquidacoes_cronograma pelos meses do ano,
+    respeitando o valor_previsto de cada parcela (fill-from-start).
+
+    Algoritmo:
+      - Para cada parcela (numero_termo, parcela_numero) com o status dado:
+          1. Obtém valor_previsto de ultra_liquidacoes.
+          2. Obtém entradas mensais de ultra_liquidacoes_cronograma para o ano.
+          3. Ordena meses ASC e preenche do início até esgotar valor_previsto.
+          4. Se valor_previsto > soma do cronograma, o excesso vai para o último mês
+             e este mês é marcado como "destacado" (fundo diferente no front).
+
+    Retorna dict: {numero_termo: {"meses": {1..12: float}, "highlighted": [int]}}
+    """
+    conn = get_db()
+    cur = get_cursor()
+    try:
+        # 1. Parcelas com valor_previsto para o status/ano
+        cur.execute("""
+            SELECT
+                numero_termo,
+                parcela_numero,
+                SUM(valor_previsto)::float AS valor_previsto
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE parcela_status = %s
+              AND EXTRACT(YEAR FROM vigencia_inicial) = %s
+            GROUP BY numero_termo, parcela_numero
+        """, (parcela_status, ano_referencia))
+        parcelas = {}
+        for r in cur.fetchall():
+            key = (r['numero_termo'], r['parcela_numero'])
+            parcelas[key] = float(r['valor_previsto'] or 0)
+
+        if not parcelas:
+            return {}
+
+        # 2. Cronograma mensal para o ano
+        termos_list = list({k[0] for k in parcelas})
+        cur.execute("""
+            SELECT
+                numero_termo,
+                parcela_numero,
+                EXTRACT(MONTH FROM nome_mes)::int AS mes,
+                valor_mes::float AS valor_mes
+            FROM gestao_financeira.ultra_liquidacoes_cronograma
+            WHERE EXTRACT(YEAR FROM nome_mes) = %s
+              AND numero_termo = ANY(%s)
+            ORDER BY numero_termo, parcela_numero, nome_mes
+        """, (ano_referencia, termos_list))
+
+        cronograma_raw = {}  # {(termo, parcela): [(mes, valor), ...]}
+        for r in cur.fetchall():
+            key = (r['numero_termo'], r['parcela_numero'])
+            cronograma_raw.setdefault(key, []).append(
+                (int(r['mes']), float(r['valor_mes'] or 0))
+            )
+
+        # 3. Aplicar algoritmo fill-from-start por parcela
+        resultado = {}  # {termo: {"meses": {mes: float}, "highlighted": [mes]}}
+
+        for (termo, parcela), valor_previsto in parcelas.items():
+            entries = sorted(cronograma_raw.get((termo, parcela), []), key=lambda x: x[0])
+            if not entries:
+                continue
+
+            if termo not in resultado:
+                resultado[termo] = {'meses': {}, 'highlighted': []}
+
+            remaining = valor_previsto
+
+            for i, (mes, cronograma_val) in enumerate(entries):
+                is_last = (i == len(entries) - 1)
+
+                if remaining <= 0:
+                    month_value = 0.0
+                elif is_last:
+                    # Último mês: recebe todo o restante (pode ser > cronograma_val)
+                    month_value = remaining
+                    if remaining > cronograma_val:
+                        resultado[termo]['highlighted'].append(mes)
+                    remaining = 0.0
+                elif remaining >= cronograma_val:
+                    month_value = cronograma_val
+                    remaining -= cronograma_val
+                else:
+                    # Mês parcial
+                    month_value = remaining
+                    remaining = 0.0
+
+                resultado[termo]['meses'][mes] = (
+                    resultado[termo]['meses'].get(mes, 0.0) + month_value
+                )
+
+        return resultado
+    finally:
+        cur.close()
+
+
+@gestao_orcamentaria_bp.route('/api/cronograma-pago-detalhado')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_cronograma_pago_detalhado():
+    """Cronograma detalhado de PAGOS (fill-from-start via ultra_liquidacoes_cronograma)"""
+    ano_referencia = request.args.get('ano_referencia')
+    if not ano_referencia:
+        return jsonify({'success': False, 'error': 'Ano de referência não fornecido'}), 400
+    try:
+        dados = _distribuir_cronograma_por_status(ano_referencia, 'Pago')
+        return jsonify({'success': True, 'dados': dados})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@gestao_orcamentaria_bp.route('/api/cronograma-comprometido-detalhado')
+@login_required
+@requires_access('gestao_orcamentaria')
+def api_cronograma_comprometido_detalhado():
+    """Cronograma detalhado de COMPROMETIDOS (fill-from-start via ultra_liquidacoes_cronograma)"""
+    ano_referencia = request.args.get('ano_referencia')
+    if not ano_referencia:
+        return jsonify({'success': False, 'error': 'Ano de referência não fornecido'}), 400
+    try:
+        dados = _distribuir_cronograma_por_status(ano_referencia, 'Encaminhado para Pagamento')
+        return jsonify({'success': True, 'dados': dados})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @gestao_orcamentaria_bp.route('/api/cronograma-detalhado')
@@ -915,6 +1378,9 @@ def api_reservas():
                 dt_efet_resv,
                 dotacao_formatada,
                 hist_resv,
+                vl_resv,
+                vl_transf_resv,
+                vl_canc_resv,
                 vl_saldo_resv
             FROM gestao_financeira.back_reservas
             WHERE 1=1
@@ -945,11 +1411,15 @@ def api_reservas():
         # Converter para formato JSON serializable
         resultado = []
         for r in reservas:
+            vl_resv = converter_valor(r['vl_resv'])
+            vl_transf = converter_valor(r['vl_transf_resv'])
+            vl_canc = converter_valor(r['vl_canc_resv'])
             resultado.append({
                 'cod_resv_dota_sof': r['cod_resv_dota_sof'],
                 'dt_efet_resv': r['dt_efet_resv'].strftime('%d/%m/%Y') if r['dt_efet_resv'] else None,
                 'dotacao_formatada': r['dotacao_formatada'],
                 'hist_resv': r['hist_resv'],
+                'valor_reservado': round(vl_resv + vl_transf - vl_canc, 2),
                 'vl_saldo_resv': converter_valor(r['vl_saldo_resv'])
             })
         
@@ -986,6 +1456,9 @@ def api_reservas_csv_completo():
                 dt_efet_resv,
                 dotacao_formatada,
                 hist_resv,
+                vl_resv,
+                vl_transf_resv,
+                vl_canc_resv,
                 vl_saldo_resv
             FROM gestao_financeira.back_reservas
             ORDER BY dt_efet_resv DESC, cod_resv_dota_sof DESC
@@ -1012,14 +1485,19 @@ def api_reservas_csv_completo():
         # Criar CSV com BOM UTF-8
         csv_lines = []
         csv_lines.append('\ufeff')  # BOM UTF-8
-        csv_lines.append('Código da Reserva;Data da Reserva;Dotação Formatada;Histórico da Reserva;Saldo de Reservado\n')
+        csv_lines.append('Código da Reserva;Data da Reserva;Dotação Formatada;Histórico da Reserva;Valor Reservado;Saldo de Reserva\n')
         
         for r in reservas:
+            vl_resv = converter_valor(r['vl_resv'])
+            vl_transf = converter_valor(r['vl_transf_resv'])
+            vl_canc = converter_valor(r['vl_canc_resv'])
+            valor_reservado = vl_resv + vl_transf - vl_canc
             linha = [
                 f'"{r["cod_resv_dota_sof"] or ""}"',
                 f'"{r["dt_efet_resv"].strftime("%d/%m/%Y") if r["dt_efet_resv"] else ""}"',
                 f'"{r["dotacao_formatada"] or ""}"',
                 f'"{r["hist_resv"] or ""}"',
+                formatar_valor_csv(valor_reservado),
                 formatar_valor_csv(converter_valor(r['vl_saldo_resv']))
             ]
             csv_lines.append(';'.join(linha) + '\n')

@@ -2141,43 +2141,66 @@ def dicionario_oscs():
         
         cur = get_cursor()
         
-        # Buscar total de OSCs únicas (agregando Parcerias + CENTS por CNPJ)
+        # Buscar total de OSCs únicas (agregando Parcerias + CENTS + Celebração por CNPJ)
+        # CTE canonical_cnpj garante que a mesma OSC com diferentes registros de CNPJ seja unificada
         cur.execute("""
-            SELECT COUNT(*) as total
-            FROM (
-                SELECT COALESCE(cnpj, osc) as chave
+            WITH canonical_cnpj AS (
+                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj
                 FROM (
-                    SELECT DISTINCT cnpj, osc FROM public.Parcerias WHERE osc IS NOT NULL AND osc != ''
-                    UNION
-                    SELECT DISTINCT osc_cnpj as cnpj, osc FROM celebracao.gestao_cents WHERE osc IS NOT NULL AND osc != ''
-                ) sub
-                GROUP BY COALESCE(cnpj, osc)
-            ) unique_oscs
+                    SELECT osc, cnpj        FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    UNION ALL
+                    SELECT osc, osc_cnpj   FROM celebracao.gestao_cents        WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    UNION ALL
+                    SELECT osc, cnpj        FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                ) all_oscs
+                GROUP BY osc
+            )
+            SELECT COUNT(DISTINCT COALESCE(cnpj, osc)) as total
+            FROM canonical_cnpj
         """)
         total_oscs = cur.fetchone()['total']
         total_paginas = (total_oscs + por_pagina - 1) // por_pagina
         
-        # Buscar OSCs com contagem de termos e CENTS (paginado)
-        # Agrupa por CNPJ quando disponível, evitando duplicações
+        # Buscar OSCs com contagem de termos, CENTS e Celebração (paginado)
+        # CTE agrupa por CNPJ canônico para eliminar duplicatas entre fontes
         query = """
-            SELECT 
-                MAX(osc) as osc,
-                COUNT(DISTINCT CASE WHEN fonte = 'parcerias' THEN numero_termo END) as total_termos,
-                COUNT(DISTINCT CASE WHEN fonte = 'cents' THEN id_cents END) as total_cents,
-                MAX(cnpj) as cnpj_exemplo
+            WITH canonical_cnpj AS (
+                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj
+                FROM (
+                    SELECT osc, cnpj       FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    UNION ALL
+                    SELECT osc, osc_cnpj  FROM celebracao.gestao_cents        WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    UNION ALL
+                    SELECT osc, cnpj       FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                ) all_oscs
+                GROUP BY osc
+            )
+            SELECT
+                MAX(c.osc) as osc,
+                COUNT(DISTINCT CASE WHEN c.fonte = 'parcerias'  THEN c.numero_termo END) as total_termos,
+                COUNT(DISTINCT CASE WHEN c.fonte = 'cents'      THEN c.id_cents    END) as total_cents,
+                COUNT(DISTINCT CASE WHEN c.fonte = 'celebracao' THEN c.id_celeb    END) as total_celeb,
+                MAX(CASE WHEN NULLIF(TRIM(c.cnpj), '') IS NOT NULL THEN c.cnpj END) as cnpj_exemplo
             FROM (
-                SELECT osc, numero_termo, NULL::integer as id_cents, cnpj, 'parcerias' as fonte
+                SELECT osc, numero_termo, NULL::integer as id_cents, NULL::integer as id_celeb, cnpj, 'parcerias' as fonte
                 FROM public.Parcerias
-                WHERE osc IS NOT NULL AND osc != ''
+                WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                 
                 UNION ALL
                 
-                SELECT osc, NULL as numero_termo, id as id_cents, osc_cnpj as cnpj, 'cents' as fonte
+                SELECT osc, NULL as numero_termo, id as id_cents, NULL::integer as id_celeb, osc_cnpj as cnpj, 'cents' as fonte
                 FROM celebracao.gestao_cents
-                WHERE osc IS NOT NULL AND osc != ''
-            ) combined
-            GROUP BY COALESCE(cnpj, osc)
-            ORDER BY MAX(osc)
+                WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                
+                UNION ALL
+                
+                SELECT osc, NULL as numero_termo, NULL::integer as id_cents, id as id_celeb, cnpj, 'celebracao' as fonte
+                FROM celebracao.celebracao_parcerias
+                WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+            ) c
+            JOIN canonical_cnpj cc ON c.osc = cc.osc
+            GROUP BY COALESCE(cc.cnpj, c.osc)
+            ORDER BY MAX(c.osc)
             LIMIT %s OFFSET %s
         """
         
@@ -2294,30 +2317,50 @@ def buscar_oscs():
         
         cur = get_cursor()
         
-        # Buscar OSCs que contenham o termo (agregando Parcerias + CENTS por CNPJ)
+        # Buscar OSCs que contenham o termo (CTE para deduplicar + filtrar #N/D)
         query = """
-            SELECT 
-                MAX(osc) as osc,
-                COUNT(DISTINCT CASE WHEN fonte = 'parcerias' THEN numero_termo END) as total_termos,
-                COUNT(DISTINCT CASE WHEN fonte = 'cents' THEN id_cents END) as total_cents,
-                MAX(cnpj) as cnpj_exemplo
-            FROM (
-                SELECT osc, numero_termo, NULL::integer as id_cents, cnpj, 'parcerias' as fonte
+            WITH canonical_cnpj AS (
+                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj
+                FROM (
+                    SELECT osc, cnpj       FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    UNION ALL
+                    SELECT osc, osc_cnpj  FROM celebracao.gestao_cents        WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    UNION ALL
+                    SELECT osc, cnpj       FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                ) all_oscs
+                GROUP BY osc
+            ),
+            combined AS (
+                SELECT osc, numero_termo, NULL::integer as id_cents, NULL::integer as id_celeb, cnpj, 'parcerias' as fonte
                 FROM public.Parcerias
-                WHERE osc ILIKE %s
+                WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D') AND osc ILIKE %s
                 
                 UNION ALL
                 
-                SELECT osc, NULL as numero_termo, id as id_cents, osc_cnpj as cnpj, 'cents' as fonte
+                SELECT osc, NULL as numero_termo, id as id_cents, NULL::integer as id_celeb, osc_cnpj as cnpj, 'cents' as fonte
                 FROM celebracao.gestao_cents
-                WHERE osc ILIKE %s
-            ) combined
-            GROUP BY COALESCE(cnpj, osc)
-            ORDER BY MAX(osc)
+                WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D') AND osc ILIKE %s
+                
+                UNION ALL
+                
+                SELECT osc, NULL as numero_termo, NULL::integer as id_cents, id as id_celeb, cnpj, 'celebracao' as fonte
+                FROM celebracao.celebracao_parcerias
+                WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D') AND osc ILIKE %s
+            )
+            SELECT
+                MAX(c.osc) as osc,
+                COUNT(DISTINCT CASE WHEN c.fonte = 'parcerias'  THEN c.numero_termo END) as total_termos,
+                COUNT(DISTINCT CASE WHEN c.fonte = 'cents'      THEN c.id_cents    END) as total_cents,
+                COUNT(DISTINCT CASE WHEN c.fonte = 'celebracao' THEN c.id_celeb    END) as total_celeb,
+                MAX(CASE WHEN NULLIF(TRIM(c.cnpj), '') IS NOT NULL THEN c.cnpj END) as cnpj_exemplo
+            FROM combined c
+            JOIN canonical_cnpj cc ON c.osc = cc.osc
+            GROUP BY COALESCE(cc.cnpj, c.osc)
+            ORDER BY MAX(c.osc)
             LIMIT 100
         """
         
-        cur.execute(query, (f'%{termo_busca}%', f'%{termo_busca}%'))
+        cur.execute(query, (f'%{termo_busca}%', f'%{termo_busca}%', f'%{termo_busca}%'))
         oscs = cur.fetchall()
         cur.close()
         
@@ -2338,40 +2381,97 @@ def buscar_oscs():
 def termos_por_osc(osc):
     """
     API para buscar todos os termos de uma OSC específica
+    Retorna termos de public.Parcerias e termos de celebracao.celebracao_parcerias
     """
     try:
         cur = get_cursor()
         
-        query = """
-            SELECT 
-                numero_termo,
-                tipo_termo,
-                projeto,
-                inicio,
-                final,
-                total_previsto
-            FROM Parcerias
+        # ── Termos de public.Parcerias ─────────────────────────────────────────
+        cur.execute("""
+            SELECT numero_termo, tipo_termo, projeto, inicio, final, total_previsto
+            FROM public.Parcerias
             WHERE osc = %s
             ORDER BY numero_termo
-        """
-        
-        cur.execute(query, (osc,))
+        """, (osc,))
         termos = cur.fetchall()
+        
+        # ── Descobrir CNPJ para busca cruzada ────────────────────────────────
+        cnpj = None
+        cur.execute("""
+            SELECT cnpj FROM public.Parcerias
+            WHERE osc = %s AND cnpj IS NOT NULL AND cnpj != ''
+            LIMIT 1
+        """, (osc,))
+        row = cur.fetchone()
+        if row:
+            cnpj = row['cnpj']
+        
+        if not cnpj:
+            cur.execute("""
+                SELECT osc_cnpj as cnpj FROM celebracao.gestao_cents
+                WHERE osc = %s AND osc_cnpj IS NOT NULL AND osc_cnpj != ''
+                LIMIT 1
+            """, (osc,))
+            row = cur.fetchone()
+            if row:
+                cnpj = row['cnpj']
+        
+        if not cnpj:
+            cur.execute("""
+                SELECT cnpj FROM celebracao.celebracao_parcerias
+                WHERE osc = %s AND cnpj IS NOT NULL AND cnpj != ''
+                LIMIT 1
+            """, (osc,))
+            row = cur.fetchone()
+            if row:
+                cnpj = row['cnpj']
+        
+        # ── Termos de celebracao.celebracao_parcerias ────────────────────────
+        if cnpj:
+            cur.execute("""
+                SELECT numero_termo, status_generico, tipo_termo, projeto, inicio, final, total_previsto
+                FROM celebracao.celebracao_parcerias
+                WHERE cnpj = %s
+                ORDER BY numero_termo
+            """, (cnpj,))
+        else:
+            cur.execute("""
+                SELECT numero_termo, status_generico, tipo_termo, projeto, inicio, final, total_previsto
+                FROM celebracao.celebracao_parcerias
+                WHERE osc = %s
+                ORDER BY numero_termo
+            """, (osc,))
+        termos_celeb = cur.fetchall()
         cur.close()
         
-        # Converter datas para string e formatar valores
+        # ── Formatar Parcerias ──────────────────────────────────────────────
         termos_formatados = []
-        for termo in termos:
-            termo_dict = dict(termo)
-            termo_dict['inicio'] = termo['inicio'].strftime('%d/%m/%Y') if termo['inicio'] else '-'
-            termo_dict['final'] = termo['final'].strftime('%d/%m/%Y') if termo['final'] else '-'
-            termo_dict['total_previsto'] = float(termo['total_previsto']) if termo['total_previsto'] else 0
-            termos_formatados.append(termo_dict)
+        for t in termos:
+            td = dict(t)
+            td['inicio'] = t['inicio'].strftime('%d/%m/%Y') if t['inicio'] else '-'
+            td['final'] = t['final'].strftime('%d/%m/%Y') if t['final'] else '-'
+            td['total_previsto'] = float(t['total_previsto']) if t['total_previsto'] else 0
+            termos_formatados.append(td)
         
-        return jsonify({'termos': termos_formatados}), 200
+        # ── Formatar Celebração ─────────────────────────────────────────────
+        termos_celeb_formatados = []
+        for t in termos_celeb:
+            td = dict(t)
+            td['inicio'] = t['inicio'].strftime('%d/%m/%Y') if t['inicio'] else '-'
+            td['final'] = t['final'].strftime('%d/%m/%Y') if t['final'] else '-'
+            td['total_previsto'] = float(t['total_previsto']) if t['total_previsto'] else 0
+            td['status_generico'] = t['status_generico'] or '-'
+            termos_celeb_formatados.append(td)
+        
+        return jsonify({
+            'termos': termos_formatados,
+            'termos_celeb': termos_celeb_formatados
+        }), 200
         
     except Exception as e:
         print(f"[ERRO] Erro ao buscar termos da OSC: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
@@ -2395,36 +2495,40 @@ def atualizar_osc():
         
         cur = get_cursor()
         
-        # Verificar se já existe outra OSC com o nome novo (para evitar duplicação não intencional)
-        cur.execute("""
-            SELECT COUNT(*) as count 
-            FROM Parcerias 
-            WHERE osc = %s AND osc != %s
-        """, (osc_nova, osc_antiga))
+        # ── public.Parcerias ────────────────────────────────────────────────
+        cur.execute("UPDATE public.Parcerias SET osc = %s WHERE osc = %s", (osc_nova, osc_antiga))
+        linhas_parcerias = cur.rowcount
         
-        if cur.fetchone()['count'] > 0:
-            # Se já existe, avisar mas permitir (pode ser fusão intencional)
-            print(f"[AVISO] Já existe OSC com nome '{osc_nova}' no banco")
+        # ── celebracao.gestao_cents ─────────────────────────────────────────
+        cur.execute("UPDATE celebracao.gestao_cents SET osc = %s WHERE osc = %s", (osc_nova, osc_antiga))
+        linhas_cents = cur.rowcount
         
-        # Atualizar todos os registros
-        query = """
-            UPDATE Parcerias
-            SET osc = %s
-            WHERE osc = %s
-        """
+        # ── celebracao.celebracao_parcerias ─────────────────────────────────
+        cur.execute("UPDATE celebracao.celebracao_parcerias SET osc = %s WHERE osc = %s", (osc_nova, osc_antiga))
+        linhas_celeb = cur.rowcount
         
-        cur.execute(query, (osc_nova, osc_antiga))
-        linhas_afetadas = cur.rowcount
+        # ── public.osc_contatos (mantém histórico de contatos vinculado) ────
+        cur.execute("UPDATE public.osc_contatos SET osc = %s WHERE osc = %s", (osc_nova, osc_antiga))
+        linhas_contatos = cur.rowcount
         
-        # Commit da transação
+        linhas_total = linhas_parcerias + linhas_cents + linhas_celeb
+        
         get_db().commit()
         cur.close()
         
-        print(f"[SUCESSO] OSC atualizada: '{osc_antiga}' → '{osc_nova}' ({linhas_afetadas} registros)")
+        partes = []
+        if linhas_parcerias: partes.append(f'{linhas_parcerias} termo(s) celebrado(s)')
+        if linhas_cents:     partes.append(f'{linhas_cents} CENTS')
+        if linhas_celeb:     partes.append(f'{linhas_celeb} em celebração')
+        if linhas_contatos:  partes.append(f'{linhas_contatos} contato(s)')
+        detalhe = ' | '.join(partes) if partes else 'nenhum registro'
+        
+        print(f"[SUCESSO] OSC renomeada: '{osc_antiga}' → '{osc_nova}' ({detalhe})")
         
         return jsonify({
-            'message': f'✅ OSC atualizada com sucesso! {linhas_afetadas} registro(s) afetado(s).',
-            'linhas_afetadas': linhas_afetadas
+            'message': f'✅ OSC atualizada em todas as fontes! {detalhe}.',
+            'linhas_afetadas': linhas_total,
+            'detalhe': {'parcerias': linhas_parcerias, 'cents': linhas_cents, 'celebracao': linhas_celeb, 'contatos': linhas_contatos}
         }), 200
         
     except Exception as e:
