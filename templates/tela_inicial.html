@@ -178,12 +178,12 @@
         </div>
         
         <!-- Seção: Gestão de Parcerias -->
-        {% if is_admin or 'cents' in user_acessos or 'celebracao_parcerias' in user_acessos %}
+        {% if is_admin or 'cents' in user_acessos or 'celebracao_parcerias' in user_acessos or 'parcerias' in user_acessos or 'dgp_alteracoes' in user_acessos %}
         <div class="accordion-item">
           <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGP">
               <i class="bi bi-building me-2"></i> Gestão de Parcerias
-              <span class="badge bg-purple section-badge" style="background-color:#764ba2;">2</span>
+              <span class="badge bg-purple section-badge" style="background-color:#764ba2;">3</span>
             </button>
           </h2>
           <div id="collapseGP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
@@ -200,6 +200,13 @@
                 <div class="col-md-6">
                   <a href="{{ url_for('celebracao_parcerias.index') }}" class="btn btn-module" style="background-color:#764ba2;">
                     <i class="bi bi-people-fill"></i> Celebração de Parcerias
+                  </a>
+                </div>
+                {% endif %}
+                {% if is_admin or 'dgp_alteracoes' in user_acessos %}
+                <div class="col-md-6">
+                  <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="btn btn-module" style="background-color:#764ba2;">
+                    <i class="bi bi-arrow-repeat"></i> Aditamentos e alterações de parcerias
                   </a>
                 </div>
                 {% endif %}
@@ -348,9 +355,12 @@
         </div>
         <div class="modal-body">
           <!-- Botão Adicionar Novo Usuário -->
-          <div class="mb-3">
+          <div class="mb-3 d-flex gap-2 flex-wrap">
             <button class="btn btn-success" onclick="mostrarFormNovo()">
               <i class="bi bi-plus-circle me-2"></i>Adicionar Novo Usuário
+            </button>
+            <button class="btn btn-outline-primary" onclick="abrirControlePaginas()">
+              <i class="bi bi-grid-3x3-gap me-2"></i>Controle de Acessos: Por Página
             </button>
           </div>
 
@@ -707,89 +717,10 @@
     }
 
     async function editarUsuario(id, email, tipo, d_usuario) {
-      // Buscar dados completos do usuário incluindo acessos
-      let acessosAtuais = [];
-      try {
-        const response = await fetch(`/api/usuarios/${id}`);
-        if (response.ok) {
-          const userData = await response.json();
-          acessosAtuais = userData.acessos ? userData.acessos.split(';').filter(a => a.trim()) : [];
-        }
-      } catch (error) {
-        console.error('Erro ao buscar dados do usuário:', error);
-      }
-      
-      // Lista de todos os módulos/blueprints disponíveis (ORDEM ATUALIZADA)
-      const modulosDisponiveis = [
-        // Geral
-        { id: 'parcerias', nome: 'Parcerias', grupo: 'Geral' },
-        { id: 'orcamento', nome: 'Orçamento Anual', grupo: 'Geral' },
-        { id: 'certidoes', nome: 'Central de Certidões', grupo: 'Geral' },
-        { id: 'parcerias_notificacoes', nome: 'Ofícios, Documentos e Notificações', grupo: 'Geral' },
-        
-        // Análise de Contas
-        { id: 'analises', nome: 'Iniciar ou prosseguir análise', grupo: 'Análise de Contas' },
-        { id: 'analises', nome: 'Menu de Prestações de Contas', grupo: 'Análise de Contas' },
-        { id: 'pesquisa_parcerias', nome: 'Pesquisa de Parcerias', grupo: 'Análise de Contas' },
-        { id: 'gestao_financeira', nome: 'Gestão Financeira', grupo: 'Análise de Contas' },
-        
-        // Gestão de Parcerias
-        { id: 'cents', nome: 'CENTS', grupo: 'Gestão de Parcerias' },
-        { id: 'celebracao_parcerias', nome: 'Celebração de Parcerias', grupo: 'Gestão de Parcerias' },
-        
-        // Departamento de Parcerias
-        { id: 'editais', nome: 'Edital', grupo: 'Departamento de Parcerias' },
-        { id: 'gestao_orcamentaria', nome: 'Gestão Orçamentária', grupo: 'Departamento de Parcerias' },
-        
-        // Gestão de Dados
-        { id: 'listas', nome: 'Listas Suspensas', grupo: 'Gestão de Dados' },
-        { id: 'modelos_textos', nome: 'Modelos de Texto', grupo: 'Gestão de Dados' },
-        
-        // Gestão de Pessoas e Usuários
-        { id: 'usuarios', nome: 'Gerenciar Usuários', grupo: 'Gestão de Pessoas e Usuários' },
-        { id: 'ferias', nome: 'Férias', grupo: 'Gestão de Pessoas e Usuários' },
-        
-        // Opções de Administrador
-        { id: 'portarias', nome: 'Gerenciar Portarias/Legislações', grupo: 'Opções de Administrador' },
-        
-        // Módulos de Análise PC (sub-módulos técnicos)
-        { id: 'conc_bancaria', nome: 'Conciliação Bancária', grupo: 'Módulos Técnicos' },
-        { id: 'conc_rendimentos', nome: 'Rendimentos', grupo: 'Módulos Técnicos' },
-        { id: 'conc_contrapartida', nome: 'Contrapartida', grupo: 'Módulos Técnicos' },
-        { id: 'conc_relatorio', nome: 'Relatório de Conciliação', grupo: 'Módulos Técnicos' }
-      ];
-      
-      // Agrupar módulos
-      const grupos = {};
-      modulosDisponiveis.forEach(mod => {
-        if (!grupos[mod.grupo]) grupos[mod.grupo] = [];
-        grupos[mod.grupo].push(mod);
-      });
-      
-      // Gerar HTML dos checkboxes agrupados
-      let checkboxesHtml = '';
-      Object.keys(grupos).forEach(grupo => {
-        checkboxesHtml += `<div class="mb-3">`;
-        checkboxesHtml += `<h6 class="text-muted mb-2"><i class="bi bi-folder me-1"></i>${grupo}</h6>`;
-        grupos[grupo].forEach(mod => {
-          const checked = tipo === 'Agente Público' || acessosAtuais.includes(mod.id) ? 'checked' : '';
-          const disabled = tipo === 'Agente Público' ? 'disabled' : '';
-          checkboxesHtml += `
-            <div class="form-check">
-              <input class="form-check-input acesso-checkbox" type="checkbox" 
-                     value="${mod.id}" id="acesso_${mod.id}" ${checked} ${disabled}>
-              <label class="form-check-label" for="acesso_${mod.id}">
-                ${mod.nome}
-              </label>
-            </div>`;
-        });
-        checkboxesHtml += `</div>`;
-      });
-      
       // Criar formulário modal usando Bootstrap
       const modalHtml = `
         <div class="modal fade" id="modalEditarUsuario" tabindex="-1">
-          <div class="modal-dialog modal-lg">
+          <div class="modal-dialog">
             <div class="modal-content">
               <div class="modal-header bg-warning">
                 <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar Usuário: ${email}</h5>
@@ -798,7 +729,7 @@
               <div class="modal-body">
                 <div class="mb-3">
                   <label class="form-label">Tipo de Usuário</label>
-                  <select class="form-select" id="editTipo" onchange="atualizarAcessosDisponiveis(this.value)">
+                  <select class="form-select" id="editTipo">
                     <option value="Agente Público" ${tipo === 'Agente Público' ? 'selected' : ''}>Agente Público (Admin)</option>
                     <option value="Agente DAC" ${tipo === 'Agente DAC' ? 'selected' : ''}>Agente DAC</option>
                     <option value="Agente DGP" ${tipo === 'Agente DGP' ? 'selected' : ''}>Agente DGP</option>
@@ -811,28 +742,9 @@
                   <input type="text" class="form-control" id="editDUsuario" value="${d_usuario}" maxlength="20" placeholder="Ex: DAC, DGP, DP...">
                   <small class="text-muted">Máximo 20 caracteres</small>
                 </div>
-                
-                <hr>
-                
-                <div class="mb-3">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <label class="form-label mb-0"><i class="bi bi-key-fill me-2"></i>Controle de Acessos</label>
-                    <div id="acessosControls">
-                      <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="marcarTodos()">
-                        <i class="bi bi-check-all"></i> Marcar Todos
-                      </button>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodos()">
-                        <i class="bi bi-x"></i> Desmarcar Todos
-                      </button>
-                    </div>
-                  </div>
-                  <small class="text-muted d-block mb-3">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Agente Público tem acesso total (não editável). Para outros tipos, selecione os módulos permitidos.
-                  </small>
-                  <div id="checkboxesAcessos" style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; background-color: #f8f9fa;">
-                    ${checkboxesHtml}
-                  </div>
+                <div class="alert alert-info py-2 mb-0">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Para gerenciar os acessos deste usuário, use <strong>Controle de Acessos: Por Página</strong>.
                 </div>
               </div>
               <div class="modal-footer">
@@ -858,46 +770,9 @@
       modal.show();
     }
     
-    function atualizarAcessosDisponiveis(tipoUsuario) {
-      const checkboxes = document.querySelectorAll('.acesso-checkbox');
-      const controls = document.getElementById('acessosControls');
-      
-      if (tipoUsuario === 'Agente Público') {
-        // Agente Público: marcar todos e desabilitar
-        checkboxes.forEach(cb => {
-          cb.checked = true;
-          cb.disabled = true;
-        });
-        controls.style.display = 'none';
-      } else {
-        // Outros: habilitar edição
-        checkboxes.forEach(cb => {
-          cb.disabled = false;
-        });
-        controls.style.display = 'block';
-      }
-    }
-    
-    function marcarTodos() {
-      const checkboxes = document.querySelectorAll('.acesso-checkbox:not([disabled])');
-      checkboxes.forEach(cb => cb.checked = true);
-    }
-    
-    function desmarcarTodos() {
-      const checkboxes = document.querySelectorAll('.acesso-checkbox:not([disabled])');
-      checkboxes.forEach(cb => cb.checked = false);
-    }
-    
     async function salvarEdicao(id) {
       const novoTipo = document.getElementById('editTipo').value;
       const novoDUsuario = document.getElementById('editDUsuario').value.trim();
-      
-      // Coletar acessos selecionados
-      const checkboxes = document.querySelectorAll('.acesso-checkbox:checked');
-      const acessosSelecionados = Array.from(checkboxes).map(cb => cb.value);
-      const acessosString = acessosSelecionados.join(';');
-      
-      console.log('[DEBUG] Salvando usuário:', { id, novoTipo, novoDUsuario, acessos: acessosString });
       
       try {
         const response = await fetch(`/api/usuarios/${id}`, {
@@ -905,31 +780,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             tipo_usuario: novoTipo,
-            d_usuario: novoDUsuario,
-            acessos: acessosString
+            d_usuario: novoDUsuario
           })
         });
         
         const result = await response.json();
         
         if (response.ok) {
-          // Avisar que as permissões foram atualizadas
-          let mensagem = 'Usuário atualizado com sucesso!';
-          
-          // Se o usuário editado está logado neste momento
-          const userEmailElement = document.getElementById('usuarioEmailEdit');
-          if (userEmailElement) {
-            const userEmail = userEmailElement.value;
-            const sessionEmail = '{{ session.get("email", "") }}';
-            
-            if (userEmail === sessionEmail) {
-              mensagem += '\n\n⚠️ ATENÇÃO: Você editou suas próprias permissões!\nAs alterações foram aplicadas imediatamente.';
-            } else {
-              mensagem += '\n\nSe o usuário estiver logado, as permissões serão atualizadas automaticamente na próxima ação.';
-            }
-          }
-          
-          alert(mensagem);
+          alert('Usuário atualizado com sucesso!');
           bootstrap.Modal.getInstance(document.getElementById('modalEditarUsuario')).hide();
           carregarUsuarios();
         } else {
@@ -1437,6 +1295,326 @@
         setInterval(atualizarBadgeUsuariosAtivos, 30000);
       }
     });
+  </script>
+
+  <!-- ===== MODAL: Controle de Acessos por Página ===== -->
+  <div class="modal fade" id="modalControlePaginas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl" style="max-width:1100px;">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-grid-3x3-gap me-2"></i>Controle de Acessos: Por Página</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-0" style="min-height:520px;">
+          <div class="row g-0" style="height:100%;">
+
+            <!-- Coluna esquerda: lista de módulos -->
+            <div class="col-md-4 border-end" style="background:#f8f9fa; overflow-y:auto; max-height:72vh;">
+              <div class="p-3 border-bottom bg-white">
+                <input type="text" class="form-control form-control-sm" id="filtroPagina"
+                       placeholder="🔍 Filtrar módulo..."
+                       oninput="filtrarListaPaginas()">
+              </div>
+              <div id="listaPaginas" class="py-2">
+                <!-- Preenchido por JS -->
+              </div>
+            </div>
+
+            <!-- Coluna direita: usuários para o módulo selecionado -->
+            <div class="col-md-8 d-flex flex-column" style="max-height:72vh;">
+              <div id="painelDireitoVazio" class="text-center text-muted my-auto p-4" style="flex:1;">
+                <i class="bi bi-arrow-left-circle" style="font-size:3rem;"></i>
+                <p class="mt-3">Selecione um módulo à esquerda para gerenciar os acessos.</p>
+              </div>
+              <div id="painelDireitoConteudo" style="display:none; flex:1; overflow-y:auto;">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white sticky-top">
+                  <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i><span id="tituloPaginaSelecionada">—</span></h6>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="marcarTodosPagina(true)">
+                      <i class="bi bi-check-all"></i> Todos
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="marcarTodosPagina(false)">
+                      <i class="bi bi-x"></i> Nenhum
+                    </button>
+                    <button class="btn btn-sm btn-primary" onclick="salvarAcessosPorPagina()">
+                      <i class="bi bi-save me-1"></i>Salvar
+                    </button>
+                  </div>
+                </div>
+                <div class="p-3">
+                  <div class="mb-2">
+                    <input type="text" class="form-control form-control-sm" id="filtroUsuarioPagina"
+                           placeholder="🔍 Filtrar usuário..."
+                           oninput="filtrarUsuariosPainel()">
+                  </div>
+                  <div id="alertSalvoPagina" class="alert alert-success py-2 d-none">
+                    <i class="bi bi-check-circle me-1"></i><span id="msgSalvoPagina"></span>
+                  </div>
+                  <div id="listaUsuariosPagina">
+                    <div class="text-center py-4">
+                      <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ===== Controle de Acessos por Página =====
+  const MODULOS_PAGINAS = [
+    { id: 'parcerias',              nome: 'Parcerias',                          grupo: 'Geral' },
+    { id: 'orcamento',              nome: 'Orçamento Anual',                    grupo: 'Geral' },
+    { id: 'certidoes',              nome: 'Central de Certidões',               grupo: 'Geral' },
+    { id: 'parcerias_notificacoes', nome: 'Ofícios, Documentos e Notificações', grupo: 'Geral' },
+    { id: 'analises',               nome: 'Análise de Contas',                  grupo: 'Análise de Contas' },
+    { id: 'pesquisa_parcerias',     nome: 'Pesquisa de Parcerias',              grupo: 'Análise de Contas' },
+    { id: 'gestao_financeira',      nome: 'Gestão Financeira',                  grupo: 'Análise de Contas' },
+    { id: 'cents',                  nome: 'CENTS',                              grupo: 'Gestão de Parcerias' },
+    { id: 'celebracao_parcerias',   nome: 'Celebração de Parcerias',            grupo: 'Gestão de Parcerias' },
+    { id: 'dgp_alteracoes',         nome: 'Aditamentos e outras alterações',    grupo: 'Gestão de Parcerias' },
+    { id: 'editais',                nome: 'Editais',                            grupo: 'Departamento de Parcerias' },
+    { id: 'gestao_orcamentaria',    nome: 'Gestão Orçamentária',               grupo: 'Departamento de Parcerias' },
+    { id: 'listas',                 nome: 'Listas Suspensas',                   grupo: 'Gestão de Dados' },
+    { id: 'modelos_textos',         nome: 'Modelos de Texto',                   grupo: 'Gestão de Dados' },
+    { id: 'usuarios',               nome: 'Gerenciar Usuários',                 grupo: 'Gestão de Pessoas e Usuários' },
+    { id: 'ferias',                 nome: 'Férias',                             grupo: 'Gestão de Pessoas e Usuários' },
+    { id: 'portarias',              nome: 'Gerenciar Portarias/Legislações',    grupo: 'Opções de Administrador' },
+    { id: 'conc_bancaria',          nome: 'Conciliação Bancária',               grupo: 'Módulos Técnicos' },
+    { id: 'conc_rendimentos',       nome: 'Rendimentos',                        grupo: 'Módulos Técnicos' },
+    { id: 'conc_contrapartida',     nome: 'Contrapartida',                      grupo: 'Módulos Técnicos' },
+    { id: 'conc_relatorio',         nome: 'Relatório de Conciliação',           grupo: 'Módulos Técnicos' },
+  ];
+
+  let moduloAtual = null;
+  let usuariosModuloCache = [];
+
+  const GRUPO_ICONS = {
+    'Geral': 'bi-house',
+    'Análise de Contas': 'bi-clipboard-check',
+    'Gestão de Parcerias': 'bi-building',
+    'Departamento de Parcerias': 'bi-megaphone',
+    'Gestão de Dados': 'bi-database',
+    'Gestão de Pessoas e Usuários': 'bi-person-badge',
+    'Opções de Administrador': 'bi-gear',
+    'Módulos Técnicos': 'bi-wrench',
+  };
+
+  function abrirControlePaginas() {
+    // Fechar o modal de usuários se estiver aberto
+    const modalUsuariosEl = document.getElementById('modalUsuarios');
+    const instU = bootstrap.Modal.getInstance(modalUsuariosEl);
+    if (instU) instU.hide();
+
+    renderizarListaPaginas('');
+    moduloAtual = null;
+    document.getElementById('painelDireitoVazio').style.display = '';
+    document.getElementById('painelDireitoConteudo').style.display = 'none';
+    document.getElementById('filtroPagina').value = '';
+    document.getElementById('alertSalvoPagina').classList.add('d-none');
+
+    const modal = new bootstrap.Modal(document.getElementById('modalControlePaginas'));
+    modal.show();
+  }
+
+  function renderizarListaPaginas(filtro) {
+    const container = document.getElementById('listaPaginas');
+    const f = filtro.toLowerCase();
+
+    const grupos = {};
+    MODULOS_PAGINAS.forEach(m => {
+      if (f && !m.nome.toLowerCase().includes(f) && !m.grupo.toLowerCase().includes(f)) return;
+      if (!grupos[m.grupo]) grupos[m.grupo] = [];
+      grupos[m.grupo].push(m);
+    });
+
+    let html = '';
+    Object.keys(grupos).forEach(grupo => {
+      const icon = GRUPO_ICONS[grupo] || 'bi-folder';
+      html += `<div class="px-3 pt-2 pb-1">
+        <small class="text-muted text-uppercase fw-bold" style="font-size:.7rem;">
+          <i class="bi ${icon} me-1"></i>${grupo}
+        </small>
+      </div>`;
+      grupos[grupo].forEach(m => {
+        const ativo = moduloAtual === m.id ? 'active' : '';
+        html += `<button class="btn btn-link text-start w-100 py-2 px-4 text-decoration-none border-0 rounded-0 pagina-item ${ativo}"
+                         style="color:${ativo ? '#fff' : '#333'}; background:${ativo ? '#0d6efd' : 'transparent'};"
+                         data-modulo="${m.id}"
+                         onclick="selecionarModulo('${m.id}', '${m.nome.replace(/'/g,"\\'")}')">
+                   <i class="bi bi-file-text me-2"></i>${m.nome}
+                 </button>`;
+      });
+    });
+
+    if (!html) {
+      html = '<p class="text-muted text-center px-3 py-4 small">Nenhum módulo encontrado.</p>';
+    }
+    container.innerHTML = html;
+  }
+
+  function filtrarListaPaginas() {
+    renderizarListaPaginas(document.getElementById('filtroPagina').value);
+  }
+
+  async function selecionarModulo(modulo, nome) {
+    moduloAtual = modulo;
+    document.getElementById('tituloPaginaSelecionada').textContent = nome;
+    document.getElementById('painelDireitoVazio').style.display = 'none';
+    document.getElementById('painelDireitoConteudo').style.display = 'flex';
+    document.getElementById('painelDireitoConteudo').style.flexDirection = 'column';
+    document.getElementById('alertSalvoPagina').classList.add('d-none');
+    document.getElementById('filtroUsuarioPagina').value = '';
+
+    // Destacar item ativo
+    document.querySelectorAll('.pagina-item').forEach(btn => {
+      const isAtivo = btn.dataset.modulo === modulo;
+      btn.classList.toggle('active', isAtivo);
+      btn.style.background = isAtivo ? '#0d6efd' : 'transparent';
+      btn.style.color = isAtivo ? '#fff' : '#333';
+    });
+
+    document.getElementById('listaUsuariosPagina').innerHTML =
+      '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>';
+
+    try {
+      const resp = await fetch(`/api/acessos-por-pagina/${modulo}`);
+      if (!resp.ok) throw new Error((await resp.json()).erro);
+      usuariosModuloCache = await resp.json();
+      renderizarUsuariosPainel('');
+    } catch (e) {
+      document.getElementById('listaUsuariosPagina').innerHTML =
+        `<div class="alert alert-danger">Erro: ${e.message}</div>`;
+    }
+  }
+
+  const TIPO_BADGE = {
+    'Agente DAC': 'info',
+    'Agente DGP': 'primary',
+    'Agente DP':  'secondary',
+    'Externo':    'warning',
+  };
+
+  function renderizarUsuariosPainel(filtro) {
+    const f = filtro.toLowerCase();
+    const lista = usuariosModuloCache.filter(u =>
+      !f || u.email.toLowerCase().includes(f) || (u.tipo_usuario||'').toLowerCase().includes(f) || (u.d_usuario||'').toLowerCase().includes(f)
+    );
+
+    if (lista.length === 0) {
+      document.getElementById('listaUsuariosPagina').innerHTML =
+        '<p class="text-muted text-center py-3 small">Nenhum usuário encontrado.</p>';
+      return;
+    }
+
+    // Agrupar por tipo
+    const grupos = {};
+    lista.forEach(u => {
+      if (!grupos[u.tipo_usuario]) grupos[u.tipo_usuario] = [];
+      grupos[u.tipo_usuario].push(u);
+    });
+
+    let html = '';
+    Object.keys(grupos).forEach(tipo => {
+      const badge = TIPO_BADGE[tipo] || 'secondary';
+      html += `<div class="mb-2">
+        <div class="px-1 py-1 mb-1">
+          <span class="badge bg-${badge}">${tipo}</span>
+        </div>`;
+      grupos[tipo].forEach(u => {
+        const dep = u.d_usuario ? `<small class="text-muted ms-2"><i class="bi bi-building"></i> ${u.d_usuario}</small>` : '';
+        html += `<div class="d-flex align-items-center py-2 px-2 rounded mb-1"
+                      style="background:${u.tem_acesso ? '#e8f5e9' : '#fafafa'}; border:1px solid ${u.tem_acesso ? '#81c784' : '#dee2e6'};">
+          <div class="form-check mb-0 me-auto">
+            <input class="form-check-input usuario-acesso-cb" type="checkbox"
+                   id="cb_u_${u.id}" data-uid="${u.id}"
+                   ${u.tem_acesso ? 'checked' : ''}>
+            <label class="form-check-label" for="cb_u_${u.id}">
+              <i class="bi bi-person-circle me-1"></i>${u.email}${dep}
+            </label>
+          </div>
+          <span class="badge ${u.tem_acesso ? 'bg-success' : 'bg-light text-muted border'}" id="badge_u_${u.id}">
+            ${u.tem_acesso ? 'Tem acesso' : 'Sem acesso'}
+          </span>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+
+    document.getElementById('listaUsuariosPagina').innerHTML = html;
+
+    // Atualizar badge visualmente ao mudar checkbox
+    document.querySelectorAll('.usuario-acesso-cb').forEach(cb => {
+      cb.addEventListener('change', function() {
+        const uid = this.dataset.uid;
+        const badge = document.getElementById(`badge_u_${uid}`);
+        const row = this.closest('div[style]');
+        if (this.checked) {
+          badge.className = 'badge bg-success';
+          badge.textContent = 'Tem acesso';
+          row.style.background = '#e8f5e9';
+          row.style.border = '1px solid #81c784';
+        } else {
+          badge.className = 'badge bg-light text-muted border';
+          badge.textContent = 'Sem acesso';
+          row.style.background = '#fafafa';
+          row.style.border = '1px solid #dee2e6';
+        }
+      });
+    });
+  }
+
+  function filtrarUsuariosPainel() {
+    renderizarUsuariosPainel(document.getElementById('filtroUsuarioPagina').value);
+  }
+
+  function marcarTodosPagina(valor) {
+    document.querySelectorAll('.usuario-acesso-cb').forEach(cb => {
+      cb.checked = valor;
+      cb.dispatchEvent(new Event('change'));
+    });
+  }
+
+  async function salvarAcessosPorPagina() {
+    if (!moduloAtual) return;
+    const ids = Array.from(document.querySelectorAll('.usuario-acesso-cb:checked'))
+                     .map(cb => parseInt(cb.dataset.uid));
+
+    const btn = document.querySelector('#painelDireitoConteudo .btn-primary');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
+
+    try {
+      const resp = await fetch(`/api/acessos-por-pagina/${moduloAtual}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_ids_com_acesso: ids })
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.erro);
+
+      // Atualizar cache local
+      usuariosModuloCache.forEach(u => {
+        u.tem_acesso = ids.includes(u.id);
+      });
+
+      const alertEl = document.getElementById('alertSalvoPagina');
+      document.getElementById('msgSalvoPagina').textContent = result.mensagem;
+      alertEl.classList.remove('d-none');
+      setTimeout(() => alertEl.classList.add('d-none'), 3000);
+    } catch (e) {
+      alert('Erro ao salvar: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
+  }
   </script>
 </body>
 </html>

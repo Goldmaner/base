@@ -805,6 +805,7 @@
                                                 <th style="white-space:nowrap;">Usuário</th>
                                                 <th>De</th>
                                                 <th>Para</th>
+                                                <th style="white-space:nowrap;">Andamento mantido</th>
                                             </tr>
                                         </thead>
                                         <tbody id="corpo_historico_andamento"></tbody>
@@ -2328,13 +2329,25 @@
                     const hist = dados.historico_andamento || [];
                     const corpoHist = $('#corpo_historico_andamento').empty();
                     if (hist.length > 0) {
-                        hist.forEach(function(h) {
+                        hist.forEach(function(h, idx) {
+                            const tdManter = $('<td>').addClass('text-center');
+                            if (idx === 0 && h.andamento_para) {
+                                const btnManter = $('<button>')
+                                    .addClass('btn btn-sm btn-outline-success py-0 px-2')
+                                    .attr('title', 'Registrar novamente com a data de hoje')
+                                    .html('<i class="bi bi-arrow-clockwise me-1"></i>Manter')
+                                    .on('click', function() {
+                                        manterAndamento($('#edit_id').val(), h.andamento_para);
+                                    });
+                                tdManter.append(btnManter);
+                            }
                             corpoHist.append(
                                 $('<tr>').append(
                                     $('<td>').css('white-space', 'nowrap').text(h.data_hora),
                                     $('<td>').css('white-space', 'nowrap').text(h.usuario || '-'),
                                     $('<td>').text(h.andamento_de || '—'),
-                                    $('<td>').text(h.andamento_para || '—')
+                                    $('<td>').text(h.andamento_para || '—'),
+                                    tdManter
                                 )
                             );
                         });
@@ -2625,6 +2638,28 @@
             },
             error: function(xhr) {
                 alert('Erro ao excluir: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+            }
+        });
+    }
+    
+    // Manter andamento atual com nova data de hoje
+    function manterAndamento(parcelaId, andamentoPara) {
+        const texto = andamentoPara || '(andamento atual)';
+        if (!confirm(`⚡ Confirma manter o andamento com a data de hoje?\n\n"${texto}"\n\nUma nova entrada será registrada no histórico com a data de hoje.`)) return;
+
+        $.ajax({
+            url: `/gestao_financeira/ultra-liquidacoes/api/parcela/${parcelaId}/manter-andamento`,
+            method: 'POST',
+            success: function(resp) {
+                if (resp.success) {
+                    // Re-carregar o modal para mostrar o histórico atualizado
+                    editarParcela(parseInt(parcelaId));
+                } else {
+                    alert('Erro: ' + resp.error);
+                }
+            },
+            error: function(xhr) {
+                alert('Erro ao manter andamento: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
             }
         });
     }

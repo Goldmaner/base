@@ -216,7 +216,7 @@
               <td class="fw-semibold text-primary">{{ r.sei_orcamentario or '—' }}</td>
               <td>{{ r.sei_celeb or '—' }}</td>
               <td class="truncate-cell" title="{{ r.projeto or '' }}">{{ r.projeto or '—' }}</td>
-              <td>{{ r.numero_memorando or '—' }}</td>
+              <td>{{ r.numero_memorando ~ '/' ~ r.created_at[:4] if r.numero_memorando is not none and r.created_at else (r.numero_memorando or '—') }}</td>
               <td>{{ r.numero_consulta or '—' }}</td>
               <td>
                 {% set disp = r.disponibilidade_orcamentaria or 'Não Informado' %}
@@ -332,7 +332,7 @@
             </div>
             <div class="col-md-3">
               <label class="form-label">Nº Memorando</label>
-              <input type="number" class="form-control form-control-sm" id="n_memo" name="numero_memorando" min="0">
+              <input type="text" class="form-control form-control-sm" id="n_memo" name="numero_memorando" placeholder="Ex: 1/2026">
             </div>
             <div class="col-md-3">
               <label class="form-label">Nº Consulta</label>
@@ -434,12 +434,13 @@
             </div>
             <div class="col-md-3">
               <label class="form-label">Nº Memorando</label>
-              <input type="number" class="form-control form-control-sm" id="e_memo" name="numero_memorando" min="0">
+              <input type="text" class="form-control form-control-sm" id="e_memo" name="numero_memorando" placeholder="Ex: 1/2026">
             </div>
             <div class="col-md-3">
               <label class="form-label">Nº Consulta</label>
               <input type="number" class="form-control form-control-sm" id="e_consulta" name="numero_consulta" min="0">
             </div>
+
             <!-- Exibição (read-only) dos dados da emenda -->
             <div class="col-12 mt-2">
               <h6 class="text-secondary fw-bold border-bottom pb-1 mb-2">
@@ -546,7 +547,8 @@ async function buscarProximoMemo(seiCeleb) {
   try {
     const res = await fetch(url);
     const d = await res.json();
-    return d.success ? d.numero : null;
+    if (d.success) return { numero: d.numero, ano: d.ano, display: `${d.numero}/${d.ano}` };
+    return null;
   } catch (e) { return null; }
 }
 
@@ -574,7 +576,7 @@ function aoMudarSeiCelebNovo() {
     if (sei === 'A ser criado') return;
     const memo = await buscarProximoMemo(sei);
     const memoEl = document.getElementById('n_memo');
-    if (memoEl && memo !== null) memoEl.value = memo;
+    if (memoEl && memo !== null) memoEl.value = memo.display;
   }, 600);
 }
 
@@ -653,7 +655,7 @@ async function abrirNovo() {
   // Auto-fill with next memo number
   const memo = await buscarProximoMemo('');
   const memoEl = document.getElementById('n_memo');
-  if (memoEl && memo !== null) memoEl.value = memo;
+  if (memoEl && memo !== null) memoEl.value = memo.display;
 }
 
 async function salvarNovo() {
@@ -680,7 +682,7 @@ async function salvarNovo() {
                                   ? 'A ser criado'
                                   : document.getElementById('n_sei_celeb').value.trim(),
     projeto:                    document.getElementById('n_projeto').value.trim(),
-    numero_memorando:           document.getElementById('n_memo').value.trim(),
+    numero_memorando:           parseInt(document.getElementById('n_memo').value) || null,
     numero_consulta:            document.getElementById('n_consulta').value.trim(),
     disponibilidade_orcamentaria: document.getElementById('n_disp').value,
     vereador_nome:              document.getElementById('n_vereador').value,
@@ -721,7 +723,9 @@ function abrirEditar(btnEl) {
   document.getElementById('e_sei_orc').value    = row.sei_orcamentario || '';
   document.getElementById('e_sei_celeb').value  = row.sei_celeb || '';
   document.getElementById('e_projeto').value    = row.projeto || '';
-  document.getElementById('e_memo').value       = row.numero_memorando || '';
+  document.getElementById('e_memo').value       = row.numero_memorando !== null && row.numero_memorando !== undefined
+    ? (row.created_at ? `${row.numero_memorando}/${row.created_at.slice(0, 4)}` : row.numero_memorando)
+    : '';
   document.getElementById('e_consulta').value   = row.numero_consulta || '';
 
   // Disponibilidade
@@ -785,7 +789,7 @@ async function salvarEditar() {
                                       ? 'A ser criado'
                                       : document.getElementById('e_sei_celeb').value.trim(),
     projeto:                        document.getElementById('e_projeto').value.trim(),
-    numero_memorando:               document.getElementById('e_memo').value.trim(),
+    numero_memorando:               parseInt(document.getElementById('e_memo').value) || null,
     numero_consulta:                document.getElementById('e_consulta').value.trim(),
     disponibilidade_orcamentaria:   document.getElementById('e_disp').value,
     ce_status:                      document.getElementById('e_ce_status')?.value || 'Aguardando aceite',

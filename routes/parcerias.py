@@ -2134,44 +2134,50 @@ def dicionario_oscs():
     Mostra todas as OSCs únicas com contagem de termos associados
     """
     try:
-        # Parâmetro de paginação
+        # Parâmetros de paginação e filtros
         pagina = request.args.get('pagina', 1, type=int)
         por_pagina = 50
         offset = (pagina - 1) * por_pagina
-        
+        filtro_cnpj = request.args.get('filtro_cnpj', '').strip()
+        cnpj_pattern = f'%{filtro_cnpj}%' if filtro_cnpj else '%'
+        dias_recentes = request.args.get('dias_recentes', 0, type=int)
+        dias_cond = f"AND data_mais_recente >= NOW() - INTERVAL '{dias_recentes} days'" if dias_recentes > 0 else ""
+
         cur = get_cursor()
-        
+
         # Buscar total de OSCs únicas (agregando Parcerias + CENTS + Celebração por CNPJ)
         # CTE canonical_cnpj garante que a mesma OSC com diferentes registros de CNPJ seja unificada
-        cur.execute("""
+        cur.execute(f"""
             WITH canonical_cnpj AS (
-                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj
+                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj, MAX(data_criacao) as data_mais_recente
                 FROM (
-                    SELECT osc, cnpj        FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, cnpj, data_criacao  FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                     UNION ALL
-                    SELECT osc, osc_cnpj   FROM celebracao.gestao_cents        WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, osc_cnpj, created_em FROM celebracao.gestao_cents       WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                     UNION ALL
-                    SELECT osc, cnpj        FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, cnpj, created_at    FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                 ) all_oscs
                 GROUP BY osc
             )
             SELECT COUNT(DISTINCT COALESCE(cnpj, osc)) as total
             FROM canonical_cnpj
-        """)
+            WHERE COALESCE(cnpj, '') ILIKE %s
+            {dias_cond}
+        """, [cnpj_pattern])
         total_oscs = cur.fetchone()['total']
         total_paginas = (total_oscs + por_pagina - 1) // por_pagina
         
         # Buscar OSCs com contagem de termos, CENTS e Celebração (paginado)
         # CTE agrupa por CNPJ canônico para eliminar duplicatas entre fontes
-        query = """
+        query = f"""
             WITH canonical_cnpj AS (
-                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj
+                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj, MAX(data_criacao) as data_mais_recente
                 FROM (
-                    SELECT osc, cnpj       FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, cnpj, data_criacao  FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                     UNION ALL
-                    SELECT osc, osc_cnpj  FROM celebracao.gestao_cents        WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, osc_cnpj, created_em FROM celebracao.gestao_cents       WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                     UNION ALL
-                    SELECT osc, cnpj       FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, cnpj, created_at    FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                 ) all_oscs
                 GROUP BY osc
             )
@@ -2199,20 +2205,24 @@ def dicionario_oscs():
                 WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
             ) c
             JOIN canonical_cnpj cc ON c.osc = cc.osc
+            WHERE COALESCE(cc.cnpj, '') ILIKE %s
+            {dias_cond}
             GROUP BY COALESCE(cc.cnpj, c.osc)
             ORDER BY MAX(c.osc)
             LIMIT %s OFFSET %s
         """
-        
-        cur.execute(query, (por_pagina, offset))
+
+        cur.execute(query, (cnpj_pattern, por_pagina, offset))
         oscs = cur.fetchall()
         cur.close()
-        
+
         return render_template('parcerias_osc_dict.html',
                              oscs=oscs,
                              total_oscs=total_oscs,
                              pagina_atual=pagina,
-                             total_paginas=total_paginas)
+                             total_paginas=total_paginas,
+                             filtro_cnpj=filtro_cnpj,
+                             dias_recentes=dias_recentes)
         
     except Exception as e:
         print(f"[ERRO] Erro ao carregar dicionário de OSCs: {str(e)}")
@@ -2311,22 +2321,27 @@ def buscar_oscs():
     """
     try:
         termo_busca = request.args.get('q', '').strip()
-        
-        if not termo_busca:
-            return jsonify({'error': 'Termo de busca vazio'}), 400
-        
+        cnpj_busca = request.args.get('cnpj', '').strip()
+        dias_recentes = request.args.get('dias_recentes', 0, type=int)
+        osc_pattern = f'%{termo_busca}%' if termo_busca else '%'
+        cnpj_pattern = f'%{cnpj_busca}%' if cnpj_busca else '%'
+        dias_cond = f"AND cc.data_mais_recente >= NOW() - INTERVAL '{dias_recentes} days'" if dias_recentes > 0 else ""
+
+        if not termo_busca and not cnpj_busca:
+            return jsonify({'error': 'Informe pelo menos um critério de busca'}), 400
+
         cur = get_cursor()
         
         # Buscar OSCs que contenham o termo (CTE para deduplicar + filtrar #N/D)
-        query = """
+        query = f"""
             WITH canonical_cnpj AS (
-                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj
+                SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj, MAX(data_criacao) as data_mais_recente
                 FROM (
-                    SELECT osc, cnpj       FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, cnpj, data_criacao  FROM public.Parcerias              WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                     UNION ALL
-                    SELECT osc, osc_cnpj  FROM celebracao.gestao_cents        WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, osc_cnpj, created_em FROM celebracao.gestao_cents       WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                     UNION ALL
-                    SELECT osc, cnpj       FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
+                    SELECT osc, cnpj, created_at    FROM celebracao.celebracao_parcerias WHERE osc IS NOT NULL AND TRIM(osc) NOT IN ('', '#N/D')
                 ) all_oscs
                 GROUP BY osc
             ),
@@ -2355,19 +2370,21 @@ def buscar_oscs():
                 MAX(CASE WHEN NULLIF(TRIM(c.cnpj), '') IS NOT NULL THEN c.cnpj END) as cnpj_exemplo
             FROM combined c
             JOIN canonical_cnpj cc ON c.osc = cc.osc
+            WHERE COALESCE(cc.cnpj, '') ILIKE %s
+            {dias_cond}
             GROUP BY COALESCE(cc.cnpj, c.osc)
             ORDER BY MAX(c.osc)
             LIMIT 100
         """
-        
-        cur.execute(query, (f'%{termo_busca}%', f'%{termo_busca}%', f'%{termo_busca}%'))
+
+        cur.execute(query, (osc_pattern, osc_pattern, osc_pattern, cnpj_pattern))
         oscs = cur.fetchall()
         cur.close()
-        
+
         return jsonify({
             'oscs': [dict(osc) for osc in oscs],
             'total': len(oscs),
-            'termo_busca': termo_busca
+            'termo_busca': termo_busca or cnpj_busca
         }), 200
         
     except Exception as e:
@@ -2769,7 +2786,7 @@ def deletar_contato(id):
 
 @parcerias_bp.route("/rescisoes", methods=["GET"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def termos_rescindidos():
     """
     Página de cadastro e listagem de termos rescindidos
@@ -2805,7 +2822,7 @@ def termos_rescindidos():
 
 @parcerias_bp.route("/api/termos-disponiveis", methods=["GET"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def api_termos_disponiveis():
     """
     API para autocomplete de termos disponíveis (não rescindidos)
@@ -2849,7 +2866,7 @@ def api_termos_disponiveis():
 
 @parcerias_bp.route("/rescisao/salvar", methods=["POST"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def salvar_rescisao():
     """
     Salvar novo termo rescindido
@@ -2918,7 +2935,7 @@ def salvar_rescisao():
 
 @parcerias_bp.route("/rescisao/editar/<int:id>", methods=["GET", "POST"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def editar_rescisao(id):
     """
     Editar termo rescindido existente
@@ -3000,7 +3017,7 @@ def editar_rescisao(id):
 
 @parcerias_bp.route("/rescisao/deletar/<int:id>", methods=["POST"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def deletar_rescisao(id):
     """
     Deletar termo rescindido
@@ -3039,7 +3056,7 @@ def deletar_rescisao(id):
 
 @parcerias_bp.route("/dgp_alteracoes", methods=["GET"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def dgp_alteracoes():
     """
     Página de gerenciamento de alterações em termos de parceria
@@ -3223,7 +3240,7 @@ def dgp_alteracoes():
 
 @parcerias_bp.route("/dgp_alteracoes/exportar_csv", methods=["GET"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def dgp_alteracoes_exportar_csv():
     """
     Exportar alterações DGP para CSV (respeitando filtros ativos)
@@ -3481,7 +3498,7 @@ def api_lista_pgs():
 
 @parcerias_bp.route("/dgp_alteracoes_futuro", methods=["GET"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def dgp_alteracoes_futuro():
     """
     Página de gerenciamento de futuros aditamentos de prorrogação de vigência
@@ -3622,7 +3639,7 @@ def dgp_alteracoes_futuro():
 
 @parcerias_bp.route("/dgp_alteracoes_futuro/exportar_csv", methods=["GET"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def dgp_alteracoes_futuro_csv():
     """
     Exportar futuros aditamentos para CSV
@@ -3850,7 +3867,7 @@ def buscar_proximo_numero_alteracao():
 
 @parcerias_bp.route("/dgp_alteracoes_temp_sei", methods=["GET"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def dgp_alteracoes_temp_sei():
     """
     Relatório editável de parcerias_sei - renderiza apenas o template
@@ -4295,7 +4312,7 @@ def api_inserir_parcerias_sei():
 
 @parcerias_bp.route("/alteracao/salvar", methods=["POST"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def salvar_alteracao():
     """
     Salvar alteração(ões) de termo
@@ -5137,7 +5154,7 @@ def atualizar_alteracao():
 
 @parcerias_bp.route("/alteracao/deletar", methods=["POST"])
 @login_required
-@requires_access('parcerias')
+@requires_access('dgp_alteracoes')
 def deletar_alteracao():
     """
     Deletar alteração(ões) de termo

@@ -171,22 +171,28 @@ def index():
 @login_required
 def api_proximo_memorando():
     sei_celeb = request.args.get('sei_celeb', '').strip()
+    ano_atual = datetime.now().year
     db = get_db()
     cur = db.cursor()
     # Se sei_celeb fornecido e já existir um registro com ele, reusar mesmo memorando
     if sei_celeb and sei_celeb not in ('-', 'A ser criado'):
         cur.execute("""
-            SELECT numero_memorando FROM celebracao.celebracao_emendas
-            WHERE sei_celeb = %s AND numero_memorando IS NOT NULL
-            ORDER BY id ASC LIMIT 1
+            SELECT ce.numero_memorando, EXTRACT(YEAR FROM ce.created_at)::int AS ano
+            FROM celebracao.celebracao_emendas ce
+            WHERE ce.sei_celeb = %s AND ce.numero_memorando IS NOT NULL
+            ORDER BY ce.id ASC LIMIT 1
         """, [sei_celeb])
         row = cur.fetchone()
         if row and row[0] is not None:
-            return jsonify(success=True, numero=int(row[0]), fonte='sei_celeb')
-    # Próximo = MAX + 1
-    cur.execute("SELECT COALESCE(MAX(numero_memorando), 0) + 1 AS proximo FROM celebracao.celebracao_emendas")
+            return jsonify(success=True, numero=int(row[0]), ano=int(row[1]) if row[1] else ano_atual, fonte='sei_celeb')
+    # Próximo = MAX do ano atual + 1 (reinicia a cada ano)
+    cur.execute("""
+        SELECT COALESCE(MAX(numero_memorando), 0) + 1 AS proximo
+        FROM celebracao.celebracao_emendas
+        WHERE EXTRACT(YEAR FROM created_at) = %s
+    """, [ano_atual])
     row = cur.fetchone()
-    return jsonify(success=True, numero=int(row[0]) if row else 1, fonte='maximo')
+    return jsonify(success=True, numero=int(row[0]) if row else 1, ano=ano_atual, fonte='maximo')
 
 
 # ── Criar novo registro ───────────────────────────────────────────────────

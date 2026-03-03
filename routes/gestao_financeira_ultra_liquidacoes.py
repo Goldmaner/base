@@ -1389,6 +1389,63 @@ def api_excluir_parcela(parcela_id):
         cur.close()
 
 
+@ultra_liquidacoes_bp.route('/api/parcela/<int:parcela_id>/manter-andamento', methods=['POST'])
+@login_required
+def api_manter_andamento(parcela_id):
+    """Mantém o andamento atual mas atualiza a data para hoje, registrando no histórico"""
+    conn = get_db()
+    cur = get_cursor()
+
+    try:
+        cur.execute("""
+            SELECT parcela_andamento, parcela_status
+            FROM gestao_financeira.ultra_liquidacoes WHERE id = %s
+        """, (parcela_id,))
+        parcela = cur.fetchone()
+
+        if not parcela:
+            return jsonify({'success': False, 'error': 'Parcela não encontrada'}), 404
+
+        andamento_atual = parcela['parcela_andamento'] or ''
+
+        # Remover prefixo de data existente
+        andamento_base = re.sub(r'^\d{2}/\d{2}/\d{4} - ', '', andamento_atual)
+
+        if not andamento_base:
+            return jsonify({'success': False, 'error': 'Parcela não tem andamento registrado'}), 400
+
+        # Novo valor com data de hoje
+        novo_andamento = f"{datetime.now().strftime('%d/%m/%Y')} - {andamento_base}"
+
+        # Registrar no log de atividades (diff explícito)
+        g.log_detalhes = {
+            'parcela_andamento': {
+                'de':   andamento_atual,
+                'para': novo_andamento
+            }
+        }
+        g.log_recurso_tipo = 'parcela'
+        g.log_recurso_id = parcela_id
+
+        cur.execute("""
+            UPDATE gestao_financeira.ultra_liquidacoes
+            SET parcela_andamento = %s,
+                atualizado_por    = %s,
+                atualizado_em     = NOW()
+            WHERE id = %s
+        """, (novo_andamento, session.get('usuario_nome', 'Sistema'), parcela_id))
+
+        conn.commit()
+        return jsonify({'success': True, 'novo_andamento': novo_andamento})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    finally:
+        cur.close()
+
+
 @ultra_liquidacoes_bp.route('/api/exportar-csv')
 @login_required
 def api_exportar_csv():

@@ -199,7 +199,7 @@
         {% endif %}
       </div>
       <div class="d-flex gap-2 align-items-center">
-        {% if is_admin %}
+        {% if is_admin or ver_todos %}
         <button class="btn btn-light" onclick="abrirVisualizacaoGeral()" title="Gerenciar Visualização Geral">
           <i class="bi bi-eye me-1"></i> Visualização
         </button>
@@ -440,7 +440,17 @@
               </td>
               <td>
                 {% if r.substatus %}
-                  <span class="badge bg-secondary">{{ r.substatus }}</span>
+                  <div class="d-flex flex-wrap gap-1">
+                  {% for sub in r.substatus.split(';') %}
+                    {% set sub = sub.strip() %}
+                    {% if sub %}
+                      <span class="badge rounded-pill"
+                        style="font-size:0.7rem;font-weight:500;white-space:normal;text-align:left;background:#e8eaf6;color:#3949ab;border:1px solid #c5cae9;line-height:1.3;padding:3px 7px;">
+                        {{ sub }}
+                      </span>
+                    {% endif %}
+                  {% endfor %}
+                  </div>
                 {% else %}
                   -
                 {% endif %}
@@ -470,6 +480,11 @@
                   {% if not r.osc %}disabled{% endif %}>
                   <i class="bi bi-person-lines-fill"></i>
                 </button>
+                {% if pode_excluir %}
+                <button class="btn btn-sm btn-outline-danger ms-1" onclick="excluirRegistro({{ r.id }}, '{{ (r.osc or r.sei_celeb or '#' ~ r.id) | e }}')" title="Excluir registro">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -670,8 +685,10 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>// ── Variáveis de listas (do servidor) ──────────────────────────────────────
-const RESPONSAVEIS_NOMES = {{ responsaveis | map(attribute='nome_analista') | list | tojson }};
-const STATUS_LIST        = {{ status_list | tojson }};
+const RESPONSAVEIS_NOMES        = {{ responsaveis | map(attribute='nome_analista') | list | tojson }};
+const PODE_EDITAR_RESPONSAVEL   = {{ pode_editar_responsavel | tojson }};
+const NOME_ANALISTA_LOGADO      = {{ nome_analista_logado | tojson }};
+const STATUS_LIST               = {{ status_list | tojson }};
 const STATUS_GEN_MAP     = {{ status_generico_map | tojson }};
 const STATUS_IDS         = {{ status_ids | tojson }};
 const SUBSTATUS_LIST     = {{ substatus_list | tojson }};
@@ -1105,6 +1122,19 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
   // Campo Responsável: múltiplos, via pill-buttons (btn-check) + hidden input
   function responsavelField(valor) {
     const selecionados = (valor || '').split(';').map(v => v.trim()).filter(v => v);
+
+    // Sem permissão: somente leitura
+    if (!PODE_EDITAR_RESPONSAVEL) {
+      const badges = selecionados.length > 0
+        ? selecionados.map(n => `<span class="badge bg-primary me-1">${esc(n)}</span>`).join('')
+        : '<span class="text-muted small align-self-center">Não atribuído</span>';
+      return `<div class="border rounded p-2 d-flex flex-wrap align-items-center gap-1" style="background:#f8f9fa;min-height:46px;">
+          ${badges}
+        </div>
+        <small class="text-muted"><i class="bi bi-lock me-1"></i>Somente analistas com Visualização Geral podem alterar os responsáveis.</small>
+        <input type="hidden" id="edit_responsavel" name="responsavel" value="${esc(valor || '')}">`;
+    }
+
     let pills = RESPONSAVEIS_NOMES.map(nome => {
       const safeId = 'resp_' + esc(nome).replace(/[^a-zA-Z0-9]/g,'_');
       const checked = selecionados.includes(nome) ? 'checked' : '';
@@ -1140,7 +1170,7 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
   }
 
   // Campo Substatus: múltiplos, filtrados pelo status id vs substatus_limite
-  function substatusField(statusAtual, valorAtual) {
+  function substatusField(statusAtual, valorAtual, historico) {
     const selecionados = (valorAtual || '').split(';').map(v => v.trim()).filter(v => v);
     const statusId = STATUS_IDS[statusAtual] || 0;
     // só mostra substatus cujo limite >= statusId (quando statusId > 0)
@@ -1158,10 +1188,40 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
         </div>`;
     }).join('');
     if (!checks) checks = '<span class="text-muted small">Nenhum substatus disponível para este status.</span>';
+    const hist = Array.isArray(historico) ? historico : [];
+    let histHtml = '';
+    if (hist.length > 0) {
+      const rows = hist.map(h => `<tr>
+        <td style="white-space:nowrap;">${esc(h.data_hora || '')}</td>
+        <td style="white-space:nowrap;">${esc(h.usuario || '-')}</td>
+        <td>${esc(h.substatus_de || '—')}</td>
+        <td>${esc(h.substatus_para || '—')}</td>
+      </tr>`).join('');
+      histHtml = `
+      <div class="mt-2">
+        <a class="small text-muted text-decoration-none d-flex align-items-center gap-1"
+           data-bs-toggle="collapse" href="#collapseHistSubstatus" role="button">
+          <i class="bi bi-clock-history"></i>
+          Histórico de alterações (${hist.length})
+          <i class="bi bi-chevron-down" style="font-size:0.75rem;"></i>
+        </a>
+        <div class="collapse" id="collapseHistSubstatus">
+          <div class="table-responsive mt-1" style="max-height:200px;overflow-y:auto;">
+            <table class="table table-sm table-striped table-bordered mb-0" style="font-size:0.8rem;">
+              <thead class="table-secondary" style="position:sticky;top:0;">
+                <tr><th>Data/Hora</th><th>Usuário</th><th>De</th><th>Para</th></tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+    }
     return `<div class="border rounded p-2" style="max-height:130px;overflow-y:auto;background:#fff;" id="substatus_box">
         ${checks}
       </div>
-      <input type="hidden" id="edit_substatus" name="substatus" value="${esc(valorAtual || '')}">`;
+      <input type="hidden" id="edit_substatus" name="substatus" value="${esc(valorAtual || '')}">
+      ${histHtml}`;
   }
 
   return `<form id="formEditarRegistro">
@@ -1260,7 +1320,7 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
       </div>
       <div class="col-12">
         <label class="form-label fw-bold text-muted mb-1 small">Substatus</label>
-        ${substatusField(r.status, r.substatus)}
+        ${substatusField(r.status, r.substatus, r.historico_substatus)}
       </div>
 
       ${sec('currency-dollar', 'Financeiro')}
@@ -1385,6 +1445,9 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
 
 // Sincroniza os checkboxes no hidden input de responsavel
 function sincronizarResponsaveis() {
+  // Se o usuário não pode editar responsável, o hidden input já tem o valor original preservado
+  // — não sobrescrever com lista vazia de checkboxes inexistentes
+  if (!PODE_EDITAR_RESPONSAVEL) return;
   const form = document.getElementById('formEditarRegistro');
   if (!form) return;
   const checks = form.querySelectorAll('.resp-check:checked');
@@ -2025,8 +2088,19 @@ function montarFormularioNovo() {
     return `<div class="col-12"><h6 class="text-primary fw-bold border-bottom pb-2 mt-3"><i class="bi bi-${icon} me-1"></i> ${title}</h6></div>`;
   }
 
+  // Responsável(eis) para nova parceria
+  // Se o usuário não tem permissão de editar responsável, só pode atribuir a si mesmo
+  const meuNome = NOME_ANALISTA_LOGADO;
   const respChecks = RESPONSAVEIS_NOMES.map(nome => {
     const safeId = 'newresp_' + esc(nome).replace(/[^a-zA-Z0-9]/g,'_');
+    if (!PODE_EDITAR_RESPONSAVEL && meuNome) {
+      if (nome !== meuNome) return ''; // ocultar outros
+      return `<span>
+        <input class="btn-check new-resp-check" type="checkbox" value="${esc(nome)}"
+          id="${safeId}" autocomplete="off" checked disabled>
+        <label class="btn btn-sm btn-outline-primary" for="${safeId}">${esc(nome)}</label>
+      </span>`;
+    }
     return `<span>
       <input class="btn-check new-resp-check" type="checkbox" value="${esc(nome)}"
         id="${safeId}" autocomplete="off" onchange="sincronizarResponsaveisNovo()">
@@ -2106,7 +2180,8 @@ function montarFormularioNovo() {
         <div class="resp-picker d-flex flex-wrap gap-2 border rounded p-2" style="background:#fff;min-height:46px;">
           ${respChecks || '<span class="text-muted small align-self-center">Nenhum analista</span>'}
         </div>
-        <input type="hidden" id="new_responsavel" name="responsavel" value="">
+        ${!PODE_EDITAR_RESPONSAVEL && meuNome ? '<small class="text-muted"><i class="bi bi-lock me-1"></i>O processo será atribuído a você. Apenas analistas com Visualização Geral podem atribuir a outros.</small>' : ''}
+        <input type="hidden" id="new_responsavel" name="responsavel" value="${!PODE_EDITAR_RESPONSAVEL && meuNome ? esc(meuNome) : ''}">
       </div>
       <div class="col-12">
         <label class="form-label fw-bold text-muted mb-1 small">Projeto</label>
@@ -2334,6 +2409,24 @@ async function salvarNovaParc() {
       btnSalvar.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar Parceria';
       alert('Erro: ' + err);
     });
+}
+
+// ── Excluir registro ─────────────────────────────────────────────────────
+function excluirRegistro(id, label) {
+  if (!confirm(`Tem certeza que deseja EXCLUIR permanentemente o registro:\n\n"${label}" (ID ${id})\n\nEsta ação não pode ser desfeita.`)) return;
+  fetch(`/celebracao-parcerias/excluir/${id}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        const btn = document.querySelector(`button[onclick^="excluirRegistro(${id},"]`);
+        const tr = btn?.closest('tr');
+        if (tr) tr.remove();
+        else window.location.reload();
+      } else {
+        alert('Erro ao excluir: ' + (d.erro || 'Erro desconhecido'));
+      }
+    })
+    .catch(() => alert('Erro de comunicação com o servidor.'));
 }
 
 // ── Número do Termo (editar) ──────────────────────────────────────────────

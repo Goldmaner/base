@@ -183,7 +183,17 @@ def index():
                 if norm.startswith(palavras[0]):
                     nome_real = real
                     break
-        
+
+        # Tentativa final: comparar pelo nome que secure_filename geraria
+        # Isso cobre OSCs com caracteres especiais como @ que unaccent não trata
+        if not nome_real:
+            pasta_lower = osc_data['nome_pasta'].lower()
+            for row in todas_oscs_banco:
+                computed = secure_filename(row['osc'].replace(' ', '_')).lower()
+                if computed == pasta_lower:
+                    nome_real = row['osc']
+                    break
+
         if nome_real:
             oscs_nomes_reais.append(nome_real)
             osc_data['osc_nome_banco'] = nome_real
@@ -352,19 +362,42 @@ def gestao_osc(nome_pasta):
     cur = get_cursor()
     
     # Buscar dados da OSC
+    osc_nome_direto = request.args.get('osc_nome', '').strip()
     nome_busca = nome_pasta.replace('_', ' ').lower()
     palavras = nome_busca.split()[:3]
-    
-    cur.execute("""
-        SELECT osc, cnpj 
-        FROM public.parcerias 
-        WHERE unaccent(LOWER(osc)) LIKE unaccent(%s)
-        LIMIT 1
-    """, [f'%{" ".join(palavras)}%'])
-    
-    osc_data = cur.fetchone()
-    
-    # Se não encontrou, tentar com nome completo usando LIKE inicial
+    osc_data = None
+
+    # Tentativa 0: Usar nome direto do banco (passado via query param pelo front-end)
+    if osc_nome_direto:
+        cur.execute("""
+            SELECT osc, cnpj
+            FROM public.parcerias
+            WHERE osc = %s
+            LIMIT 1
+        """, [osc_nome_direto])
+        osc_data = cur.fetchone()
+
+        # Tentar em celebração se não encontrou em parcerias
+        if not osc_data:
+            cur.execute("""
+                SELECT DISTINCT osc, cnpj
+                FROM celebracao.celebracao_parcerias
+                WHERE osc = %s AND status_generico = 'Em celebração'
+                LIMIT 1
+            """, [osc_nome_direto])
+            osc_data = cur.fetchone()
+
+    # Tentativa 1: Reconstrução pelo nome da pasta com 3 palavras (fallback)
+    if not osc_data:
+        cur.execute("""
+            SELECT osc, cnpj
+            FROM public.parcerias
+            WHERE unaccent(LOWER(osc)) LIKE unaccent(%s)
+            LIMIT 1
+        """, [f'%{" ".join(palavras)}%'])
+        osc_data = cur.fetchone()
+
+    # Tentativa 2: Nome completo com LIKE inicial
     if not osc_data:
         cur.execute("""
             SELECT osc, cnpj 
@@ -374,8 +407,8 @@ def gestao_osc(nome_pasta):
             LIMIT 1
         """, [f'{nome_busca}%'])
         osc_data = cur.fetchone()
-    
-    # Busca 3: Apenas primeira palavra se ainda não encontrou
+
+    # Tentativa 3: Apenas primeira palavra
     if not osc_data and palavras:
         cur.execute("""
             SELECT osc, cnpj 
@@ -385,7 +418,18 @@ def gestao_osc(nome_pasta):
             LIMIT 1
         """, [f'{palavras[0]}%'])
         osc_data = cur.fetchone()
-    
+
+    # Tentativa 4: match por secure_filename (cobre @ e outros chars especiais)
+    if not osc_data:
+        cur.execute("SELECT DISTINCT osc, cnpj FROM public.parcerias")
+        todas_parcerias = cur.fetchall()
+        pasta_lower = nome_pasta.lower()
+        for row in todas_parcerias:
+            computed = secure_filename(row['osc'].replace(' ', '_')).lower()
+            if computed == pasta_lower:
+                osc_data = row
+                break
+
     if not osc_data:
         flash(f'OSC não encontrada: {nome_busca}. Verifique se o nome está correto na tabela parcerias.', 'error')
         return redirect(url_for('certidoes.index'))
@@ -506,7 +550,8 @@ def listar_oscs_ativas():
                 'total_valor': 0,
                 'meses': set(),
                 'pasta_existe': pasta_existe,
-                'nome_pasta': nome_pasta
+                'nome_pasta': nome_pasta,
+                'tipo_origem': 'parcela'
             }
         
         oscs_detalhadas[osc_nome]['termos'].add(parcela['numero_termo'])
@@ -522,31 +567,71 @@ def listar_oscs_ativas():
         })
         oscs_detalhadas[osc_nome]['total_valor'] += float(parcela['valor_previsto']) if parcela['valor_previsto'] else 0
         oscs_detalhadas[osc_nome]['meses'].add(parcela['mes_referencia'])
-    
+
+    # Adicionar OSCs em processo de celebração
+    cur.execute("""
+        SELECT DISTINCT osc, cnpj
+        FROM celebracao.celebracao_parcerias
+        WHERE status_generico = 'Em celebração'
+        ORDER BY osc
+    """)
+    oscs_celebracao = cur.fetchall()
+
+    cnpjs_existentes = {data['cnpj'] for data in oscs_detalhadas.values() if data.get('cnpj')}
+    nomes_existentes = set(oscs_detalhadas.keys())
+
+    for osc_celeb in oscs_celebracao:
+        osc_nome = osc_celeb['osc']
+        cnpj_celeb = osc_celeb['cnpj'] or 'N/A'
+        # Ignorar duplicatas por nome ou CNPJ
+        if osc_nome in nomes_existentes:
+            continue
+        if cnpj_celeb and cnpj_celeb != 'N/A' and cnpj_celeb in cnpjs_existentes:
+            continue
+        nome_pasta = secure_filename(osc_nome.replace(' ', '_'))
+        caminho_pasta = os.path.join(UPLOAD_FOLDER, nome_pasta)
+        pasta_existe = os.path.exists(caminho_pasta)
+        oscs_detalhadas[osc_nome] = {
+            'osc': osc_nome,
+            'cnpj': cnpj_celeb,
+            'termos': set(),
+            'parcelas': [],
+            'total_valor': 0,
+            'meses': set(),
+            'pasta_existe': pasta_existe,
+            'nome_pasta': nome_pasta,
+            'tipo_origem': 'celebracao'
+        }
+
     # Converter para lista e formatar
     resultado = []
     total_novas = 0
     total_existentes = 0
-    
+    total_celebracao = 0
+
     for osc_data in oscs_detalhadas.values():
         osc_data['termos'] = list(osc_data['termos'])
         osc_data['meses'] = sorted(list(osc_data['meses']))
         osc_data['total_parcelas'] = len(osc_data['parcelas'])
         osc_data['total_termos'] = len(osc_data['termos'])
         resultado.append(osc_data)
-        
+
         if osc_data['pasta_existe']:
             total_existentes += 1
         else:
             total_novas += 1
-    
+
+        if osc_data.get('tipo_origem') == 'celebracao':
+            total_celebracao += 1
+
     return jsonify({
         'success': True,
         'oscs': resultado,
         'total_oscs': len(resultado),
-        'total_parcelas_geral': sum(len(osc['parcelas']) for osc in resultado),
+        'total_parcelas_geral': sum(len(osc['parcelas']) for osc in resultado if osc.get('tipo_origem') != 'celebracao'),
         'total_pastas_novas': total_novas,
-        'total_pastas_existentes': total_existentes
+        'total_pastas_existentes': total_existentes,
+        'total_celebracao': total_celebracao
     })
 
 
@@ -575,13 +660,32 @@ def gerar_pastas_oscs():
         
         cur.execute(query)
         oscs = cur.fetchall()
-        
+
+        # Buscar também OSCs em processo de celebração
+        cur.execute("""
+            SELECT DISTINCT osc, cnpj
+            FROM celebracao.celebracao_parcerias
+            WHERE status_generico = 'Em celebração'
+            ORDER BY osc
+        """)
+        oscs_celebracao = cur.fetchall()
+
+        # Combinar listas evitando duplicatas por nome ou CNPJ
+        oscs_combinadas = [{'osc': o['osc'], 'cnpj': o['cnpj']} for o in oscs]
+        cnpjs_existentes = {o['cnpj'] for o in oscs_combinadas if o.get('cnpj')}
+        nomes_existentes = {o['osc'] for o in oscs_combinadas}
+        for osc_celeb in oscs_celebracao:
+            cnpj_celeb = osc_celeb['cnpj'] or ''
+            if osc_celeb['osc'] not in nomes_existentes:
+                if not cnpj_celeb or cnpj_celeb not in cnpjs_existentes:
+                    oscs_combinadas.append({'osc': osc_celeb['osc'], 'cnpj': cnpj_celeb or 'N/A'})
+
         pastas_criadas = []
         pastas_existentes = []
         erros = []
-        
+
         # Criar pastas para cada OSC
-        for osc in oscs:
+        for osc in oscs_combinadas:
             nome_osc = osc['osc']
             cnpj = osc['cnpj']
             
@@ -614,7 +718,7 @@ def gerar_pastas_oscs():
             'pastas_criadas': pastas_criadas,
             'pastas_existentes': pastas_existentes,
             'erros': erros,
-            'total_oscs': len(oscs)
+            'total_oscs': len(oscs_combinadas)
         })
         
     except Exception as e:
@@ -1315,6 +1419,66 @@ def juntar_pdfs(nome_pasta):
             'success': False,
             'erro': f'Erro ao juntar PDFs: {str(e)}'
         }), 500
+
+
+@certidoes_bp.route("/api/juntar-pdfs-selecionados", methods=["POST"])
+@login_required
+@requires_access('certidoes')
+def juntar_pdfs_selecionados():
+    """
+    API: Junta certidões selecionadas (por ID) em um único PDF.
+    Recebe JSON: { "ids": [1, 2, 3], "nome_pasta": "...", "osc": "..." }
+    """
+    try:
+        data = request.get_json()
+        ids = data.get('ids', [])
+        nome_pasta = data.get('nome_pasta', 'Certidoes')
+        if not ids:
+            return jsonify({'success': False, 'erro': 'Nenhuma certidão selecionada.'}), 400
+
+        cur = get_cursor()
+        placeholders = ','.join(['%s'] * len(ids))
+        cur.execute(f"""
+            SELECT certidao_nome, certidao_path, certidao_vencimento
+            FROM public.certidoes
+            WHERE id IN ({placeholders})
+            ORDER BY
+                CASE certidao_nome
+                    WHEN 'CNPJ' THEN 1
+                    WHEN 'CND' THEN 2
+                    WHEN 'CNDT' THEN 3
+                    WHEN 'CRF' THEN 4
+                    WHEN 'CADIN Municipal' THEN 5
+                    WHEN 'CTM' THEN 6
+                    WHEN 'CENTS' THEN 7
+                    ELSE 8
+                END
+        """, ids)
+        certidoes = cur.fetchall()
+
+        if not certidoes:
+            return jsonify({'success': False, 'erro': 'Nenhuma certidão encontrada para os IDs fornecidos.'}), 404
+
+        merger = PdfMerger()
+        for cert in certidoes:
+            caminho_completo = os.path.join(UPLOAD_FOLDER, cert['certidao_path'])
+            if not os.path.exists(caminho_completo):
+                return jsonify({'success': False, 'erro': f'Arquivo não encontrado: {cert["certidao_nome"]}'}), 404
+            try:
+                merger.append(caminho_completo)
+            except Exception as e:
+                return jsonify({'success': False, 'erro': f'Erro ao processar {cert["certidao_nome"]}: {str(e)}'}), 400
+
+        output = io.BytesIO()
+        merger.write(output)
+        merger.close()
+        output.seek(0)
+
+        nome_arquivo = f"Certidoes_{nome_pasta}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        return send_file(output, mimetype='application/pdf', as_attachment=True, download_name=nome_arquivo)
+
+    except Exception as e:
+        return jsonify({'success': False, 'erro': f'Erro ao juntar PDFs: {str(e)}'}), 500
 
 
 @certidoes_bp.route("/api/debug/oscs", methods=["GET"])

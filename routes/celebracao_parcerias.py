@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from flask import (
     Blueprint, render_template, request, jsonify, session,
-    Response
+    Response, g
 )
 from db import get_cursor, get_db
 from utils import login_required
@@ -332,6 +332,20 @@ def index():
     # Verificar se é admin
     is_admin = session.get('tipo_usuario') == 'Agente Público'
 
+    # Pode excluir: Agente Público ou Agente DGP com visualizacao_geral ativa
+    pode_excluir = is_admin or (
+        session.get('tipo_usuario') == 'Agente DGP'
+        and ver_todos
+        and nome_analista is not None
+    )
+
+    # Pode editar responsável: Agente Público OU Agente DGP com visualizacao_geral
+    pode_editar_responsavel = is_admin or (
+        session.get('tipo_usuario') == 'Agente DGP'
+        and ver_todos
+        and nome_analista is not None
+    )
+
     return render_template(
         'celebracao_parcerias.html',
         registros=registros,
@@ -353,6 +367,8 @@ def index():
         lei_list=lei_list,
         regionalizacao_map=regionalizacao_map,
         is_admin=is_admin,
+        pode_excluir=pode_excluir,
+        pode_editar_responsavel=pode_editar_responsavel,
         nome_analista_logado=nome_analista,
         ver_todos=ver_todos,
         **filtros_vals
@@ -479,6 +495,30 @@ def obter_detalhe(id):
     if dados.get('total_previsto') is not None:
         dados['total_previsto'] = float(dados['total_previsto'])
 
+    # Histórico de alterações de substatus
+    cur.execute("""
+        SELECT
+            TO_CHAR(created_at, 'DD/MM/YYYY HH24:MI') AS data_hora,
+            usuario_nome,
+            detalhes->'substatus'->>'de'   AS substatus_de,
+            detalhes->'substatus'->>'para' AS substatus_para
+        FROM gestao_pessoas.log_atividades
+        WHERE recurso_tipo = 'celebracao'
+          AND recurso_id   = %s
+          AND detalhes ? 'substatus'
+        ORDER BY created_at DESC
+        LIMIT 30
+    """, (str(id),))
+    dados['historico_substatus'] = [
+        {
+            'data_hora':       r['data_hora'],
+            'usuario':         r['usuario_nome'],
+            'substatus_de':    r['substatus_de'],
+            'substatus_para':  r['substatus_para']
+        }
+        for r in cur.fetchall()
+    ]
+
     return jsonify({'success': True, 'registro': dados})
 
 
@@ -490,12 +530,13 @@ def obter_detalhe(id):
 def listar_visualizacao_geral():
     """
     Retorna a lista de analistas DGP com seu flag de visualizacao_geral.
-    Apenas admins podem acessar.
+    Acessível para admins e analistas DGP com visualizacao_geral=True.
     """
-    if session.get('tipo_usuario') != 'Agente Público':
-        return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
-
     cur = get_cursor()
+    is_admin = session.get('tipo_usuario') == 'Agente Público'
+    _, ver_todos = obter_filtro_usuario(cur)
+    if not is_admin and not ver_todos:
+        return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
     cur.execute("""
         SELECT id, nome_analista, rf, status,
                COALESCE(visualizacao_geral, FALSE) AS visualizacao_geral
@@ -517,12 +558,15 @@ def listar_visualizacao_geral():
 def atualizar_visualizacao_geral():
     """
     Atualiza os flags de visualizacao_geral para analistas DGP.
+    Acessível para admins e analistas DGP com visualizacao_geral=True.
     Recebe JSON: { "analistas": [ { "id": 1, "visualizacao_geral": true }, ... ] }
     """
-    if session.get('tipo_usuario') != 'Agente Público':
+    cur = get_cursor()
+    is_admin = session.get('tipo_usuario') == 'Agente Público'
+    _, ver_todos = obter_filtro_usuario(cur)
+    if not is_admin and not ver_todos:
         return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
 
-    cur = get_cursor()
     db = get_db()
 
     try:
@@ -651,6 +695,19 @@ def editar(id):
                 return Decimal(str(v).replace(',', '.'))
             except Exception:
                 return None
+
+        # ── Diff de substatus para log_atividades ──
+        cur.execute(
+            "SELECT substatus FROM celebracao.celebracao_parcerias WHERE id = %s",
+            [id]
+        )
+        _row = cur.fetchone()
+        _substatus_atual = (_row['substatus'] or '') if _row else ''
+        _substatus_novo  = s('substatus') or ''
+        if _substatus_atual != _substatus_novo:
+            g.log_detalhes      = {'substatus': {'de': _substatus_atual or None, 'para': _substatus_novo or None}}
+            g.log_recurso_tipo  = 'celebracao'
+            g.log_recurso_id    = id
 
         cur.execute("""
             UPDATE celebracao.celebracao_parcerias
@@ -797,6 +854,51 @@ def editar(id):
     except Exception as e:
         db.rollback()
         print(f"[ERRO CELEBRAÇÃO] Erro ao editar #{id}: {e}")
+        return jsonify({'success': False, 'erro': str(e)}), 500
+
+
+# ── Excluir registro ──────────────────────────────────────────────────────────
+
+@celebracao_parcerias_bp.route("/excluir/<int:id>", methods=["DELETE"])
+@login_required
+@requires_access('celebracao_parcerias')
+def excluir(id):
+    """Exclui um registro de Celebração de Parcerias (somente usuários autorizados)"""
+    tipo = session.get('tipo_usuario', '')
+    is_admin = tipo == 'Agente Público'
+
+    # Agente DGP só pode excluir se tiver visualizacao_geral
+    if not is_admin:
+        if tipo != 'Agente DGP':
+            return jsonify({'success': False, 'erro': 'Sem permissão para excluir registros.'}), 403
+        cur_check = get_cursor()
+        nome_analista, ver_todos = obter_filtro_usuario(cur_check)
+        if not (ver_todos and nome_analista is not None):
+            return jsonify({'success': False, 'erro': 'Sem permissão para excluir registros.'}), 403
+
+    cur = get_cursor()
+    db = get_db()
+    try:
+        # Buscar sei_celeb para limpar tabelas dependentes
+        cur.execute("SELECT sei_celeb FROM celebracao.celebracao_parcerias WHERE id = %s", [id])
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'success': False, 'erro': 'Registro não encontrado.'}), 404
+
+        sei = row['sei_celeb']
+        if sei:
+            cur.execute("DELETE FROM celebracao.celebracao_parcerias_enderecos WHERE sei_celeb = %s", [sei])
+            cur.execute("DELETE FROM celebracao.celebracao_parcerias_sei WHERE sei_celeb = %s", [sei])
+            cur.execute("DELETE FROM celebracao.celebracao_parcerias_infos_adicionais WHERE sei_celeb = %s", [sei])
+
+        cur.execute("DELETE FROM celebracao.celebracao_parcerias WHERE id = %s", [id])
+        db.commit()
+        print(f"[CELEBRAÇÃO] Registro #{id} excluído por {session.get('email')}")
+        return jsonify({'success': True, 'mensagem': f'Registro #{id} excluído com sucesso.'})
+
+    except Exception as e:
+        db.rollback()
+        print(f"[ERRO CELEBRAÇÃO] Erro ao excluir #{id}: {e}")
         return jsonify({'success': False, 'erro': str(e)}), 500
 
 

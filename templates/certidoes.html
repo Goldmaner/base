@@ -238,7 +238,10 @@
                 <div class="row g-4">
                     {% for osc in oscs_com_pastas %}
                     <div class="col-md-3">
-                        <div class="card osc-grid-card h-100" onclick="abrirOSC('{{ osc.nome_pasta }}')">
+                        <div class="card osc-grid-card h-100"
+                             data-nome-pasta="{{ osc.nome_pasta }}"
+                             data-osc-nome="{{ osc.osc_nome_banco or '' }}"
+                             onclick="abrirOSC(this)">
                             <div class="card-body text-center">
                                 <!-- 🔍 DEBUG: Mostrar nome_pasta -->
                                 <small class="text-muted" style="font-size: 0.7rem; display: block; margin-bottom: 5px;">
@@ -347,10 +350,16 @@
                                 </div>
                             </div>
                             <div class="row mt-2">
-                                <div class="col-md-12">
+                                <div class="col-md-6">
                                     <small class="text-muted">
                                         <i class="bi bi-check-circle text-success me-1"></i>
                                         <span id="resumo-pastas-existentes">0</span> pasta(s) já existe(m) e será(ão) mantida(s)
+                                    </small>
+                                </div>
+                                <div class="col-md-6">
+                                    <small class="text-primary fw-bold">
+                                        <i class="bi bi-pen me-1"></i>
+                                        <span id="resumo-celebracao">0</span> OSC(s) com processo em celebração incluídas
                                     </small>
                                 </div>
                             </div>
@@ -535,8 +544,14 @@
             window.location.href = '{{ url_for("certidoes.index") }}';
         }
         
-        function abrirOSC(nomePasta) {
-            window.location.href = `/certidoes/osc/${nomePasta}`;
+        function abrirOSC(el) {
+            const nomePasta = el.dataset.nomePasta;
+            const oscNome = el.dataset.oscNome;
+            let url = `/certidoes/osc/${nomePasta}`;
+            if (oscNome) {
+                url += `?osc_nome=${encodeURIComponent(oscNome)}`;
+            }
+            window.location.href = url;
         }
 
         function abrirModalNovaCertidao(osc = '', cnpj = '') {
@@ -680,6 +695,7 @@
                     document.getElementById('resumo-total-parcelas').textContent = result.total_parcelas_geral;
                     document.getElementById('resumo-pastas-novas').textContent = result.total_pastas_novas;
                     document.getElementById('resumo-pastas-existentes').textContent = result.total_pastas_existentes;
+                    document.getElementById('resumo-celebracao').textContent = result.total_celebracao || 0;
                     
                     // Calcular valor total
                     const valorTotal = result.oscs.reduce((sum, osc) => sum + osc.total_valor, 0);
@@ -689,18 +705,26 @@
                     let html = '';
                     
                     result.oscs.forEach((osc, index) => {
+                        const ehCelebracao = osc.tipo_origem === 'celebracao';
+
                         // Badge de status da pasta
-                        const pastaStatus = osc.pasta_existe 
+                        let pastaStatus = osc.pasta_existe
                             ? '<span class="badge bg-success ms-2"><i class="bi bi-check-circle me-1"></i>Pasta Existe</span>'
                             : '<span class="badge bg-warning text-dark ms-2"><i class="bi bi-plus-circle me-1"></i>Pasta Nova</span>';
-                        
+                        if (ehCelebracao) {
+                            pastaStatus += ' <span class="badge bg-primary ms-1"><i class="bi bi-pen me-1"></i>Processo em Celebração</span>';
+                        }
+
                         // Classe para controlar visibilidade: ocultar pastas existentes por padrão
                         const visibilidadeClass = osc.pasta_existe ? 'osc-existente' : 'osc-nova';
                         const displayStyle = osc.pasta_existe ? 'display: none;' : '';
-                        
+
+                        // Cor de fundo: azul claro para celebração, verde para pasta existente, amarelo para nova
+                        const headerBg = ehCelebracao ? '#e3f2fd' : (osc.pasta_existe ? '#e8f5e9' : '#fff3cd');
+
                         html += `
                             <div class="card mb-3 ${visibilidadeClass}" style="${displayStyle}">
-                                <div class="card-header" style="background-color: ${osc.pasta_existe ? '#e8f5e9' : '#fff3cd'};">
+                                <div class="card-header" style="background-color: ${headerBg};">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
                                             <h6 class="mb-1">
@@ -710,12 +734,30 @@
                                             <small class="text-muted">CNPJ: ${osc.cnpj}</small>
                                         </div>
                                         <div class="text-end">
-                                            <span class="badge bg-primary me-2">${osc.total_termos} termo(s)</span>
-                                            <span class="badge bg-success">${osc.total_parcelas} parcela(s)</span>
+                                            ${ehCelebracao
+                                                ? '<span class="badge bg-primary">Em Celebração</span>'
+                                                : `<span class="badge bg-primary me-2">${osc.total_termos} termo(s)</span><span class="badge bg-success">${osc.total_parcelas} parcela(s)</span>`
+                                            }
                                         </div>
                                     </div>
                                 </div>
                                 <div class="card-body">
+                                    ${osc.pasta_existe
+                                        ? '<div class="alert alert-success py-2 mb-3"><small><i class="bi bi-folder-check me-2"></i>Pasta: <code>' + osc.nome_pasta + '</code> já existe e será mantida</small></div>'
+                                        : '<div class="alert alert-warning py-2 mb-3"><small><i class="bi bi-folder-plus me-2"></i>Nova pasta será criada: <code>' + osc.nome_pasta + '</code></small></div>'
+                                    }
+                        `;
+
+                        if (ehCelebracao) {
+                            html += `
+                                    <div class="alert alert-primary py-2">
+                                        <i class="bi bi-pen me-2"></i>
+                                        <strong>Processo em Celebração</strong> — OSC com processo de parceria em fase de celebração.
+                                        A pasta será criada para permitir o encartamento de certidões antecipadamente.
+                                    </div>
+                            `;
+                        } else {
+                            html += `
                                     <div class="row mb-3">
                                         <div class="col-md-4">
                                             <strong>Termos:</strong><br>
@@ -730,13 +772,12 @@
                                             <small>R$ ${osc.total_valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</small>
                                         </div>
                                     </div>
-                                    ${osc.pasta_existe ? '<div class="alert alert-success py-2 mb-3"><small><i class="bi bi-folder-check me-2"></i>Pasta: <code>' + osc.nome_pasta + '</code> já existe e será mantida</small></div>' : '<div class="alert alert-warning py-2 mb-3"><small><i class="bi bi-folder-plus me-2"></i>Nova pasta será criada: <code>' + osc.nome_pasta + '</code></small></div>'}
-                                    
-                                    <button class="btn btn-sm btn-outline-primary" type="button" 
+
+                                    <button class="btn btn-sm btn-outline-primary" type="button"
                                             data-bs-toggle="collapse" data-bs-target="#parcelas-${index}">
                                         <i class="bi bi-list-ul me-2"></i>Ver Detalhes das ${osc.total_parcelas} Parcelas
                                     </button>
-                                    
+
                                     <div class="collapse mt-3" id="parcelas-${index}">
                                         <div class="table-responsive">
                                             <table class="table table-sm table-bordered">
@@ -750,25 +791,27 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                        `;
-                        
-                        osc.parcelas.forEach(parcela => {
-                            html += `
-                                <tr>
-                                    <td><small>${parcela.numero_termo}</small></td>
-                                    <td><small>${parcela.mes_referencia}</small></td>
-                                    <td><small>${parcela.vigencia_inicial} a ${parcela.vigencia_final}</small></td>
-                                    <td><small><span class="badge ${parcela.parcela_tipo === 'Programada' ? 'bg-info' : 'bg-warning text-dark'}">${parcela.parcela_tipo}</span></small></td>
-                                    <td class="text-end"><small>R$ ${parcela.parcela_valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</small></td>
-                                </tr>
                             `;
-                        });
-                        
-                        html += `
+                            osc.parcelas.forEach(parcela => {
+                                html += `
+                                    <tr>
+                                        <td><small>${parcela.numero_termo}</small></td>
+                                        <td><small>${parcela.mes_referencia}</small></td>
+                                        <td><small>${parcela.vigencia_inicial} a ${parcela.vigencia_final}</small></td>
+                                        <td><small><span class="badge ${parcela.parcela_tipo === 'Programada' ? 'bg-info' : 'bg-warning text-dark'}">${parcela.parcela_tipo}</span></small></td>
+                                        <td class="text-end"><small>R$ ${parcela.parcela_valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</small></td>
+                                    </tr>
+                                `;
+                            });
+                            html += `
                                                 </tbody>
                                             </table>
                                         </div>
                                     </div>
+                            `;
+                        }
+
+                        html += `
                                 </div>
                             </div>
                         `;

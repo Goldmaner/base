@@ -41,7 +41,7 @@
 - Melhorar filtros de pendências da Ultra.✅
 - Adicionar novos relatórios orçamentários e financeiros.✅
 - Criar pasta dedicada para certidões e atualizações financeiras.✅
-- Aprimorar o uso das pastas dedicadas a certidões, compatibilizando todas as OSCs.
+- Aprimorar o uso das pastas dedicadas a certidões, compatibilizando todas as OSCs.✅
 - Automatizar texto da primeira parcela.
 - Fazer uma checkbox para tirar os de TCL de COSAN.
 - Fazer um relatório completo do que está encaminhado para pagamento, pagos e atrasados.
@@ -49,6 +49,7 @@
 ## 8. Celebração e DGP
 - Desenvolver módulo para celebração de parcerias, com workflow próprio.✅
 - Incluir módulo para gestão de CENTS.✅
+- Vincular projeto celebrado com Parcerias.html
 
 ## 9. Editais
 - Criar módulo para cadastro, acompanhamento e publicação de editais.✅
@@ -81,4 +82,4 @@
 ## 15. Listas Suspensas
 - Adicionar ramais na lista de coordenadores e pessoas gestoras.
 - Adicionar lista de documentações de Alterações e Processos.
-- Atualizar os nomes. 
+- Atualizar o que for alterado na lista suspensa, nas tables.

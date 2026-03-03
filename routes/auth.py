@@ -393,6 +393,91 @@ def resetar_senha(user_id):
         return jsonify({"erro": str(e)}), 500
 
 
+@auth_bp.route("/api/acessos-por-pagina/<modulo>", methods=["GET"])
+@login_required
+def acessos_por_pagina_get(modulo):
+    """
+    Retorna todos os usuários (não-Agente Público) com indicação se têm acesso ao módulo.
+    """
+    if session.get("tipo_usuario") != "Agente Público":
+        return jsonify({"erro": "Acesso negado"}), 403
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT id, email, tipo_usuario, d_usuario, acessos
+            FROM gestao_pessoas.usuarios
+            WHERE tipo_usuario != 'Agente Público'
+            ORDER BY tipo_usuario, email
+        """)
+        usuarios = cur.fetchall()
+        cur.close()
+
+        resultado = []
+        for u in usuarios:
+            acessos_lista = [a.strip() for a in (u['acessos'] or '').split(';') if a.strip()]
+            resultado.append({
+                "id": u["id"],
+                "email": u["email"],
+                "tipo_usuario": u["tipo_usuario"],
+                "d_usuario": u["d_usuario"],
+                "tem_acesso": modulo in acessos_lista
+            })
+        return jsonify(resultado), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@auth_bp.route("/api/acessos-por-pagina/<modulo>", methods=["PUT"])
+@login_required
+def acessos_por_pagina_put(modulo):
+    """
+    Recebe lista de IDs que DEVEM ter acesso ao módulo e atualiza em bulk.
+    Body: { "user_ids_com_acesso": [1, 2, 5] }
+    """
+    if session.get("tipo_usuario") != "Agente Público":
+        return jsonify({"erro": "Acesso negado"}), 403
+    try:
+        data = request.get_json()
+        ids_com_acesso = set(data.get("user_ids_com_acesso", []))
+
+        cur = get_cursor()
+        cur.execute("""
+            SELECT id, acessos
+            FROM gestao_pessoas.usuarios
+            WHERE tipo_usuario != 'Agente Público'
+        """)
+        usuarios = cur.fetchall()
+
+        atualizados = 0
+        for u in usuarios:
+            acessos_lista = [a.strip() for a in (u['acessos'] or '').split(';') if a.strip()]
+            tinha = modulo in acessos_lista
+
+            if u['id'] in ids_com_acesso and not tinha:
+                acessos_lista.append(modulo)
+            elif u['id'] not in ids_com_acesso and tinha:
+                acessos_lista = [a for a in acessos_lista if a != modulo]
+            else:
+                continue  # sem mudança
+
+            novo_acessos = ';'.join(acessos_lista) if acessos_lista else None
+            cur.execute("""
+                UPDATE gestao_pessoas.usuarios SET acessos = %s WHERE id = %s
+            """, (novo_acessos, u['id']))
+            atualizados += 1
+
+            # Atualizar sessão se for o usuário logado
+            if session.get('user_id') == u['id']:
+                session['acessos'] = novo_acessos or ""
+
+        get_db().commit()
+        cur.close()
+        return jsonify({"mensagem": f"{atualizados} usuário(s) atualizado(s)", "atualizados": atualizados}), 200
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({"erro": str(e)}), 500
+
+
 @auth_bp.route("/api/solicitar-reset-senha", methods=["POST"])
 def solicitar_reset_senha():
     """
