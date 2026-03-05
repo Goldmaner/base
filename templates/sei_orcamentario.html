@@ -390,11 +390,7 @@
       </div>
       <div class="modal-body">
         <div id="alertEditar"></div>
-        <div class="alert alert-info py-2 small mb-3">
-          <i class="bi bi-info-circle me-1"></i>
-          Edição altera apenas os dados de <strong>identificação</strong>.
-          Para atualizar vereador/valor, exclua e recrie o registro.
-        </div>
+
         <input type="hidden" id="e_id">
         <form id="formEditar">
           <div class="row g-3">
@@ -441,23 +437,29 @@
               <input type="number" class="form-control form-control-sm" id="e_consulta" name="numero_consulta" min="0">
             </div>
 
-            <!-- Exibição (read-only) dos dados da emenda -->
+            <!-- Emenda Parlamentar -->
             <div class="col-12 mt-2">
-              <h6 class="text-secondary fw-bold border-bottom pb-1 mb-2">
-                <i class="bi bi-person-badge me-1"></i> Emenda Parlamentar <small class="fw-normal">(somente leitura)</small>
+              <h6 class="text-success fw-bold border-bottom pb-1 mb-2">
+                <i class="bi bi-person-badge me-1"></i> Emenda Parlamentar
               </h6>
             </div>
-            <div class="col-md-5">
+            <div class="col-md-6">
               <label class="form-label">Vereador</label>
-              <input type="text" class="form-control form-control-sm" id="e_vereador" readonly style="background:#f0f0f0;">
+              <select class="form-select form-select-sm select2-vereador-editar" id="e_vereador" name="vereador_nome">
+                <option value="">-- Selecione --</option>
+                {% for v in vereadores %}
+                <option value="{{ v }}">{{ v }}</option>
+                {% endfor %}
+              </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-6">
               <label class="form-label">Valor (R$)</label>
-              <input type="text" class="form-control form-control-sm" id="e_valor" readonly style="background:#f0f0f0;">
+              <input type="text" class="form-control form-control-sm" id="e_valor" name="valor"
+                     placeholder="Ex: 150.000,00" onblur="formatarValorBR(this)">
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Informações</label>
-              <input type="text" class="form-control form-control-sm" id="e_obs" readonly style="background:#f0f0f0;">
+            <div class="col-12">
+              <label class="form-label">Informações / Observações</label>
+              <textarea class="form-control form-control-sm" id="e_obs" name="observacoes" rows="3"></textarea>
             </div>
           </div>
         </form>
@@ -505,12 +507,14 @@
 <script>
 // ── Inicialização Select2 ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
-  $('.select2-vereador').select2({
+  const select2Opts = {
     theme: 'bootstrap-5',
     placeholder: 'Digite para buscar…',
     allowClear: true,
     width: '100%',
-  });
+  };
+  $('.select2-vereador').select2(select2Opts);
+  $('.select2-vereador-editar').select2({ ...select2Opts, dropdownParent: $('#modalEditar') });
 });
 
 // ── Máscara SEI: XXXX.XXXX/XXXXXXX-X ───────────────────────────────────
@@ -747,9 +751,19 @@ function abrirEditar(btnEl) {
     if (eSeiInput) { eSeiInput.disabled = false; eSeiInput.style.background = ''; }
   }
 
-  // Somente leitura
-  document.getElementById('e_vereador').value = row.vereador_nome || '—';
-  document.getElementById('e_obs').value      = row.observacoes || '';
+  // Vereador (select2)
+  try {
+    const vereadorVal = row.vereador_nome || '';
+    if (vereadorVal) {
+      const opt = new Option(vereadorVal, vereadorVal, true, true);
+      $('#e_vereador').append(opt).trigger('change');
+    } else {
+      $('#e_vereador').val(null).trigger('change');
+    }
+  } catch(e) {}
+
+  // Observações
+  document.getElementById('e_obs').value = row.observacoes || '';
 
   // Valor formatado
   if (row.valor !== null && row.valor !== undefined) {
@@ -793,6 +807,9 @@ async function salvarEditar() {
     numero_consulta:                document.getElementById('e_consulta').value.trim(),
     disponibilidade_orcamentaria:   document.getElementById('e_disp').value,
     ce_status:                      document.getElementById('e_ce_status')?.value || 'Aguardando aceite',
+    vereador_nome:                  document.getElementById('e_vereador').value,
+    valor:                          document.getElementById('e_valor').value.trim(),
+    observacoes:                    document.getElementById('e_obs').value.trim(),
   };
 
   try {

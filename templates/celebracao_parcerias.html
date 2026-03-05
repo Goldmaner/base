@@ -426,12 +426,24 @@
             <tr{% if edisp == 'all_available' %} style="--bs-table-bg:#dbeeff;"{% elif edisp == 'mixed' %} style="--bs-table-bg:#f0f8ff;"{% endif %}{% if edisp == 'mixed' and r.emenda_disp_detail %} data-bs-toggle="tooltip" data-bs-placement="top" title="{% for e in r.emenda_disp_detail %}{{ e.sei_orc }}: {{ e.disp }}{% if not loop.last %} | {% endif %}{% endfor %}{% if r.emenda_total_valor %} · Total: R$ {{ r.emenda_total_valor | format_brl }}{% endif %}"{% endif %}>
               <td>
                 {% if r.responsavel %}
-                  <span class="badge bg-primary">{{ r.responsavel }}</span>
+                  <div class="d-flex flex-wrap gap-1">
+                  {% for nome in r.responsavel.split(';') %}
+                    {% set nome = nome.strip() %}
+                    {% if nome %}
+                      <span class="badge bg-primary" style="font-size:0.75rem;">{{ nome }}</span>
+                    {% endif %}
+                  {% endfor %}
+                  </div>
                 {% else %}
                   <span class="text-muted">-</span>
                 {% endif %}
               </td>
               <td>
+                {% if r.is_novo_processo %}
+                  <i class="bi bi-stars text-warning me-1"
+                     data-bs-toggle="tooltip" data-bs-placement="top"
+                     title="Novo processo — criado há menos de 2 dias e sem edições"></i>
+                {% endif %}
                 {% if r.status %}
                   <span class="badge bg-info text-dark">{{ r.status }}</span>
                 {% else %}

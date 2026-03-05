@@ -234,7 +234,13 @@ def index():
                         = REGEXP_REPLACE(cp.sei_celeb, '[^0-9]', '', 'g')
                 )
                 ELSE NULL
-            END AS emenda_total_valor
+            END AS emenda_total_valor,
+            CASE
+                WHEN cp.atualizado_at IS NULL
+                     AND cp.created_at >= NOW() - INTERVAL '2 days'
+                THEN TRUE
+                ELSE FALSE
+            END AS is_novo_processo
         FROM celebracao.celebracao_parcerias cp
         {where_clause}
         ORDER BY id DESC
@@ -628,10 +634,10 @@ def criar():
                  meses, dias, total_previsto, conta, lei, observacoes,
                  numeracao_termo, inicio, final, assinatura,
                  nome_pg, celebracao_secretaria, status_generico, numero_termo,
-                 responsavel)
+                 responsavel, criado_por)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s)
+                    %s, %s, %s, %s, %s, %s)
             RETURNING id
         """, [
             s('edital_nome'), s('unidade_gestora'), s('tipo_termo'), s('sei_celeb'),
@@ -639,7 +645,7 @@ def criar():
             i('meses'), i('dias'), dec('total_previsto'), s('conta'), s('lei'), s('observacoes'),
             i('numeracao_termo'), d('inicio'), d('final'), d('assinatura'),
             s('nome_pg'), s('celebracao_secretaria'), s('status_generico'), s('numero_termo'),
-            s('responsavel')
+            s('responsavel'), session.get('email')
         ])
         new_id = cur.fetchone()['id']
         db.commit()
@@ -735,7 +741,9 @@ def editar(id):
                 celebracao_secretaria = %s,
                 status_generico       = %s,
                 numero_termo          = %s,
-                responsavel           = %s
+                responsavel           = %s,
+                atualizado_at         = NOW(),
+                atualizado_por        = %s
             WHERE id = %s
         """, [
             s('edital_nome'), s('unidade_gestora'), s('tipo_termo'),
@@ -746,6 +754,7 @@ def editar(id):
             i('numeracao_termo'), d('inicio'), d('final'),
             d('assinatura'), s('nome_pg'), s('celebracao_secretaria'),
             s('status_generico'), s('numero_termo'), s('responsavel'),
+            session.get('email'),
             id
         ])
 

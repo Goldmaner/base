@@ -283,6 +283,17 @@ def editar(id):
     consulta  = d.get('numero_consulta') or None
     disp      = (d.get('disponibilidade_orcamentaria') or 'Não Informado').strip()
     ce_status = (d.get('ce_status') or 'Aguardando aceite').strip()
+    vereador  = (d.get('vereador_nome') or '').strip() or None
+    obs       = (d.get('observacoes') or '').strip() or None
+
+    # Parse valor
+    valor_raw = d.get('valor')
+    valor = None
+    if valor_raw not in (None, ''):
+        try:
+            valor = float(str(valor_raw).replace('.', '').replace(',', '.'))
+        except (ValueError, TypeError):
+            valor = None
 
     if not sei_orc:
         return jsonify(success=False, erro='SEI Orçamentário é obrigatório.')
@@ -317,16 +328,35 @@ def editar(id):
              WHERE id = %s
         """, (sei_orc, sei_eff, projeto, memorando, consulta, disp, ce_status, id))
 
-        # Sincronizar vínculo secundário em parcerias_emendas
-        if not sei_eff and projeto:
-            if old_sei:
-                cur.execute(
-                    "UPDATE public.parcerias_emendas SET observacoes = %s WHERE sei_celeb = %s",
-                    [projeto, old_sei])
-            if old_projeto and old_projeto != projeto:
-                cur.execute(
-                    "UPDATE public.parcerias_emendas SET observacoes = %s WHERE observacoes = %s",
-                    [projeto, old_projeto])
+        # Atualizar vereador/valor/obs em parcerias_emendas
+        link_sei = sei_eff or old_sei or None
+        if link_sei:
+            cur.execute(
+                "SELECT id FROM public.parcerias_emendas WHERE sei_celeb = %s ORDER BY criado_em DESC NULLS LAST LIMIT 1",
+                [link_sei])
+            pe = cur.fetchone()
+            if pe:
+                cur.execute("""
+                    UPDATE public.parcerias_emendas
+                       SET vereador_nome = %s,
+                           valor         = %s,
+                           observacoes   = %s
+                     WHERE id = %s
+                """, (vereador, valor, obs, pe[0]))
+            else:
+                cur.execute("""
+                    INSERT INTO public.parcerias_emendas (sei_celeb, vereador_nome, valor, observacoes)
+                    VALUES (%s, %s, %s, %s)
+                """, (link_sei, vereador, valor, obs))
+        elif projeto or old_projeto:
+            chave = old_projeto or projeto
+            cur.execute("""
+                UPDATE public.parcerias_emendas
+                   SET vereador_nome = %s,
+                       valor         = %s,
+                       observacoes   = %s
+                 WHERE observacoes = %s
+            """, (vereador, valor, obs, chave))
 
         db.commit()
         return jsonify(success=True, mensagem='Registro atualizado com sucesso.')
