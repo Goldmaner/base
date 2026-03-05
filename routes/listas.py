@@ -438,16 +438,19 @@ TABELAS_CONFIG = {
     'c_dp_documentos': {
         'nome': 'DP: Tipos de Documento',
         'schema': 'categoricas',
-        'colunas_editaveis': ['tipo_documento', 'descricao', 'orgao_emissor'],
+        'colunas_editaveis': ['tipo_documento', 'descricao', 'orgao_emissor', 'tipo_usuario'],
         'labels': {
             'tipo_documento': 'Tipo de Documento',
             'descricao': 'Descrição',
-            'orgao_emissor': 'Órgão Emissor'
+            'orgao_emissor': 'Órgão Emissor',
+            'tipo_usuario': 'Tipo de Usuário'
         },
-        'colunas_filtro': ['tipo_documento', 'orgao_emissor'],
-        'ordem': 'tipo_documento',
+        'colunas_filtro': ['tipo_documento', 'orgao_emissor', 'tipo_usuario'],
+        'ordem': 'tipo_usuario, tipo_documento',
         'tipos_campo': {
-            'descricao': 'textarea'
+            'descricao': 'textarea',
+            'tipo_usuario': 'select',
+            'opcoes_tipo_usuario': ['Agente DP', 'Agente DAC', 'Agente DGP']
         }
     },
     'c_geral_coordenadores': {
@@ -1020,7 +1023,9 @@ def index():
         print(f"[DEBUG] Tabelas config: {list(TABELAS_CONFIG.keys())}")
         for chave, config in TABELAS_CONFIG.items():
             print(f"  - {chave}: {config.get('nome', 'SEM NOME')}")
-        return render_template('listas.html', tabelas=TABELAS_CONFIG)
+        from flask import session
+        tipo_usuario_logado = session.get('tipo_usuario', '')
+        return render_template('listas.html', tabelas=TABELAS_CONFIG, tipo_usuario_logado=tipo_usuario_logado)
     except Exception as e:
         print(f"[ERRO] Erro ao renderizar listas.html: {str(e)}")
         import traceback

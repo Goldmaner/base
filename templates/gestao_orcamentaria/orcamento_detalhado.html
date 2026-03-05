@@ -425,6 +425,7 @@
         <label class="ms-3"><input type="checkbox" id="chk_total_pago" onchange="atualizarColunasVisiveis()"> Total Pago</label>
         <label class="ms-3"><input type="checkbox" id="chk_total_comprometido" onchange="atualizarColunasVisiveis()"> Total Comprometido</label>
         <label class="ms-3"><input type="checkbox" id="chk_total_disponivel" onchange="atualizarColunasVisiveis()"> Total Disponível</label>
+        <label class="ms-3"><input type="checkbox" id="chk_total_indisponivel" onchange="atualizarColunasVisiveis()"> Total Indisponível</label>
         <label class="ms-3"><input type="checkbox" id="chk_valor_residual" onchange="atualizarColunasVisiveis()"> Valor Residual</label>
     </div>
     
@@ -493,6 +494,10 @@
                         Total Disponível
                         <i class="bi bi-calendar3" id="icone-cronograma-disponivel"></i>
                     </th>
+                    <th onclick="toggleCronogramaIndisponivel()" class="col-total-indisponivel" style="display:none; cursor: pointer; background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%); color:white;" title="Clique para expandir distribuição mensal do valor indisponível (Global &minus; Disponível)">
+                        Total Indisponível
+                        <i class="bi bi-calendar3" id="icone-cronograma-indisponivel"></i>
+                    </th>
                     <th class="col-valor-residual" style="display:none; background: linear-gradient(135deg, #198754 0%, #146c43 100%); color:white;" title="Residual = Disponível &minus; Global (exibido apenas quando Disponível &gt; Global)">
                         Valor Residual
                     </th>
@@ -515,7 +520,7 @@
                     <th class="col-projeto" style="display: none;"></th>
                     <th class="col-sei-celeb" style="display: none;"></th>
                     <th class="valor-moeda" id="total_programado_footer">R$ 0,00</th>
-                    <th class="valor-moeda" id="total_projetado_footer">R$ 0,00</th>                    <th class="valor-moeda bg-success bg-opacity-50" id="total_global_footer">R$ 0,00</th>                    <th class="valor-moeda bg-danger bg-opacity-25 col-total-pago" style="display:none;" id="total_pago_footer">R$ 0,00</th>                    <th class="valor-moeda col-total-comprometido" style="display:none; background:#ffe5cc;" id="total_comprometido_footer">R$ 0,00</th>                    <th class="valor-moeda col-total-disponivel" style="display:none; background:#d1e7ff;" id="total_disponivel_footer">R$ 0,00</th>                    <th class="valor-moeda col-valor-residual" style="display:none; background:#d1e7dd;" id="total_residual_footer">-</th>                </tr>
+                    <th class="valor-moeda" id="total_projetado_footer">R$ 0,00</th>                    <th class="valor-moeda bg-success bg-opacity-50" id="total_global_footer">R$ 0,00</th>                    <th class="valor-moeda bg-danger bg-opacity-25 col-total-pago" style="display:none;" id="total_pago_footer">R$ 0,00</th>                    <th class="valor-moeda col-total-comprometido" style="display:none; background:#ffe5cc;" id="total_comprometido_footer">R$ 0,00</th>                    <th class="valor-moeda col-total-disponivel" style="display:none; background:#d1e7ff;" id="total_disponivel_footer">R$ 0,00</th>                    <th class="valor-moeda col-total-indisponivel" style="display:none; background:#f8d7da;" id="total_indisponivel_footer">-</th>                    <th class="valor-moeda col-valor-residual" style="display:none; background:#d1e7dd;" id="total_residual_footer">-</th>                </tr>
             </tfoot>
         </table>
     </div>
@@ -554,6 +559,7 @@
     // Cache das celebrações — persiste entre reloads do cronograma
     let cronogramaCelebracoes = {};
     let cronogramaDisponivelExpandido = false;
+    let cronogramaIndisponivelExpandido = false;
     
     // Configurar toastr
     toastr.options = {
@@ -679,6 +685,27 @@
             }
         } else {
             $('#icone-cronograma-disponivel').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
+            renderizarTabela();
+        }
+    }
+
+    // Toggle do cronograma de Indisponível
+    function toggleCronogramaIndisponivel() {
+        cronogramaIndisponivelExpandido = !cronogramaIndisponivelExpandido;
+        if (cronogramaIndisponivelExpandido) {
+            $('#icone-cronograma-indisponivel').removeClass('bi-calendar3').addClass('bi-calendar3-fill');
+            const temDadosNormal = Object.keys((dadosCronograma.projetados || {})).length > 0 ||
+                                   Object.keys((dadosCronograma.programados || {})).length > 0;
+            const temDadosDetalhado = Object.keys(dadosCronogramaDetalhado).length > 0;
+            const temDados = modoDetalhado ? temDadosDetalhado : temDadosNormal;
+            if (!temDados) {
+                if (modoDetalhado) { carregarCronogramaDetalhado(); }
+                else { carregarCronogramaMensal(); }
+            } else {
+                renderizarTabela();
+            }
+        } else {
+            $('#icone-cronograma-indisponivel').removeClass('bi-calendar3-fill').addClass('bi-calendar3');
             renderizarTabela();
         }
     }
@@ -1203,10 +1230,12 @@
         $('.col-sei-celeb').toggle(mostrarSeiCeleb);
         const mostrarTotalComprometido = $('#chk_total_comprometido').is(':checked');
         const mostrarTotalDisponivel = $('#chk_total_disponivel').is(':checked');
+        const mostrarTotalIndisponivel = $('#chk_total_indisponivel').is(':checked');
         const mostrarValorResidual = $('#chk_valor_residual').is(':checked');
         $('.col-total-pago').toggle(mostrarTotalPago);
         $('.col-total-comprometido').toggle(mostrarTotalComprometido);
         $('.col-total-disponivel').toggle(mostrarTotalDisponivel);
+        $('.col-total-indisponivel').toggle(mostrarTotalIndisponivel);
         $('.col-valor-residual').toggle(mostrarValorResidual);
         
         salvarFiltros(); // ⚡ NOVO: Salvar estado das colunas
@@ -1242,6 +1271,7 @@
         thead.find('.col-mes-pago').remove();
         thead.find('.col-mes-comprometido').remove();
         thead.find('.col-mes-disponivel').remove();
+        thead.find('.col-mes-indisponivel').remove();
         
         // Se cronograma PROGRAMADO expandido, adicionar 12 colunas antes de "Total Programado"
         if (cronogramaProgramadoExpandido) {
@@ -1283,7 +1313,7 @@
         }
         
         // Habilitar scroll horizontal se algum cronograma expandido
-        if (cronogramaProgramadoExpandido || cronogramaProjetadoExpandido || cronogramaGlobalExpandido || cronogramaPagoExpandido || cronogramaComprometidoExpandido || cronogramaDisponivelExpandido) {
+        if (cronogramaProgramadoExpandido || cronogramaProjetadoExpandido || cronogramaGlobalExpandido || cronogramaPagoExpandido || cronogramaComprometidoExpandido || cronogramaDisponivelExpandido || cronogramaIndisponivelExpandido) {
             $('.table-responsive').css('overflow-x', 'auto');
         }
         
@@ -1329,6 +1359,21 @@
                     'font-size': '0.85rem'
                 }).attr('title', 'Disponível: ' + mes);
                 thMes.insertBefore(thDisponivel);
+            });
+        }
+
+        // Se cronograma INDISPONÍVEL expandido, adicionar 12 colunas antes de "Total Indisponível" no thead
+        if (cronogramaIndisponivelExpandido && $('#chk_total_indisponivel').is(':checked')) {
+            const thIndisponivel = thead.find('th.col-total-indisponivel');
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            meses.forEach(function(mes) {
+                const thMes = $('<th>').addClass('col-mes-indisponivel').text(mes + ' 🔴').css({
+                    'min-width': '120px',
+                    'background': 'linear-gradient(135deg, #dc3545 0%, #b02a37 100%)',
+                    'color': 'white',
+                    'font-size': '0.85rem'
+                }).attr('title', 'Indisponível: ' + mes);
+                thMes.insertBefore(thIndisponivel);
             });
         }
         
@@ -1574,6 +1619,34 @@
                 })
                 .text(formatarMoeda(item.total_disponivel || 0)));
 
+            // Se cronograma INDISPONÍVEL expandido, adicionar 12 colunas mensais ANTES de Total Indisponível
+            if (cronogramaIndisponivelExpandido && $('#chk_total_indisponivel').is(':checked')) {
+                const totalDispItem = item.total_disponivel || 0;
+                const cronogramaMensal = getMonthlyGlobalForItem(item);
+                const { meses: mesesDisp } = calcularDisponivelMensal(totalDispItem, cronogramaMensal);
+                for (let mes = 1; mes <= 12; mes++) {
+                    const globalMes = cronogramaMensal[mes] || 0;
+                    const dispMes = mesesDisp[mes] || 0;
+                    const indisponMes = Math.max(globalMes - dispMes, 0);
+                    let bgColor = globalMes === 0 ? '#f8f9fa' : (indisponMes > 0 ? '#f8d7da' : '#d4edda');
+                    const tdMes = $('<td>').addClass('valor-moeda col-mes-indisponivel')
+                        .text(indisponMes > 0 ? formatarMoeda(indisponMes) : '-')
+                        .css({ 'background': bgColor });
+                    if (indisponMes > 0) tdMes.attr('title', 'Parcela não coberta pelo disponível');
+                    tr.append(tdMes);
+                }
+            }
+
+            // Adicionar Total Indisponível (opcional)
+            const valorIndisponivelItem = item.total_indisponivel || 0;
+            tr.append($('<td>').addClass('valor-moeda col-total-indisponivel')
+                .css({
+                    'display': $('#chk_total_indisponivel').is(':checked') ? '' : 'none',
+                    'background': valorIndisponivelItem > 0 ? '#f8d7da' : '#fff',
+                    'color': valorIndisponivelItem > 0 ? '#842029' : '#6c757d'
+                })
+                .text(valorIndisponivelItem > 0 ? formatarMoeda(valorIndisponivelItem) : '-'));
+
             // Adicionar Valor Residual (opcional) — só exibe quando disponível > global
             const valorResidualItem = item.valor_residual || 0;
             tr.append($('<td>').addClass('valor-moeda col-valor-residual')
@@ -1600,6 +1673,7 @@
         footerRow.find('.col-mes-pago').remove();
         footerRow.find('.col-mes-comprometido').remove();
         footerRow.find('.col-mes-disponivel').remove();
+        footerRow.find('.col-mes-indisponivel').remove();
         
         // Atualizar total de Valor Atualizado no footer
         $('#total_atualizado_footer').text(formatarMoeda(totalAtualizado));
@@ -1785,6 +1859,32 @@
                 thMes.insertBefore(thDisponivelFooter);
             }
         }
+
+        // Calcular e exibir Total Indisponível no footer
+        const totalIndisponivelFooter = dadosFiltrados.reduce((sum, item) => sum + (item.total_indisponivel || 0), 0);
+        $('#total_indisponivel_footer').text(totalIndisponivelFooter > 0 ? formatarMoeda(totalIndisponivelFooter) : '-');
+
+        // Se cronograma INDISPONÍVEL expandido, adicionar totais mensais
+        if (cronogramaIndisponivelExpandido && $('#chk_total_indisponivel').is(':checked')) {
+            const thIndisponivelFooter = $('#total_indisponivel_footer');
+            for (let mes = 1; mes <= 12; mes++) {
+                let totalMesIndisponivel = 0;
+                dadosFiltrados.forEach(function(item) {
+                    const cronogramaMensal = getMonthlyGlobalForItem(item);
+                    const { meses: mesesDisp } = calcularDisponivelMensal(item.total_disponivel || 0, cronogramaMensal);
+                    const globalMes = cronogramaMensal[mes] || 0;
+                    const dispMes = mesesDisp[mes] || 0;
+                    totalMesIndisponivel += Math.max(globalMes - dispMes, 0);
+                });
+                const thMes = $('<th>').addClass('valor-moeda col-mes-indisponivel')
+                    .text(totalMesIndisponivel > 0 ? formatarMoeda(totalMesIndisponivel) : '-')
+                    .css({
+                        'background': totalMesIndisponivel > 0 ? '#f8d7da' : '#f8f9fa',
+                        'font-weight': '700'
+                    });
+                thMes.insertBefore(thIndisponivelFooter);
+            }
+        }
     }
     
     // Atualizar cards de resumo
@@ -1953,6 +2053,7 @@
             chk_total_pago: filtrosSalvos.chk_total_pago,
             chk_total_comprometido: filtrosSalvos.chk_total_comprometido,
             chk_total_disponivel: filtrosSalvos.chk_total_disponivel,
+            chk_total_indisponivel: filtrosSalvos.chk_total_indisponivel,
             chk_valor_residual: filtrosSalvos.chk_valor_residual
         };
         localStorage.setItem('orcamento_detalhado_filtros', JSON.stringify(apenasAnoEColunas));
@@ -2056,6 +2157,16 @@
                 meses.forEach(mes => cabecalho.push(mes));
             }
             cabecalho.push('Total Disponível');
+        }
+
+        // Se Total Indisponível visível, adicionar ao cabeçalho
+        if ($('#chk_total_indisponivel').is(':checked')) {
+            if (cronogramaIndisponivelExpandido) {
+                const meses = ['Jan (Indisp)', 'Fev (Indisp)', 'Mar (Indisp)', 'Abr (Indisp)', 'Mai (Indisp)', 'Jun (Indisp)',
+                              'Jul (Indisp)', 'Ago (Indisp)', 'Set (Indisp)', 'Out (Indisp)', 'Nov (Indisp)', 'Dez (Indisp)'];
+                meses.forEach(mes => cabecalho.push(mes));
+            }
+            cabecalho.push('Total Indisponível');
         }
 
         if ($('#chk_valor_residual').is(':checked')) cabecalho.push('Valor Residual');
@@ -2165,6 +2276,20 @@
                 linha.push(formatarMoedaExcel(item.total_disponivel || 0));
             }
 
+            // Adicionar Total Indisponível se visível
+            if ($('#chk_total_indisponivel').is(':checked')) {
+                if (cronogramaIndisponivelExpandido) {
+                    const cronogramaMensal = getMonthlyGlobalForItem(item);
+                    const { meses: mesesDisp } = calcularDisponivelMensal(item.total_disponivel || 0, cronogramaMensal);
+                    for (let mes = 1; mes <= 12; mes++) {
+                        const globalMes = cronogramaMensal[mes] || 0;
+                        const dispMes = mesesDisp[mes] || 0;
+                        linha.push(formatarMoedaExcel(Math.max(globalMes - dispMes, 0)));
+                    }
+                }
+                linha.push((item.total_indisponivel || 0) > 0 ? formatarMoedaExcel(item.total_indisponivel) : '0,00');
+            }
+
             if ($('#chk_valor_residual').is(':checked'))
                 linha.push((item.valor_residual || 0) > 0 ? formatarMoedaExcel(item.valor_residual) : '');
             
@@ -2248,6 +2373,7 @@
             chk_total_pago: $('#chk_total_pago').is(':checked'),
             chk_total_comprometido: $('#chk_total_comprometido').is(':checked'),
             chk_total_disponivel: $('#chk_total_disponivel').is(':checked'),
+            chk_total_indisponivel: $('#chk_total_indisponivel').is(':checked'),
             chk_valor_residual: $('#chk_valor_residual').is(':checked'),
             
             // Modo cronograma detalhado
@@ -2318,6 +2444,7 @@
             $('#chk_total_pago').prop('checked', filtros.chk_total_pago || false);
             $('#chk_total_comprometido').prop('checked', filtros.chk_total_comprometido || false);
             $('#chk_total_disponivel').prop('checked', filtros.chk_total_disponivel || false);
+            $('#chk_total_indisponivel').prop('checked', filtros.chk_total_indisponivel || false);
             $('#chk_valor_residual').prop('checked', filtros.chk_valor_residual || false);
             
             // Restaurar modo cronograma detalhado
@@ -2338,6 +2465,7 @@
             $('.col-total-pago').toggle(filtros.chk_total_pago || false);
             $('.col-total-comprometido').toggle(filtros.chk_total_comprometido || false);
             $('.col-total-disponivel').toggle(filtros.chk_total_disponivel || false);
+            $('.col-total-indisponivel').toggle(filtros.chk_total_indisponivel || false);
             $('.col-valor-residual').toggle(filtros.chk_valor_residual || false);
             
             console.log('✅ Filtros restaurados com sucesso');

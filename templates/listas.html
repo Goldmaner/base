@@ -9,6 +9,9 @@
   <style>
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+    tr.row-agente-dp  td { background-color: #cfe2ff !important; color: #084298 !important; }
+    tr.row-agente-dac td { background-color: #d1e7dd !important; color: #0a3622 !important; }
+    tr.row-agente-dgp td { background-color: #fff3cd !important; color: #664d03 !important; }
   </style>
 </head>
 <body>
@@ -96,6 +99,7 @@
     let configAtual = null;
     let registroEditando = null;
     let modalFormulario = null;
+    const tipoUsuarioLogado = "{{ tipo_usuario_logado }}";
 
     document.addEventListener('DOMContentLoaded', function() {
       modalFormulario = new bootstrap.Modal(document.getElementById('modalFormulario'));
@@ -124,6 +128,14 @@
 
         // Atualizar título
         document.getElementById('tituloTabela').textContent = configAtual.nome;
+
+        // Remover/adicionar table-striped conforme a tabela
+        const tabelaEl = document.getElementById('tabelaDados');
+        if (tabelaAtual === 'c_dp_documentos') {
+          tabelaEl.classList.remove('table-striped');
+        } else {
+          tabelaEl.classList.add('table-striped');
+        }
 
         // Construir cabeçalho da tabela
         const cabecalho = document.getElementById('cabecalhoTabela');
@@ -227,6 +239,17 @@
         for (const registro of dados) {
           const tr = document.createElement('tr');
           tr.setAttribute('data-id', registro.id);
+
+          // Colorir linha conforme tipo_usuario
+          if (tabelaAtual === 'c_dp_documentos' && registro.tipo_usuario) {
+            const classeMap = {
+              'Agente DP':  'row-agente-dp',
+              'Agente DAC': 'row-agente-dac',
+              'Agente DGP': 'row-agente-dgp'
+            };
+            const cls = classeMap[registro.tipo_usuario];
+            if (cls) tr.classList.add(cls);
+          }
           
           // Se tem inline_edit, adicionar checkbox
           if (configAtual.inline_edit) {
@@ -354,7 +377,8 @@
           tdAcoes.appendChild(btnEditar);
           
           const _tabelasSemExclusao = ['c_dgp_celebracao_status', 'c_dgp_celebracao_substatus'];
-          if (!_tabelasSemExclusao.includes(tabelaAtual)) {
+          const _excluirBloqueadoPorTipo = tabelaAtual === 'c_dp_documentos' && tipoUsuarioLogado !== 'Agente Público';
+          if (!_tabelasSemExclusao.includes(tabelaAtual) && !_excluirBloqueadoPorTipo) {
             const btnExcluir = document.createElement('button');
             btnExcluir.className = 'btn btn-sm btn-danger';
             btnExcluir.onclick = () => excluirRegistro(registro.id);

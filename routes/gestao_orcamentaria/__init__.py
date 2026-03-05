@@ -501,6 +501,8 @@ def api_orcamento_detalhado():
             total_global_item = item.get('total_global') or 0
             residual = td - total_global_item
             item['valor_residual'] = round(residual, 2) if residual > 0 else 0
+            indisponivel = total_global_item - td
+            item['total_indisponivel'] = round(indisponivel, 2) if indisponivel > 0 else 0
 
         return jsonify({
             'success': True,

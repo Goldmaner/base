@@ -73,6 +73,7 @@
 - Produção de relatórios para os dados existentes, com dashboards, etc.
 - Atribuições bem definidas de todas as páginas.
 - Construção de relatório para preenchimento dos usuários, com indicadores (preenchimento, análise, revisão, emissão).
+- Página de Instrução para inclusão dos Manuais.
 
 ## 14. Preenchimento de dados e sistema
 - Preenchimento de dados de diversas tables.
