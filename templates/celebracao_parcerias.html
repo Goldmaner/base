@@ -407,15 +407,33 @@
       <table class="table table-hover table-bordered table-sm mb-0">
         <thead class="table-dark sticky-header">
           <tr>
-            <th>Responsável</th>
-            <th>Status</th>
+            {% macro th_sort(col, label) %}
+              {% set next_dir = 'asc' if (sort_col == col and sort_dir == 'desc') else 'desc' %}
+              {% set icon = 'bi-sort-down' if (sort_col == col and sort_dir == 'desc') else ('bi-sort-up' if (sort_col == col and sort_dir == 'asc') else 'bi-arrow-down-up') %}
+              <th style="cursor:pointer;white-space:nowrap;">
+                <a class="text-white text-decoration-none" href="{{ url_for('celebracao_parcerias.index', page=1, per_page=per_page, sort=col, dir=next_dir,
+                   filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
+                   filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
+                   filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
+                   filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
+                   filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
+                   filtro_status_generico=filtro_status_generico) }}">
+                  {{ label }} <i class="bi {{ icon }}"></i>
+                </a>
+              </th>
+            {% endmacro %}
+            {{ th_sort('responsavel', 'Responsável') }}
+            {{ th_sort('status', 'Status') }}
             <th>Substatus</th>
             <th>SEI Celebração</th>
             <th>Tipo de Termo</th>
-            <th>OSC</th>
-            <th>Projeto</th>
-            <th>Unidade Gestora</th>
-            <th class="text-end">Total Previsto</th>
+            {{ th_sort('osc', 'OSC') }}
+            {{ th_sort('projeto', 'Projeto') }}
+            {{ th_sort('unidade_gestora', 'Unidade Gestora') }}
+            {% if filtro_status_generico == 'Celebrado' %}
+            {{ th_sort('assinatura', 'Data de Assinatura') }}
+            {% endif %}
+            {{ th_sort('total_previsto', 'Total Previsto') }}
             <th class="text-center" style="min-width:70px;">Ação</th>
           </tr>
         </thead>
@@ -476,6 +494,9 @@
                 {{ (r.projeto or '-')[:35] }}{% if r.projeto and r.projeto|length > 35 %}...{% endif %}
               </td>
               <td>{{ r.unidade_gestora or '-' }}</td>
+              {% if filtro_status_generico == 'Celebrado' %}
+              <td class="text-center">{{ r.assinatura.strftime('%d/%m/%Y') if r.assinatura else '-' }}</td>
+              {% endif %}
               <td class="text-end">
                 {% if r.total_previsto is not none %}
                   R$ {{ r.total_previsto | format_brl }}
@@ -492,6 +513,11 @@
                   {% if not r.osc %}disabled{% endif %}>
                   <i class="bi bi-person-lines-fill"></i>
                 </button>
+                {% if r.pode_inserir_parceria %}
+                <button class="btn btn-sm btn-success ms-1" title="Inserir parceria" disabled>
+                  <i class="bi bi-plus-circle"></i> Inserir parceria
+                </button>
+                {% endif %}
                 {% if pode_excluir %}
                 <button class="btn btn-sm btn-outline-danger ms-1" onclick="excluirRegistro({{ r.id }}, '{{ (r.osc or r.sei_celeb or '#' ~ r.id) | e }}')" title="Excluir registro">
                   <i class="bi bi-trash"></i>
@@ -502,7 +528,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="10" class="text-center text-muted py-4">
+              <td colspan="{{ 11 if filtro_status_generico == 'Celebrado' else 10 }}" class="text-center text-muted py-4">
                 <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                 Nenhum registro encontrado.
                 {% if filtros_ativos %}
@@ -524,7 +550,7 @@
     <ul class="pagination pagination-sm">
       <!-- Anterior -->
       <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-        <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=page-1, per_page=per_page,
+        <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=page-1, per_page=per_page, sort=sort_col, dir=sort_dir,
            filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
            filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
            filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
@@ -540,7 +566,7 @@
 
       {% if start_page > 1 %}
         <li class="page-item">
-          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=1, per_page=per_page,
+          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=1, per_page=per_page, sort=sort_col, dir=sort_dir,
              filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
              filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
              filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
@@ -555,7 +581,7 @@
 
       {% for p in range(start_page, end_page + 1) %}
         <li class="page-item {% if p == page %}active{% endif %}">
-          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=p, per_page=per_page,
+          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=p, per_page=per_page, sort=sort_col, dir=sort_dir,
              filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
              filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
              filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
@@ -570,7 +596,7 @@
           <li class="page-item disabled"><span class="page-link">...</span></li>
         {% endif %}
         <li class="page-item">
-          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=total_pages, per_page=per_page,
+          <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=total_pages, per_page=per_page, sort=sort_col, dir=sort_dir,
              filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
              filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
              filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
@@ -582,7 +608,7 @@
 
       <!-- Próximo -->
       <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-        <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=page+1, per_page=per_page,
+        <a class="page-link" href="{{ url_for('celebracao_parcerias.index', page=page+1, per_page=per_page, sort=sort_col, dir=sort_dir,
            filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
            filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
            filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
@@ -923,6 +949,27 @@ function salvarRegistro() {
     return;
   }
 
+  // Aviso suave: data de assinatura a mais de 15 dias de hoje (passado ou futuro)
+  if (_assVal) {
+    const _assDate = new Date(_assVal + 'T00:00:00');
+    const _hoje = new Date(); _hoje.setHours(0, 0, 0, 0);
+    const _diffDias = Math.round((_assDate - _hoje) / 86400000);
+    if (Math.abs(_diffDias) > 15) {
+      const _assFormatada = _assDate.toLocaleDateString('pt-BR');
+      const _sentido = _diffDias > 0
+        ? `${_diffDias} dias no futuro`
+        : `${Math.abs(_diffDias)} dias no passado`;
+      const _confirmar = confirm(
+        `Atenção: a data de assinatura (${_assFormatada}) está ${_sentido} em relação a hoje.\n\nDeseja salvar mesmo assim?`
+      );
+      if (!_confirmar) {
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = '<i class="bi bi-check-circle me-1"></i> Salvar Alterações';
+        return;
+      }
+    }
+  }
+
   // ── Campos obrigatórios sempre ───────────────────────────────────────────────
   const _alwaysReq = [
     { id: 'edit_sei_celeb',   label: 'SEI Celebração' },
@@ -1251,6 +1298,7 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
           name="numeracao_termo" value="${(r.numeracao_termo !== null && r.numeracao_termo !== undefined) ? r.numeracao_termo : ''}"
           min="1" max="999" step="1" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,3)"
           onchange="rebuildNumeroTermo()">
+        <small id="numeracao_termo_lock_info" class="text-muted d-none"><i class="bi bi-lock-fill me-1"></i>Disponível a partir de "Em processo de empenho".</small>
       </div>
       <div class="col-md-4">
         <label class="form-label fw-bold text-muted mb-1 small">Tipo de Termo</label>
@@ -1276,7 +1324,11 @@ Preposições em minúsculo, demais termos com Maiúscula inicial.`;
               <option value="">-- Selecione --</option>
             </select>
           </div>
-          <div class="col-md-7">
+          <div class="col-md-3">
+            <label class="form-label fw-bold text-muted mb-1 small">Nº Consulta</label>
+            <input type="text" class="form-control form-control-sm" id="edit_numero_consulta" readonly style="background:#f0f0f0;">
+          </div>
+          <div class="col-md-4">
             <label class="form-label fw-bold text-muted mb-1 small">Vereadores vinculados</label>
             <input type="text" class="form-control form-control-sm" id="edit_vereadores_info" readonly style="background:#f0f0f0;">
           </div>
@@ -1483,8 +1535,24 @@ function aoMudarStatus(statusVal) {
   if (sgEl) sgEl.value = STATUS_GEN_MAP[statusVal] || '';
   // Reconstruir caixas de substatus para o novo status
   const box = document.getElementById('substatus_box');
-  if (!box) return;
   const statusId = STATUS_IDS[statusVal] || 0;
+  // Bloquear Numeração do Termo enquanto status id < 13
+  const _numTermoLock = document.getElementById('edit_numeracao_termo');
+  const _lockInfo     = document.getElementById('numeracao_termo_lock_info');
+  if (_numTermoLock) {
+    if (statusId >= 13) {
+      _numTermoLock.removeAttribute('readonly');
+      _numTermoLock.style.backgroundColor = '';
+      _numTermoLock.style.cursor = '';
+      if (_lockInfo) _lockInfo.classList.add('d-none');
+    } else {
+      _numTermoLock.setAttribute('readonly', 'readonly');
+      _numTermoLock.style.backgroundColor = '#f0f0f0';
+      _numTermoLock.style.cursor = 'not-allowed';
+      if (_lockInfo) _lockInfo.classList.remove('d-none');
+    }
+  }
+  if (!box) return;
   const hiddenAtual = document.getElementById('edit_substatus');
   const selecionados = hiddenAtual ? hiddenAtual.value.split(';').map(v => v.trim()).filter(v => v) : [];
   let html = '';
@@ -1865,6 +1933,7 @@ function formatarTotalPrevisto(input) {
 
 // ── Emenda Parlamentar ──────────────────────────────────────────────────────
 const EMENDA_EDITAL_NAME = 'Sem Edital (Emenda Parlamentar)';
+const _emendasData = {};
 
 async function verificarEditalEmenda(prefix) {
   const editId = prefix === 'edit' ? 'edit_edital_nome' : 'new_edital_nome';
@@ -1901,6 +1970,9 @@ async function verificarEditalEmenda(prefix) {
       opt.textContent = e.sei_orcamentario;
       sel.appendChild(opt);
     });
+    _emendasData[prefix] = d.emendas;
+    const _ncResetEl = document.getElementById(`${prefix}_numero_consulta`);
+    if (_ncResetEl) _ncResetEl.value = '';
     document.getElementById(`${prefix}_vereadores_info`).value = d.vereadores.join(', ') || '—';
     if (d.projeto) {
       const projEl = document.getElementById(projId);
@@ -1923,7 +1995,11 @@ async function verificarEditalEmenda(prefix) {
       const via = d.vinculo === 'projeto' ? ' <span class="badge bg-secondary" style="font-size:0.7rem;">vínculo por projeto</span>' : '';
       alertEl.innerHTML = via ? `<div class="text-muted small">${via}</div>` : '';
     }
-    if (d.emendas.length === 1) sel.value = d.emendas[0].sei_orcamentario;
+    if (d.emendas.length === 1) {
+      sel.value = d.emendas[0].sei_orcamentario;
+      const _nc1El = document.getElementById(`${prefix}_numero_consulta`);
+      if (_nc1El) _nc1El.value = d.emendas[0].numero_consulta || '';
+    }
   } catch (err) {
     document.getElementById(`alerta_emenda_${prefix}`).innerHTML =
       '<div class="alert alert-danger py-1 small mb-0">Erro ao carregar emendas.</div>';
@@ -1931,7 +2007,10 @@ async function verificarEditalEmenda(prefix) {
 }
 
 function aoSelecionarSEIorc(prefix) {
-  /* futuro: auto-preencher projeto conforme SEI Orçamentário selecionado */
+  const seiOrc = document.getElementById(`${prefix}_sei_orcamentario`)?.value || '';
+  const emenda = (_emendasData[prefix] || []).find(e => e.sei_orcamentario === seiOrc);
+  const ncEl   = document.getElementById(`${prefix}_numero_consulta`);
+  if (ncEl) ncEl.value = (emenda && emenda.numero_consulta) ? emenda.numero_consulta : '';
 }
 
 // ── Lei: auto-detecção via /api/portaria-automatica ───────────────────────

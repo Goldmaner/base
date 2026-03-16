@@ -93,7 +93,10 @@ def listar():
             p.final::text as final_str,
             p.meses,
             p.total_previsto,
-            p.total_pago,
+            (SELECT COALESCE(SUM(ul.valor_previsto), 0)
+             FROM gestao_financeira.ultra_liquidacoes ul
+             WHERE ul.numero_termo = p.numero_termo
+               AND ul.parcela_status = 'Pago') AS total_pago,
             p.sei_celeb,
             p.sei_pc,
             (SELECT pg.nome_pg 

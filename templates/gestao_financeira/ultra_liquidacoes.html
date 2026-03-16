@@ -602,6 +602,19 @@
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Parcela(s)</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto me-3">
+                    <button type="button" id="btn_nav_anterior" class="btn btn-sm btn-outline-light"
+                            onclick="navegarParcela(-1)"
+                            title="">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <span id="nav_posicao" class="text-white small" style="white-space:nowrap;"></span>
+                    <button type="button" id="btn_nav_proximo" class="btn btn-sm btn-outline-light"
+                            onclick="navegarParcela(1)"
+                            title="">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -640,7 +653,9 @@
                                 <strong>Termo:</strong> <span id="info_numero_termo"></span><br>
                                 <strong>OSC:</strong> <span id="info_osc"></span><br>
                                 <strong>CNPJ:</strong> <span id="info_cnpj"></span><br>
-                                <strong>Vigência da Parceria:</strong> <span id="info_vigencia_parceria"></span>
+                                <strong>Vigência da Parceria:</strong> <span id="info_vigencia_parceria"></span><br>
+                                <strong>SEI Celebração:</strong> <span id="info_sei_celeb"></span><br>
+                                <strong>SEI Pagamento/PC:</strong> <span id="info_sei_pc"></span>
                             </div>
                         </div>
                     </div>
@@ -806,6 +821,7 @@
                                                 <th>De</th>
                                                 <th>Para</th>
                                                 <th style="white-space:nowrap;">Andamento mantido</th>
+                                                <th></th>
                                             </tr>
                                         </thead>
                                         <tbody id="corpo_historico_andamento"></tbody>
@@ -1242,6 +1258,7 @@
     let secaoAtual = 'nao_pago';
     let paginaAtual = 1;
     let dadosAtuais = [];
+    let indiceParcelaAtual = -1;  // Índice da parcela aberta no modal de navegação
     let modoParcelasProjetadas = false;  // Flag para controlar se está adicionando projetadas
     let totalMesesOriginais = 0;  // Quantos meses já existiam no cronograma original
     let ultimoInfoAlteracaoSalvo = 'Base';  // ⚡ NOVO: Armazena o último info_alteracao SALVO no banco
@@ -1947,7 +1964,7 @@
             const btnEditar = $('<button>').addClass('btn btn-sm btn-primary btn-acao')
                 .html('<i class="bi bi-pencil"></i>')
                 .attr('title', 'Editar')
-                .on('click', function() { editarParcela(parcela.id); });
+                .on('click', function() { editarParcela(parcela.id, dadosAtuais.indexOf(parcela)); });
             
             const btnExcluir = $('<button>').addClass('btn btn-sm btn-danger btn-acao')
                 .html('<i class="bi bi-trash"></i>')
@@ -2258,7 +2275,8 @@
     }
     
     // Editar parcela
-    function editarParcela(id) {
+    function editarParcela(id, indice) {
+        if (indice !== undefined) indiceParcelaAtual = indice;
         $.ajax({
             url: `/gestao_financeira/ultra-liquidacoes/api/parcela/${id}`,
             method: 'GET',
@@ -2275,6 +2293,8 @@
                     $('#info_osc').text(dados.osc || '-');
                     $('#info_cnpj').text(dados.cnpj || '-');
                     $('#info_vigencia_parceria').text(`${dados.inicio_parceria} a ${dados.final_parceria}`);
+                    $('#info_sei_celeb').text(dados.sei_celeb || '-');
+                    $('#info_sei_pc').text(dados.sei_pc || '-');
                     
                     $('#edit_vigencia_inicial').val(converterDataParaInput(dados.vigencia_inicial));
                     $('#edit_vigencia_final').val(converterDataParaInput(dados.vigencia_final));
@@ -2333,6 +2353,7 @@
                             const tdManter = $('<td>').addClass('text-center');
                             if (idx === 0 && h.andamento_para) {
                                 const btnManter = $('<button>')
+                                    .attr('type', 'button')
                                     .addClass('btn btn-sm btn-outline-success py-0 px-2')
                                     .attr('title', 'Registrar novamente com a data de hoje')
                                     .html('<i class="bi bi-arrow-clockwise me-1"></i>Manter')
@@ -2341,13 +2362,38 @@
                                     });
                                 tdManter.append(btnManter);
                             }
+                            const tdDeletar = $('<td>').addClass('text-center');
+                            const btnDeletar = $('<button>')
+                                .attr('type', 'button')
+                                .addClass('btn btn-sm btn-outline-danger py-0 px-1')
+                                .attr('title', 'Excluir este registro do histórico')
+                                .html('<i class="bi bi-trash"></i>')
+                                .on('click', function() {
+                                    if (!confirm('⚠️ Excluir este registro do histórico de andamento?')) return;
+                                    $.ajax({
+                                        url: `/gestao_financeira/ultra-liquidacoes/api/historico-andamento/${h.id}`,
+                                        method: 'DELETE',
+                                        success: function(resp) {
+                                            if (resp.success) {
+                                                editarParcela(parseInt($('#edit_id').val()));
+                                            } else {
+                                                alert('Erro: ' + resp.error);
+                                            }
+                                        },
+                                        error: function(xhr) {
+                                            alert('Erro ao excluir: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+                                        }
+                                    });
+                                });
+                            tdDeletar.append(btnDeletar);
                             corpoHist.append(
                                 $('<tr>').append(
                                     $('<td>').css('white-space', 'nowrap').text(h.data_hora),
                                     $('<td>').css('white-space', 'nowrap').text(h.usuario || '-'),
                                     $('<td>').text(h.andamento_de || '—'),
                                     $('<td>').text(h.andamento_para || '—'),
-                                    tdManter
+                                    tdManter,
+                                    tdDeletar
                                 )
                             );
                         });
@@ -2381,14 +2427,40 @@
                     
                     // Resetar para aba individual
                     $('#tab-individual').tab('show');
-                    
-                    $('#modalEditarParcela').modal('show');
+
+                    // Atualizar controles de navegação
+                    const total = dadosAtuais.length;
+                    $('#nav_posicao').text(total > 0 ? `${indiceParcelaAtual + 1} / ${total}` : '');
+
+                    const primeiroItem = indiceParcelaAtual <= 0;
+                    const ultimoItem  = indiceParcelaAtual >= total - 1;
+                    const msgPagina   = 'Limite da página atual. Feche e navegue para a página anterior/próxima.';
+
+                    $('#btn_nav_anterior')
+                        .prop('disabled', primeiroItem)
+                        .attr('title', primeiroItem ? msgPagina : 'Parcela anterior');
+                    $('#btn_nav_proximo')
+                        .prop('disabled', ultimoItem)
+                        .attr('title', ultimoItem ? msgPagina : 'Próxima parcela');
+
+                    if (!$('#modalEditarParcela').hasClass('show')) {
+                        $('#modalEditarParcela').modal('show');
+                    }
                 }
             },
             error: function(xhr) {
                 alert('Erro ao carregar parcela: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
             }
         });
+    }
+
+    // Navegar entre parcelas da página atual
+    function navegarParcela(direcao) {
+        const novoIndice = indiceParcelaAtual + direcao;
+        if (novoIndice < 0 || novoIndice >= dadosAtuais.length) return;
+        const parcela = dadosAtuais[novoIndice];
+        if (!parcela) return;
+        editarParcela(parcela.id, novoIndice);
     }
     
     // Validar valores

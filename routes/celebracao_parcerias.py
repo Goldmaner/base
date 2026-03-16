@@ -168,6 +168,25 @@ def index():
         per_page = 20
     offset = (page - 1) * per_page
 
+    # Ordenação
+    COLUNAS_SORT = {
+        'id':          'cp.id',
+        'responsavel': 'cp.responsavel',
+        'status':      'cp.status',
+        'osc':         'cp.osc',
+        'projeto':     'cp.projeto',
+        'assinatura':  'cp.assinatura',
+        'total_previsto': 'cp.total_previsto',
+        'unidade_gestora': 'cp.unidade_gestora',
+    }
+    sort_col  = request.args.get('sort', 'id').strip()
+    sort_dir  = request.args.get('dir', 'desc').strip().lower()
+    if sort_col not in COLUNAS_SORT:
+        sort_col = 'id'
+    if sort_dir not in ('asc', 'desc'):
+        sort_dir = 'desc'
+    order_expr = f"{COLUNAS_SORT[sort_col]} {sort_dir.upper()} NULLS LAST"
+
     # Filtros do formulário
     filtros_vals = ler_filtros_request()
 
@@ -240,10 +259,22 @@ def index():
                      AND cp.created_at >= NOW() - INTERVAL '2 days'
                 THEN TRUE
                 ELSE FALSE
-            END AS is_novo_processo
+            END AS is_novo_processo,
+            CASE
+                WHEN cp.status_generico = 'Celebrado'
+                     AND cp.assinatura IS NOT NULL
+                     AND cp.sei_celeb IS NOT NULL
+                     AND TRIM(cp.sei_celeb) != ''
+                     AND NOT EXISTS (
+                         SELECT 1 FROM public.parcerias p
+                         WHERE p.sei_celeb = cp.sei_celeb
+                     )
+                THEN TRUE
+                ELSE FALSE
+            END AS pode_inserir_parceria
         FROM celebracao.celebracao_parcerias cp
         {where_clause}
-        ORDER BY id DESC
+        ORDER BY {order_expr}
         LIMIT %s OFFSET %s
     """, params + [per_page, offset])
     registros = cur.fetchall()
@@ -377,6 +408,8 @@ def index():
         pode_editar_responsavel=pode_editar_responsavel,
         nome_analista_logado=nome_analista,
         ver_todos=ver_todos,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
         **filtros_vals
     )
 
@@ -1121,7 +1154,7 @@ def api_emendas_por_sei():
 
     if usar_projeto:
         cur.execute("""
-            SELECT sei_orcamentario, projeto
+            SELECT sei_orcamentario, projeto, numero_consulta
             FROM celebracao.celebracao_emendas
             WHERE unaccent(LOWER(projeto)) = unaccent(LOWER(%s))
             ORDER BY id
@@ -1134,7 +1167,7 @@ def api_emendas_por_sei():
         """, [projeto_fb])
     else:
         cur.execute("""
-            SELECT sei_orcamentario, projeto
+            SELECT sei_orcamentario, projeto, numero_consulta
             FROM celebracao.celebracao_emendas
             WHERE sei_celeb = %s
             ORDER BY id

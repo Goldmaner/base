@@ -1141,6 +1141,7 @@ def api_obter_parcela(parcela_id):
         # Histórico de alterações do status de andamento
         cur.execute("""
             SELECT
+                id,
                 TO_CHAR(created_at, 'DD/MM/YYYY HH24:MI') AS data_hora,
                 usuario_nome,
                 detalhes->'parcela_andamento'->>'de'   AS andamento_de,
@@ -1154,6 +1155,7 @@ def api_obter_parcela(parcela_id):
         """, (str(parcela_id),))
         historico_andamento = [
             {
+                'id':             r['id'],
                 'data_hora':      r['data_hora'],
                 'usuario':        r['usuario_nome'],
                 'andamento_de':   r['andamento_de'],
@@ -1442,6 +1444,31 @@ def api_manter_andamento(parcela_id):
         conn.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+    finally:
+        cur.close()
+
+
+@ultra_liquidacoes_bp.route('/api/historico-andamento/<int:log_id>', methods=['DELETE'])
+@login_required
+def api_deletar_historico_andamento(log_id):
+    """Remove uma entrada do histórico de andamento (log_atividades)"""
+    conn = get_db()
+    cur = get_cursor()
+    try:
+        cur.execute("""
+            DELETE FROM gestao_pessoas.log_atividades
+            WHERE id = %s
+              AND recurso_tipo = 'parcela'
+              AND detalhes ? 'parcela_andamento'
+        """, (log_id,))
+        if cur.rowcount == 0:
+            conn.rollback()
+            return jsonify({'success': False, 'error': 'Registro não encontrado'}), 404
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         cur.close()
 

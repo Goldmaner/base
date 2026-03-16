@@ -2,8 +2,8 @@
 Blueprint de gerenciamento de listas/tabelas categóricas
 """
 
-from flask import Blueprint, render_template, request, jsonify
-from db import get_cursor, execute_query
+from flask import Blueprint, render_template, request, jsonify, session
+from db import get_cursor, execute_query, get_db
 from utils import login_required
 from decorators import requires_access
 
@@ -1636,4 +1636,115 @@ def mover_item(tabela, id):
         traceback.print_exc()
         return jsonify({'erro': str(e)}), 500
 
+
+# ── Contatos de Vereadores ─────────────────────────────────────────────────
+
+@listas_bp.route("/vereadores/contatos/<path:vereador_nome>", methods=["GET"])
+@login_required
+@requires_access('listas')
+def listar_contatos_vereador(vereador_nome):
+    """Retorna todos os contatos de um vereador"""
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT id, vereador_nome, contato_nome, contato_posicao, contato_tipo,
+                   contato_info, status, observacao, responsavel, criado_em
+            FROM public.contatos_vereadores
+            WHERE vereador_nome = %s
+            ORDER BY status DESC, contato_nome
+        """, (vereador_nome,))
+        contatos = cur.fetchall()
+        contatos_fmt = []
+        for c in contatos:
+            d = dict(c)
+            d['criado_em'] = d['criado_em'].strftime('%d/%m/%Y %H:%M') if d.get('criado_em') else '-'
+            contatos_fmt.append(d)
+        return jsonify({'contatos': contatos_fmt}), 200
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/vereadores/contatos/criar", methods=["POST"])
+@login_required
+@requires_access('listas')
+def criar_contato_vereador():
+    """Cria um novo contato de vereador"""
+    try:
+        data = request.get_json()
+        vereador_nome = (data.get('vereador_nome') or '').strip()
+        c = data.get('contato', {})
+        contato_nome = (c.get('nome') or '').strip()
+        contato_posicao = (c.get('posicao') or '').strip() or None
+        contato_tipo = (c.get('tipo') or '').strip()
+        contato_info = (c.get('info') or '').strip()
+        status = (c.get('status') or 'Ativo').strip()
+        observacao = (c.get('observacao') or '').strip() or None
+        responsavel = session.get('d_usuario', 'sistema')
+
+        if not vereador_nome or not contato_nome or not contato_tipo or not contato_info:
+            return jsonify({'erro': 'Campos obrigatórios: Vereador, Nome do contato, Tipo e Informação'}), 400
+
+        cur = get_cursor()
+        cur.execute("""
+            INSERT INTO public.contatos_vereadores
+                (vereador_nome, contato_nome, contato_posicao, contato_tipo,
+                 contato_info, status, observacao, responsavel, criado_em)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """, (vereador_nome, contato_nome, contato_posicao, contato_tipo,
+              contato_info, status, observacao, responsavel))
+        get_db().commit()
+        return jsonify({'mensagem': 'Contato adicionado com sucesso!'}), 200
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/vereadores/contatos/editar/<int:id>", methods=["POST"])
+@login_required
+@requires_access('listas')
+def editar_contato_vereador(id):
+    """Edita um contato de vereador existente"""
+    try:
+        data = request.get_json()
+        contato_nome = (data.get('contato_nome') or '').strip()
+        contato_posicao = (data.get('contato_posicao') or '').strip() or None
+        contato_tipo = (data.get('contato_tipo') or '').strip()
+        contato_info = (data.get('contato_info') or '').strip()
+        status = (data.get('status') or 'Ativo').strip()
+        observacao = (data.get('observacao') or '').strip() or None
+
+        if not contato_nome or not contato_tipo or not contato_info:
+            return jsonify({'erro': 'Campos obrigatórios: Nome, Tipo e Informação de Contato'}), 400
+
+        cur = get_cursor()
+        cur.execute("""
+            UPDATE public.contatos_vereadores
+            SET contato_nome = %s, contato_posicao = %s, contato_tipo = %s,
+                contato_info = %s, status = %s, observacao = %s
+            WHERE id = %s
+        """, (contato_nome, contato_posicao, contato_tipo, contato_info, status, observacao, id))
+        if cur.rowcount == 0:
+            return jsonify({'erro': 'Contato não encontrado'}), 404
+        get_db().commit()
+        return jsonify({'mensagem': 'Contato atualizado com sucesso!'}), 200
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/vereadores/contatos/deletar/<int:id>", methods=["POST"])
+@login_required
+@requires_access('listas')
+def deletar_contato_vereador(id):
+    """Exclui um contato de vereador"""
+    try:
+        cur = get_cursor()
+        cur.execute("DELETE FROM public.contatos_vereadores WHERE id = %s", (id,))
+        if cur.rowcount == 0:
+            return jsonify({'erro': 'Contato não encontrado'}), 404
+        get_db().commit()
+        return jsonify({'mensagem': 'Contato excluído com sucesso!'}), 200
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
 

@@ -386,6 +386,16 @@
             btnExcluir.title = 'Excluir';
             tdAcoes.appendChild(btnExcluir);
           }
+
+          // Botão Contatos — somente tabela de vereadores
+          if (tabelaAtual === 'c_geral_vereadores') {
+            const btnContatos = document.createElement('button');
+            btnContatos.className = 'btn btn-sm btn-outline-info ms-1';
+            btnContatos.onclick = () => abrirContatosVereador(registro.vereador_nome);
+            btnContatos.innerHTML = '<i class="bi bi-person-lines-fill"></i>';
+            btnContatos.title = 'Contatos';
+            tdAcoes.appendChild(btnContatos);
+          }
           
           tr.appendChild(tdAcoes);
 
@@ -1431,7 +1441,173 @@
     function ordenarPorPareceres() {
       ordenarPorColuna('total_pareceres');
     }
-    
+
+    // ── Contatos de Vereadores ────────────────────────────────────────────────
+    let _contatosVereadorAtual = null;
+
+    function abrirContatosVereador(vereadorNome) {
+      if (!vereadorNome) return;
+      _contatosVereadorAtual = vereadorNome;
+      document.getElementById('modalContatosVereadorTitulo').textContent = vereadorNome;
+      document.getElementById('contatosVereadorLista').innerHTML =
+        '<div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-1"></span>Carregando...</div>';
+      document.getElementById('formNovoContatoVer').style.display = 'none';
+      document.getElementById('formEditarContatoVer').style.display = 'none';
+      document.getElementById('btnMostrarNovoContatoVer').style.display = '';
+      new bootstrap.Modal(document.getElementById('modalContatosVereador')).show();
+      carregarContatosVereador(vereadorNome);
+    }
+
+    async function carregarContatosVereador(vereadorNome) {
+      try {
+        const res = await fetch(`/listas/vereadores/contatos/${encodeURIComponent(vereadorNome)}`);
+        const d = await res.json();
+        const lista = document.getElementById('contatosVereadorLista');
+        if (!d.contatos || d.contatos.length === 0) {
+          lista.innerHTML = '<p class="text-muted small text-center py-2">Nenhum contato cadastrado.</p>';
+          return;
+        }
+        lista.innerHTML = d.contatos.map(c => {
+          const nm  = (c.contato_nome     || '').replace(/"/g, '&quot;').replace(/'/g, '\'');
+          const pos = (c.contato_posicao  || '').replace(/"/g, '&quot;').replace(/'/g, '\'');
+          const tp  = (c.contato_tipo     || '').replace(/"/g, '&quot;').replace(/'/g, '\'');
+          const inf = (c.contato_info     || '').replace(/"/g, '&quot;').replace(/'/g, '\'');
+          const obs = (c.observacao       || '').replace(/"/g, '&quot;').replace(/'/g, '\'');
+          return `
+          <div class="border rounded p-2 mb-2 ${c.status === 'Inativo' ? 'opacity-50' : ''}">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div class="flex-grow-1">
+                <strong>${c.contato_nome || '—'}</strong>
+                ${c.contato_posicao ? `<span class="text-muted small ms-1">· ${c.contato_posicao}</span>` : ''}
+                <br>
+                <span class="badge bg-secondary me-1">${c.contato_tipo || '—'}</span>
+                <span class="small">${c.contato_info || '—'}</span>
+                ${c.observacao ? `<br><span class="text-muted small fst-italic">${c.observacao}</span>` : ''}
+              </div>
+              <div class="d-flex gap-1 flex-shrink-0">
+                <button class="btn btn-sm btn-outline-primary" style="padding:1px 6px;"
+                  onclick="editarContatoVer(${c.id},'${nm}','${pos}','${tp}','${inf}','${c.status||''}','${obs}')">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" style="padding:1px 6px;"
+                  onclick="deletarContatoVer(${c.id})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      } catch (err) {
+        document.getElementById('contatosVereadorLista').innerHTML =
+          '<div class="alert alert-danger py-1 small">Erro ao carregar contatos.</div>';
+      }
+    }
+
+    function editarContatoVer(id, nome, posicao, tipo, info, status, obs) {
+      document.getElementById('formNovoContatoVer').style.display = 'none';
+      document.getElementById('btnMostrarNovoContatoVer').style.display = '';
+      const frm = document.getElementById('formEditarContatoVer');
+      frm.style.display = '';
+      frm.dataset.id = id;
+      document.getElementById('ev_nome').value = nome;
+      document.getElementById('ev_posicao').value = posicao;
+      document.getElementById('ev_tipo').value = tipo;
+      document.getElementById('ev_info').value = info;
+      document.getElementById('ev_status').value = status;
+      document.getElementById('ev_obs').value = obs;
+    }
+
+    async function salvarEditarContatoVer() {
+      const frm = document.getElementById('formEditarContatoVer');
+      const _id = frm.dataset.id;
+      const body = {
+        contato_nome:     document.getElementById('ev_nome').value.trim(),
+        contato_posicao:  document.getElementById('ev_posicao').value.trim(),
+        contato_tipo:     document.getElementById('ev_tipo').value,
+        contato_info:     document.getElementById('ev_info').value.trim(),
+        status:           document.getElementById('ev_status').value,
+        observacao:       document.getElementById('ev_obs').value.trim()
+      };
+      if (!body.contato_nome) { alert('Informe o nome do contato.'); return; }
+      try {
+        const res = await fetch(`/listas/vereadores/contatos/editar/${_id}`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+        });
+        const d = await res.json();
+        if (res.ok) {
+          frm.style.display = 'none';
+          document.getElementById('btnMostrarNovoContatoVer').style.display = '';
+          carregarContatosVereador(_contatosVereadorAtual);
+        } else { alert(d.erro || d.error || 'Erro ao salvar.'); }
+      } catch (err) { alert('Erro: ' + err); }
+    }
+
+    async function deletarContatoVer(id) {
+      if (!confirm('Excluir este contato?')) return;
+      try {
+        const res = await fetch(`/listas/vereadores/contatos/deletar/${id}`, { method: 'POST' });
+        const d = await res.json();
+        if (res.ok) carregarContatosVereador(_contatosVereadorAtual);
+        else alert(d.erro || d.error || 'Erro ao excluir.');
+      } catch (err) { alert('Erro: ' + err); }
+    }
+
+    function aplicarMascaraTelVer(infoId, tipoId) {
+      const tipo = document.getElementById(tipoId)?.value || '';
+      const input = document.getElementById(infoId);
+      if (!input) return;
+      const novo = input.cloneNode(true);
+      input.parentNode.replaceChild(novo, input);
+      const isTel = tipo.includes('Telefone') || tipo === 'WhatsApp' || tipo === 'Gabinete';
+      if (!isTel) {
+        novo.placeholder = tipo.includes('E-mail') ? 'email@exemplo.com' : '';
+        novo.removeAttribute('maxlength');
+        return;
+      }
+      novo.placeholder = (tipo === 'Telefone Fixo' || tipo === 'Gabinete') ? '(11) 3333-3333' : '(11) 98888-8888';
+      novo.maxLength = 15;
+      novo.addEventListener('input', function(e) {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 11) v = v.substring(0, 11);
+        if      (v.length >= 11) v = v.replace(/^(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        else if (v.length >= 10) v = v.replace(/^(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+        else if (v.length >= 7)  v = v.replace(/^(\d{2})(\d{4,5})(\d{0,4})/, '($1) $2-$3');
+        else if (v.length >= 3)  v = v.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+        else if (v.length >= 1)  v = v.replace(/^(\d*)/, '($1');
+        e.target.value = v;
+      });
+    }
+
+    async function salvarNovoContatoVer() {
+      const body = {
+        vereador_nome: _contatosVereadorAtual,
+        contato: {
+          nome:      document.getElementById('nv_nome').value.trim(),
+          posicao:   document.getElementById('nv_posicao').value.trim(),
+          tipo:      document.getElementById('nv_tipo').value,
+          info:      document.getElementById('nv_info').value.trim(),
+          status:    document.getElementById('nv_status').value,
+          observacao: document.getElementById('nv_obs').value.trim()
+        }
+      };
+      if (!body.contato.nome) { alert('Informe o nome do contato.'); return; }
+      if (!body.contato.info) { alert('Informe a informação de contato.'); return; }
+      try {
+        const res = await fetch('/listas/vereadores/contatos/criar', {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+        });
+        const d = await res.json();
+        if (res.ok) {
+          document.getElementById('formNovoContatoVer').style.display = 'none';
+          document.getElementById('btnMostrarNovoContatoVer').style.display = '';
+          ['nv_nome', 'nv_posicao', 'nv_info', 'nv_obs'].forEach(id => document.getElementById(id).value = '');
+          document.getElementById('nv_tipo').value = 'E-mail';
+          document.getElementById('nv_status').value = 'Ativo';
+          carregarContatosVereador(_contatosVereadorAtual);
+        } else { alert(d.erro || d.error || 'Erro ao criar contato.'); }
+      } catch (err) { alert('Erro: ' + err); }
+    }
+
     function ordenarPorColunaTexto(nomeColuna) {
       const tbody = document.getElementById('corpoTabela');
       const linhas = Array.from(tbody.getElementsByTagName('tr'));
@@ -1500,5 +1676,128 @@
       atualizarRodape();
     }
   </script>
+
+  <!-- Modal: Contatos do Vereador -->
+  <div class="modal fade" id="modalContatosVereador" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title">
+            <i class="bi bi-person-lines-fill me-2 text-info"></i>
+            <span id="modalContatosVereadorTitulo"></span>
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="contatosVereadorLista"></div>
+
+          <!-- Form: Editar contato -->
+          <div id="formEditarContatoVer" style="display:none;" class="border rounded p-3 mb-3 bg-light">
+            <h6 class="text-primary fw-bold mb-3"><i class="bi bi-pencil me-1"></i>Editar Contato</h6>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold mb-1">Nome *</label>
+                <input type="text" class="form-control form-control-sm" id="ev_nome">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold mb-1">Posição/Cargo</label>
+                <input type="text" class="form-control form-control-sm" id="ev_posicao"
+                  placeholder="Ex: Assessor, Chefe de Gabinete...">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold mb-1">Tipo</label>
+                <select class="form-select form-select-sm" id="ev_tipo"
+                  onchange="aplicarMascaraTelVer('ev_info','ev_tipo')">
+                  <option>E-mail</option><option>Telefone Fixo</option><option>Telefone Celular</option>
+                  <option>WhatsApp</option><option>Gabinete</option><option>Outro</option>
+                </select>
+              </div>
+              <div class="col-md-5">
+                <label class="form-label small fw-bold mb-1">Informação *</label>
+                <input type="text" class="form-control form-control-sm" id="ev_info">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-bold mb-1">Status</label>
+                <select class="form-select form-select-sm" id="ev_status">
+                  <option>Ativo</option><option>Inativo</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label small fw-bold mb-1">Observação</label>
+                <input type="text" class="form-control form-control-sm" id="ev_obs">
+              </div>
+            </div>
+            <div class="mt-3 d-flex gap-2">
+              <button class="btn btn-sm btn-primary" onclick="salvarEditarContatoVer()">
+                <i class="bi bi-check-lg me-1"></i>Salvar
+              </button>
+              <button class="btn btn-sm btn-secondary"
+                onclick="document.getElementById('formEditarContatoVer').style.display='none'">
+                Cancelar
+              </button>
+            </div>
+          </div>
+
+          <!-- Form: Novo contato -->
+          <div id="formNovoContatoVer" style="display:none;" class="border rounded p-3 bg-light">
+            <h6 class="text-success fw-bold mb-3"><i class="bi bi-plus-circle me-1"></i>Novo Contato</h6>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold mb-1">Nome *</label>
+                <input type="text" class="form-control form-control-sm" id="nv_nome"
+                  placeholder="Nome do contato">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold mb-1">Posição/Cargo</label>
+                <input type="text" class="form-control form-control-sm" id="nv_posicao"
+                  placeholder="Ex: Assessor, Chefe de Gabinete...">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold mb-1">Tipo</label>
+                <select class="form-select form-select-sm" id="nv_tipo"
+                  onchange="aplicarMascaraTelVer('nv_info','nv_tipo')">
+                  <option>E-mail</option><option>Telefone Fixo</option><option>Telefone Celular</option>
+                  <option>WhatsApp</option><option>Gabinete</option><option>Outro</option>
+                </select>
+              </div>
+              <div class="col-md-5">
+                <label class="form-label small fw-bold mb-1">Informação *</label>
+                <input type="text" class="form-control form-control-sm" id="nv_info"
+                  placeholder="email@exemplo.com ou (11) 98888-8888">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-bold mb-1">Status</label>
+                <select class="form-select form-select-sm" id="nv_status">
+                  <option>Ativo</option><option>Inativo</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label small fw-bold mb-1">Observação</label>
+                <input type="text" class="form-control form-control-sm" id="nv_obs"
+                  placeholder="Observações opcionais">
+              </div>
+            </div>
+            <div class="mt-3 d-flex gap-2">
+              <button class="btn btn-sm btn-success" onclick="salvarNovoContatoVer()">
+                <i class="bi bi-check-lg me-1"></i>Adicionar
+              </button>
+              <button class="btn btn-sm btn-secondary"
+                onclick="document.getElementById('formNovoContatoVer').style.display='none';document.getElementById('btnMostrarNovoContatoVer').style.display=''">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button id="btnMostrarNovoContatoVer" class="btn btn-success btn-sm"
+            onclick="document.getElementById('formNovoContatoVer').style.display='';document.getElementById('formEditarContatoVer').style.display='none';this.style.display='none'">
+            <i class="bi bi-plus-lg me-1"></i>Adicionar Contato
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
