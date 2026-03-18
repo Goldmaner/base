@@ -158,7 +158,7 @@ def editar(numero_termo):
     cur = get_cursor()
     
     # Buscar total_previsto e sei_celeb para exibir no subtítulo
-    cur.execute("SELECT total_previsto, sei_celeb FROM Parcerias WHERE numero_termo = %s", (numero_termo,))
+    cur.execute("SELECT total_previsto, sei_celeb, inicio, final FROM Parcerias WHERE numero_termo = %s", (numero_termo,))
     row = cur.fetchone()
     
     try:
@@ -168,6 +168,8 @@ def editar(numero_termo):
     
     # Obter SEI de celebração
     sei_celeb = row['sei_celeb'] if row and row.get('sei_celeb') else None
+    inicio = str(row['inicio']) if row and row.get('inicio') else None
+    final = str(row['final']) if row and row.get('final') else None
     
     # formatar em pt-BR: R$ 1.234.567,89
     formatted_total = 'R$ ' + f"{total_previsto_val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -193,7 +195,9 @@ def editar(numero_termo):
                          total_previsto=formatted_total, 
                          total_previsto_val=total_previsto_val,
                          sei_celeb=sei_celeb,
-                         aditivos=aditivos)
+                         aditivos=aditivos,
+                         inicio=inicio,
+                         final=final)
 
 
 @orcamento_bp.route('/dicionario-despesas')
@@ -782,3 +786,122 @@ def salvar_observacoes(numero_termo):
     
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar observações: {str(e)}"}), 500
+
+
+@orcamento_bp.route('/api/ocr-pdf', methods=['POST'])
+@login_required
+def api_ocr_pdf():
+    """
+    Recebe um PDF e extrai tabelas usando pdfplumber.
+    Retorna JSON com as linhas extraídas.
+    """
+    try:
+        import io as _io
+
+        try:
+            import pdfplumber
+        except ImportError:
+            return jsonify({'error': 'pdfplumber não instalado. Execute: pip install pdfplumber'}), 500
+
+        if 'arquivo' not in request.files:
+            return jsonify({'error': 'Nenhum arquivo enviado (campo "arquivo")'}), 400
+
+        arquivo = request.files['arquivo']
+        if not arquivo.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'Apenas arquivos PDF são aceitos neste endpoint'}), 400
+
+        conteudo = arquivo.read()
+        if len(conteudo) == 0:
+            return jsonify({'error': 'Arquivo vazio'}), 400
+
+        todas_linhas = []
+        colunas = []
+
+        with pdfplumber.open(_io.BytesIO(conteudo)) as pdf:
+            for pagina in pdf.pages:
+                tabelas = pagina.extract_tables()
+                for tabela in tabelas:
+                    if not tabela or len(tabela) < 2:
+                        continue
+                    # Primeira linha da primeira tabela vira cabeçalho
+                    if not colunas:
+                        colunas = [str(c or '').strip() for c in tabela[0]]
+                    for linha in tabela[1:]:
+                        linha_dict = {}
+                        for i, val in enumerate(linha):
+                            nome_col = colunas[i] if i < len(colunas) else f'Coluna {i + 1}'
+                            linha_dict[nome_col] = str(val or '').strip()
+                        if any(v for v in linha_dict.values()):
+                            todas_linhas.append(linha_dict)
+
+        if todas_linhas:
+            return jsonify({
+                'rows': todas_linhas,
+                'columns': colunas,
+                'message': f'{len(todas_linhas)} linha(s) extraída(s) de {len(colunas)} coluna(s)'
+            }), 200
+
+        # Sem tabelas estruturadas — retornar texto bruto
+        partes_texto = []
+        with pdfplumber.open(_io.BytesIO(conteudo)) as pdf:
+            for pagina in pdf.pages:
+                t = pagina.extract_text()
+                if t:
+                    partes_texto.append(t)
+
+        return jsonify({
+            'rows': [],
+            'columns': [],
+            'texto': '\n'.join(partes_texto),
+            'message': 'Nenhuma tabela estruturada encontrada. Texto bruto retornado para análise manual.'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Erro ao processar PDF: {str(e)}'}), 500
+
+
+@orcamento_bp.route('/api/clonar-aditivo', methods=['POST'])
+@login_required
+def api_clonar_aditivo():
+    """
+    Cria um novo aditivo copiando todos os registros de um aditivo de origem.
+    Retorna o número do novo aditivo.
+    """
+    try:
+        data = request.get_json()
+        numero_termo = data.get('numero_termo')
+        aditivo_origem = int(data.get('aditivo_origem', 0))
+
+        if not numero_termo:
+            return jsonify({'error': 'numero_termo é obrigatório'}), 400
+
+        from db import get_db
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Descobrir o próximo número de aditivo
+        cur.execute("""
+            SELECT COALESCE(MAX(COALESCE(aditivo, 0)), 0) + 1 as proximo
+            FROM Parcerias_Despesas WHERE numero_termo = %s
+        """, (numero_termo,))
+        novo_aditivo = cur.fetchone()[0]
+
+        # Copiar linhas do aditivo de origem para o novo aditivo
+        cur.execute("""
+            INSERT INTO Parcerias_Despesas
+                (numero_termo, rubrica, quantidade, categoria_despesa, valor, mes, aditivo)
+            SELECT numero_termo, rubrica, quantidade, categoria_despesa, valor, mes, %s
+            FROM Parcerias_Despesas
+            WHERE numero_termo = %s AND COALESCE(aditivo, 0) = %s
+        """, (novo_aditivo, numero_termo, aditivo_origem))
+
+        conn.commit()
+        cur.close()
+
+        return jsonify({
+            'novo_aditivo': novo_aditivo,
+            'message': f'Aditivo {novo_aditivo} criado com {cur.rowcount if hasattr(cur, "rowcount") else "?"} registros'
+        }), 201
+
+    except Exception as e:
+        return jsonify({'error': f'Erro ao criar aditivo: {str(e)}'}), 500

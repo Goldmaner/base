@@ -1161,6 +1161,7 @@ def api_importar_dotacao():
     try:
         conn = get_db()
         cur = conn.cursor()
+        cur.execute("SET datestyle TO 'ISO, DMY'")
         total_importados = 0
         
         # Processar cada arquivo enviado
@@ -1282,6 +1283,7 @@ def api_importar_reservas():
     try:
         conn = get_db()
         cur = conn.cursor()
+        cur.execute("SET datestyle TO 'ISO, DMY'")
         total_importados = 0
         
         # Processar arquivo único
@@ -1418,6 +1420,7 @@ def api_importar_empenhos():
     try:
         conn = get_db()
         cur = conn.cursor()
+        cur.execute("SET datestyle TO 'ISO, DMY'")
         total_importados = 0
         
         # Processar cada arquivo enviado

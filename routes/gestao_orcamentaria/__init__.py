@@ -77,7 +77,69 @@ def api_orcamento_detalhado():
         if not termos:
             return jsonify({'success': True, 'dados': []})
         
-        # 2. Para cada termo, buscar dotação e informações adicionais
+        # 2. PRÉ-CARREGAR dados em bulk (evita N+1 queries por termo)
+        
+        # 2a. Carregar TODAS as parcerias dos termos de uma vez
+        termos_list = [t['numero_termo'] for t in termos]
+        cur.execute("""
+            SELECT 
+                numero_termo, osc, cnpj, projeto, sei_celeb, sei_pc, tipo_termo, 
+                final, inicio, total_previsto,
+                CASE 
+                    WHEN final IS NOT NULL AND inicio IS NOT NULL THEN
+                        EXTRACT(YEAR FROM AGE(final, inicio)) * 12 + EXTRACT(MONTH FROM AGE(final, inicio))
+                    ELSE NULL
+                END as meses_vigencia
+            FROM public.parcerias
+            WHERE numero_termo = ANY(%s)
+        """, (termos_list,))
+        parcerias_map = {r['numero_termo']: r for r in cur.fetchall()}
+        
+        # 2b. Carregar TODAS as dotações de uma vez (tabela pequena)
+        cur.execute("""
+            SELECT condicoes_termo, condicoes_unidade, condicoes_osc, 
+                   dotacao_numero, programa_aplicacao
+            FROM categoricas.c_geral_dotacoes
+        """)
+        todas_dotacoes = cur.fetchall()
+        
+        # Indexar dotações para lookup rápido em Python
+        # Prioridade 1: (termo, unidade, osc) → dotacao
+        # Prioridade 2: (termo, unidade, '') → dotacao
+        # Prioridade 3: (termo) → dotacao
+        dotacoes_com_osc = {}    # {(termo, unidade, osc): (dotacao, programatica)}
+        dotacoes_sem_osc = {}    # {(termo, unidade): (dotacao, programatica)}
+        dotacoes_por_termo = {}  # {(termo,): (dotacao, programatica)}
+        dotacoes_por_numero = {} # {dotacao_numero: programatica}
+        
+        for d in todas_dotacoes:
+            ct = d['condicoes_termo'] or ''
+            cu = d['condicoes_unidade'] or ''
+            co = d['condicoes_osc'] or ''
+            dn = d['dotacao_numero']
+            pa = d['programa_aplicacao']
+            
+            if dn:
+                dotacoes_por_numero[dn] = pa
+            
+            if co:
+                dotacoes_com_osc.setdefault((ct, cu, co), (dn, pa))
+            else:
+                dotacoes_sem_osc.setdefault((ct, cu), (dn, pa))
+            dotacoes_por_termo.setdefault((ct,), (dn, pa))
+        
+        def buscar_dotacao(tipo_termo, unidade, osc):
+            """Busca dotação no cache em Python (mesma lógica de prioridade)"""
+            if osc and unidade:
+                r = dotacoes_com_osc.get((tipo_termo, unidade, osc))
+                if r:
+                    return r
+            if unidade:
+                r = dotacoes_sem_osc.get((tipo_termo, unidade))
+                if r:
+                    return r
+            return dotacoes_por_termo.get((tipo_termo,), (None, None))
+        
         resultado = []
         
         for termo in termos:
@@ -89,30 +151,16 @@ def api_orcamento_detalhado():
             total_comprometido = float(termo['total_comprometido'] or 0)
             
             # Extrair informações do termo
-            # Formato esperado: TCL/055/2023/SMDHC/SESANA
             partes_termo = numero_termo.split('/')
             
             if len(partes_termo) < 5:
-                # Termo com formato inválido, pular
                 continue
             
-            tipo_termo = partes_termo[0]  # Ex: TCL, TFM
-            unidade = partes_termo[4] if len(partes_termo) > 4 else None  # Ex: SESANA, FUMCAD
+            tipo_termo = partes_termo[0]
+            unidade = partes_termo[4] if len(partes_termo) > 4 else None
             
-            # Buscar informações da parceria (OSC, CNPJ, Projeto, SEI Celebração, SEI PC, tipo_termo, final, inicio)
-            cur.execute("""
-                SELECT 
-                    osc, cnpj, projeto, sei_celeb, sei_pc, tipo_termo, final, inicio, total_previsto,
-                    CASE 
-                        WHEN final IS NOT NULL AND inicio IS NOT NULL THEN
-                            EXTRACT(YEAR FROM AGE(final, inicio)) * 12 + EXTRACT(MONTH FROM AGE(final, inicio))
-                        ELSE NULL
-                    END as meses_vigencia
-                FROM public.parcerias
-                WHERE numero_termo = %s
-            """, (numero_termo,))
-            
-            parceria = cur.fetchone()
+            # Buscar parceria no cache (0 queries)
+            parceria = parcerias_map.get(numero_termo)
             osc = parceria['osc'] if parceria else None
             cnpj = parceria['cnpj'] if parceria else None
             projeto = parceria['projeto'] if parceria else None
@@ -124,63 +172,14 @@ def api_orcamento_detalhado():
             meses_vigencia = int(parceria['meses_vigencia']) if parceria and parceria['meses_vigencia'] is not None else None
             valor_atualizado = float(parceria['total_previsto']) if parceria and parceria['total_previsto'] is not None else None
             
-            # Buscar dotação orçamentária
-            # Prioridade 1: Termo + Unidade + OSC
-            # Prioridade 2: Termo + Unidade
-            # Prioridade 3: Termo
-            dotacao = None
-            programatica = None
-            
-            if osc and unidade:
-                cur.execute("""
-                    SELECT dotacao_numero, programa_aplicacao
-                    FROM categoricas.c_geral_dotacoes
-                    WHERE condicoes_termo = %s 
-                      AND condicoes_unidade = %s 
-                      AND condicoes_osc = %s
-                    LIMIT 1
-                """, (tipo_termo, unidade, osc))
-                dotacao_row = cur.fetchone()
-                if dotacao_row:
-                    dotacao = dotacao_row['dotacao_numero']
-                    programatica = dotacao_row['programa_aplicacao']
-            
-            # Se não encontrou com OSC, tentar sem OSC
-            if not dotacao and unidade:
-                cur.execute("""
-                    SELECT dotacao_numero, programa_aplicacao
-                    FROM categoricas.c_geral_dotacoes
-                    WHERE condicoes_termo = %s 
-                      AND condicoes_unidade = %s 
-                      AND (condicoes_osc IS NULL OR condicoes_osc = '')
-                    LIMIT 1
-                """, (tipo_termo, unidade))
-                dotacao_row = cur.fetchone()
-                if dotacao_row:
-                    dotacao = dotacao_row['dotacao_numero']
-                    programatica = dotacao_row['programa_aplicacao']
-            
-            # Se ainda não encontrou, tentar só com tipo de termo
-            if not dotacao:
-                cur.execute("""
-                    SELECT dotacao_numero, programa_aplicacao
-                    FROM categoricas.c_geral_dotacoes
-                    WHERE condicoes_termo = %s
-                    LIMIT 1
-                """, (tipo_termo,))
-                dotacao_row = cur.fetchone()
-                if dotacao_row:
-                    dotacao = dotacao_row['dotacao_numero']
-                    programatica = dotacao_row['programa_aplicacao']
+            # Buscar dotação no cache (0 queries)
+            dotacao, programatica = buscar_dotacao(tipo_termo, unidade, osc)
             
             # Extrair Projeto-Atividade da dotação
-            # Formato: 34.10.14.422.3013.2.053.33503900.00.1.500.9001.0
-            # Projeto-Atividade está na posição após 3013 (sempre 4 dígitos após o 5º ponto)
             projeto_atividade = None
             if dotacao:
                 partes_dotacao = dotacao.split('.')
                 if len(partes_dotacao) >= 7:
-                    # Posição 5 é o código (ex: 3013), posição 6 é o projeto-atividade (ex: 2.053)
                     projeto_atividade = partes_dotacao[5] + '.' + partes_dotacao[6]
             
             # Só adicionar se tiver algum valor (programado ou projetado)
@@ -248,19 +247,8 @@ def api_orcamento_detalhado():
             # Para editais, valor_atualizado = soma de todos os meses (span completo do edital)
             valor_atualizado_edital = float(edital['total_edital'] or 0)
             
-            # Buscar Programática usando dotacao_formatada na tabela c_geral_dotacoes
-            # A dotação contém o projeto-atividade, então buscamos pela dotação completa
-            programatica_edital = None
-            if dotacao_formatada:
-                cur.execute("""
-                    SELECT programa_aplicacao
-                    FROM categoricas.c_geral_dotacoes
-                    WHERE dotacao_numero = %s
-                    LIMIT 1
-                """, (dotacao_formatada,))
-                prog_row = cur.fetchone()
-                if prog_row:
-                    programatica_edital = prog_row['programa_aplicacao']
+            # Buscar Programática no cache já carregado (0 queries)
+            programatica_edital = dotacoes_por_numero.get(dotacao_formatada) if dotacao_formatada else None
             
             # Adicionar edital aos resultados
             # IMPORTANTE: Colunas auxiliares (CNPJ, Tipo de Contrato, etc.) = "-"
@@ -393,35 +381,8 @@ def api_orcamento_detalhado():
             programatica_cel = None
             
             if condicoes_termo and condicoes_unidade:
-                # Tentar buscar dotação com OSC primeiro
-                if cel['osc']:
-                    cur.execute("""
-                        SELECT dotacao_numero, programa_aplicacao
-                        FROM categoricas.c_geral_dotacoes
-                        WHERE condicoes_termo = %s 
-                          AND condicoes_unidade = %s
-                          AND condicoes_osc = %s
-                        LIMIT 1
-                    """, (condicoes_termo, condicoes_unidade, cel['osc']))
-                    dotacao_row = cur.fetchone()
-                    if dotacao_row:
-                        dotacao_cel = dotacao_row['dotacao_numero']
-                        programatica_cel = dotacao_row['programa_aplicacao']
-                
-                # Se não encontrou com OSC, tentar sem
-                if not dotacao_cel:
-                    cur.execute("""
-                        SELECT dotacao_numero, programa_aplicacao
-                        FROM categoricas.c_geral_dotacoes
-                        WHERE condicoes_termo = %s 
-                          AND condicoes_unidade = %s
-                          AND (condicoes_osc IS NULL OR condicoes_osc = '')
-                        LIMIT 1
-                    """, (condicoes_termo, condicoes_unidade))
-                    dotacao_row = cur.fetchone()
-                    if dotacao_row:
-                        dotacao_cel = dotacao_row['dotacao_numero']
-                        programatica_cel = dotacao_row['programa_aplicacao']
+                # Buscar dotação no cache já carregado (0 queries)
+                dotacao_cel, programatica_cel = buscar_dotacao(condicoes_termo, condicoes_unidade, cel['osc'])
             
             # Extrair Projeto-Atividade da dotação
             projeto_atividade_cel = None

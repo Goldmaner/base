@@ -16,6 +16,7 @@ from threading import Thread
 from routes.main import main_bp
 from routes.auth import auth_bp
 from routes.orcamento import orcamento_bp
+from routes.orcamento_ocr import orcamento_ocr_bp
 from routes.instrucoes import instrucoes_bp
 from routes.despesas import despesas_bp
 from routes.parcerias import parcerias_bp
@@ -224,6 +225,7 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = SECRET_KEY
     app.config["DEBUG"] = DEBUG
+    app.json.sort_keys = False  # preservar ordem de inserção das chaves JSON
     
     # Registrar função de limpeza do banco de dados
     app.teardown_appcontext(close_db)
@@ -254,6 +256,7 @@ def create_app():
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(orcamento_bp)
+    app.register_blueprint(orcamento_ocr_bp)
     app.register_blueprint(instrucoes_bp)
     app.register_blueprint(despesas_bp)
     app.register_blueprint(parcerias_bp)

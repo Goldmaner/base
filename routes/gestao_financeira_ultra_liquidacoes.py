@@ -129,98 +129,61 @@ def calcular_empenhos_disponiveis(cur, hoje):
                 'tipo': 'tabela_inexistente',
                 'mensagem': 'Tabela gestao_financeira.back_empenhos não encontrada'
             })
-            return {}, avisos
+            return {}, {}, avisos
         
-        # Buscar todos os termos com sei_celeb
+        # Buscar TODOS os empenhos de uma vez via JOIN (evita N+1 queries por termo)
         cur.execute("""
-            SELECT DISTINCT 
-                p.numero_termo,
-                p.sei_celeb
+            SELECT
+                REGEXP_REPLACE(p.sei_celeb, '[-./]', '', 'g') AS cod_sof,
+                e.cod_eph,
+                EXTRACT(YEAR FROM e.dt_eph)::integer AS ano_eph,
+                COALESCE(NULLIF(REPLACE(e.val_tot_eph, ',', '.'), '')::numeric, 0) AS val_tot_eph,
+                COALESCE(NULLIF(REPLACE(e.val_tot_lqdc_eph, ',', '.'), '')::numeric, 0) AS val_tot_lqdc_eph,
+                COALESCE(NULLIF(REPLACE(e.val_tot_pago_eph, ',', '.'), '')::numeric, 0) AS val_tot_pago_eph,
+                COALESCE(NULLIF(REPLACE(e.val_tot_canc_eph, ',', '.'), '')::numeric, 0) AS val_tot_canc_eph,
+                e.cod_item_desp_sof
             FROM public.parcerias p
+            JOIN gestao_financeira.back_empenhos e
+                ON e.cod_nro_pcss_sof = REGEXP_REPLACE(p.sei_celeb, '[-./]', '', 'g')
             WHERE p.sei_celeb IS NOT NULL AND p.sei_celeb != ''
+            ORDER BY e.dt_eph, e.cod_eph
         """)
-        termos_sei = cur.fetchall()
-        print(f"   Total de termos com SEI: {len(termos_sei)}")
-        
-        # Contador para limitar debug
-        contador_debug = 0
-        max_debug = 5
-        
-        for termo_sei in termos_sei:
-            numero_termo = termo_sei['numero_termo']
-            sei_celeb = termo_sei['sei_celeb']
-            cod_sof = converter_sei_para_cod_sof(sei_celeb)
-            
-            if not cod_sof:
-                continue
-            
-            try:
-                # Buscar TODOS os campos de empenhos por ano
-                # IMPORTANTE: campos são VARCHAR em formato BR (vírgula decimal)
-                cur.execute("""
-                    SELECT 
-                        cod_eph,
-                        EXTRACT(YEAR FROM dt_eph)::integer as ano_eph,
-                        COALESCE(NULLIF(REPLACE(val_tot_eph, ',', '.'), '')::numeric, 0) as val_tot_eph,
-                        COALESCE(NULLIF(REPLACE(val_tot_lqdc_eph, ',', '.'), '')::numeric, 0) as val_tot_lqdc_eph,
-                        COALESCE(NULLIF(REPLACE(val_tot_pago_eph, ',', '.'), '')::numeric, 0) as val_tot_pago_eph,
-                        COALESCE(NULLIF(REPLACE(val_tot_canc_eph, ',', '.'), '')::numeric, 0) as val_tot_canc_eph,
-                        cod_item_desp_sof
-                    FROM gestao_financeira.back_empenhos
-                    WHERE cod_nro_pcss_sof = %s
-                    ORDER BY dt_eph, cod_eph
-                """, [cod_sof])
-                
-                empenhos = cur.fetchall()
-                
-                # Agrupar por COD_SOF + ANO (não por termo!)
-                for emp in empenhos:
-                    ano = int(emp['ano_eph'])
-                    elemento = emp['cod_item_desp_sof']  # '23' ou '24'
-                    chave = (cod_sof, ano)  # CHAVE: (cod_sof, ano) não (termo, ano)!
-                    chave_elemento = (cod_sof, ano, elemento)  # CHAVE para pagos por elemento
-                    
-                    if chave not in empenhos_por_termo_ano:
-                        empenhos_por_termo_ano[chave] = []
-                    
-                    # Cálculo do disponível: Total - Cancelado - Pago (NÃO considerar liquidado)
-                    disponivel = (
-                        float(emp['val_tot_eph']) - 
-                        float(emp['val_tot_canc_eph']) - 
-                        float(emp['val_tot_pago_eph'])
-                    )
-                    
-                    # Agregar valor pago por elemento
-                    if chave_elemento not in pagos_por_elemento:
-                        pagos_por_elemento[chave_elemento] = 0
-                    pagos_por_elemento[chave_elemento] += float(emp['val_tot_pago_eph'])
-                    
-                    empenhos_por_termo_ano[chave].append({
-                        'cod_eph': emp['cod_eph'],
-                        'ano_eph': ano,
-                        'val_tot_eph': float(emp['val_tot_eph']),
-                        'val_tot_lqdc_eph': float(emp['val_tot_lqdc_eph']),
-                        'val_tot_pago_eph': float(emp['val_tot_pago_eph']),
-                        'val_tot_canc_eph': float(emp['val_tot_canc_eph']),
-                        'cod_item_desp_sof': elemento,
-                        'disponivel': disponivel
-                    })
-                    
-            except Exception as e:
-                # ROLLBACK para não quebrar próximas queries
-                try:
-                    conn = get_db()
-                    conn.rollback()
-                except:
-                    pass
-                
-                avisos.append({
-                    'tipo': 'erro_empenho',
-                    'termo': numero_termo,
-                    'mensagem': str(e)
-                })
-                print(f"   ❌ ERRO ao buscar empenhos para {numero_termo}: {str(e)}")
-                continue
+        todos_empenhos = cur.fetchall()
+        print(f"   Total de empenhos carregados (query única): {len(todos_empenhos)}")
+
+        # Agrupar por COD_SOF + ANO (não por termo!)
+        for emp in todos_empenhos:
+            cod_sof = emp['cod_sof']
+            ano = int(emp['ano_eph'])
+            elemento = emp['cod_item_desp_sof']  # '23' ou '24'
+            chave = (cod_sof, ano)  # CHAVE: (cod_sof, ano) não (termo, ano)!
+            chave_elemento = (cod_sof, ano, elemento)  # CHAVE para pagos por elemento
+
+            if chave not in empenhos_por_termo_ano:
+                empenhos_por_termo_ano[chave] = []
+
+            # Cálculo do disponível: Total - Cancelado - Pago (NÃO considerar liquidado)
+            disponivel = (
+                float(emp['val_tot_eph']) -
+                float(emp['val_tot_canc_eph']) -
+                float(emp['val_tot_pago_eph'])
+            )
+
+            # Agregar valor pago por elemento
+            if chave_elemento not in pagos_por_elemento:
+                pagos_por_elemento[chave_elemento] = 0
+            pagos_por_elemento[chave_elemento] += float(emp['val_tot_pago_eph'])
+
+            empenhos_por_termo_ano[chave].append({
+                'cod_eph': emp['cod_eph'],
+                'ano_eph': ano,
+                'val_tot_eph': float(emp['val_tot_eph']),
+                'val_tot_lqdc_eph': float(emp['val_tot_lqdc_eph']),
+                'val_tot_pago_eph': float(emp['val_tot_pago_eph']),
+                'val_tot_canc_eph': float(emp['val_tot_canc_eph']),
+                'cod_item_desp_sof': elemento,
+                'disponivel': disponivel
+            })
         
     except Exception as e:
         import traceback
@@ -228,13 +191,8 @@ def calcular_empenhos_disponiveis(cur, hoje):
             'tipo': 'erro_geral',
             'mensagem': f'Funcionalidade de empenhos desabilitada: {str(e)}'
         })
-        print(f"\n❌ ERRO GERAL em calcular_empenhos_disponiveis:")
-        print(f"   Erro: {str(e)}")
-        print(f"   Tipo: {type(e).__name__}")
-        print(f"   Traceback:")
         traceback.print_exc()
-        print()
-        return {}, avisos
+        return {}, {}, avisos
     
     return empenhos_por_termo_ano, pagos_por_elemento, avisos
 
@@ -813,14 +771,12 @@ def api_listar_parcelas():
         # Salvar avisos no session para o relatório DEBUG (última execução)
         session['debug_avisos_empenhos'] = avisos_empenhos
         
-        # Criar mapeamento termo → sei_celeb para buscar empenhos depois
-        # (evitar query dentro do loop)
-        cur.execute("""
-            SELECT numero_termo, sei_celeb
-            FROM public.parcerias
-            WHERE sei_celeb IS NOT NULL AND sei_celeb != ''
-        """)
-        termo_para_sei = {r['numero_termo']: r['sei_celeb'] for r in cur.fetchall()}
+        # Criar mapeamento termo → sei_celeb a partir dos dados já carregados
+        # (p.sei_celeb já está no SELECT principal — sem query adicional ao banco)
+        termo_para_sei = {
+            p['numero_termo']: p['sei_celeb']
+            for p in parcelas if p['sei_celeb']
+        }
         
         for p in parcelas:
             # Calcular pendências

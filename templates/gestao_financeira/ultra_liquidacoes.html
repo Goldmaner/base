@@ -1359,7 +1359,7 @@
             const btnSalvar = $('#btnSalvarModal');
             
             if (abaAtiva === 'tab-coletiva') {
-                btnSalvar.html('<i class="bi bi-check-circle me-2"></i>Salvar Alterações Coletivas');
+                btnSalvar.html('<i class="bi bi-check-circle me-2"></i>Salvar Alterações Coletivas').show();
                 
                 // Carregar parcelas quando mudar para aba coletiva
                 const numeroTermo = $('#coletivo_numero_termo_hidden').val();
@@ -2679,8 +2679,8 @@
             success: function(response) {
                 console.log('Resposta edição coletiva:', response);
                 if (response.success) {
-                    $('#modalEditarParcela').modal('hide');
                     carregarDados();
+                    carregarParcelasColetivas(numeroTermo);
                     alert(`✅ ${response.message}`);
                 } else {
                     alert('⚠️ Erro: ' + (response.error || 'Resposta sem sucesso'));

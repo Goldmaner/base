@@ -54,6 +54,8 @@
   /* aumentar a altura das linhas e inputs para melhor legibilidade */
   #tabelaOrc2 td, #tabelaOrc2 th { padding: .75rem .5rem; }
   #tabelaOrc2 .form-control { height: calc(1.8em + .75rem); padding: .375rem .5rem; }
+  /* inputs da linha Tipo não devem herdar a altura fixa das células de dados */
+  #tabelaOrc2 #rowAditivo .tipo-mes-input { height: auto !important; min-height: unset !important; line-height: 1.4; box-shadow: none !important; }
   /* resizer handle */
   #tabelaOrc2 th { position: relative; }
   .col-resizer { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; z-index: 20; }
@@ -90,9 +92,9 @@
     </h5>
     
     <!-- Dropdown Aditivo -->
-    <div class="mt-2 mb-3">
-      <label for="aditivoSelect" class="form-label fw-bold">Aditivo:</label>
-      <select id="aditivoSelect" class="form-select form-select-sm w-auto d-inline-block ms-2" style="width: 200px !important;">
+    <div class="mt-2 mb-3 d-flex align-items-center gap-2 flex-wrap">
+      <label for="aditivoSelect" class="form-label fw-bold mb-0">Aditivo:</label>
+      <select id="aditivoSelect" class="form-select form-select-sm w-auto d-inline-block" style="min-width: 140px;">
         {% if aditivos %}
           {% for ad in aditivos %}
             <option value="{{ ad }}" {% if ad == 0 %}selected{% endif %}>
@@ -103,6 +105,9 @@
           <option value="0" selected>Base</option>
         {% endif %}
       </select>
+      <button id="btnNovoAditivo" type="button" class="btn btn-outline-primary btn-sm" title="Criar novo aditivo copiando os dados do aditivo atual">
+        &#xff0b; Novo Aditivo
+      </button>
     </div>
 
     <div class="mt-3 d-flex gap-2 align-items-center flex-wrap justify-content-between">
@@ -127,16 +132,40 @@
         </div>
       </div>
       
-      <!-- Botão de Observações -->
-      <button id="btnObservacoes" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalObservacoes">
-        💬 Observações
-      </button>
+      <!-- Botões lado direito -->
+      <div class="d-flex gap-2">
+        <button id="btnOCR" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalOCR">
+          🔍 OCR (Teste)
+        </button>
+        <button id="btnObservacoes" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalObservacoes">
+          💬 Observações
+        </button>
+      </div>
     </div>
 
     <div class="mt-3">
       <div class="table-wrapper">
       <table class="table table-sm table-bordered" id="tabelaOrc2">
         <thead class="table-light">
+          <!-- ROW 0: Tipo de aditivo por mês (editável) -->
+          <tr id="rowAditivo" style="background-color:#dbeafe; font-size:0.75rem;">
+            <th colspan="5" class="text-end pe-2 text-muted border-end" style="font-variant:small-caps; vertical-align:middle;" title="Clique em qualquer célula para editar. Ao modificar um mês, todos os seguintes assumem o mesmo valor.">Tipo ✏️</th>
+            <th class="aditivo-mes-label text-center month-td"><input type="text" class="tipo-mes-input form-control form-control-sm text-center fw-semibold text-primary p-0 border-0 bg-transparent" value="Base" style="font-size:0.75rem;"></th>
+            <th class="aditivo-mes-label text-center month-td"><input type="text" class="tipo-mes-input form-control form-control-sm text-center fw-semibold text-primary p-0 border-0 bg-transparent" value="Base" style="font-size:0.75rem;"></th>
+            <th class="aditivo-mes-label text-center month-td"><input type="text" class="tipo-mes-input form-control form-control-sm text-center fw-semibold text-primary p-0 border-0 bg-transparent" value="Base" style="font-size:0.75rem;"></th>
+            <th class="aditivo-mes-label text-center month-td"><input type="text" class="tipo-mes-input form-control form-control-sm text-center fw-semibold text-primary p-0 border-0 bg-transparent" value="Base" style="font-size:0.75rem;"></th>
+            <th id="rowAditivoEnd" colspan="2"></th>
+          </tr>
+          <!-- ROW 1: Rótulos do calendário -->
+          <tr id="rowCalendario" style="background-color:#dcfce7; font-size:0.72rem;">
+            <th colspan="5" class="text-end pe-2 text-muted border-end" style="font-variant:small-caps; vertical-align:middle;">Período</th>
+            <th class="calendario-mes-label text-center text-muted month-td"></th>
+            <th class="calendario-mes-label text-center text-muted month-td"></th>
+            <th class="calendario-mes-label text-center text-muted month-td"></th>
+            <th class="calendario-mes-label text-center text-muted month-td"></th>
+            <th id="rowCalendarioEnd" colspan="2"></th>
+          </tr>
+          <!-- ROW 2: Cabeçalho principal -->
           <tr>
             <th style="width: 40px;" class="text-center">Nº</th>
             <th style="width: 60px;">Mover</th>
@@ -288,6 +317,83 @@
   <!-- SheetJS para leitura de Excel no cliente -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script>
+    // === CONSTANTES DA PARCERIA (datas do banco) ===
+    const INICIO_PARCERIA = {{ inicio | tojson }};
+    const FINAL_PARCERIA = {{ final | tojson }};
+
+    // === FUNÇÕES DE RÓTULOS DE CABEÇALHO ===
+
+    // --- Tipo Labels: localStorage helpers ---
+    function _tipoLabelsKey() {
+      return 'tipo_labels_{{ numero_termo|e }}';
+    }
+    function _salvarTipoLabels() {
+      const labels = Array.from(document.querySelectorAll('#rowAditivo .aditivo-mes-label input.tipo-mes-input'))
+        .map(i => i.value);
+      try { localStorage.setItem(_tipoLabelsKey(), JSON.stringify(labels)); } catch(e) {}
+    }
+    function _carregarTipoLabels() {
+      let stored = null;
+      try { stored = JSON.parse(localStorage.getItem(_tipoLabelsKey())); } catch(e) {}
+      if (!stored || !stored.length) return false;
+      const inputs = document.querySelectorAll('#rowAditivo .aditivo-mes-label input.tipo-mes-input');
+      inputs.forEach((inp, idx) => {
+        if (stored[idx] !== undefined) inp.value = stored[idx];
+      });
+      return true;
+    }
+
+    function calcularNumMesesProjeto() {
+      if (!INICIO_PARCERIA || !FINAL_PARCERIA) return null;
+      const [anoI, mesI] = INICIO_PARCERIA.split('-').map(Number);
+      const [anoF, mesF] = FINAL_PARCERIA.split('-').map(Number);
+      return Math.max(1, (anoF - anoI) * 12 + (mesF - mesI) + 1);
+    }
+
+    function atualizarRowAditivo() {
+      // Só aplica o label padrão se não houver dado salvo no localStorage
+      if (_carregarTipoLabels()) return;
+      const defaultLabel = _aditivoLabel();
+      document.querySelectorAll('#rowAditivo .aditivo-mes-label input.tipo-mes-input').forEach(inp => {
+        inp.value = defaultLabel;
+      });
+    }
+
+    function calcularLabelsMeses() {
+      if (!INICIO_PARCERIA) return [];
+      const [ano, mes, dia] = INICIO_PARCERIA.split('-').map(Number);
+      const finalParts = FINAL_PARCERIA ? FINAL_PARCERIA.split('-').map(Number) : null;
+      const nomes = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+      const numMeses = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
+      const labels = [];
+      for (let i = 0; i < numMeses; i++) {
+        const mesIdx = (mes - 1 + i) % 12;
+        const anoAtual = ano + Math.floor((mes - 1 + i) / 12);
+        const anoStr = String(anoAtual).slice(-2);
+        let label = nomes[mesIdx] + '/' + anoStr;
+        // Primeiro mês parcial
+        if (i === 0 && dia > 1) {
+          const diasNoMes = new Date(anoAtual, mesIdx + 1, 0).getDate();
+          label += ' (' + (diasNoMes - dia + 1) + 'd)';
+        }
+        // Último mês parcial
+        if (finalParts && i === numMeses - 1) {
+          const [, , fDia] = finalParts;
+          const diasNoMes = new Date(anoAtual, mesIdx + 1, 0).getDate();
+          if (fDia < diasNoMes) label += ' (' + fDia + 'd)';
+        }
+        labels.push(label);
+      }
+      return labels;
+    }
+
+    function atualizarRowCalendario() {
+      const cells = document.querySelectorAll('#rowCalendario .calendario-mes-label');
+      const labels = calcularLabelsMeses();
+      cells.forEach((td, i) => { td.textContent = labels[i] || ''; });
+    }
+    // === FIM FUNÇÕES DE RÓTULOS ===
+
     // === SISTEMA DE UNDO COM MÚLTIPLOS NÍVEIS ===
     let historicoEdicoes = []; // Array para armazenar até 10 edições
     const MAX_UNDO = 10;
@@ -397,25 +503,58 @@
       return th;
     }
 
+    // Cria célula para rowAditivo (com input editável)
+    function makeAditivoCell() {
+      const td = document.createElement('th');
+      td.className = 'aditivo-mes-label text-center month-td';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'tipo-mes-input form-control form-control-sm text-center fw-semibold text-primary p-0 border-0 bg-transparent';
+      inp.style.fontSize = '0.75rem';
+      // Usar o último valor da row como padrão (cascata para novos meses)
+      const existentes = document.querySelectorAll('#rowAditivo .aditivo-mes-label input.tipo-mes-input');
+      inp.value = existentes.length > 0 ? existentes[existentes.length - 1].value : _aditivoLabel();
+      td.appendChild(inp);
+      return td;
+    }
+
+    // Cria célula para rowCalendario
+    function makeCalendarioCell(idx) {
+      const td = document.createElement('th');
+      td.className = 'calendario-mes-label text-center text-muted month-td';
+      td.style.fontSize = '0.72rem';
+      const labels = calcularLabelsMeses();
+      td.textContent = labels[idx] || '';
+      return td;
+    }
+
+    function _aditivoLabel() {
+      const v = parseInt(document.getElementById('aditivoSelect').value) || 0;
+      return v === 0 ? 'Base' : 'Aditivo ' + v;
+    }
+
     // centraliza a lógica de remoção de um mês a partir do elemento <th>
     function removeMonthByTh(th){
       if (!th) return;
-      const thead = document.querySelector('#tabelaOrc2 thead tr');
+      const thead = document.querySelector('#tabelaOrc2 thead tr:last-child');
       const currentMonths = thead.querySelectorAll('.month-th').length;
       if (currentMonths <= 1){
-        // não permite remover a última coluna de mês
         alert('Deve permanecer pelo menos 1 mês.');
         return;
       }
       const ths = Array.from(thead.querySelectorAll('.month-th'));
       const idx = ths.indexOf(th);
       if (idx >= 0){
-        // remover a célula correspondente em cada linha
+        // remover a célula correspondente em cada linha do body
         document.querySelectorAll('#bodyOrc2 tr').forEach(tr => {
-          const cells = tr.querySelectorAll('td');
-          const cellIdx = 3 + idx; // 0:rubrica,1:quant,2:categoria -> meses começam em 3
-          if (cells[cellIdx]) cells[cellIdx].remove();
+          const meses = tr.querySelectorAll('td.month-td');
+          if (meses[idx]) meses[idx].remove();
         });
+        // remover das linhas de rótulo do cabeçalho
+        const adLabels = document.querySelectorAll('#rowAditivo .aditivo-mes-label');
+        if (adLabels[idx]) adLabels[idx].remove();
+        const calLabels = document.querySelectorAll('#rowCalendario .calendario-mes-label');
+        if (calLabels[idx]) calLabels[idx].remove();
         // remover total correspondente
         const foot = document.querySelectorAll('#tabelaOrc2 tfoot .col-total');
         if (foot[idx]) foot[idx].remove();
@@ -427,7 +566,7 @@
     // adicionar meses N de uma vez
     document.getElementById('addMonthsBtn').addEventListener('click', function(){
       const n = parseInt(document.getElementById('numCols').value,10) || 0; if (n<=0) return;
-      const thead = document.querySelector('#tabelaOrc2 thead tr'); const currentMonths = thead.querySelectorAll('.month-th').length;
+      const thead = document.querySelector('#tabelaOrc2 thead tr:last-child'); const currentMonths = thead.querySelectorAll('.month-th').length;
       // Inserir antes da coluna Total (penúltima posição, pois última é Ação)
       const totalTh = thead.querySelector('.col-total-linha');
       for (let k=0;k<n;k++){ const idx = currentMonths + k + 1; const th = makeMonthHeader('Mês ' + idx); thead.insertBefore(th, totalTh); }
@@ -436,6 +575,16 @@
     const totalTd = tr.querySelector('.col-total-linha');
     for (let k=0;k<n;k++){ const td = document.createElement('td'); td.className = 'month-td'; td.innerHTML = `<input type="text" class="form-control form-control-sm valor" placeholder="0,00">`; tr.insertBefore(td, totalTd); }
   });
+      // inserir células nas linhas de rótulo
+      const rowAd = document.getElementById('rowAditivo');
+      const endAd = document.getElementById('rowAditivoEnd');
+      const rowCal = document.getElementById('rowCalendario');
+      const endCal = document.getElementById('rowCalendarioEnd');
+      const totalAdLabels = rowAd.querySelectorAll('.aditivo-mes-label').length;
+      for (let k=0;k<n;k++){
+        rowAd.insertBefore(makeAditivoCell(), endAd);
+        rowCal.insertBefore(makeCalendarioCell(totalAdLabels + k), endCal);
+      }
       // adicionar tfoot colunas (antes da coluna do grandTotal)
       const tfootRow = document.querySelector('#tabelaOrc2 tfoot tr'); 
       const grandTotalTd = document.getElementById('grandTotal').parentElement;
@@ -490,7 +639,7 @@
     }
 
     // inicializar redimensionáveis nos headers existentes
-    document.querySelectorAll('#tabelaOrc2 thead tr th').forEach(th => makeResizable(th));
+    document.querySelectorAll('#tabelaOrc2 thead tr:last-child th').forEach(th => makeResizable(th));
 
     // ---------- Importar Excel (cliente) ----------
     document.getElementById('importExcelBtn').addEventListener('click', function(){
@@ -533,6 +682,13 @@
       let colCategoria = keys.find(k => /categoria|cat/i.test(k)) || keys.find(k => /tipo/i.test(k)) || null;
       // meses: as demais colunas que não sejam rubrica/quantidade/categoria
       const monthCols = keys.filter(k => k !== colRubrica && k !== colQuantidade && k !== colCategoria);
+      // ordenar colunas de mês numericamente ("Mês 1", "Mês 2", ... "Mês 12") para evitar
+      // ordenação alfabética (que colocaria Mês 10 antes de Mês 2)
+      monthCols.sort((a, b) => {
+        const na = parseInt((a.match(/\d+/) || ['0'])[0]);
+        const nb = parseInt((b.match(/\d+/) || ['0'])[0]);
+        return na - nb;
+      });
 
       // ajustar número de meses na tabela para igualar monthCols.length (adicionar/remover em bloco)
       const currentMonths = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
@@ -1086,7 +1242,7 @@
 
     // recalcular totais por coluna, total geral E total por linha
     function recalcTotals(){
-      const thead = document.querySelector('#tabelaOrc2 thead tr');
+      const thead = document.querySelector('#tabelaOrc2 thead tr:last-child');
       const monthCount = thead.querySelectorAll('.month-th').length;
       const totals = Array.from({length: monthCount}, ()=>0);
       document.querySelectorAll('#bodyOrc2 tr').forEach(tr => {
@@ -1252,6 +1408,19 @@
         const despesas = data.despesas || [];
         if (despesas.length === 0) {
           console.log('Nenhuma despesa encontrada para este termo');
+          // Auto-abrir meses baseado no período da parceria (apenas se datas disponíveis)
+          const numMesTarget = calcularNumMesesProjeto();
+          if (numMesTarget) {
+            const currentMonths = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
+            if (numMesTarget > currentMonths) {
+              document.getElementById('numCols').value = numMesTarget - currentMonths;
+              document.getElementById('addMonthsBtn').click();
+            } else if (numMesTarget < currentMonths) {
+              const ths = Array.from(document.querySelectorAll('#tabelaOrc2 thead tr:last-child .month-th'));
+              for (let i = ths.length - 1; i >= numMesTarget; i--) { removeMonthByTh(ths[i]); }
+            }
+            atualizarRowCalendario();
+          }
           return;
         }
         
@@ -1385,6 +1554,23 @@
       });
     }
 
+    // === CASCATA DO TIPO (rowAditivo) ===
+    // Ao editar um mês, replica o valor para todos os meses seguintes
+    document.getElementById('rowAditivo').addEventListener('input', function(e) {
+      if (!e.target.classList.contains('tipo-mes-input')) return;
+      const todos = Array.from(document.querySelectorAll('#rowAditivo .aditivo-mes-label input.tipo-mes-input'));
+      const idx = todos.indexOf(e.target);
+      if (idx < 0) return;
+      const valor = e.target.value;
+      for (let i = idx + 1; i < todos.length; i++) { todos[i].value = valor; }
+      _salvarTipoLabels();
+    });
+    // Também salva ao sair do campo (caso o usuário não altere o valor mas mude de foco)
+    document.getElementById('rowAditivo').addEventListener('change', function(e) {
+      if (e.target.classList.contains('tipo-mes-input')) _salvarTipoLabels();
+    });
+    // === FIM CASCATA TIPO ===
+
     // inicial
     recalcTotals();
     carregarCategorias();
@@ -1392,6 +1578,8 @@
     carregarDadosExistentes();
     numerarLinhas();
     configurarDestaqueLinhas();
+    atualizarRowAditivo();
+    atualizarRowCalendario();
     
     // Adicionar listener para mudança de aditivo
     document.getElementById('aditivoSelect').addEventListener('change', function() {
@@ -1399,12 +1587,49 @@
       const tbody = document.getElementById('bodyOrc2');
       const rows = tbody.querySelectorAll('tr');
       rows.forEach(row => {
-        // Limpar valores dos inputs
         row.querySelectorAll('input').forEach(input => input.value = '');
         row.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
       });
+      // Atualizar rótulo de aditivo nas colunas de mês
+      atualizarRowAditivo();
       // Recarregar dados do aditivo selecionado
       carregarDadosExistentes();
+    });
+
+    // === BOTÃO NOVO ADITIVO ===
+    document.getElementById('btnNovoAditivo').addEventListener('click', async function() {
+      const aditivoAtual = parseInt(document.getElementById('aditivoSelect').value) || 0;
+      const labelAtual = aditivoAtual === 0 ? 'Base' : 'Aditivo ' + aditivoAtual;
+      if (!confirm(`Criar novo Aditivo copiando os dados de "${labelAtual}"?\nO novo aditivo será adicionado ao selector e você poderá editar os valores antes de salvar.`)) return;
+
+      this.disabled = true;
+      const origHtml = this.innerHTML;
+      this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+      try {
+        const resp = await fetch('/orcamento/api/clonar-aditivo', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({numero_termo: '{{ numero_termo|e }}', aditivo_origem: aditivoAtual})
+        });
+        const data = await resp.json();
+        if (data.error) { alert('❌ ' + data.error); return; }
+
+        const novoAditivo = data.novo_aditivo;
+        const select = document.getElementById('aditivoSelect');
+        const opt = document.createElement('option');
+        opt.value = novoAditivo;
+        opt.textContent = 'Aditivo ' + novoAditivo;
+        select.appendChild(opt);
+        select.value = novoAditivo;
+        select.dispatchEvent(new Event('change'));
+        alert(`✅ Aditivo ${novoAditivo} criado! Edite os valores e salve.`);
+      } catch(e) {
+        alert('❌ Erro: ' + e.message);
+      } finally {
+        this.disabled = false;
+        this.innerHTML = origHtml;
+      }
     });
     
     // === FUNCIONALIDADE DE OBSERVAÇÕES ===
@@ -1495,7 +1720,223 @@
         btn.innerHTML = htmlOriginal;
       });
     });
+    // === OCR ===
+    // Todos os listeners do OCR ficam em DOMContentLoaded porque o HTML
+    // do modal (#modalOCR, #ocrModeloSelect, etc.) vem APÓS este <script>.
+    document.addEventListener('DOMContentLoaded', function() {
+
+    // Carregar catálogo de modelos quando o modal abrir
+    (function() {
+      const modal = document.getElementById('modalOCR');
+      let modelosCarregados = false;
+      modal.addEventListener('show.bs.modal', function() {
+        if (modelosCarregados) return;
+        fetch('/orcamento/ocr/modelos')
+          .then(r => r.json())
+          .then(data => {
+            const sel = document.getElementById('ocrModeloSelect');
+            Object.entries(data.modelos || {}).forEach(([id, m]) => {
+              const opt = document.createElement('option');
+              opt.value = id;
+              opt.textContent = m.nome;
+              opt.dataset.descricao = m.descricao || '';
+              opt.dataset.formatos = (m.formatos || []).join(', ');
+              sel.appendChild(opt);
+            });
+            modelosCarregados = true;
+          })
+          .catch(() => { /* silencioso — modelo bruto ainda funciona */ });
+      });
+    })();
+
+    // Ao mudar seleção de modelo, exibir descrição e hint de formatos
+    document.getElementById('ocrModeloSelect').addEventListener('change', function() {
+      const opt = this.options[this.selectedIndex];
+      document.getElementById('ocrModeloDescricao').textContent = opt.dataset.descricao || '';
+      const fmts = opt.dataset.formatos || 'PDF, XLSX, XLS';
+      document.getElementById('ocrFileHint').textContent = 'Formatos aceitos: ' + fmts;
+    });
+
+    document.getElementById('btnProcessarOCR').addEventListener('click', function() {
+      const fileInput = document.getElementById('ocrFileInput');
+      const file = fileInput.files[0];
+      if (!file) { alert('Selecione um arquivo.'); return; }
+
+      const statusDiv = document.getElementById('ocrStatus');
+      const previewDiv = document.getElementById('ocrPreview');
+      previewDiv.classList.add('d-none');
+      statusDiv.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div> Processando...';
+
+      const modelo = document.getElementById('ocrModeloSelect').value;
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      // ── MODO MODELO: enviar para o parser estruturado no backend ──────
+      if (modelo) {
+        const numMeses = document.querySelectorAll('#tabelaOrc2 thead .month-th').length;
+        const fd = new FormData();
+        fd.append('arquivo', file);
+        fd.append('modelo', modelo);
+        fd.append('num_meses', numMeses);
+        fetch('/orcamento/ocr/parse', { method: 'POST', body: fd })
+          .then(r => r.json())
+          .then(data => {
+            if (data.error) {
+              let msg = '❌ ' + data.error;
+              if (data.modelos_disponiveis) {
+                msg += '<br><small>Modelos disponíveis: ' + data.modelos_disponiveis.join(', ') + '</small>';
+              }
+              statusDiv.innerHTML = msg;
+              return;
+            }
+            let msg = '✅ ' + data.message;
+            if (data.avisos && data.avisos.length > 0) {
+              msg += '<br><small class="text-warning">⚠️ ' + data.avisos.join(' | ') + '</small>';
+            }
+            statusDiv.innerHTML = msg;
+            if (data.rows && data.rows.length > 0) {
+              // Ordenar colunas numericamente para o preview (Mês 1, Mês 2, ..., Mês 12)
+              const colunasOcr = Object.keys(data.rows[0]).sort((a, b) => {
+                const na = parseInt((a.match(/\d+/) || ['0'])[0]);
+                const nb = parseInt((b.match(/\d+/) || ['0'])[0]);
+                if (!a.match(/\d/)) return -1;
+                if (!b.match(/\d/)) return 1;
+                return na - nb;
+              });
+              renderizarPreviewOCR(colunasOcr, data.rows);
+            }
+          })
+          .catch(e => { statusDiv.innerHTML = '❌ Erro: ' + e.message; });
+        return;
+      }
+
+      // ── MODO BRUTO: comportamento original ────────────────────────────
+      if (ext === 'pdf') {
+        const formData = new FormData();
+        formData.append('arquivo', file);
+        fetch('/orcamento/api/ocr-pdf', { method: 'POST', body: formData })
+          .then(r => r.json())
+          .then(data => {
+            if (data.error) { statusDiv.innerHTML = '❌ ' + data.error; return; }
+            statusDiv.innerHTML = '✅ ' + (data.message || data.rows.length + ' linha(s) extraída(s)');
+            if (data.texto) {
+              statusDiv.innerHTML += '<br><small class="text-muted">Nenhuma tabela encontrada. Texto bruto abaixo:</small>';
+              statusDiv.innerHTML += '<pre class="border p-2 bg-light" style="max-height:200px;overflow-y:auto;font-size:0.8rem">' + data.texto.substring(0, 3000) + '</pre>';
+              return;
+            }
+            if (data.rows && data.rows.length > 0) {
+              renderizarPreviewOCR(data.columns, data.rows);
+            }
+          })
+          .catch(e => { statusDiv.innerHTML = '❌ Erro: ' + e.message; });
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            statusDiv.innerHTML = '✅ ' + json.length + ' linha(s) extraída(s) do Excel.';
+            if (json.length > 0) { renderizarPreviewOCR(Object.keys(json[0]), json); }
+          } catch(err) { statusDiv.innerHTML = '❌ Erro ao ler Excel: ' + err.message; }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        statusDiv.innerHTML = '❌ Formato não suportado. Use PDF, XLSX ou XLS.';
+      }
+    });
+
+    function renderizarPreviewOCR(colunas, linhas) {
+      const preview = document.getElementById('ocrPreview');
+      const thead = document.getElementById('ocrPreviewHead');
+      const tbody = document.getElementById('ocrPreviewBody');
+
+      // Cabeçalho
+      let thHtml = '<tr>';
+      colunas.forEach(c => { thHtml += '<th>' + c + '</th>'; });
+      thHtml += '</tr>';
+      thead.innerHTML = thHtml;
+
+      // Linhas
+      let trHtml = '';
+      linhas.forEach(linha => {
+        trHtml += '<tr>';
+        colunas.forEach(c => { trHtml += '<td>' + (linha[c] || '') + '</td>'; });
+        trHtml += '</tr>';
+      });
+      tbody.innerHTML = trHtml;
+
+      // Guardar dados para importação
+      document.getElementById('btnImportarOCR').dataset.ocrRows = JSON.stringify(linhas);
+      preview.classList.remove('d-none');
+    }
+
+    document.getElementById('btnImportarOCR').addEventListener('click', function() {
+      try {
+        const rows = JSON.parse(this.dataset.ocrRows || '[]');
+        if (rows.length === 0) { alert('Nenhum dado para importar.'); return; }
+        importFromJson(rows);
+        bootstrap.Modal.getInstance(document.getElementById('modalOCR')).hide();
+        alert('✅ ' + rows.length + ' linha(s) importada(s) para a tabela!');
+      } catch(e) { alert('Erro ao importar: ' + e.message); }
+    });
+
+    }); // fim DOMContentLoaded OCR
+    // === FIM OCR ===
   </script>
+
+  <!-- Modal OCR (Teste) -->
+  <div class="modal fade" id="modalOCR" tabindex="-1" aria-labelledby="modalOCRLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title" id="modalOCRLabel">🔍 OCR — Importar de PDF ou Excel</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info mb-3">
+            <strong>Modo Modelo:</strong> escolha um modelo para importação estruturada (xlsx/csv → rubrica e meses preenchidos automaticamente).<br>
+            <strong>Modo Bruto:</strong> deixe o modelo em branco para extração genérica — PDF via backend, Excel via SheetJS local.
+          </div>
+
+          <!-- Seleção de modelo -->
+          <div class="mb-3">
+            <label for="ocrModeloSelect" class="form-label fw-bold">Modelo de proposta orçamentária:</label>
+            <select id="ocrModeloSelect" class="form-select">
+              <option value="">— Extração bruta (sem modelo) —</option>
+              <!-- preenchido dinamicamente pelo JS ao abrir o modal -->
+            </select>
+            <div id="ocrModeloDescricao" class="form-text text-muted mt-1"></div>
+          </div>
+
+          <div class="mb-3">
+            <label for="ocrFileInput" class="form-label fw-bold">Arquivo:</label>
+            <input type="file" id="ocrFileInput" class="form-control" accept=".pdf,.xlsx,.xls,.csv">
+            <div id="ocrFileHint" class="form-text text-muted">PDF, XLSX, XLS ou CSV</div>
+          </div>
+          <button id="btnProcessarOCR" class="btn btn-primary">🔍 Processar Arquivo</button>
+          <div id="ocrStatus" class="mt-2"></div>
+          <div id="ocrPreview" class="mt-3 d-none">
+            <h6 class="fw-bold">Prévia dos dados extraídos:</h6>
+            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+              <table class="table table-sm table-bordered">
+                <thead class="table-secondary" id="ocrPreviewHead"></thead>
+                <tbody id="ocrPreviewBody"></tbody>
+              </table>
+            </div>
+            <div class="mt-2 d-flex gap-2 align-items-center">
+              <button id="btnImportarOCR" class="btn btn-success">✅ Importar para Tabela</button>
+              <small class="text-muted">Revise os dados. Colunas reconhecidas: <strong>Rubrica</strong>, <strong>Quantidade</strong>, <strong>Categoria de Despesa</strong> e colunas de mês (ex: <em>Mês 1</em>, <em>Janeiro</em>).</small>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
 
