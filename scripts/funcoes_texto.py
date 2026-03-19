@@ -1,5 +1,5 @@
 """
-Sistema simplificado de substituição de variáveis em textos automáticos
+Funções_texto: Sistema simplificado de substituição de variáveis em textos automáticos
 Apenas variáveis simples, sem funções complexas
 """
 

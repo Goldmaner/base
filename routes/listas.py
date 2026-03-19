@@ -14,8 +14,18 @@ def converter_valor_para_db(valor, campo, config):
     """
     Converte valores do frontend para o formato do banco de dados
     """
+    # Strings vazias viram NULL no banco (campos opcionais não preenchidos)
+    if isinstance(valor, str) and valor.strip() == '':
+        return None
+
     # Se o campo for 'status' e valor for string, converter para boolean
+    # EXCETO se a tabela tem opções explícitas (coluna TEXT, não BOOLEAN)
     if campo == 'status' and isinstance(valor, str):
+        tipos = config.get('tipos_campo', {}) if config else {}
+        if f'opcoes_{campo}' in tipos:
+            # Coluna TEXT com opções configuradas — manter string como está
+            return valor
+        # Coluna BOOLEAN sem opções explícitas
         return valor.lower() in ['ativo', 'true', '1', 'sim']
     
     # Se o campo for 'status_pg' e valor for string, manter string
@@ -36,6 +46,11 @@ def converter_valor_para_frontend(valor, campo):
     # Se o campo for 'status' e valor for boolean, converter para string
     if campo == 'status' and isinstance(valor, bool):
         return 'Ativo' if valor else 'Inativo'
+    # Corrigir registros corrompidos: 'false'/'true' armazenados como texto
+    if campo == 'status' and valor in ('false', 'f'):
+        return 'Inativo'
+    if campo == 'status' and valor in ('true', 't'):
+        return 'Ativo'
     
     return valor
 
@@ -45,11 +60,25 @@ TABELAS_CONFIG = {
     'c_dac_analistas': {
         'nome': 'DAC: Analistas',
         'schema': 'categoricas',
-        'colunas_editaveis': ['nome_analista', 'd_usuario', 'status'],
-        'labels': {'nome_analista': 'Nome do Analista', 'd_usuario': 'R.F.', 'status': 'Status'},
+        'colunas_editaveis': ['nome_analista', 'd_usuario', 'posicao_analista', 'contrato_inicio', 'contrato_fim', 'status'],
+        'colunas_obrigatorias': ['nome_analista', 'd_usuario', 'posicao_analista', 'status'],
+        'labels': {
+            'nome_analista': 'Nome do Analista',
+            'd_usuario': 'R.F.',
+            'posicao_analista': 'Posição',
+            'contrato_inicio': 'Início do Contrato',
+            'contrato_fim': 'Fim do Contrato',
+            'status': 'Status'
+        },
+        'colunas_filtro': ['nome_analista', 'd_usuario', 'posicao_analista', 'status'],
         'ordem': 'nome_analista',
         'tipos_campo': {
-            'status': ['Ativo', 'Inativo']
+            'posicao_analista': 'select',
+            'opcoes_posicao_analista': ['Servidor(a)', 'Servidor(a) Temporário(a)', 'Estagiário(a)'],
+            'contrato_inicio': 'date',
+            'contrato_fim': 'date',
+            'status': 'select',
+            'opcoes_status': ['Ativo', 'Inativo']
         },
         'inline_edit': True,
         'inline_columns': ['status']
@@ -1077,7 +1106,8 @@ def obter_dados(tabela):
                 item[col] = converter_valor_para_frontend(valor, col)
                 
                 # Formatar datas para formato brasileiro (DD/MM/YYYY)
-                if col in ['legislatura_inicio', 'legislatura_fim'] and valor:
+                tipos_campo = config.get('tipos_campo', {})
+                if valor and (col in ['legislatura_inicio', 'legislatura_fim'] or tipos_campo.get(col) == 'date'):
                     from datetime import date, datetime
                     if isinstance(valor, (date, datetime)):
                         item[col] = valor.strftime('%d/%m/%Y')
@@ -1314,6 +1344,16 @@ def atualizar_registro(tabela, id):
         
         # Se for pessoa_gestora e o nome mudou, precisamos atualizar Parcerias também
         nome_antigo = None
+        nome_analista_antigo = None
+
+        if tabela == 'c_dac_analistas' and 'nome_analista' in campos_a_atualizar:
+            cur = get_cursor()
+            cur.execute(f"SELECT nome_analista FROM {schema}.{tabela} WHERE id = %s", (id,))
+            resultado = cur.fetchone()
+            if resultado:
+                nome_analista_antigo = resultado['nome_analista']
+            cur.close()
+
         if tabela == 'c_geral_pessoa_gestora' and 'nome_pg' in campos_a_atualizar:
             cur = get_cursor()
             cur.execute(f"SELECT nome_pg FROM {schema}.{tabela} WHERE id = %s", (id,))
@@ -1373,6 +1413,15 @@ def atualizar_registro(tabela, id):
         print(f"[DEBUG atualizar_registro] Valores: {valores}")
         
         if execute_query(query, valores):
+            # Se alterou nome do analista DAC, atualizar também em checklist_analista
+            if tabela == 'c_dac_analistas' and nome_analista_antigo and nome_analista_antigo != campos_a_atualizar.get('nome_analista'):
+                novo_nome = campos_a_atualizar.get('nome_analista')
+                execute_query(
+                    "UPDATE analises_pc.checklist_analista SET nome_analista = %s WHERE nome_analista = %s",
+                    (novo_nome, nome_analista_antigo)
+                )
+                print(f"[CASCATA] nome_analista atualizado: '{nome_analista_antigo}' → '{novo_nome}' em checklist_analista")
+
             # Se alterou nome da pessoa gestora, atualizar também na tabela parcerias_analises
             if tabela == 'c_geral_pessoa_gestora' and nome_antigo and nome_antigo != campos_a_atualizar.get('nome_pg'):
                 query_parcerias = """

@@ -392,6 +392,7 @@
         <div id="alertEditar"></div>
 
         <input type="hidden" id="e_id">
+        <input type="hidden" id="e_pe_id">
         <form id="formEditar">
           <div class="row g-3">
             <div class="col-md-3">
@@ -724,6 +725,7 @@ function abrirEditar(btnEl) {
 
   document.getElementById('alertEditar').innerHTML = '';
   document.getElementById('e_id').value         = row.id;
+  document.getElementById('e_pe_id').value      = row.pe_id || '';
   document.getElementById('e_sei_orc').value    = row.sei_orcamentario || '';
   document.getElementById('e_sei_celeb').value  = row.sei_celeb || '';
   document.getElementById('e_projeto').value    = row.projeto || '';
@@ -798,6 +800,7 @@ async function salvarEditar() {
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Salvando…';
 
   const payload = {
+    pe_id:                          parseInt(document.getElementById('e_pe_id').value) || null,
     sei_orcamentario:               seiOrc,
     sei_celeb:                      document.getElementById('e_sei_celeb_criar')?.checked
                                       ? 'A ser criado'

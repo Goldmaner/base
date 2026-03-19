@@ -113,12 +113,17 @@ def index():
             pe.status        AS pe_status
         FROM celebracao.celebracao_emendas ce
         LEFT JOIN public.parcerias_emendas pe
-               ON ce.sei_celeb = pe.sei_celeb
-              AND pe.id = (
-                    SELECT id FROM public.parcerias_emendas
-                     WHERE sei_celeb = ce.sei_celeb
-                     ORDER BY criado_em DESC NULLS LAST
-                     LIMIT 1
+               ON pe.id = COALESCE(
+                    -- Vínculo direto 1:1 (registros criados por esta tela)
+                    (SELECT id FROM public.parcerias_emendas
+                      WHERE celebracao_emenda_id = ce.id
+                      LIMIT 1),
+                    -- Fallback para registros antigos sem celebracao_emenda_id
+                    (SELECT id FROM public.parcerias_emendas
+                      WHERE sei_celeb = ce.sei_celeb
+                        AND celebracao_emenda_id IS NULL
+                      ORDER BY criado_em DESC NULLS LAST
+                      LIMIT 1)
                   )
         {where}
         ORDER BY ce.created_at DESC NULLS LAST
@@ -252,13 +257,13 @@ def criar():
         """, (sei_orc, sei_eff, projeto, memorando, consulta, disp, ce_status, usuario))
         new_id = cur.fetchone()[0]
 
-        # Salvar em parcerias_emendas: pelo sei_celeb (primário) ou pelo projeto (secundário)
+        # Salvar em parcerias_emendas com vínculo direto ao ce.id
         if sei_eff or projeto:
             cur.execute("""
                 INSERT INTO public.parcerias_emendas
-                    (sei_celeb, vereador_nome, valor, observacoes, status)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (sei_eff, vereador, valor, obs, pe_status))
+                    (sei_celeb, vereador_nome, valor, observacoes, status, celebracao_emenda_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (sei_eff, vereador, valor, obs, pe_status, new_id))
 
         db.commit()
         return jsonify(success=True, id=new_id, mensagem=f'SEI Orçamentário {sei_orc} criado com sucesso.')
@@ -330,33 +335,34 @@ def editar(id):
 
         # Atualizar vereador/valor/obs em parcerias_emendas
         link_sei = sei_eff or old_sei or None
-        if link_sei:
-            cur.execute(
-                "SELECT id FROM public.parcerias_emendas WHERE sei_celeb = %s ORDER BY criado_em DESC NULLS LAST LIMIT 1",
-                [link_sei])
-            pe = cur.fetchone()
-            if pe:
-                cur.execute("""
-                    UPDATE public.parcerias_emendas
-                       SET vereador_nome = %s,
-                           valor         = %s,
-                           observacoes   = %s
-                     WHERE id = %s
-                """, (vereador, valor, obs, pe[0]))
-            else:
-                cur.execute("""
-                    INSERT INTO public.parcerias_emendas (sei_celeb, vereador_nome, valor, observacoes)
-                    VALUES (%s, %s, %s, %s)
-                """, (link_sei, vereador, valor, obs))
-        elif projeto or old_projeto:
-            chave = old_projeto or projeto
-            cur.execute("""
-                UPDATE public.parcerias_emendas
-                   SET vereador_nome = %s,
-                       valor         = %s,
-                       observacoes   = %s
-                 WHERE observacoes = %s
-            """, (vereador, valor, obs, chave))
+
+        # Tentativa 1: vínculo direto 1:1 por celebracao_emenda_id
+        cur.execute("""
+            UPDATE public.parcerias_emendas
+               SET vereador_nome = %s, valor = %s, observacoes = %s
+             WHERE celebracao_emenda_id = %s
+        """, (vereador, valor, obs, id))
+
+        if cur.rowcount == 0:
+            # Tentativa 2: fallback para registros sem celebracao_emenda_id
+            if link_sei:
+                cur.execute(
+                    "SELECT id FROM public.parcerias_emendas WHERE sei_celeb = %s AND celebracao_emenda_id IS NULL ORDER BY criado_em DESC NULLS LAST LIMIT 1",
+                    [link_sei])
+                pe = cur.fetchone()
+                if pe:
+                    cur.execute("""
+                        UPDATE public.parcerias_emendas
+                           SET vereador_nome = %s, valor = %s, observacoes = %s,
+                               celebracao_emenda_id = %s
+                         WHERE id = %s
+                    """, (vereador, valor, obs, id, pe[0]))
+                else:
+                    cur.execute("""
+                        INSERT INTO public.parcerias_emendas
+                            (sei_celeb, vereador_nome, valor, observacoes, celebracao_emenda_id)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (link_sei, vereador, valor, obs, id))
 
         db.commit()
         return jsonify(success=True, mensagem='Registro atualizado com sucesso.')

@@ -15,7 +15,7 @@
 ## 3. Orçamento Anual
 - Permitir inclusão de observações detalhadas por item/orçamento.✅
 - Adicionar mais opções de medidas para quantidade, com estrutura padronizada (ex: unidade, serviço, pacote) (Médio, porém não prioritário)
-- OCR para leitura dos orçamentos anuais e demais propostas (Difícil).
+- OCR para leitura dos orçamentos anuais e demais propostas (Difícil, em teste).
 
 ## 4. Parcerias
 - Implementar sistema para registrar e gerenciar alterações futuras/projetadas em parcerias.✅
@@ -52,7 +52,7 @@
 - Desenvolver módulo para celebração de parcerias, com workflow próprio.✅
 - Incluir módulo para gestão de CENTS.✅
 - Vincular projeto celebrado com Parcerias.html (Fácil)
-- Inserir Nº Consulta na Nova Parceria e contatos de vereadores (Fácil)
+- Inserir Nº Consulta na Nova Parceria e contatos de vereadores (Fácil)✅
 
 ## 9. Editais
 - Criar módulo para cadastro, acompanhamento e publicação de editais.✅
