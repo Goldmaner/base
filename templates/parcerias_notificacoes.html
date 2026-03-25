@@ -101,6 +101,7 @@
                         <option value="">Todos</option>
                         <option value="Atrasado">Atrasado</option>
                         <option value="No prazo">No prazo</option>
+                        <option value="Respondido">Respondido</option>
                         <option value="Não aplicável">Não aplicável</option>
                     </select>
                 </div>
@@ -321,6 +322,18 @@
         let termosCarregados = false;
         let limiteAtual = 100; // Limite padrão
 
+        // Filtro padrão por setor conforme tipo de usuário
+        const TIPO_USUARIO = '{{ user.tipo_usuario }}';
+        const NOME_ANALISTA_LOGADO = {{ nome_analista_logado | tojson }};
+        const PODE_EDITAR = {{ pode_editar | tojson }};
+        const ORGAO_FILTER_MAP = {
+            'Agente DGP': 'Agente DGP',
+            'Agente DAC': 'Agente DAC',
+            'Agente DP' : 'Agente DP',
+        };
+        // orgaoFilterDefault: enviado automaticamente nas buscas; vazio = ver tudo
+        const orgaoFilterDefault = ORGAO_FILTER_MAP[TIPO_USUARIO] || '';
+
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
             console.log('[DEBUG] Inicializando página de notificações...');
@@ -333,13 +346,6 @@
             // Event listener para calcular próximo número quando tipo_doc mudar
             document.getElementById('tipoDoc').addEventListener('change', calcularProximoNumero);
             document.getElementById('anoDoc').addEventListener('change', calcularProximoNumero);
-            
-            // Event listener para autocomplete dinâmico
-            document.getElementById('tipoDoc').addEventListener('input', function() {
-                if (this.value.length >= 2) {
-                    buscarTiposDocumento(this.value);
-                }
-            });
         });
 
         // Carregar tipos de documento (filtrados por tipo de usuário)
@@ -622,7 +628,12 @@
                 if (filtroResponsavel) params.append('nome_responsavel', filtroResponsavel);
                 if (filtroStatus) params.append('status', filtroStatus);
                 if (filtroDocRespondido) params.append('doc_respondido', filtroDocRespondido);
-                
+
+                // Filtro de setor: só ignora o padrão se o usuário escolheu um tipo manualmente
+                if (!filtroTipo && orgaoFilterDefault) {
+                    params.append('orgao_filter', orgaoFilterDefault);
+                }
+
                 // Adicionar limite
                 params.append('limite', limiteAtual);
 
@@ -666,6 +677,8 @@
                     statusHtml = '<span class="badge bg-danger">Atrasado</span>';
                 } else if (notif.status_prazo === 'No prazo') {
                     statusHtml = '<span class="badge bg-success">No prazo</span>';
+                } else if (notif.status_prazo === 'Respondido') {
+                    statusHtml = '<span class="badge bg-info text-dark">Respondido</span>';
                 } else if (notif.status_prazo === 'Não aplicável') {
                     statusHtml = '<span class="badge bg-secondary">Não aplicável</span>';
                 }
@@ -717,14 +730,14 @@
 
         // Limpar filtros
         function limparFiltros() {
-            document.getElementById('filtroTipo').value = '';
+            document.getElementById('filtroTipo').value = '';  // volta a "Todos" do setor
             document.getElementById('filtroAno').value = '';
             document.getElementById('filtroNumero').value = '';
             document.getElementById('filtroTermo').value = '';
             document.getElementById('filtroResponsavel').value = '';
             document.getElementById('filtroStatus').value = '';
             document.getElementById('filtroDocRespondido').value = '';
-            carregarNotificacoes();
+            carregarNotificacoes(); // orgaoFilterDefault é reaplicado automaticamente
         }
 
         // Alterar limite de registros
@@ -748,6 +761,16 @@
             
             // Limpar campo de número (será preenchido quando tipo_doc for selecionado)
             document.getElementById('numeroDoc').value = '';
+            
+            // Pré-preencher responsável com o nome do analista logado
+            if (NOME_ANALISTA_LOGADO) {
+                document.getElementById('nomeResponsavel').value = NOME_ANALISTA_LOGADO;
+            }
+            
+            // Agente DGP sem visualizacao_geral: bloquear número do termo e responsável
+            const isDGPRestrito = (TIPO_USUARIO === 'Agente DGP' && !PODE_EDITAR);
+            document.getElementById('numeroTermo').disabled = isDGPRestrito;
+            document.getElementById('nomeResponsavel').disabled = isDGPRestrito;
             
             modalNotificacao.show();
         }
@@ -784,6 +807,11 @@
                 const selectResp = document.getElementById('nomeResponsavel');
                 selectResp.value = notif.nome_responsavel || '';
                 console.log('[DEBUG] Valor do select após seleção:', selectResp.value);
+
+                // Agente DGP sem visualizacao_geral: bloquear número do termo e responsável
+                const isDGPRestrito = (TIPO_USUARIO === 'Agente DGP' && !PODE_EDITAR);
+                document.getElementById('numeroTermo').disabled = isDGPRestrito;
+                selectResp.disabled = isDGPRestrito;
                 
                 if (notif.dilacao) {
                     document.getElementById('dilacaoSim').checked = true;

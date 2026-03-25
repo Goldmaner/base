@@ -2,6 +2,8 @@
 Rotas para Ofícios, Documentos e Notificações de Parcerias
 """
 
+import re
+
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db, execute_query
 from functools import wraps
@@ -9,6 +11,16 @@ from decorators import requires_access
 from datetime import timedelta, date, datetime
 
 bp = Blueprint('parcerias_notificacoes', __name__, url_prefix='/parcerias_notificacoes')
+
+
+def normalizar_rf(rf):
+    """Extrai os primeiros 6 dígitos numéricos do R.F. (ignora dígito verificador e prefixo 'd')."""
+    if not rf:
+        return None
+    rf_str = str(rf).lower().strip()
+    rf_str = re.sub(r'^d', '', rf_str)
+    digitos = re.sub(r'[^\d]', '', rf_str)
+    return digitos[:6] if len(digitos) >= 6 else digitos
 
 
 def login_required(f):
@@ -31,7 +43,52 @@ def listar():
         'email': session.get('email'),
         'tipo_usuario': session.get('tipo_usuario')
     }
-    return render_template('parcerias_notificacoes.html', user=user)
+
+    nome_analista_logado = None
+    pode_editar = True  # default: pode editar (DAC e outros)
+
+    tipo = session.get('tipo_usuario', '')
+    d_usuario = session.get('d_usuario', '')
+
+    try:
+        cur = get_cursor()
+        if tipo == 'Agente DGP':
+            rf_norm = normalizar_rf(d_usuario)
+            if rf_norm:
+                cur.execute("""
+                    SELECT nome_analista,
+                           COALESCE(visualizacao_geral, FALSE) AS visualizacao_geral
+                    FROM categoricas.c_dgp_analistas
+                    WHERE REGEXP_REPLACE(LOWER(COALESCE(rf,'')), '[^0-9]', '', 'g')
+                          LIKE %s || '%%'
+                      AND status = TRUE
+                    LIMIT 1
+                """, (rf_norm,))
+                row = cur.fetchone()
+                if row:
+                    nome_analista_logado = row['nome_analista']
+                    pode_editar = bool(row['visualizacao_geral'])
+        elif tipo == 'Agente DAC':
+            if d_usuario:
+                cur.execute("""
+                    SELECT nome_analista
+                    FROM categoricas.c_dac_analistas
+                    WHERE d_usuario = %s AND status = TRUE
+                    LIMIT 1
+                """, (d_usuario,))
+                row = cur.fetchone()
+                if row:
+                    nome_analista_logado = row['nome_analista']
+                # DAC users can always edit
+    except Exception as e:
+        print(f"[ERRO] ao obter analista logado: {e}")
+
+    return render_template(
+        'parcerias_notificacoes.html',
+        user=user,
+        nome_analista_logado=nome_analista_logado,
+        pode_editar=pode_editar
+    )
 
 
 @bp.route('/api/notificacoes', methods=['GET'])
@@ -53,6 +110,7 @@ def api_listar_notificacoes():
         filtro_responsavel = request.args.get('nome_responsavel', '').strip()
         filtro_status = request.args.get('status', '').strip()
         filtro_doc_respondido = request.args.get('doc_respondido', '').strip()
+        orgao_filter = request.args.get('orgao_filter', '').strip()
         limite = request.args.get('limite', '100').strip()
         
         # Query base com JOIN para pegar OSC, sei_pc e calcular prazo
@@ -79,9 +137,13 @@ def api_listar_notificacoes():
                 cdp.prazo_dias
             FROM parcerias_notificacoes pn
             LEFT JOIN parcerias p ON pn.numero_termo = p.numero_termo
-            LEFT JOIN categoricas.c_documentos_dp_prazos cdp 
-                ON pn.tipo_doc = cdp.tipo_documento 
-                AND p.portaria = cdp.lei
+            LEFT JOIN LATERAL (
+                SELECT prazo_dias
+                FROM categoricas.c_documentos_dp_prazos
+                WHERE tipo_documento = pn.tipo_doc
+                ORDER BY CASE WHEN lei = p.portaria THEN 0 ELSE 1 END
+                LIMIT 1
+            ) cdp ON true
             WHERE 1=1
         """
         
@@ -107,9 +169,19 @@ def api_listar_notificacoes():
         if filtro_responsavel:
             query += " AND LOWER(pn.nome_responsavel) LIKE LOWER(%s)"
             params.append(f'%{filtro_responsavel}%')
-        
-        # Ordenar pelos mais recentes
-        query += " ORDER BY pn.id DESC"
+
+        # Filtro por setor (orgao_emissor via c_dp_documentos)
+        if orgao_filter:
+            query += """
+                AND pn.tipo_doc IN (
+                    SELECT tipo_documento
+                    FROM categoricas.c_dp_documentos
+                    WHERE tipo_usuario = %s
+                )"""
+            params.append(orgao_filter)
+
+        # Ordenar por ano e número do documento (maior primeiro)
+        query += " ORDER BY pn.ano_doc DESC, pn.numero_doc DESC"
         
         # Adicionar limite se não for "todas"
         if limite.lower() != 'todas':
@@ -149,7 +221,9 @@ def api_listar_notificacoes():
                     
                     # Calcular status (comparar com data de hoje)
                     hoje = date.today()
-                    if data_prazo < hoje:
+                    if item.get('doc_respondido'):
+                        status_prazo = 'Respondido'
+                    elif data_prazo < hoje:
                         status_prazo = 'Atrasado'
                     else:
                         status_prazo = 'No prazo'
@@ -611,13 +685,15 @@ def api_calcular_prazo():
         
         cur = get_cursor()
         
-        # Buscar prazo_dias baseado em tipo_doc e portaria do termo
+        # Buscar prazo_dias: tenta match por portaria do termo, senão usa qualquer entrada para o tipo_doc
         cur.execute("""
-            SELECT cdp.prazo_dias
-            FROM categoricas.c_documentos_dp_prazos cdp
-            INNER JOIN parcerias p ON cdp.lei = p.portaria
-            WHERE cdp.tipo_documento = %s 
-            AND p.numero_termo = %s
+            SELECT prazo_dias
+            FROM categoricas.c_documentos_dp_prazos
+            WHERE tipo_documento = %s
+            ORDER BY CASE
+                WHEN lei = (SELECT portaria FROM parcerias WHERE numero_termo = %s LIMIT 1) THEN 0
+                ELSE 1
+            END
             LIMIT 1
         """, (tipo_doc, numero_termo))
         

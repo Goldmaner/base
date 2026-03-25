@@ -2779,15 +2779,28 @@ def gerar_encaminhamento_pagamento():
         conn = get_db()
         cursor = conn.cursor()
         
-        # 1. Buscar modelo de texto (id=20)
-        cursor.execute("""
-            SELECT modelo_texto 
-            FROM categoricas.c_geral_modelo_textos 
-            WHERE id = 20
-        """)
+        # 0. Determinar qual modelo usar baseado nos tipos de parcela selecionados
+        # id=22 para 1ª Parcela (qualquer variação); id=20 para demais ou mistas
+        placeholders_check = ','.join(['%s'] * len(parcela_ids))
+        cursor.execute(
+            f"SELECT parcela_numero FROM gestao_financeira.ultra_liquidacoes WHERE id IN ({placeholders_check})",
+            tuple(parcela_ids)
+        )
+        numeros_check = [r[0] for r in cursor.fetchall() if r[0]]
+        is_somente_primeira_parcela = (
+            len(numeros_check) > 0 and
+            all(p.strip().startswith('1ª Parcela') for p in numeros_check)
+        )
+        modelo_id = 22 if is_somente_primeira_parcela else 20
+
+        # 1. Buscar modelo de texto
+        cursor.execute(
+            "SELECT modelo_texto FROM categoricas.c_geral_modelo_textos WHERE id = %s",
+            (modelo_id,)
+        )
         modelo_row = cursor.fetchone()
         if not modelo_row or not modelo_row[0]:
-            return "Modelo de texto (ID 20) não encontrado", 404
+            return f"Modelo de texto (ID {modelo_id}) não encontrado", 404
         
         modelo_html = modelo_row[0]
         
@@ -2903,7 +2916,7 @@ def gerar_encaminhamento_pagamento():
         n_parcela = formatar_lista_parcelas(parcelas_texto)
         
         # Verificar se alguma parcela é "1ª Parcela" (para condicional de glosa/retenção)
-        tem_primeira_parcela = any('1ª Parcela' in p for p in parcelas_texto)
+        tem_primeira_parcela = any(p.strip().startswith('1ª Parcela') for p in parcelas_texto)
         
         # Gerar linhas da tabela de parcelas
         linhas_tabela_html = gerar_linhas_tabela_parcelas(parcelas_rows)

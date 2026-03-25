@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Calendário CDA — SMDHC</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { background:#f8f9fa; padding:20px; }
+    .header-section {
+      background: linear-gradient(135deg, #0d6efd 0%, #084ecf 100%);
+      color: white; padding: 24px 30px; border-radius: 8px;
+      margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,.1);
+    }
+    .card-section { background:#fff; padding:20px 24px; border-radius:8px; margin-bottom:20px; box-shadow:0 2px 4px rgba(0,0,0,.1); }
+
+    /* Gantt wrapper — horizontal scroll, fixed left column */
+    .gantt-wrapper { overflow-x: auto; }
+    .gantt-table { border-collapse: collapse; min-width: max-content; font-size: .78rem; }
+    .gantt-table th, .gantt-table td { border: 1px solid #dee2e6; padding: 0; }
+
+    /* Header rows */
+    .gantt-table .year-row th { background: #0d6efd; color: #fff; text-align: center; font-size: .75rem; white-space: nowrap; padding: 3px 4px; }
+    .gantt-table .month-row th { background: #e9ecef; text-align: center; font-size: .7rem; white-space: nowrap; min-width: 34px; padding: 2px 3px; color:#495057; }
+    .gantt-table .month-row th.today-col { background: #fff3cd; }
+
+    /* Fixed label column */
+    .col-vaga { background: #f8f9fa; white-space: nowrap; padding: 4px 8px; position: sticky; left: 0; z-index: 2; border-right: 2px solid #adb5bd !important; min-width: 150px; max-width: 200px; }
+    .col-vaga .unidade-label { font-size: .63rem; color: #6c757d; display: block; white-space: normal; line-height: 1.2; margin-top: 1px; }
+    .gantt-table .year-row .col-vaga,
+    .gantt-table .month-row .col-vaga { background: #0d6efd; color: #fff; font-weight: 600; z-index: 3; }
+    .gantt-table .month-row .col-vaga { background: #e9ecef; color: #495057; }
+
+    /* Data rows */
+    .vaga-row td { height: 28px; position: relative; padding: 0; }
+    .vaga-row .col-vaga { height: auto; padding: 3px 8px; }
+    .vaga-row:hover .col-vaga { background: #e8f0ff; }
+
+    /* Gantt bars */
+    .gantt-cell { position: relative; height: 28px; }
+    .bar {
+      position: absolute; top: 4px; bottom: 4px; border-radius: 3px;
+      overflow: hidden; white-space: nowrap; padding: 0 4px;
+      font-size: .68rem; line-height: 20px; font-weight: 500;
+      cursor: default; opacity: .92; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .bar-active   { background: #198754; color: #fff; }
+    .bar-exited   { background: #6c757d; color: #fff; }
+    .bar-vacante  { background: #fd7e14; color: #fff; }
+    .bar-unknown  { background: #adb5bd; color: #333; }
+    .bar-nodata   { background: #ced4da; color: #6c757d; font-style: italic; }
+
+    /* Month highlight today */
+    td.today-col { background: rgba(255,193,7,.08); }
+
+    /* Legend */
+    .legend-dot { width:14px; height:14px; border-radius:3px; display:inline-block; margin-right:4px; vertical-align:middle; }
+
+    /* Filter bar */
+    #filtro-cal { max-width:280px; }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+
+  <div class="header-section">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2 class="mb-1"><i class="bi bi-calendar3"></i> Calendário de Ocupação — CDA SMDHC</h2>
+        <p class="mb-0 opacity-75">Linha do tempo de titulares por vaga</p>
+      </div>
+      <a href="{{ url_for('gestao_pessoas.nomeacoes') }}" class="btn btn-light">
+        <i class="bi bi-arrow-left"></i> Nomeações
+      </a>
+    </div>
+  </div>
+
+  <div class="card-section">
+    <!-- Controls -->
+    <div class="d-flex flex-wrap gap-3 align-items-center mb-3">
+      <div class="input-group" id="filtro-cal">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" id="inp-filtro" class="form-control form-control-sm" placeholder="Filtrar vaga ou nome…">
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        <label class="small text-muted mb-0">Ordenar por:</label>
+        <select id="sel-sort" class="form-select form-select-sm w-auto" onchange="sortarCalendario()">
+          <option value="vaga_asc">Vaga ↑</option>
+          <option value="vaga_desc">Vaga ↓</option>
+          <option value="cda_asc">CDA ↑ (menor primeiro)</option>
+          <option value="cda_desc">CDA ↓ (maior primeiro)</option>
+        </select>
+      </div>
+      <div class="d-flex gap-2 align-items-center small">
+        <span><span class="legend-dot" style="background:#198754"></span>Ativo</span>
+        <span><span class="legend-dot" style="background:#6c757d"></span>Exonerado(a)</span>
+        <span><span class="legend-dot" style="background:#fd7e14"></span>Vacante</span>
+        <span><span class="legend-dot" style="background:#adb5bd"></span>Desconhecido</span>
+        <span><span class="legend-dot" style="background:#ced4da"></span>Sem dado</span>
+      </div>
+      <label class="form-check-label small ms-auto">
+        <input type="checkbox" id="chk-only-active" class="form-check-input"> Apenas vagas com dados
+      </label>
+    </div>
+
+    <!-- Gantt -->
+    <div class="gantt-wrapper">
+      <table class="gantt-table" id="gantt-table">
+        <thead>
+          <tr class="year-row" id="row-years">
+            <th class="col-vaga">Vaga / CDA</th>
+          </tr>
+          <tr class="month-row" id="row-months">
+            <th class="col-vaga">Nomeados</th>
+          </tr>
+        </thead>
+        <tbody id="gantt-body"></tbody>
+      </table>
+    </div>
+    <p class="text-muted small mt-2 mb-0" id="status-count"></p>
+  </div>
+
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip" style="position:fixed;display:none;background:#212529;color:#fff;padding:6px 10px;border-radius:5px;font-size:.78rem;z-index:9999;pointer-events:none;max-width:260px;"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const RAW = {{ dados_json | safe }};
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function monthKey(y, m) { return y * 100 + m; }   // e.g. 202304
+
+function parseYM(dateStr) {
+  // "YYYY-MM-DD" → {y, m}
+  if (!dateStr) return null;
+  const parts = dateStr.split('-');
+  return { y: parseInt(parts[0]), m: parseInt(parts[1]) };
+}
+
+function monthsBetween(from, to) {
+  // inclusive list of {y,m} from `from` to `to`
+  const list = [];
+  let y = from.y, m = from.m;
+  while (y < to.y || (y === to.y && m <= to.m)) {
+    list.push({ y, m });
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return list;
+}
+
+function labelMonth(m) {
+  return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][m - 1];
+}
+
+// Colour for a bar
+function barClass(obs, isActive) {
+  if (isActive) return 'bar-active';
+  const o = (obs || '').toLowerCase();
+  if (o.includes('exoner')) return 'bar-exited';
+  if (o.includes('vacante')) return 'bar-vacante';
+  if (o.includes('desconhecido')) return 'bar-unknown';
+  return 'bar-exited';   // default for past periods
+}
+
+// ── Build month range ────────────────────────────────────────────────────────
+const today = new Date();
+const todayYM = { y: today.getFullYear(), m: today.getMonth() + 1 };
+
+// Find global min date from data
+let globalMin = { y: 2023, m: 4 };  // fallback Apr/2023
+RAW.vagas.forEach(v => {
+  v.periodos.forEach(p => {
+    const ym = parseYM(p.inicio);
+    if (ym && monthKey(ym.y, ym.m) < monthKey(globalMin.y, globalMin.m)) globalMin = ym;
+  });
+});
+
+const MONTHS = monthsBetween(globalMin, todayYM);
+const MONTH_IDX = {};  // "YYYYMM" → column index (0-based)
+MONTHS.forEach((ym, i) => { MONTH_IDX[monthKey(ym.y, ym.m)] = i; });
+const N_MONTHS = MONTHS.length;
+
+// ── Build header rows ────────────────────────────────────────────────────────
+const rowYears  = document.getElementById('row-years');
+const rowMonths = document.getElementById('row-months');
+
+// Year groups
+let lastY = null, yearSpan = 0, yearTh = null;
+MONTHS.forEach((ym, i) => {
+  if (ym.y !== lastY) {
+    if (yearTh) yearTh.colSpan = yearSpan;
+    yearTh = document.createElement('th');
+    yearTh.textContent = ym.y;
+    rowYears.appendChild(yearTh);
+    lastY = ym.y; yearSpan = 1;
+  } else {
+    yearSpan++;
+  }
+  const th = document.createElement('th');
+  th.textContent = labelMonth(ym.m);
+  if (ym.y === todayYM.y && ym.m === todayYM.m) th.classList.add('today-col');
+  rowMonths.appendChild(th);
+});
+if (yearTh) yearTh.colSpan = yearSpan;
+
+// ── Build body ────────────────────────────────────────────────────────────────
+const tbody = document.getElementById('gantt-body');
+let visCount = 0;
+
+RAW.vagas.forEach(v => {
+  const tr = document.createElement('tr');
+  tr.className = 'vaga-row';
+  tr.dataset.vaga = v.numero;
+  tr.dataset.cda = v.cda || 0;
+  tr.dataset.hasPeriodos = v.periodos.length > 0 ? '1' : '0';
+
+  // Label cell
+  const tdLabel = document.createElement('td');
+  tdLabel.className = 'col-vaga';
+  const cdaStr = v.cda ? `<span class="badge bg-primary ms-1" style="font-size:.65rem">CDA-${v.cda}</span>` : '';
+  const unidadeStr = v.unidade ? `<span class="unidade-label" title="${v.unidade}">${v.unidade}</span>` : '';
+  tdLabel.innerHTML = `<strong>${v.numero}</strong>${cdaStr}${unidadeStr}`;
+  tr.appendChild(tdLabel);
+
+  // Build an array of bars per column slot
+  // Each cell is a <td> for one month; bars are absolutely positioned within
+  // We'll use a single-row approach: create one td per month, then overlay bars
+
+  // First allocate bars → [colStart, colEnd_inclusive, periodo]
+  const bars = v.periodos
+    .filter(p => p.inicio)
+    .map(p => {
+      const startYM = parseYM(p.inicio);
+      const endYM   = p.fim ? parseYM(p.fim) : todayYM;
+      const colStart = Math.max(0, MONTH_IDX[monthKey(startYM.y, startYM.m)] ?? 0);
+      const colEnd   = Math.min(N_MONTHS - 1, MONTH_IDX[monthKey(endYM.y, endYM.m)] ?? N_MONTHS - 1);
+      const isActive = !p.fim;
+      return { colStart, colEnd, periodo: p, isActive };
+    })
+    .filter(b => b.colEnd >= b.colStart);
+
+  // Create month cells
+  const cells = [];
+  for (let i = 0; i < N_MONTHS; i++) {
+    const td = document.createElement('td');
+    td.className = 'gantt-cell';
+    if (MONTHS[i].y === todayYM.y && MONTHS[i].m === todayYM.m) td.classList.add('today-col');
+    tr.appendChild(td);
+    cells.push(td);
+  }
+
+  // We render bars using absolute positioning inside a containing div
+  // Wrap all cells in a relative-positioned div overlay by using a spanning td
+  // Actually: we'll draw bars as stacked inside a single wide cell approach
+  // Better: use a single <td colspan=N> with relative positioning
+  // -- Remove individual cells, replace with one spanning td
+  while (tr.children.length > 1) tr.removeChild(tr.lastChild);
+
+  const tdGantt = document.createElement('td');
+  tdGantt.colSpan = N_MONTHS;
+  tdGantt.style.cssText = 'position:relative;padding:0;height:28px;';
+  tr.appendChild(tdGantt);
+
+  // Render each bar
+  bars.forEach(b => {
+    const leftPct  = (b.colStart / N_MONTHS) * 100;
+    const widthPct = ((b.colEnd - b.colStart + 1) / N_MONTHS) * 100;
+    const div = document.createElement('div');
+    div.className = 'bar ' + barClass(b.periodo.obs, b.isActive);
+    div.style.left  = leftPct + '%';
+    div.style.width = widthPct + '%';
+    // Name label - truncate
+    const nome = b.periodo.nome || '(sem nome)';
+    div.textContent = nome;
+    div.title = nome;
+    // Tooltip on hover
+    div.addEventListener('mouseenter', e => showTip(e, b.periodo, b.isActive));
+    div.addEventListener('mousemove', e => moveTip(e));
+    div.addEventListener('mouseleave', hideTip);
+    tdGantt.appendChild(div);
+  });
+
+  // Mark month boundaries with thin lines (using CSS background)
+  tdGantt.style.backgroundImage =
+    `repeating-linear-gradient(to right, transparent, transparent calc(${100/N_MONTHS}% - 1px), #dee2e6 calc(${100/N_MONTHS}% - 1px), #dee2e6 ${100/N_MONTHS}%)`;
+
+  tbody.appendChild(tr);
+  if (v.periodos.length > 0) visCount++;
+});
+
+document.getElementById('status-count').textContent =
+  `${RAW.vagas.length} vagas — ${visCount} com registros.`;
+
+// ── Tooltip ──────────────────────────────────────────────────────────────────
+const tip = document.getElementById('tooltip');
+function showTip(e, p, isActive) {
+  const lines = [
+    `<strong>${p.nome || '(sem nome)'}</strong>`,
+    p.rf ? `RF: ${p.rf}` : '',
+    `Início: ${p.inicio || '—'}`,
+    `Encerramento: ${p.fim || (isActive ? 'Ativo' : '—')}`,
+    p.obs ? `Status: ${p.obs}` : '',
+  ].filter(Boolean).join('<br>');
+  tip.innerHTML = lines;
+  tip.style.display = 'block';
+  moveTip(e);
+}
+function moveTip(e) {
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top  = (e.clientY - 10) + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+document.getElementById('inp-filtro').addEventListener('input', function() {
+  const term = this.value.toLowerCase();
+  applyFilter(term, document.getElementById('chk-only-active').checked);
+});
+document.getElementById('chk-only-active').addEventListener('change', function() {
+  const term = document.getElementById('inp-filtro').value.toLowerCase();
+  applyFilter(term, this.checked);
+});
+
+function applyFilter(term, onlyWithData) {
+  let shown = 0;
+  document.querySelectorAll('#gantt-body tr.vaga-row').forEach(tr => {
+    const vaga = tr.dataset.vaga;
+    const hasPeriodos = tr.dataset.hasPeriodos === '1';
+    const labelText = tr.querySelector('.col-vaga').textContent.toLowerCase();
+    // Also search bar names
+    const barText = Array.from(tr.querySelectorAll('.bar')).map(b => b.textContent.toLowerCase()).join(' ');
+    const matchTerm = !term || labelText.includes(term) || barText.includes(term);
+    const matchOnly = !onlyWithData || hasPeriodos;
+    const show = matchTerm && matchOnly;
+    tr.style.display = show ? '' : 'none';
+    if (show) shown++;
+  });
+  document.getElementById('status-count').textContent =
+    `${shown} vagas exibidas de ${RAW.vagas.length}.`;
+}
+
+// ── Sort (únicos por vaga/CDA) + localStorage ─────────────────────────────────────────────────────
+const SORT_LS = 'smdhc_calendario_sort_v1';
+
+function sortarCalendario() {
+  const val = document.getElementById('sel-sort').value;
+  localStorage.setItem(SORT_LS, val);
+  const ganttBody = document.getElementById('gantt-body');
+  const rows = Array.from(ganttBody.querySelectorAll('tr.vaga-row'));
+  rows.sort((a, b) => {
+    const va = parseInt(a.dataset.vaga) || 0;
+    const vb = parseInt(b.dataset.vaga) || 0;
+    const ca = parseInt(a.dataset.cda)  || 999;
+    const cb = parseInt(b.dataset.cda)  || 999;
+    if (val === 'vaga_asc')  return va - vb;
+    if (val === 'vaga_desc') return vb - va;
+    if (val === 'cda_asc')   return ca !== cb ? ca - cb : va - vb;
+    if (val === 'cda_desc')  return ca !== cb ? cb - ca : va - vb;
+    return 0;
+  });
+  rows.forEach(r => ganttBody.appendChild(r));
+}
+
+// Restore saved sort on page load
+(function() {
+  const saved = localStorage.getItem(SORT_LS);
+  const sel = document.getElementById('sel-sort');
+  if (saved && sel) {
+    sel.value = saved;
+    sortarCalendario();
+  }
+})();
+</script>
+</body>
+</html>

@@ -42,6 +42,7 @@ from routes.cents import cents_bp
 from routes.celebracao_parcerias import celebracao_parcerias_bp
 from routes.sei_orcamentario import sei_orcamentario_bp
 from routes.sof_api import sof_api_bp
+from routes.gestao_pessoas import gestao_pessoas_bp
 
 
 # ============================================================================
@@ -282,6 +283,7 @@ def create_app():
     app.register_blueprint(celebracao_parcerias_bp)
     app.register_blueprint(sei_orcamentario_bp)
     app.register_blueprint(sof_api_bp)
+    app.register_blueprint(gestao_pessoas_bp)
     
     # ========================================================================
     # HOOKS GLOBAIS PARA LOGGING AUTOMÁTICO

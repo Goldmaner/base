@@ -70,6 +70,9 @@
         <button type="button" class="btn btn-sm btn-success ms-2" onclick="verUsuariosAtivos()" title="Ver usuários online">
           <i class="bi bi-people-fill"></i> <span id="badge-usuarios-ativos" class="badge bg-light text-dark">0</span> online
         </button>
+        <a href="{{ url_for('main.tela_inicial_ideias') }}" class="btn btn-sm btn-outline-warning ms-2" title="Laboratório de design">
+          <i class="bi bi-palette"></i> Design
+        </a>
         {% endif %}
         <br>
         <button type="button" class="btn btn-sm btn-outline-primary mt-2 me-2" data-bs-toggle="modal" data-bs-target="#modalAlterarSenha">
@@ -282,12 +285,12 @@
         {% endif %}
         
         <!-- Seção: Gestão de Pessoas e Usuários -->
-        {% if is_admin or 'usuarios' in user_acessos or 'ferias' in user_acessos %}
+        {% if is_admin or 'usuarios' in user_acessos or 'ferias' in user_acessos or 'gestao_pessoas' in user_acessos %}
         <div class="accordion-item">
           <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePessoas">
               <i class="bi bi-person-badge me-2"></i> Gestão de Pessoas e Usuários
-              <span class="badge bg-secondary section-badge">2</span>
+              <span class="badge bg-secondary section-badge">3</span>
             </button>
           </h2>
           <div id="collapsePessoas" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
@@ -305,6 +308,14 @@
                 <div class="col-md-6">
                   <a href="{{ url_for('ferias.listar') }}" class="btn btn-module" style="background-color:#6f42c1;">
                     <i class="bi bi-calendar-check"></i> Férias
+                  </a>
+                </div>
+                {% endif %}
+
+                {% if is_admin or 'gestao_pessoas' in user_acessos %}
+                <div class="col-md-6">
+                  <a href="{{ url_for('gestao_pessoas.nomeacoes') }}" class="btn btn-module" style="background-color:#6f42c1;">
+                    <i class="bi bi-person-badge"></i> Nomeações CDA
                   </a>
                 </div>
                 {% endif %}
@@ -1384,6 +1395,7 @@
     { id: 'modelos_textos',         nome: 'Modelos de Texto',                   grupo: 'Gestão de Dados' },
     { id: 'usuarios',               nome: 'Gerenciar Usuários',                 grupo: 'Gestão de Pessoas e Usuários' },
     { id: 'ferias',                 nome: 'Férias',                             grupo: 'Gestão de Pessoas e Usuários' },
+    { id: 'gestao_pessoas',         nome: 'Nomeações CDA',                      grupo: 'Gestão de Pessoas e Usuários' },
     { id: 'portarias',              nome: 'Gerenciar Portarias/Legislações',    grupo: 'Opções de Administrador' },
     { id: 'conc_bancaria',          nome: 'Conciliação Bancária',               grupo: 'Módulos Técnicos' },
     { id: 'conc_rendimentos',       nome: 'Rendimentos',                        grupo: 'Módulos Técnicos' },

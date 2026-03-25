@@ -1,0 +1,1253 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nomeações CDA - SMDHC</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f8f9fa; padding: 20px; }
+
+    .header-section {
+      background: linear-gradient(135deg, #0d6efd 0%, #084ecf 100%);
+      color: white;
+      padding: 28px 30px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,.1);
+    }
+    .card-section {
+      background: #fff;
+      padding: 28px 30px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,.1);
+    }
+    .table thead th {
+      background-color: #0d6efd;
+      color: white;
+      white-space: nowrap;
+    }
+    .table tbody tr td[contenteditable="true"]:focus {
+      outline: 2px solid #0d6efd;
+      background-color: #f0f7ff;
+    }
+    .spinner-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+    .spinner-overlay.ativo { display: flex; }
+    .col-nocopy { background-color: #f8f9fa; color: #6c757d; font-size: .8rem; }
+    .nav-tabs .nav-link.active { font-weight: 600; }
+    textarea.do-input { font-family: monospace; font-size: .85rem; }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { background-color: #0b5ed7; }
+    th.sort-asc::after  { content: ' \25B2'; font-size: .7em; }
+    th.sort-desc::after { content: ' \25BC'; font-size: .7em; }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+
+  <!-- Cabeçalho -->
+  <div class="header-section">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2 class="mb-1"><i class="bi bi-person-badge"></i> Nomeações CDA — SMDHC</h2>
+        <p class="mb-0 opacity-75">Importação e registro de titulares de cargo em comissão</p>
+      </div>
+      <a href="{{ url_for('main.index') }}" class="btn btn-light">
+        <i class="bi bi-arrow-left"></i> Início
+      </a>
+      <a href="{{ url_for('gestao_pessoas.calendario') }}" class="btn btn-outline-light">
+        <i class="bi bi-calendar3"></i> Calendário
+      </a>
+    </div>
+  </div>
+
+  <!-- Abas -->
+  <div class="card-section">
+    <ul class="nav nav-tabs mb-4" id="abas">
+      <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#aba-cola">
+          <i class="bi bi-clipboard-plus"></i> Cola texto
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#aba-buscar">
+          <i class="bi bi-search"></i> Buscar no D.O.
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+
+      <!-- ============================================================ -->
+      <!-- ABA 1 — Cola texto                                           -->
+      <!-- ============================================================ -->
+      <div class="tab-pane fade show active" id="aba-cola">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Data de publicação (DD/MM/AAAA)</label>
+            <input type="text" id="data-pub-cola" class="form-control" placeholder="Ex.: 15/03/2025"
+                   maxlength="10">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Número do documento</label>
+            <input type="text" id="num-doc-cola" class="form-control" placeholder="Ex.: 153198882">
+          </div>
+        </div>
+
+        <label class="form-label fw-semibold">Texto do D.O. (cole aqui)</label>
+        <textarea id="texto-do" class="form-control do-input mb-3" rows="8"
+                  placeholder="Cole aqui o texto ou HTML do Diário Oficial..."></textarea>
+
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-primary" onclick="processarTexto()">
+            <i class="bi bi-table"></i> Processar texto
+          </button>
+          <button class="btn btn-outline-secondary" onclick="limparTexto()">
+            <i class="bi bi-x-circle"></i> Limpar
+          </button>
+        </div>
+
+        <!-- Resultado do parser -->
+        <div id="resultado-cola" class="mt-4" style="display:none;">
+          <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+            <h5 class="mb-0">
+              Resultado
+              <span id="badge-cola-count" class="badge bg-primary ms-2">0</span>
+            </h5>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="copiarTabela(false)">
+                <i class="bi bi-clipboard"></i> Copiar sem cabeçalho
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="copiarTabela(true)">
+                <i class="bi bi-clipboard-check"></i> Copiar com cabeçalho
+              </button>
+              <button class="btn btn-sm btn-success" onclick="salvarTabela()">
+                <i class="bi bi-floppy"></i> Salvar no banco
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle" id="tabela-cola">
+              <thead>
+                <tr>
+                  <th class="col-nocopy">Nível CDA</th>
+                  <th>Nº da Vaga</th>
+                  <th>Nome</th>
+                  <th>RF</th>
+                  <th>Data Publicação</th>
+                  <th>Nº Documento</th>
+                  <th>Unidade</th>
+                  <th>Observações</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-cola"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- fim aba 1 -->
+
+      <!-- ============================================================ -->
+      <!-- ABA 2 — Buscar no D.O.                                       -->
+      <!-- ============================================================ -->
+      <div class="tab-pane fade" id="aba-buscar">
+        <div class="row g-3 mb-4 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Data início</label>
+            <input type="text" id="dt-inicio" class="form-control" placeholder="DD/MM/AAAA" maxlength="10">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Data fim</label>
+            <input type="text" id="dt-fim" class="form-control" placeholder="DD/MM/AAAA" maxlength="10">
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-primary w-100" onclick="buscarDO()">
+              <i class="bi bi-search"></i> Buscar no D.O.
+            </button>
+          </div>
+        </div>
+
+        <div id="aviso-busca" class="alert alert-info d-none"></div>
+
+        <!-- Documentos encontrados -->
+        <div id="docs-encontrados" style="display:none;" class="mb-4">
+          <h6 class="fw-semibold mb-2">
+            Documentos encontrados
+            <span id="badge-docs" class="badge bg-secondary ms-1">0</span>
+          </h6>
+          <ul id="lista-docs" class="list-group list-group-flush"></ul>
+        </div>
+
+        <!-- Tabela de nomeações do D.O. -->
+        <div id="resultado-busca" style="display:none;">
+          <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+            <h5 class="mb-0">
+              Nomeações encontradas
+              <span id="badge-busca-count" class="badge bg-primary ms-2">0</span>
+            </h5>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="selecionarTodos(true)">
+                Selecionar todos
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="selecionarTodos(false)">
+                Desmarcar todos
+              </button>
+              <button class="btn btn-sm btn-success" onclick="importarSelecionados()">
+                <i class="bi bi-floppy"></i> Importar selecionados
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle" id="tabela-busca">
+              <thead>
+                <tr>
+                  <th style="width:40px;"><input type="checkbox" id="chk-todos" onclick="selecionarTodos(this.checked)"></th>
+                  <th class="col-nocopy">Nível CDA</th>
+                  <th>Nº da Vaga</th>
+                  <th>Nome</th>
+                  <th>RF</th>
+                  <th>Data Publicação</th>
+                  <th>Nº Documento</th>
+                  <th>Unidade</th>
+                  <th>Observações</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-busca"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- fim aba 2 -->
+
+    </div><!-- tab-content -->
+  </div><!-- card-section -->
+
+  <!-- ================================================================ -->
+  <!-- Tabela de registros salvos no banco                              -->
+  <!-- ================================================================ -->
+  <div class="card-section">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <h5 class="mb-0">
+        <i class="bi bi-database me-1 text-primary"></i> Registros no banco
+        <span class="badge bg-primary ms-2">{{ registros | length }}</span>
+      </h5>
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <div class="input-group" style="max-width:260px;">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" id="filtro-banco" class="form-control" placeholder="Buscar em todo o banco..." value="{{ q }}">
+        </div>
+        <select id="filtro-obs" class="form-select form-select-sm" style="max-width:185px;" title="Filtrar por Observações">
+          <option value="__all__" {% if not filter_obs or filter_obs == '__all__' %}selected{% endif %}>Todas observações</option>
+          <option value="__empty__" {% if filter_obs == '__empty__' %}selected{% endif %}>— (sem observação)</option>
+          <option value="Vaga Ocupada" {% if filter_obs == 'Vaga Ocupada' %}selected{% endif %}>Vaga Ocupada</option>
+          <option value="Vacante" {% if filter_obs == 'Vacante' %}selected{% endif %}>Vacante</option>
+          <option value="Exonerado(a)" {% if filter_obs == 'Exonerado(a)' %}selected{% endif %}>Exonerado(a)</option>
+          <option value="Desconhecido" {% if filter_obs == 'Desconhecido' %}selected{% endif %}>Desconhecido</option>
+        </select>
+        <select id="filtro-cda" class="form-select form-select-sm" style="max-width:115px;" title="Filtrar por CDA">
+          <option value="__all__" {% if not filter_cda or filter_cda == '__all__' %}selected{% endif %}>Todos CDAs</option>
+          <option value="1" {% if filter_cda == '1' %}selected{% endif %}>CDA-1</option>
+          <option value="2" {% if filter_cda == '2' %}selected{% endif %}>CDA-2</option>
+          <option value="3" {% if filter_cda == '3' %}selected{% endif %}>CDA-3</option>
+          <option value="4" {% if filter_cda == '4' %}selected{% endif %}>CDA-4</option>
+          <option value="5" {% if filter_cda == '5' %}selected{% endif %}>CDA-5</option>
+          <option value="6" {% if filter_cda == '6' %}selected{% endif %}>CDA-6</option>
+        </select>
+        <button class="btn btn-sm btn-outline-secondary" onclick="location.reload()" title="Recarregar registros do banco">
+          <i class="bi bi-arrow-clockwise"></i> Atualizar
+        </button>
+        <button class="btn btn-sm btn-outline-success" onclick="exportarCSV()" title="Exportar registros visíveis como CSV UTF-8 (separador ;)">
+          <i class="bi bi-download"></i> Exportar CSV
+        </button>
+        <button class="btn btn-sm btn-outline-primary" onclick="adicionarNovaLinha()" title="Adicionar nova linha para inserção">
+          <i class="bi bi-plus-circle"></i> Nova linha
+        </button>
+      </div>
+    </div>
+
+    {% if registros %}
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover align-middle" id="tabela-banco">
+        <thead>
+          <tr>
+            <th class="sortable{% if sort_col == 'cda' %} sort-{{ sort_dir }}{% endif %}" data-sort-key="cda">Nível CDA</th>
+            <th class="sortable{% if sort_col == 'vaga' %} sort-{{ sort_dir }}{% endif %}" data-sort-key="vaga">Nº Vaga</th>
+            <th class="sortable{% if sort_col == 'nome' %} sort-{{ sort_dir }}{% endif %}" data-sort-key="nome">Nome</th>
+            <th>RF</th>
+            <th class="sortable{% if sort_col == 'data_pub' %} sort-{{ sort_dir }}{% endif %}" data-sort-key="data_pub">Data Publicação</th>
+            <th class="sortable{% if sort_col == 'data_enc' %} sort-{{ sort_dir }}{% endif %}" data-sort-key="data_enc">Data Encerramento</th>
+            <th>Nº Documento</th>
+            <th>Unidade</th>
+            <th>Observações</th>
+            <th>Cadastrado em</th>
+            <th style="width:44px;"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-banco">
+          {% for r in registros %}
+          <tr data-id="{{ r.id }}">
+            <td>{% if r.cda %}CDA-{{ r.cda }}{% endif %}</td>
+            <td>{{ r.numero_vaga or '' }}</td>
+            <td class="p-1">
+              <input type="text"
+                     class="form-control form-control-sm border-0 bg-transparent campo-input"
+                     data-field="nome_servidor"
+                     value="{{ r.nome_servidor or '' }}"
+                     data-original="{{ r.nome_servidor or '' }}"
+                     placeholder="Nome">
+            </td>
+            <td class="p-1">
+              <input type="text"
+                     class="form-control form-control-sm border-0 bg-transparent campo-input"
+                     data-field="numero_rf"
+                     value="{{ r.numero_rf or '' }}"
+                     data-original="{{ r.numero_rf or '' }}"
+                     placeholder="RF">
+            </td>
+            <td class="p-1">
+              <input type="text" maxlength="10"
+                     class="form-control form-control-sm border-0 bg-transparent campo-input campo-data"
+                     data-field="data_publicacao"
+                     value="{{ r.data_publicacao or '' }}"
+                     data-original="{{ r.data_publicacao or '' }}"
+                     placeholder="DD/MM/AAAA">
+            </td>
+            <td class="p-1">
+              <input type="text" maxlength="10"
+                     class="form-control form-control-sm border-0 bg-transparent campo-input campo-data{% if r.data_encerramento %} text-danger{% endif %}"
+                     data-field="data_encerramento"
+                     value="{{ r.data_encerramento or '' }}"
+                     data-original="{{ r.data_encerramento or '' }}"
+                     placeholder="DD/MM/AAAA">
+            </td>
+            <td class="p-1">
+              <input type="text"
+                     class="form-control form-control-sm border-0 bg-transparent campo-input"
+                     data-field="numero_documento"
+                     value="{{ r.numero_documento or '' }}"
+                     data-original="{{ r.numero_documento or '' }}"
+                     placeholder="Nº Doc">
+            </td>
+            <td class="p-1">
+              <input type="text" list="setores-list"
+                     class="form-control form-control-sm border-0 bg-transparent unidade-input"
+                     value="{{ r.unidade or '' }}"
+                     data-original="{{ r.unidade or '' }}">
+            </td>
+            <td class="p-1">
+              <select class="form-select form-select-sm border-0 bg-transparent observacoes-select"
+                      data-original="{{ r.observacoes or '' }}">
+                <option value="" {% if not r.observacoes %}selected{% endif %}>—</option>
+                <option value="Vaga Ocupada" {% if r.observacoes == 'Vaga Ocupada' %}selected{% endif %}>Vaga Ocupada</option>
+                <option value="Vacante" {% if r.observacoes == 'Vacante' %}selected{% endif %}>Vacante</option>
+                <option value="Exonerado(a)" {% if r.observacoes == 'Exonerado(a)' %}selected{% endif %}>Exonerado(a)</option>
+                <option value="Desconhecido" {% if r.observacoes == 'Desconhecido' %}selected{% endif %}>Desconhecido</option>
+              </select>
+            </td>
+            <td class="text-muted small">{{ r.criado_em or '' }}</td>
+            <td class="p-1 text-center">
+              <button class="btn btn-sm btn-outline-danger py-0 px-1 btn-excluir"
+                      onclick="excluirRegistro({{ r.id }}, this)" title="Excluir registro">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="alert alert-secondary mb-0">Nenhum registro salvo ainda.</div>
+    {% endif %}
+
+    {% set pp_param = 'all' if per_page == 0 else per_page %}
+    {% set qp = (('&q=' ~ (q | urlencode)) if q else '') ~ (('&obs=' ~ (filter_obs | urlencode)) if (filter_obs and filter_obs != '__all__') else '') ~ (('&cda=' ~ filter_cda) if (filter_cda and filter_cda != '__all__') else '') %}
+    <div class="d-flex align-items-center justify-content-center gap-2 mt-3">
+      <label class="form-label mb-0 small text-muted">Registros por página:</label>
+      <select class="form-select form-select-sm w-auto" onchange="navegarPerPage(this.value)">
+        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        <option value="200" {% if per_page == 200 %}selected{% endif %}>200</option>
+        <option value="500" {% if per_page == 500 %}selected{% endif %}>500</option>
+        <option value="all" {% if per_page == 0 %}selected{% endif %}>Todos</option>
+      </select>
+      <span class="text-muted small">{{ total_count }} registros{% if q or filter_obs or filter_cda %} encontrados{% else %} no total{% endif %}</span>
+    </div>
+    {% if total_pages > 1 %}
+    <nav class="mt-2" aria-label="Paginação de registros">
+      {% set pg_start = [page - 2, 1] | max %}
+      {% set pg_end   = [page + 2, total_pages] | min %}
+      <ul class="pagination pagination-sm justify-content-center mb-1">
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+          <a class="page-link" href="?page={{ page - 1 }}&per_page={{ pp_param }}&sort={{ sort_col }}&dir={{ sort_dir }}{{ qp }}">‹</a>
+        </li>
+        {% if pg_start > 1 %}
+          <li class="page-item"><a class="page-link" href="?page=1&per_page={{ pp_param }}&sort={{ sort_col }}&dir={{ sort_dir }}{{ qp }}">1</a></li>
+          {% if pg_start > 2 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+        {% endif %}
+        {% for p in range(pg_start, pg_end + 1) %}
+          <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="?page={{ p }}&per_page={{ pp_param }}&sort={{ sort_col }}&dir={{ sort_dir }}{{ qp }}">{{ p }}</a>
+          </li>
+        {% endfor %}
+        {% if pg_end < total_pages %}
+          {% if pg_end < total_pages - 1 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+          <li class="page-item"><a class="page-link" href="?page={{ total_pages }}&per_page={{ pp_param }}&sort={{ sort_col }}&dir={{ sort_dir }}{{ qp }}">{{ total_pages }}</a></li>
+        {% endif %}
+        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+          <a class="page-link" href="?page={{ page + 1 }}&per_page={{ pp_param }}&sort={{ sort_col }}&dir={{ sort_dir }}{{ qp }}">›</a>
+        </li>
+      </ul>
+      <p class="text-center text-muted small mb-0">
+        Página {{ page }} de {{ total_pages }}
+      </p>
+    </nav>
+    {% endif %}
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Gerenciar setores / unidades                                      -->
+  <!-- ================================================================ -->
+  <div class="card-section">
+    <div class="d-flex align-items-center justify-content-between mb-1">
+      <h6 class="mb-0 fw-semibold">
+        <i class="bi bi-building me-1 text-primary"></i> Setores / Unidades
+        <span class="text-muted fw-normal small">(lista suspensa para a coluna Unidade)</span>
+      </h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              data-bs-toggle="collapse" data-bs-target="#colapso-setores" aria-expanded="false">
+        <i class="bi bi-chevron-down"></i>
+      </button>
+    </div>
+    <div class="collapse" id="colapso-setores">
+      <p class="small text-muted mb-2">
+        Setores aqui cadastrados aparecem como sugestões ao editar <strong>Unidade</strong>.
+        Salvos no navegador (localStorage).
+      </p>
+      <div class="input-group mb-2" style="max-width:520px;">
+        <input type="text" id="input-novo-setor" class="form-control form-control-sm"
+               placeholder="Nome do setor ou unidade"
+               onkeydown="if(event.key==='Enter'){adicionarSetor();}">
+        <button class="btn btn-sm btn-primary" onclick="adicionarSetor()">
+          <i class="bi bi-plus-lg"></i> Adicionar
+        </button>
+      </div>
+      <ul id="lista-setores" class="list-group list-group-flush"
+          style="max-height:220px; overflow-y:auto; max-width:600px;"></ul>
+    </div>
+  </div>
+
+</div><!-- container -->
+
+<datalist id="setores-list"></datalist>
+
+<!-- Spinner overlay -->
+<div class="spinner-overlay" id="spinner">
+  <div class="text-center text-white">
+    <div class="spinner-border mb-3" style="width:3rem;height:3rem;" role="status"></div>
+    <div id="spinner-msg" class="fs-5">Aguarde...</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:11000">
+  <div id="toast" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div id="toast-msg" class="toast-body"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// =========================================================
+// Constantes e helpers
+// =========================================================
+const HEADERS_COPY = ['Nº da Vaga', 'Nome', 'RF', 'Data Publicação', 'Nº Documento', 'Unidade', 'Observações'];
+const HEADERS_ALL  = ['cda', 'numero_vaga', 'nome_servidor', 'numero_rf',
+                      'data_publicacao', 'numero_documento', 'unidade', 'observacoes'];
+
+function mostrarToast(msg, tipo = 'success') {
+  const el = document.getElementById('toast');
+  el.className = `toast align-items-center text-bg-${tipo} border-0`;
+  document.getElementById('toast-msg').textContent = msg;
+  bootstrap.Toast.getOrCreateInstance(el, {delay: 4000}).show();
+}
+
+function spinnerOn(msg = 'Aguarde...') {
+  document.getElementById('spinner-msg').textContent = msg;
+  document.getElementById('spinner').classList.add('ativo');
+}
+function spinnerOff() {
+  document.getElementById('spinner').classList.remove('ativo');
+}
+
+function formatarData(v) {
+  if (!v) return '';
+  v = String(v).replace(/\D/g, '');
+  if (v.length === 8) return v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+  return String(v);
+}
+
+// Aplica máscara DD/MM/AAAA enquanto o usuário digita
+function maskDate(inputEl) {
+  inputEl.addEventListener('input', function () {
+    let v = this.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+    else if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+    this.value = v;
+  });
+}
+maskDate(document.getElementById('data-pub-cola'));
+maskDate(document.getElementById('dt-inicio'));
+maskDate(document.getElementById('dt-fim'));
+
+// =========================================================
+// Parser de texto (Aba 1)
+// =========================================================
+const PREFIXOS = [
+  /^Nomear\s+o\s+senhor(?:a)?\s+/i,
+  /^Nomear\s+a\s+senhora\s+/i,
+  /^Nomear\s+o\s+servidor\s+/i,
+  /^Nomear\s+a\s+servidora\s+/i,
+  /^Nomear\s+o\s+sr\.?\s+/i,
+  /^Nomear\s+a\s+sr[aª]\.?\s+/i,
+  /^Nomear\s+/i,
+];
+
+function stripName(name) {
+  for (const re of PREFIXOS) name = name.replace(re, '');
+  // Remove prefixos de lista numerada: "1- ", "2- ", etc.
+  name = name.replace(/^\d+[-–.]\s*/, '');
+  return name.trim();
+}
+
+function parsearTexto(rawText, dataPub, numDoc) {
+  // Se parece HTML, extrair texto
+  let texto = rawText;
+  if (/<[a-z][\s\S]*>/i.test(rawText)) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawText, 'text/html');
+    texto = doc.body.innerText || doc.body.textContent || '';
+  }
+
+  const linhas = texto.split('\n');
+  const nomeacoes = [];
+
+  // Auto-detectar data de publicação
+  if (!dataPub) {
+    const m = texto.match(/Publica(?:ç|c)(?:ã|a)o:\s*(\d{2}\/\d{2}\/\d{4})/i);
+    if (m) dataPub = m[1];
+  }
+  // Auto-detectar número do documento
+  if (!numDoc) {
+    // 1. Prioridade: <title>ARQUIP | DOSP - XXXXXXXX - ...</title>
+    const titleM = rawText.match(/<title[^>]*>[^<]*DOSP\s*-\s*(\d+)/i);
+    if (titleM) numDoc = titleM[1];
+  }
+  if (!numDoc) {
+    // 2. SEI nº XXXXXXXX (rodapé do documento)
+    const seiM = texto.match(/SEI\s+n[°º.]\s*(\d+)/i);
+    if (seiM) numDoc = seiM[1];
+  }
+  if (!numDoc) {
+    // 3. Fallback: "o seguinte documento ... integra este ato XXXXXXXX"
+    const legM = texto.match(/O seguinte documento\b[\w\s]*\bintegra este ato\s+(\d+)/i);
+    if (legM) numDoc = legM[1];
+  }
+
+  // Agrupa linhas em chunks: nova entrada numerada ou linha em branco = novo chunk
+  const chunks = [];
+  let curChunk = [];
+  for (const rawLinha of linhas) {
+    const s = rawLinha.trim();
+    if (!s) { if (curChunk.length) { chunks.push(curChunk.join(' ')); curChunk = []; } continue; }
+    if (/^\d+[.\-]\s+[A-Z\u00C0-\u00FF]/.test(s)) { if (curChunk.length) chunks.push(curChunk.join(' ')); curChunk = [s]; }
+    else curChunk.push(s);
+  }
+  if (curChunk.length) chunks.push(curChunk.join(' '));
+
+  for (let linha of chunks) {
+    const upper = linha.toUpperCase();
+    if (!upper.includes('CDA')) continue;
+
+    // Nome
+    const nameMatch = linha.match(/^(.+?),\s*(?:\w+\/)?(?:RG|RF|CPF)(?:\/\w+)?\s+/i);
+    let nome = nameMatch ? stripName(nameMatch[1]) : '';
+
+    // RF
+    const rfMatch = linha.match(/\bRF\s+([\d.]+(?:-\d)?)/i);
+    const rf = rfMatch ? rfMatch[1].replace(/\D/g, '') : '';
+
+    // CDA
+    const cdaMatch = linha.match(/\bCDA-?(\d+)/i);
+    const cda = cdaMatch ? cdaMatch[1] : '';
+
+    // Vaga (explícita: "vaga 21989"; fallback: número isolado entre vírgulas)
+    let vagaMatch = linha.match(/\bvaga\s+(\d+)/i);
+    if (!vagaMatch) vagaMatch = linha.match(/,\s*(\d{4,6})\s*[,.]/);    
+    const vaga = vagaMatch ? vagaMatch[1] : '';
+
+    if (cda && vaga) {
+      nomeacoes.push({
+        cda,
+        numero_vaga: vaga,
+        nome_servidor: nome,
+        numero_rf: rf,
+        data_publicacao: dataPub,
+        numero_documento: numDoc,
+        unidade: '',
+        observacoes: '',
+      });
+    }
+  }
+  return nomeacoes;
+}
+
+function processarTexto() {
+  const texto = document.getElementById('texto-do').value.trim();
+  if (!texto) { mostrarToast('Cole o texto do D.O. antes.', 'warning'); return; }
+
+  const dataPub = document.getElementById('data-pub-cola').value.trim();
+  const numDoc  = document.getElementById('num-doc-cola').value.trim();
+
+  const nomeacoes = parsearTexto(texto, dataPub, numDoc);
+  renderizarTabela('corpo-cola', nomeacoes);
+  document.getElementById('badge-cola-count').textContent = nomeacoes.length;
+
+  const res = document.getElementById('resultado-cola');
+  res.style.display = nomeacoes.length > 0 ? '' : 'none';
+  if (!nomeacoes.length) mostrarToast('Nenhuma nomeação CDA encontrada no texto.', 'warning');
+}
+
+function limparTexto() {
+  document.getElementById('texto-do').value = '';
+  document.getElementById('data-pub-cola').value = '';
+  document.getElementById('num-doc-cola').value = '';
+  document.getElementById('corpo-cola').innerHTML = '';
+  document.getElementById('resultado-cola').style.display = 'none';
+}
+
+// =========================================================
+// Renderização de tabela editável
+// =========================================================
+function renderizarTabela(tbodyId, nomeacoes, comCheckbox = false) {
+  const tbody = document.getElementById(tbodyId);
+  tbody.innerHTML = '';
+  nomeacoes.forEach((n, i) => {
+    const tr = document.createElement('tr');
+    tr.dataset.idx = i;
+
+    if (comCheckbox) {
+      const tdChk = document.createElement('td');
+      tdChk.innerHTML = `<input type="checkbox" class="chk-row" checked>`;
+      tr.appendChild(tdChk);
+    }
+
+    // CDA (sem cópia)
+    const tdCda = document.createElement('td');
+    tdCda.className = 'col-nocopy';
+    tdCda.setAttribute('data-nocopy', 'true');
+    tdCda.textContent = n.cda ? `CDA-${n.cda}` : '';
+    tr.appendChild(tdCda);
+
+    const campos = [
+      {key: 'numero_vaga'},
+      {key: 'nome_servidor'},
+      {key: 'numero_rf'},
+      {key: 'data_publicacao'},
+      {key: 'numero_documento'},
+      {key: 'unidade'},
+      {key: 'observacoes'},
+    ];
+    for (const c of campos) {
+      const td = document.createElement('td');
+      td.contentEditable = 'true';
+      td.dataset.field = c.key;
+      td.textContent = n[c.key] || '';
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  });
+}
+
+// =========================================================
+// Coletar dados da tabela da Aba 1
+// =========================================================
+function coletarDados(tbodyId) {
+  const linhas = document.querySelectorAll(`#${tbodyId} tr`);
+  const dados = [];
+  linhas.forEach(tr => {
+    const row = {};
+    // CDA (td.col-nocopy)
+    const tdCda = tr.querySelector('td[data-nocopy]');
+    if (tdCda) {
+      const txt = tdCda.textContent.replace(/CDA-/i, '').trim();
+      row.cda = txt || null;
+    }
+    tr.querySelectorAll('td[data-field]').forEach(td => {
+      row[td.dataset.field] = td.textContent.trim();
+    });
+    dados.push(row);
+  });
+  return dados;
+}
+
+// =========================================================
+// Copiar para área de transferência (Aba 1)
+// =========================================================
+function copiarTabela(comCabecalho) {
+  const linhas = document.querySelectorAll('#corpo-cola tr');
+  const partes = [];
+  if (comCabecalho) partes.push(HEADERS_COPY.join('\t'));
+  linhas.forEach(tr => {
+    const cells = tr.querySelectorAll('td:not([data-nocopy])');
+    partes.push(Array.from(cells).map(c => c.textContent.trim()).join('\t'));
+  });
+  navigator.clipboard.writeText(partes.join('\n'))
+    .then(() => mostrarToast('Copiado!'))
+    .catch(() => mostrarToast('Falha ao copiar.', 'danger'));
+}
+
+// =========================================================
+// Salvar no banco (Aba 1)
+// =========================================================
+function salvarTabela() {
+  const dados = coletarDados('corpo-cola');
+  if (!dados.length) { mostrarToast('Nada para salvar.', 'warning'); return; }
+  spinnerOn('Salvando...');
+  fetch('/gestao_pessoas/nomeacoes/salvar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(dados),
+  })
+  .then(r => r.json())
+  .then(resp => {
+    spinnerOff();
+    if (resp.success) {
+      const ig = resp.ignorados || 0;
+      let msg = `${resp.salvos} registro(s) salvo(s) com sucesso!`;
+      if (ig > 0) msg += ` (${ig} duplicata(s) ignorada(s))`;
+      mostrarToast(msg, resp.salvos > 0 ? 'success' : 'warning');
+    } else {
+      mostrarToast(resp.erro || 'Erro ao salvar.', 'danger');
+    }
+  })
+  .catch(() => { spinnerOff(); mostrarToast('Erro de comunicação.', 'danger'); });
+}
+
+// =========================================================
+// Buscar no D.O. (Aba 2)
+// =========================================================
+function buscarDO() {
+  const dtIni = document.getElementById('dt-inicio').value.trim();
+  const dtFim = document.getElementById('dt-fim').value.trim();
+  const re = /^\d{2}\/\d{2}\/\d{4}$/;
+  if (!re.test(dtIni) || !re.test(dtFim)) {
+    mostrarToast('Informe datas válidas (DD/MM/AAAA).', 'warning');
+    return;
+  }
+
+  const aviso = document.getElementById('aviso-busca');
+  aviso.className = 'alert alert-info';
+  aviso.textContent = '';
+  aviso.classList.remove('d-none');
+
+  document.getElementById('docs-encontrados').style.display = 'none';
+  document.getElementById('resultado-busca').style.display = 'none';
+
+  spinnerOn('Buscando no D.O....');
+
+  fetch('/gestao_pessoas/nomeacoes/buscar-do', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({data_inicio: dtIni, data_fim: dtFim}),
+  })
+  .then(r => r.json())
+  .then(resp => {
+    spinnerOff();
+    if (!resp.success) {
+      aviso.className = 'alert alert-danger';
+      aviso.textContent = resp.erro || 'Erro ao buscar.';
+      return;
+    }
+
+    aviso.classList.add('d-none');
+
+    const docs = resp.documentos || [];
+    const noms = resp.nomeacoes || [];
+
+    // Documentos
+    document.getElementById('badge-docs').textContent = docs.length;
+    const listaEl = document.getElementById('lista-docs');
+    listaEl.innerHTML = '';
+    docs.forEach(d => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item d-flex justify-content-between align-items-center py-1';
+      li.innerHTML = `
+        <span><i class="bi bi-file-earmark-text text-primary me-1"></i>
+              Doc. ${d.numero} — ${d.tipo}</span>
+        <span class="text-muted small">${d.data}</span>
+      `;
+      listaEl.appendChild(li);
+    });
+    document.getElementById('docs-encontrados').style.display = docs.length ? '' : 'none';
+
+    // Nomeações
+    document.getElementById('badge-busca-count').textContent = noms.length;
+    renderizarTabela('corpo-busca', noms, true);
+    document.getElementById('resultado-busca').style.display = noms.length ? '' : 'none';
+
+    if (!noms.length) {
+      aviso.className = 'alert alert-warning';
+      aviso.textContent = resp.mensagem || 'Nenhuma nomeação encontrada.';
+      aviso.classList.remove('d-none');
+    }
+  })
+  .catch(err => {
+    spinnerOff();
+    aviso.className = 'alert alert-danger';
+    aviso.textContent = 'Erro de comunicação: ' + err.message;
+  });
+}
+
+function selecionarTodos(val) {
+  document.querySelectorAll('#corpo-busca .chk-row').forEach(c => c.checked = val);
+  const chkTodos = document.getElementById('chk-todos');
+  if (chkTodos) chkTodos.checked = val;
+}
+
+function importarSelecionados() {
+  const linhas = document.querySelectorAll('#corpo-busca tr');
+  const dados = [];
+  linhas.forEach(tr => {
+    const chk = tr.querySelector('.chk-row');
+    if (!chk || !chk.checked) return;
+    const row = {};
+    const tdCda = tr.querySelector('td[data-nocopy]');
+    if (tdCda) row.cda = tdCda.textContent.replace(/CDA-/i, '').trim();
+    tr.querySelectorAll('td[data-field]').forEach(td => {
+      row[td.dataset.field] = td.textContent.trim();
+    });
+    dados.push(row);
+  });
+
+  if (!dados.length) { mostrarToast('Selecione ao menos uma nomeação.', 'warning'); return; }
+
+  spinnerOn('Salvando...');
+  fetch('/gestao_pessoas/nomeacoes/salvar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(dados),
+  })
+  .then(r => r.json())
+  .then(resp => {
+    spinnerOff();
+    if (resp.success) {
+      const ig = resp.ignorados || 0;
+      let msg = `${resp.salvos} nomeaç${resp.salvos === 1 ? 'ão importada' : 'ões importadas'}!`;
+      if (ig > 0) msg += ` (${ig} duplicata(s) ignorada(s))`;
+      mostrarToast(msg, resp.salvos > 0 ? 'success' : 'warning');
+    } else {
+      mostrarToast(resp.erro || 'Erro ao salvar.', 'danger');
+    }
+  })
+  .catch(() => { spinnerOff(); mostrarToast('Erro de comunicação.', 'danger'); });
+}
+
+// =========================================================
+// Filtro da tabela de registros do banco (server-side)
+// =========================================================
+let _filtroTimer;
+
+function navegarFiltro() {
+  const url = new URL(window.location.href);
+  const q   = (document.getElementById('filtro-banco')?.value || '').trim();
+  const obs = document.getElementById('filtro-obs')?.value || '';
+  const cda = document.getElementById('filtro-cda')?.value || '';
+  if (q) url.searchParams.set('q', q); else url.searchParams.delete('q');
+  if (obs && obs !== '__all__') url.searchParams.set('obs', obs); else url.searchParams.delete('obs');
+  if (cda && cda !== '__all__') url.searchParams.set('cda', cda); else url.searchParams.delete('cda');
+  url.searchParams.set('page', '1');
+  window.location.href = url.toString();
+}
+
+document.getElementById('filtro-banco')?.addEventListener('input', function() {
+  clearTimeout(_filtroTimer);
+  _filtroTimer = setTimeout(navegarFiltro, 600);
+});
+document.getElementById('filtro-banco')?.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { clearTimeout(_filtroTimer); navegarFiltro(); }
+});
+document.getElementById('filtro-obs')?.addEventListener('change', function() {
+  clearTimeout(_filtroTimer);
+  navegarFiltro();
+});
+document.getElementById('filtro-cda')?.addEventListener('change', function() {
+  clearTimeout(_filtroTimer);
+  navegarFiltro();
+});
+
+// =========================================================
+// Ordenação da tabela do banco (server-side via URL params)
+// =========================================================
+const BANCO_SORT_LS = 'smdhc_banco_sort_v1';
+
+// Persist current sort to localStorage; on fresh load, redirect using saved preference
+(function initBancoSort() {
+  const url = new URL(window.location.href);
+  const sortParam = url.searchParams.get('sort');
+  const dirParam  = url.searchParams.get('dir');
+  if (sortParam && dirParam) {
+    localStorage.setItem(BANCO_SORT_LS, JSON.stringify({sort: sortParam, dir: dirParam}));
+  } else {
+    try {
+      const saved = JSON.parse(localStorage.getItem(BANCO_SORT_LS) || 'null');
+      if (saved && saved.sort && saved.dir) {
+        url.searchParams.set('sort', saved.sort);
+        url.searchParams.set('dir',  saved.dir);
+        window.location.replace(url.toString());
+      }
+    } catch(e) {}
+  }
+})();
+
+// Navigate to sorted URL (same page, page reset to 1)
+function navegarSort(key) {
+  const url = new URL(window.location.href);
+  const curSort = url.searchParams.get('sort') || 'data_pub';
+  const curDir  = url.searchParams.get('dir')  || 'desc';
+  // Same column → flip direction; different column → ascending
+  const newDir  = (curSort === key && curDir === 'asc') ? 'desc' : 'asc';
+  url.searchParams.set('sort', key);
+  url.searchParams.set('dir',  newDir);
+  url.searchParams.set('page', '1');
+  localStorage.setItem(BANCO_SORT_LS, JSON.stringify({sort: key, dir: newDir}));
+  window.location.href = url.toString();
+}
+
+// Bind header clicks
+document.querySelectorAll('#tabela-banco thead th.sortable').forEach(th => {
+  th.addEventListener('click', () => navegarSort(th.dataset.sortKey));
+});
+
+function navegarPerPage(val) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('page', '1');
+  url.searchParams.set('per_page', val);
+  window.location.href = url.toString();
+}
+
+// =========================================================
+// Auto-save da coluna Unidade
+// =========================================================
+function debounce(fn, delay) {
+  let t;
+  return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), delay); };
+}
+
+function salvarUnidade(input) {
+  const tr = input.closest('tr');
+  const id = tr ? tr.dataset.id : null;
+  if (!id) return;
+  const val = input.value.trim();
+  fetch(`/gestao_pessoas/nomeacoes/${id}/unidade`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({unidade: val}),
+  })
+  .then(r => r.json())
+  .then(resp => {
+    if (resp.success) {
+      input.dataset.original = val;
+      input.style.outline = '2px solid #28a745';
+      setTimeout(() => { input.style.outline = ''; }, 1500);
+    } else {
+      mostrarToast('Erro ao salvar unidade.', 'danger');
+      input.value = input.dataset.original || '';
+    }
+  })
+  .catch(() => { mostrarToast('Erro de comunicação.', 'danger'); input.value = input.dataset.original || ''; });
+}
+
+document.querySelectorAll('.unidade-input').forEach(inp => {
+  inp.addEventListener('input', debounce(() => salvarUnidade(inp), 700));
+});
+
+// Auto-save da coluna Observações
+function salvarObservacoes(sel) {
+  const tr = sel.closest('tr');
+  const id = tr ? tr.dataset.id : null;
+  if (!id) return;
+  const val = sel.value;
+  fetch(`/gestao_pessoas/nomeacoes/${id}/observacoes`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({observacoes: val}),
+  })
+  .then(r => r.json())
+  .then(resp => {
+    if (resp.success) {
+      sel.dataset.original = val;
+      sel.style.outline = '2px solid #28a745';
+      setTimeout(() => { sel.style.outline = ''; }, 1500);
+    } else {
+      mostrarToast('Erro ao salvar observações.', 'danger');
+      sel.value = sel.dataset.original || '';
+    }
+  })
+  .catch(() => { mostrarToast('Erro de comunicação.', 'danger'); sel.value = sel.dataset.original || ''; });
+}
+
+document.querySelectorAll('.observacoes-select').forEach(sel => {
+  sel.addEventListener('change', () => salvarObservacoes(sel));
+});
+
+// =========================================================
+// Auto-save campos editáveis (Nome, RF, Data Pub, Nº Doc)
+// =========================================================
+function salvarCampo(input) {
+  const tr = input.closest('tr');
+  const id = tr ? tr.dataset.id : null;
+  if (!id) return;
+  const campo = input.dataset.field;
+  let val = input.value.trim();
+  // Validate date field format
+  if (campo === 'data_publicacao' && val && !/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+    mostrarToast('Data inválida — use DD/MM/AAAA.', 'warning');
+    input.value = input.dataset.original || '';
+    return;
+  }
+  fetch(`/gestao_pessoas/nomeacoes/${id}/campo`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({campo, valor: val}),
+  })
+  .then(r => r.json())
+  .then(resp => {
+    if (resp.success) {
+      input.dataset.original = val;
+      input.style.outline = '2px solid #28a745';
+      setTimeout(() => { input.style.outline = ''; }, 1500);
+      // If data_publicacao changed, reload to refresh data_encerramento
+      if (campo === 'data_publicacao') mostrarToast('Data atualizada! Clique em "Atualizar" para ver encerramento recalculado.', 'info');
+    } else {
+      mostrarToast(resp.erro || 'Erro ao salvar.', 'danger');
+      input.value = input.dataset.original || '';
+    }
+  })
+  .catch(() => { mostrarToast('Erro de comunicação.', 'danger'); input.value = input.dataset.original || ''; });
+}
+
+document.querySelectorAll('.campo-input').forEach(inp => {
+  inp.addEventListener('change', () => salvarCampo(inp));
+});
+// Apply date mask to all existing date inputs
+document.querySelectorAll('.campo-data').forEach(inp => maskDate(inp));
+
+// =========================================================
+// Export CSV
+// =========================================================
+function exportarCSV() {
+  const headers = ['Nível CDA','Nº Vaga','Nome','RF','Data Publicação','Data Encerramento','Nº Documento','Unidade','Observações','Cadastrado em'];
+  const linhas = [headers.join(';')];
+  document.querySelectorAll('#tbody-banco tr:not([data-nova])').forEach(tr => {
+    if (tr.style.display === 'none') return;
+    const cells = tr.querySelectorAll('td');
+    const vals = [];
+    for (let i = 0; i < 10; i++) {
+      const cell = cells[i];
+      if (!cell) { vals.push(''); continue; }
+      const inp = cell.querySelector('input');
+      const sel = cell.querySelector('select');
+      let v = inp ? inp.value.trim() : sel ? sel.value : cell.textContent.trim();
+      if (v.includes(';') || v.includes('"') || v.includes('\n')) v = '"' + v.replace(/"/g, '""') + '"';
+      vals.push(v);
+    }
+    linhas.push(vals.join(';'));
+  });
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + linhas.join('\n')], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'nomeacoes_cda.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// =========================================================
+// Nova linha + Excluir registro
+// =========================================================
+function adicionarNovaLinha() {
+  if (document.getElementById('nova-linha-form')) {
+    document.getElementById('nova-linha-form').scrollIntoView({behavior:'smooth', block:'nearest'});
+    return;
+  }
+  const tbody = document.getElementById('tbody-banco');
+  if (!tbody) { mostrarToast('Sem tabela visível. Salve um registro primeiro ou use a Aba 1.', 'warning'); return; }
+  const tr = document.createElement('tr');
+  tr.id = 'nova-linha-form';
+  tr.dataset.nova = '1';
+  tr.className = 'table-warning';
+  tr.innerHTML = `
+    <td class="p-1">
+      <select class="form-select form-select-sm" id="nl-cda">
+        <option value="">—</option>
+        <option value="1">CDA-1</option>
+        <option value="2">CDA-2</option>
+        <option value="3">CDA-3</option>
+        <option value="4">CDA-4</option>
+        <option value="5">CDA-5</option>
+        <option value="6">CDA-6</option>
+      </select>
+    </td>
+    <td class="p-1"><input id="nl-vaga" type="text" class="form-control form-control-sm" placeholder="Nº Vaga"></td>
+    <td class="p-1"><input id="nl-nome" type="text" class="form-control form-control-sm" placeholder="Nome"></td>
+    <td class="p-1"><input id="nl-rf" type="text" class="form-control form-control-sm" placeholder="RF"></td>
+    <td class="p-1"><input id="nl-datapub" type="text" class="form-control form-control-sm" maxlength="10" placeholder="DD/MM/AAAA"></td>
+    <td class="p-1 text-muted small text-center"><em>auto</em></td>
+    <td class="p-1"><input id="nl-doc" type="text" class="form-control form-control-sm" placeholder="Nº Doc"></td>
+    <td class="p-1"><input id="nl-unidade" type="text" list="setores-list" class="form-control form-control-sm" placeholder="Unidade"></td>
+    <td class="p-1">
+      <select id="nl-obs" class="form-select form-select-sm">
+        <option value="">—</option>
+        <option value="Vaga Ocupada">Vaga Ocupada</option>
+        <option value="Vacante">Vacante</option>
+        <option value="Exonerado(a)">Exonerado(a)</option>
+        <option value="Desconhecido">Desconhecido</option>
+      </select>
+    </td>
+    <td class="text-muted small"></td>
+    <td class="p-1 text-center">
+      <button class="btn btn-sm btn-success py-0 px-1 me-1" onclick="salvarNovaLinha()" title="Salvar"><i class="bi bi-check-lg"></i></button>
+      <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="cancelarNovaLinha()" title="Cancelar"><i class="bi bi-x-lg"></i></button>
+    </td>`;
+  tbody.appendChild(tr);
+  maskDate(document.getElementById('nl-datapub'));
+  tr.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function cancelarNovaLinha() {
+  const tr = document.getElementById('nova-linha-form');
+  if (tr) tr.remove();
+}
+
+function salvarNovaLinha() {
+  const dados = [{
+    cda: document.getElementById('nl-cda')?.value || '',
+    numero_vaga: document.getElementById('nl-vaga')?.value.trim() || '',
+    nome_servidor: document.getElementById('nl-nome')?.value.trim() || '',
+    numero_rf: document.getElementById('nl-rf')?.value.trim() || '',
+    data_publicacao: document.getElementById('nl-datapub')?.value.trim() || '',
+    numero_documento: document.getElementById('nl-doc')?.value.trim() || '',
+    unidade: document.getElementById('nl-unidade')?.value.trim() || '',
+    observacoes: document.getElementById('nl-obs')?.value || '',
+  }];
+  spinnerOn('Salvando...');
+  fetch('/gestao_pessoas/nomeacoes/salvar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(dados),
+  })
+  .then(r => r.json())
+  .then(resp => {
+    spinnerOff();
+    if (resp.success) {
+      cancelarNovaLinha();
+      mostrarToast(resp.salvos > 0 ? 'Registro salvo! Clique em "Atualizar" para ver.' : 'Duplicata ignorada.', resp.salvos > 0 ? 'success' : 'warning');
+    } else {
+      mostrarToast(resp.erro || 'Erro ao salvar.', 'danger');
+    }
+  })
+  .catch(() => { spinnerOff(); mostrarToast('Erro de comunicação.', 'danger'); });
+}
+
+function excluirRegistro(id, btn) {
+  if (!confirm('Excluir este registro permanentemente? Esta ação não pode ser desfeita.')) return;
+  const tr = btn.closest('tr');
+  fetch(`/gestao_pessoas/nomeacoes/${id}`, {
+    method: 'DELETE',
+    headers: {'Content-Type': 'application/json'},
+  })
+  .then(r => r.json())
+  .then(resp => {
+    if (resp.success) { tr.remove(); mostrarToast('Registro excluído.'); }
+    else mostrarToast(resp.erro || 'Erro ao excluir.', 'danger');
+  })
+  .catch(() => mostrarToast('Erro de comunicação.', 'danger'));
+}
+
+// =========================================================
+// Gerenciar setores (localStorage)
+// =========================================================
+const SETORES_LS = 'smdhc_setores_v1';
+
+function getSetores() {
+  try { return JSON.parse(localStorage.getItem(SETORES_LS) || '[]'); } catch { return []; }
+}
+function saveSetores(list) { localStorage.setItem(SETORES_LS, JSON.stringify(list)); }
+
+function populateDatalist() {
+  const dl = document.getElementById('setores-list');
+  if (!dl) return;
+  dl.innerHTML = '';
+  getSetores().forEach(s => { const o = document.createElement('option'); o.value = s; dl.appendChild(o); });
+}
+
+function renderSetoresList() {
+  const ul = document.getElementById('lista-setores');
+  if (!ul) return;
+  const list = getSetores();
+  ul.innerHTML = '';
+  if (!list.length) {
+    ul.innerHTML = '<li class="list-group-item text-muted small">Nenhum setor cadastrado ainda.</li>';
+    return;
+  }
+  list.forEach(s => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center py-1 small';
+    li.innerHTML = `<span>${s}</span>
+      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="removerSetor(${JSON.stringify(s)})">
+        <i class="bi bi-x"></i>
+      </button>`;
+    ul.appendChild(li);
+  });
+}
+
+function adicionarSetor() {
+  const inp = document.getElementById('input-novo-setor');
+  const val = inp ? inp.value.trim() : '';
+  if (!val) return;
+  const list = getSetores();
+  if (!list.includes(val)) {
+    list.push(val);
+    list.sort((a, b) => a.localeCompare(b, 'pt'));
+    saveSetores(list);
+    populateDatalist();
+    renderSetoresList();
+  }
+  if (inp) inp.value = '';
+}
+
+function removerSetor(setor) {
+  saveSetores(getSetores().filter(s => s !== setor));
+  populateDatalist();
+  renderSetoresList();
+}
+
+populateDatalist();
+renderSetoresList();
+</script>
+</body>
+</html>

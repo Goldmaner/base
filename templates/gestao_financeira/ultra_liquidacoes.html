@@ -3594,17 +3594,25 @@
             tdParcela.attr('data-parcela-numero', parcelaNumero);
             tr.append(tdParcela);
             
-            // Botão de excluir apenas na última linha E se não for modo projetadas
+            // Botões de ação: Implantação (todas não-projetadas) + Excluir (apenas última não-projetada)
             const tdAcao = $('<td>').addClass('text-center');
-            if (index === dadosSalvos.length - 1 && !modoParcelasProjetadas) {
-                const btnExcluir = $('<button>')
-                    .addClass('btn btn-sm btn-outline-danger')
-                    .html('<i class="bi bi-trash"></i>')
-                    .attr('title', 'Excluir última linha')
-                    .on('click', function() {
-                        excluirUltimaLinhaCronograma();
-                    });
-                tdAcao.append(btnExcluir);
+            if (!modoParcelasProjetadas) {
+                const btnImplDZ = $('<button>')
+                    .addClass('btn btn-sm btn-outline-warning btn-implantacao-cronograma')
+                    .html('<i class="bi bi-star-fill"></i>')
+                    .attr('title', 'Converter em Parcela de Implantação')
+                    .on('click', function() { converterParaImplantacao(this); });
+                tdAcao.append(btnImplDZ);
+                if (index === dadosSalvos.length - 1) {
+                    const btnExcluir = $('<button>')
+                        .addClass('btn btn-sm btn-outline-danger btn-excluir-cronograma ms-1')
+                        .html('<i class="bi bi-trash"></i>')
+                        .attr('title', 'Excluir última linha')
+                        .on('click', function() {
+                            excluirUltimaLinhaCronograma();
+                        });
+                    tdAcao.append(btnExcluir);
+                }
             }
             tr.append(tdAcao);
             
@@ -3705,11 +3713,17 @@
             tdParcela.attr('data-parcela-numero', numeroParcela);
             tr.append(tdParcela);
             
-            // Adicionar botão de excluir apenas para a última linha
+            // Botão de Implantação (todas as linhas) + Excluir (apenas última)
             const tdAcao = $('<td>').addClass('text-center');
+            const btnImpl = $('<button>')
+                .addClass('btn btn-sm btn-outline-warning btn-implantacao-cronograma')
+                .html('<i class="bi bi-star-fill"></i>')
+                .attr('title', 'Converter em Parcela de Implantação')
+                .on('click', function() { converterParaImplantacao(this); });
+            tdAcao.append(btnImpl);
             if (index === meses.length - 1) {
                 const btnExcluir = $('<button>')
-                    .addClass('btn btn-sm btn-outline-danger')
+                    .addClass('btn btn-sm btn-outline-danger btn-excluir-cronograma ms-1')
                     .html('<i class="bi bi-trash"></i>')
                     .attr('title', 'Excluir última linha')
                     .on('click', function() {
@@ -3909,20 +3923,56 @@
     // Excluir última linha do cronograma
     function atualizarNumerosParcelas() {
         const tipoParcela = $('input[name="tipo_parcela_manual"]:checked').val();
-        const totalLinhas = $('#corpo_cronograma tr').length;
         
-        $('#corpo_cronograma tr').each(function(index) {
-            const tr = $(this);
+        // Contar apenas linhas que NÃO são Implantação para calcular o total correto
+        const todasLinhas = $('#corpo_cronograma tr').toArray();
+        const totalNaoImplantacao = todasLinhas.filter(tr => !$(tr).data('implantacao')).length;
+        
+        let effectiveIndex = 0; // índice que ignora linhas de Implantação
+        
+        todasLinhas.forEach(function(trEl) {
+            const tr = $(trEl);
+            
+            // Linhas de Implantação: preservar texto e não incrementar índice
+            if (tr.data('implantacao')) {
+                tr.find('td').eq(6).text('Implantação');
+                return;
+            }
+            
             const input = tr.find('.cronograma-val-23');
             const mes = parseInt(input.data('mes'));
             const ano = parseInt(input.data('ano'));
             
-            const numeroParcela = calcularNumeroParcela(index, tipoParcela, totalLinhas, mes, ano);
+            // Usar effectiveIndex (descontando Implantações) e totalNaoImplantacao como total
+            const numeroParcela = calcularNumeroParcela(effectiveIndex, tipoParcela, totalNaoImplantacao, mes, ano);
             // Coluna 6 = Nº Parcela (0:Salvar, 1:Info, 2:Mês, 3:Val23, 4:Val24, 5:Total, 6:Parcela, 7:Ação)
             tr.find('td').eq(6).text(numeroParcela);
+            
+            effectiveIndex++;
         });
         
         console.log(`✅ Números de parcelas atualizados para tipo: ${tipoParcela}`);
+    }
+    
+    // Converter linha do cronograma em Parcela de Implantação (ou reverter)
+    function converterParaImplantacao(btn) {
+        const tr = $(btn).closest('tr');
+        
+        if (tr.data('implantacao')) {
+            // Reverter: remover marcação e recalcular número normal
+            tr.data('implantacao', false);
+            tr.removeAttr('data-implantacao');
+            $(btn).removeClass('btn-warning').addClass('btn-outline-warning');
+            $(btn).attr('title', 'Converter em Parcela de Implantação');
+        } else {
+            // Marcar como Implantação
+            tr.data('implantacao', true);
+            tr.attr('data-implantacao', 'true');
+            $(btn).removeClass('btn-outline-warning').addClass('btn-warning');
+            $(btn).attr('title', 'Remover marcação de Implantação (clique para reverter)');
+        }
+        
+        atualizarNumerosParcelas();
     }
     
     function adicionarLinhaCronograma() {
@@ -3956,8 +4006,8 @@
         const tipoParcela = $('input[name="tipo_parcela_manual"]:checked').val();
         const numeroParcela = calcularNumeroParcela(totalLinhas, tipoParcela, totalLinhas + 1, proximoMes, proximoAno);
         
-        // Remover botão de excluir da antiga última linha
-        ultimaLinha.find('td:last').empty();
+        // Remover botão de excluir da antiga última linha (preservar botão de implantação)
+        ultimaLinha.find('.btn-excluir-cronograma').remove();
         
         // Criar nova linha
         const tr = $('<tr>');
@@ -4019,10 +4069,16 @@
         tdParcela.attr('data-parcela-numero', numeroParcela);
         tr.append(tdParcela);
         
-        // Adicionar botão de excluir na nova última linha
+        // Adicionar botões de implantação + excluir na nova última linha
         const tdAcao = $('<td>').addClass('text-center');
+        const btnImplAdic = $('<button>')
+            .addClass('btn btn-sm btn-outline-warning btn-implantacao-cronograma')
+            .html('<i class="bi bi-star-fill"></i>')
+            .attr('title', 'Converter em Parcela de Implantação')
+            .on('click', function() { converterParaImplantacao(this); });
+        tdAcao.append(btnImplAdic);
         const btnExcluir = $('<button>')
-            .addClass('btn btn-sm btn-outline-danger')
+            .addClass('btn btn-sm btn-outline-danger btn-excluir-cronograma ms-1')
             .html('<i class="bi bi-trash"></i>')
             .attr('title', 'Excluir última linha')
             .on('click', function() {
@@ -4134,7 +4190,14 @@
         }
         tdParcela.attr('data-parcela-numero', numeroParcela);
         tr.append(tdParcela);
-        tr.append($('<td>').addClass('text-center')); // Sem botão de excluir
+        const tdAcaoNova = $('<td>').addClass('text-center');
+        const btnImplNova = $('<button>')
+            .addClass('btn btn-sm btn-outline-warning btn-implantacao-cronograma')
+            .html('<i class="bi bi-star-fill"></i>')
+            .attr('title', 'Converter em Parcela de Implantação')
+            .on('click', function() { converterParaImplantacao(this); });
+        tdAcaoNova.append(btnImplNova);
+        tr.append(tdAcaoNova);
         
         // Inserir no início
         $('#corpo_cronograma').prepend(tr);
@@ -4142,12 +4205,12 @@
         // Recalcular números de parcela de todas as linhas
         atualizarNumerosParcelas();
         
-        // Garantir que apenas a última linha tenha botão de excluir
-        $('#corpo_cronograma tr td:last-child').empty();
+        // Garantir que apenas a última linha tenha botão de excluir (preservar botões de implantação)
+        $('#corpo_cronograma tr .btn-excluir-cronograma').remove();
         const ultimaLinha = $('#corpo_cronograma tr:last');
         const tdAcao = ultimaLinha.find('td:last');
         const btnExcluir = $('<button>')
-            .addClass('btn btn-sm btn-outline-danger')
+            .addClass('btn btn-sm btn-outline-danger btn-excluir-cronograma ms-1')
             .html('<i class="bi bi-trash"></i>')
             .attr('title', 'Excluir última linha')
             .on('click', function() {
@@ -4178,16 +4241,16 @@
             // Remover última linha
             $('#corpo_cronograma tr:last').remove();
             
-            // Remover botão de excluir da antiga penúltima linha (agora última)
-            $('#corpo_cronograma tr').find('.btn-outline-danger').remove();
+            // Remover botão de excluir da antiga penúltima linha (agora última), preservar implantação
+            $('#corpo_cronograma tr').find('.btn-excluir-cronograma').remove();
             
-            // Adicionar botão de excluir na nova última linha
+            // Adicionar botão de excluir na nova última linha (botão de implantação já está lá)
             const ultimaLinha = $('#corpo_cronograma tr:last');
             const tdAcao = ultimaLinha.find('td:last');
-            tdAcao.empty().addClass('text-center');
+            tdAcao.addClass('text-center');
             
             const btnExcluir = $('<button>')
-                .addClass('btn btn-sm btn-outline-danger')
+                .addClass('btn btn-sm btn-outline-danger btn-excluir-cronograma ms-1')
                 .html('<i class="bi bi-trash"></i>')
                 .attr('title', 'Excluir última linha')
                 .on('click', function() {

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parser de Nomeações CDA</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            padding: 24px;
+        }
+
+        h1 {
+            color: #1a3a5c;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            letter-spacing: 0.01em;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            font-size: 0.95rem;
+            color: #1a3a5c;
+            margin-bottom: 14px;
+            border-bottom: 2px solid #e8edf2;
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 0.88rem;
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s;
+            line-height: 1.5;
+        }
+
+        textarea:focus { border-color: #0078d4; }
+
+        .fields-row {
+            display: flex;
+            gap: 16px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .field-group label {
+            font-size: 0.78rem;
+            color: #555;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .field-group input {
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+            min-width: 180px;
+        }
+
+        .field-group input:focus { border-color: #0078d4; }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            font-weight: 600;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-primary { background: #0078d4; color: white; }
+        .btn-primary:hover { background: #006cbd; }
+
+        .btn-success { background: #107c10; color: white; }
+        .btn-success:hover { background: #0b6b0b; }
+
+        .btn-danger { background: #d32f2f; color: white; }
+        .btn-danger:hover { background: #b71c1c; }
+
+        .btn-copy {
+            background: #f3f6f9;
+            color: #333;
+            border: 1px solid #d0d7de;
+            padding: 5px 14px;
+            font-size: 0.8rem;
+        }
+
+        .btn-copy:hover { background: #e0e8f0; }
+
+        .btn-copy.copied {
+            background: #d4edda;
+            color: #107c10;
+            border-color: #b2dfdb;
+        }
+
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .table-wrapper { overflow-x: auto; }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.86rem;
+        }
+
+        thead th {
+            background: #1a3a5c;
+            color: white;
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+            font-weight: 600;
+            font-size: 0.8rem;
+            letter-spacing: 0.03em;
+        }
+
+        tbody tr:nth-child(even) { background: #f8fafc; }
+        tbody tr:hover { background: #eef4fb; }
+
+        tbody td {
+            padding: 7px 12px;
+            border-bottom: 1px solid #e8edf2;
+            vertical-align: middle;
+        }
+
+        td[contenteditable="true"] {
+            cursor: text;
+            outline: none;
+            min-width: 80px;
+        }
+
+        td[contenteditable="true"]:focus {
+            background: #fffde7 !important;
+            box-shadow: inset 0 0 0 2px #ffd740;
+            border-radius: 3px;
+        }
+
+        td[contenteditable="true"]:empty::after {
+            content: '—';
+            color: #ccc;
+            pointer-events: none;
+        }
+
+        .count-badge {
+            background: #0078d4;
+            color: white;
+            border-radius: 12px;
+            padding: 2px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        #outputSection { display: none; }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #107c10;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 0.87rem;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: translateY(8px);
+            transition: all 0.25s;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .toast.show { opacity: 1; transform: translateY(0); }
+
+        .hint {
+            font-size: 0.76rem;
+            color: #888;
+            margin-top: 6px;
+        }
+
+        .copy-all-group {
+            display: flex;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Parser de Nomeações — Cargos CDA</h1>
+
+<!-- INPUT -->
+<div class="card">
+    <h2>Cole o texto ou o HTML do Diário Oficial</h2>
+    <textarea id="inputText" placeholder="Cole aqui o texto simples OU o código HTML da página do D.O. — ambos funcionam."></textarea>
+    <p class="hint">Aceita texto simples ou HTML copiado da página. Data de publicação e nº do documento são detectados automaticamente. Só as linhas com "vaga" e "CDA" são processadas.</p>
+
+    <div class="fields-row">
+        <div class="field-group">
+            <label>Data da Publicação</label>
+            <input type="text" id="dataPublicacao" placeholder="DD/MM/AAAA">
+        </div>
+        <div class="field-group">
+            <label>Nº do Documento (Observações)</label>
+            <input type="text" id="numDoc" placeholder="Ex: 081247420">
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="btn btn-primary" onclick="parseAndDisplay()">▶ Processar Texto</button>
+        <button class="btn btn-copy" onclick="clearAll()">Limpar</button>
+    </div>
+</div>
+
+<!-- OUTPUT -->
+<div class="card" id="outputSection">
+    <div class="output-header">
+        <h2>
+            Resultado
+            <span id="countBadge" class="count-badge"></span>
+        </h2>
+        <div class="copy-all-group">
+            <button class="btn btn-success" onclick="copyAll(false)">Copiar Linhas</button>
+            <button class="btn btn-primary" onclick="copyAll(true)">Copiar com Cabeçalho</button>
+        </div>
+    </div>
+    <p class="hint" style="margin-bottom:12px">Clique em qualquer célula para editar antes de copiar.</p>
+
+    <div class="table-wrapper">
+        <table id="resultTable">
+            <thead>
+                <tr>
+                    <th>Nível CDA</th>
+                    <th>Nº da Vaga</th>
+                    <th>Nome do Ocupante</th>
+                    <th>Data da Publicação</th>
+                    <th>Unidade / Lotação</th>
+                    <th>Observações</th>
+                    <th style="text-align:center">Copiar</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+    const HEADERS = ['Nº da Vaga', 'Nome do Ocupante', 'Data da Publicação', 'Unidade / Lotação', 'Observações'];
+
+    function isHtml(str) {
+        return /<[a-z][\s\S]*>/i.test(str);
+    }
+
+    function extractFromHtml(raw) {
+        const div = document.createElement('div');
+        div.innerHTML = raw;
+
+        // Tenta extrair data de publicação dos spans com a classe do D.O.
+        let autoDate = '';
+        div.querySelectorAll('.info__publicacao, [class*="publicacao"]').forEach(el => {
+            const m = el.textContent.match(/Publica[çc][aã]o:\s*(\d{2}\/\d{2}\/\d{4})/i);
+            if (m) autoDate = m[1];
+        });
+
+        const plainText = div.innerText || div.textContent || '';
+
+        // Fallback: busca no texto extraído
+        if (!autoDate) {
+            const m = plainText.match(/Publica[çc][aã]o:\s*(\d{2}\/\d{2}\/\d{4})/i);
+            if (m) autoDate = m[1];
+        }
+
+        return { plainText, autoDate };
+    }
+
+    function parseAndDisplay() {
+        const rawInput = document.getElementById('inputText').value;
+
+        let text, autoDate = '';
+
+        if (isHtml(rawInput)) {
+            const extracted = extractFromHtml(rawInput);
+            text = extracted.plainText;
+            autoDate = extracted.autoDate;
+        } else {
+            text = rawInput;
+            // Tenta extrair data do texto plano
+            const m = text.match(/Publica[çc][aã]o:\s*(\d{2}\/\d{2}\/\d{4})/i);
+            if (m) autoDate = m[1];
+        }
+
+        // Preenche data automaticamente se o campo estiver vazio
+        let dataPublicacao = document.getElementById('dataPublicacao').value.trim();
+        if (!dataPublicacao && autoDate) {
+            dataPublicacao = autoDate;
+            document.getElementById('dataPublicacao').value = autoDate;
+        }
+
+        // Tenta extrair automaticamente o nº do doc:
+        // Aceita "O seguinte documento [palavras opcionais] integra este ato XXXXXXX"
+        let numDoc = document.getElementById('numDoc').value.trim();
+        if (!numDoc) {
+            const autoDoc = text.match(/O seguinte documento\b[\w\s]*\bintegra este ato\s+(\d+)/i);
+            if (autoDoc) {
+                numDoc = autoDoc[1];
+                document.getElementById('numDoc').value = numDoc;
+            }
+        }
+
+        const obs = numDoc
+            ? (numDoc.toLowerCase().startsWith('doc.') ? numDoc : 'Doc. ' + numDoc)
+            : '';
+
+        const results = [];
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        for (const line of lines) {
+            const upper = line.toUpperCase();
+            if (!upper.includes('VAGA') || !upper.includes('CDA')) continue;
+
+            // Nome: tudo antes de ", RG" ou ", RF"
+            const nameMatch = line.match(/^(.+?),\s*(?:RG|RF)\s+/i);
+            let name = nameMatch ? nameMatch[1].trim() : '';
+
+            // Remove prefixos como "Nomear o senhor", "Nomear a senhora", etc.
+            name = name.replace(/^Nomear\s+(?:o\s+senhor(?:a)?|a\s+senhora|o\s+servidor|a\s+servidora|o\s+sr\.?|a\s+sr[aª]\.?)\s+/i, '').trim();
+            name = name.replace(/^Nomear\s+/i, '').trim();
+
+            // Nível CDA
+            const cdaMatch = line.match(/Ref\.\s*(CDA-[\w\d]+)/i);
+            const cda = cdaMatch ? cdaMatch[1].toUpperCase() : '';
+
+            // Número da vaga
+            const vagaMatch = line.match(/vaga\s+(\d+)/i);
+            const vaga = vagaMatch ? vagaMatch[1] : '';
+
+            if (cda && vaga) {
+                results.push({ cda, vaga, name, data: dataPublicacao, unidade: '', obs });
+            }
+        }
+
+        if (results.length === 0) {
+            showToast('Nenhuma nomeação encontrada. Verifique se o texto contém "vaga" e "CDA".', '#c62828');
+            return;
+        }
+
+        renderTable(results);
+        showToast(results.length + ' nomeaç' + (results.length === 1 ? 'ão encontrada' : 'ões encontradas') + '!');
+    }
+
+    function renderTable(results) {
+        const tbody = document.getElementById('resultBody');
+        tbody.innerHTML = '';
+
+        results.forEach(r => {
+            const tr = document.createElement('tr');
+
+            // CDA: visível na tabela mas excluído da cópia
+            const tdCda = document.createElement('td');
+            tdCda.contentEditable = 'true';
+            tdCda.dataset.nocopy = 'true';
+            tdCda.textContent = r.cda;
+            tr.appendChild(tdCda);
+
+            const copyVals = [r.vaga, r.name, r.data, r.unidade, r.obs];
+            copyVals.forEach(val => {
+                const td = document.createElement('td');
+                td.contentEditable = 'true';
+                td.textContent = val;
+                tr.appendChild(td);
+            });
+
+            // Botão copiar linha
+            const tdBtn = document.createElement('td');
+            tdBtn.style.textAlign = 'center';
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-copy';
+            btn.textContent = 'Copiar';
+            btn.onclick = () => copyRow(tr, btn);
+            tdBtn.appendChild(btn);
+            tr.appendChild(tdBtn);
+
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('countBadge').textContent = results.length + ' linha' + (results.length !== 1 ? 's' : '');
+        const sec = document.getElementById('outputSection');
+        sec.style.display = 'block';
+        sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function getRowValues(tr) {
+        return Array.from(tr.querySelectorAll('td[contenteditable]'))
+            .filter(td => !td.dataset.nocopy)
+            .map(td => td.textContent.trim());
+    }
+
+    function copyRow(tr, btn) {
+        const tsv = getRowValues(tr).join('\t');
+        navigator.clipboard.writeText(tsv).then(() => {
+            btn.textContent = '✓ Copiado';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 2000);
+        });
+    }
+
+    function copyAll(withHeader) {
+        const rows = document.querySelectorAll('#resultBody tr');
+        if (rows.length === 0) return;
+
+        const lines = Array.from(rows).map(tr => getRowValues(tr).join('\t'));
+        if (withHeader) lines.unshift(HEADERS.join('\t'));
+
+        navigator.clipboard.writeText(lines.join('\n')).then(() => {
+            const msg = (withHeader ? 'Cabeçalho + ' : '') + rows.length + ' linha' + (rows.length !== 1 ? 's' : '') + ' copiada' + (rows.length !== 1 ? 's' : '') + ' — cole no Excel!';
+            showToast(msg);
+        });
+    }
+
+    function clearAll() {
+        document.getElementById('inputText').value = '';
+        document.getElementById('dataPublicacao').value = '';
+        document.getElementById('numDoc').value = '';
+        document.getElementById('resultBody').innerHTML = '';
+        document.getElementById('outputSection').style.display = 'none';
+    }
+
+    function showToast(msg, color) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.style.background = color || '#107c10';
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3500);
+    }
+</script>
+</body>
+</html>

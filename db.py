@@ -6,14 +6,55 @@ from flask import g
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from config import DB_CONFIG
+import time
+
+# Queries que demorem mais que este valor (em segundos) serão logadas
+SLOW_QUERY_THRESHOLD = 1.0
+
+
+def get_cursor():
+    """
+    Retorna um cursor instrumentado que loga queries lentas (> SLOW_QUERY_THRESHOLD segundos).
+    """
+    db = get_db()
+    if db is None:
+        return None
+    raw_cursor = db.cursor(cursor_factory=RealDictCursor)
+
+    class TimedCursor:
+        def __init__(self, cursor):
+            self._cur = cursor
+
+        def execute(self, query, params=None):
+            t0 = time.time()
+            self._cur.execute(query, params)
+            elapsed = time.time() - t0
+            if elapsed >= SLOW_QUERY_THRESHOLD:
+                print(f"[SLOW QUERY {elapsed:.2f}s] {str(query)[:200]}")
+
+        def executemany(self, query, params_list):
+            t0 = time.time()
+            self._cur.executemany(query, params_list)
+            elapsed = time.time() - t0
+            if elapsed >= SLOW_QUERY_THRESHOLD:
+                print(f"[SLOW QUERY BATCH {elapsed:.2f}s] {str(query)[:200]}")
+
+        def __getattr__(self, name):
+            return getattr(self._cur, name)
+
+        def __iter__(self):
+            return iter(self._cur)
+
+    return TimedCursor(raw_cursor)
 
 
 def get_db():
     """
     Obtém a conexão com o banco de dados LOCAL.
     Cria uma nova conexão se não existir uma no contexto da aplicação.
+    Reconecta automaticamente se a conexão foi encerrada pelo servidor (ex: timeout SSL).
     """
-    if "db" not in g:
+    if "db" not in g or g.db is None or g.db.closed != 0:
         try:
             g.db = psycopg2.connect(**DB_CONFIG)
             g.db.autocommit = False  # Para controlar transações manualmente
@@ -21,17 +62,6 @@ def get_db():
             print(f"[ERRO] Falha ao conectar no banco: {e}")
             g.db = None
     return g.db
-
-
-def get_cursor():
-    """
-    Retorna um cursor que funciona como dictionary.
-    Facilita o acesso aos dados por nome de coluna.
-    """
-    db = get_db()
-    if db is None:
-        return None
-    return db.cursor(cursor_factory=RealDictCursor)
 
 
 def execute_query(query, params=None):

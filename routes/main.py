@@ -50,6 +50,22 @@ def index():
     return render_template("tela_inicial.html", user=user, is_admin=is_admin, user_acessos=user_acessos)
 
 
+@main_bp.route("/tela-inicial-ideias", methods=["GET"])
+@login_required
+def tela_inicial_ideias():
+    """
+    Laboratório de design – showcase de 4 opções de layout (apenas Agente Público)
+    """
+    cur = get_cursor()
+    cur.execute("SELECT id, email, tipo_usuario FROM gestao_pessoas.usuarios WHERE id = %s", (session["user_id"],))
+    user = cur.fetchone()
+    cur.close()
+    if user['tipo_usuario'] != 'Agente Público':
+        flash('Acesso restrito.', 'danger')
+        return redirect(url_for('main.index'))
+    return render_template("tela_inicial_ideias.html", user=user)
+
+
 @main_bp.route("/admin/portarias", methods=["GET", "POST"])
 @login_required
 @requires_access('portarias')
