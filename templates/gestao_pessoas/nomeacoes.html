@@ -1,4 +1,5 @@
 <!doctype html>
+{% set CARGO_LABEL = {1:'CDA-1',2:'CDA-2',3:'CDA-3',4:'CDA-4',5:'CDA-5',6:'CDA-6',7:'AAG',8:'APPGG',9:'APDO',10:'Procurador(a)',11:'CHG',12:'Secretário(a)',13:'Secretário(a) Adjunto(a)'} %}
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
@@ -264,6 +265,13 @@
           <option value="4" {% if filter_cda == '4' %}selected{% endif %}>CDA-4</option>
           <option value="5" {% if filter_cda == '5' %}selected{% endif %}>CDA-5</option>
           <option value="6" {% if filter_cda == '6' %}selected{% endif %}>CDA-6</option>
+          <option value="7" {% if filter_cda == '7' %}selected{% endif %}>AAG</option>
+          <option value="8" {% if filter_cda == '8' %}selected{% endif %}>APPGG</option>
+          <option value="9" {% if filter_cda == '9' %}selected{% endif %}>APDO</option>
+          <option value="10" {% if filter_cda == '10' %}selected{% endif %}>Procurador(a)</option>
+          <option value="11" {% if filter_cda == '11' %}selected{% endif %}>CHG</option>
+          <option value="12" {% if filter_cda == '12' %}selected{% endif %}>Secretário(a)</option>
+          <option value="13" {% if filter_cda == '13' %}selected{% endif %}>Secretário(a) Adjunto(a)</option>
         </select>
         <button class="btn btn-sm btn-outline-secondary" onclick="location.reload()" title="Recarregar registros do banco">
           <i class="bi bi-arrow-clockwise"></i> Atualizar
@@ -298,7 +306,7 @@
         <tbody id="tbody-banco">
           {% for r in registros %}
           <tr data-id="{{ r.id }}">
-            <td>{% if r.cda %}CDA-{{ r.cda }}{% endif %}</td>
+            <td>{% if r.cda %}{{ CARGO_LABEL.get(r.cda, 'CDA-' ~ r.cda) }}{% endif %}</td>
             <td>{{ r.numero_vaga or '' }}</td>
             <td class="p-1">
               <input type="text"
@@ -1110,6 +1118,13 @@ function adicionarNovaLinha() {
         <option value="4">CDA-4</option>
         <option value="5">CDA-5</option>
         <option value="6">CDA-6</option>
+        <option value="7">AAG</option>
+        <option value="8">APPGG</option>
+        <option value="9">APDO</option>
+        <option value="10">Procurador(a)</option>
+        <option value="11">CHG</option>
+        <option value="12">Secretário(a)</option>
+        <option value="13">Secretário(a) Adjunto(a)</option>
       </select>
     </td>
     <td class="p-1"><input id="nl-vaga" type="text" class="form-control form-control-sm" placeholder="Nº Vaga"></td>

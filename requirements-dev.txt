@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Ferramentas de scripts e analise (nao usadas em producao)
+pandas==2.2.3

@@ -17,8 +17,8 @@
 
     /* Gantt wrapper — horizontal scroll, fixed left column */
     .gantt-wrapper { overflow-x: auto; }
-    .gantt-table { border-collapse: collapse; min-width: max-content; font-size: .78rem; }
-    .gantt-table th, .gantt-table td { border: 1px solid #dee2e6; padding: 0; }
+    .gantt-table { border-collapse: separate; border-spacing: 0; min-width: max-content; font-size: .78rem; }
+    .gantt-table th, .gantt-table td { border: none; border-right: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6; padding: 0; }
 
     /* Header rows */
     .gantt-table .year-row th { background: #0d6efd; color: #fff; text-align: center; font-size: .75rem; white-space: nowrap; padding: 3px 4px; }
@@ -26,11 +26,9 @@
     .gantt-table .month-row th.today-col { background: #fff3cd; }
 
     /* Fixed label column */
-    .col-vaga { background: #f8f9fa; white-space: nowrap; padding: 4px 8px; position: sticky; left: 0; z-index: 2; border-right: 2px solid #adb5bd !important; min-width: 150px; max-width: 200px; }
-    .col-vaga .unidade-label { font-size: .63rem; color: #6c757d; display: block; white-space: normal; line-height: 1.2; margin-top: 1px; }
-    .gantt-table .year-row .col-vaga,
-    .gantt-table .month-row .col-vaga { background: #0d6efd; color: #fff; font-weight: 600; z-index: 3; }
-    .gantt-table .month-row .col-vaga { background: #e9ecef; color: #495057; }
+    .col-vaga { background: #f8f9fa; white-space: nowrap; padding: 4px 8px; position: sticky; left: 0; z-index: 2; border-right: 2px solid #adb5bd !important; width: 120px; min-width: 120px; }
+    .gantt-table .year-row .col-vaga { background: #0d6efd; color: #fff; font-weight: 600; z-index: 3; }
+    .gantt-table .month-row .col-vaga { background: #e9ecef; color: #495057; font-weight: 600; z-index: 3; }
 
     /* Data rows */
     .vaga-row td { height: 28px; position: relative; padding: 0; }
@@ -88,8 +86,8 @@
         <select id="sel-sort" class="form-select form-select-sm w-auto" onchange="sortarCalendario()">
           <option value="vaga_asc">Vaga ↑</option>
           <option value="vaga_desc">Vaga ↓</option>
-          <option value="cda_asc">CDA ↑ (menor primeiro)</option>
-          <option value="cda_desc">CDA ↓ (maior primeiro)</option>
+          <option value="cda_desc">Cargo ↓ (Secr. primeiro)</option>
+          <option value="cda_asc">Cargo ↑ (AAG primeiro)</option>
         </select>
       </div>
       <div class="d-flex gap-2 align-items-center small">
@@ -102,6 +100,9 @@
       <label class="form-check-label small ms-auto">
         <input type="checkbox" id="chk-only-active" class="form-check-input"> Apenas vagas com dados
       </label>
+      <button class="btn btn-sm btn-outline-info" onclick="abrirModalUnidades()" title="Ver resumo por unidade">
+        <i class="bi bi-building"></i> Por Unidades
+      </button>
     </div>
 
     <!-- Gantt -->
@@ -123,12 +124,65 @@
 
 </div>
 
+<!-- Modal Unidades -->
+<div class="modal fade" id="modal-unidades" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-building me-2"></i>Unidades — Visão Geral</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+          <div class="input-group" style="max-width:260px;">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" id="modal-filtro-unidade" class="form-control form-control-sm" placeholder="Buscar unidade ou nome..." oninput="renderModalUnidades()">
+          </div>
+          <select id="modal-filtro-cda" class="form-select form-select-sm w-auto" onchange="renderModalUnidades()">
+            <option value="">Todos CDAs</option>
+            <option value="1">CDA-1</option>
+            <option value="2">CDA-2</option>
+            <option value="3">CDA-3</option>
+            <option value="4">CDA-4</option>
+            <option value="5">CDA-5</option>
+            <option value="6">CDA-6</option>
+            <option value="7">AAG</option>
+            <option value="8">APPGG</option>
+            <option value="9">APDO</option>
+            <option value="10">Procurador(a)</option>
+            <option value="11">CHG</option>
+            <option value="12">Secretário(a)</option>
+            <option value="13">Secretário(a) Adjunto(a)</option>
+          </select>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="chk-apenas-ativos" onchange="renderModalUnidades()">
+            <label class="form-check-label small" for="chk-apenas-ativos">Retirar não ativos</label>
+          </div>
+          <button class="btn btn-sm btn-outline-danger" onclick="exportarPDFUnidades()" title="Exportar PDF com filtros atuais">
+            <i class="bi bi-file-pdf"></i> Exportar PDF
+          </button>
+          <span id="modal-resumo" class="text-muted small ms-auto"></span>
+        </div>
+        <div id="modal-unidades-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Tooltip -->
 <div id="tooltip" style="position:fixed;display:none;background:#212529;color:#fff;padding:6px 10px;border-radius:5px;font-size:.78rem;z-index:9999;pointer-events:none;max-width:260px;"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const RAW = {{ dados_json | safe }};
+
+// ── Cargo label map ───────────────────────────────────────────────────────────────────────────────
+const CARGO_LABEL = {1:'CDA-1',2:'CDA-2',3:'CDA-3',4:'CDA-4',5:'CDA-5',6:'CDA-6',
+  7:'AAG',8:'APPGG',9:'APDO',10:'Procurador(a)',11:'CHG',12:'Secretário(a)',13:'Secretário(a) Adjunto(a)'};
+function cargoLabel(n) { return n ? (CARGO_LABEL[n] || 'CDA-'+n) : ''; }
+// Ordem hierárquica customão: 12,13,11,10,8,9,6,5,4,3,2,1,7
+const CARGO_ORDER = [12,13,11,10,8,9,6,5,4,3,2,1,7];
+function cargoRank(n) { const i = CARGO_ORDER.indexOf(n); return i === -1 ? 99 : i; }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function monthKey(y, m) { return y * 100 + m; }   // e.g. 202304
@@ -216,14 +270,14 @@ RAW.vagas.forEach(v => {
   tr.className = 'vaga-row';
   tr.dataset.vaga = v.numero;
   tr.dataset.cda = v.cda || 0;
+  tr.dataset.unidade = v.unidade || '';
   tr.dataset.hasPeriodos = v.periodos.length > 0 ? '1' : '0';
 
-  // Label cell
+  // Vaga / CDA cell
   const tdLabel = document.createElement('td');
   tdLabel.className = 'col-vaga';
-  const cdaStr = v.cda ? `<span class="badge bg-primary ms-1" style="font-size:.65rem">CDA-${v.cda}</span>` : '';
-  const unidadeStr = v.unidade ? `<span class="unidade-label" title="${v.unidade}">${v.unidade}</span>` : '';
-  tdLabel.innerHTML = `<strong>${v.numero}</strong>${cdaStr}${unidadeStr}`;
+  const cdaStr = v.cda ? `<span class="badge bg-primary ms-1" style="font-size:.65rem">${cargoLabel(v.cda)}</span>` : '';
+  tdLabel.innerHTML = `<strong>${v.numero}</strong>${cdaStr}`;
   tr.appendChild(tdLabel);
 
   // Build an array of bars per column slot
@@ -328,12 +382,11 @@ document.getElementById('chk-only-active').addEventListener('change', function()
 function applyFilter(term, onlyWithData) {
   let shown = 0;
   document.querySelectorAll('#gantt-body tr.vaga-row').forEach(tr => {
-    const vaga = tr.dataset.vaga;
     const hasPeriodos = tr.dataset.hasPeriodos === '1';
     const labelText = tr.querySelector('.col-vaga').textContent.toLowerCase();
-    // Also search bar names
+    const unidadeText = (tr.dataset.unidade || '').toLowerCase();
     const barText = Array.from(tr.querySelectorAll('.bar')).map(b => b.textContent.toLowerCase()).join(' ');
-    const matchTerm = !term || labelText.includes(term) || barText.includes(term);
+    const matchTerm = !term || labelText.includes(term) || barText.includes(term) || unidadeText.includes(term);
     const matchOnly = !onlyWithData || hasPeriodos;
     const show = matchTerm && matchOnly;
     tr.style.display = show ? '' : 'none';
@@ -344,7 +397,7 @@ function applyFilter(term, onlyWithData) {
 }
 
 // ── Sort (únicos por vaga/CDA) + localStorage ─────────────────────────────────────────────────────
-const SORT_LS = 'smdhc_calendario_sort_v1';
+const SORT_LS = 'smdhc_calendario_sort_v2';
 
 function sortarCalendario() {
   const val = document.getElementById('sel-sort').value;
@@ -358,8 +411,10 @@ function sortarCalendario() {
     const cb = parseInt(b.dataset.cda)  || 999;
     if (val === 'vaga_asc')  return va - vb;
     if (val === 'vaga_desc') return vb - va;
-    if (val === 'cda_asc')   return ca !== cb ? ca - cb : va - vb;
-    if (val === 'cda_desc')  return ca !== cb ? cb - ca : va - vb;
+    // cda_desc = Secr. primeiro (rank menor = mais sênior vem antes)
+    if (val === 'cda_desc')  return cargoRank(ca) !== cargoRank(cb) ? cargoRank(ca) - cargoRank(cb) : va - vb;
+    // cda_asc  = AAG primeiro (rank maior = menos sênior vem antes)
+    if (val === 'cda_asc')   return cargoRank(ca) !== cargoRank(cb) ? cargoRank(cb) - cargoRank(ca) : vb - va;
     return 0;
   });
   rows.forEach(r => ganttBody.appendChild(r));
@@ -374,6 +429,261 @@ function sortarCalendario() {
     sortarCalendario();
   }
 })();
+
+// ── Modal Unidades ────────────────────────────────────────────────────────────
+function abrirModalUnidades() {
+  renderModalUnidades();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-unidades')).show();
+}
+
+function _badgeClass(obs, isActive) {
+  if (isActive) return 'bg-success';
+  const o = (obs || '').toLowerCase();
+  if (o.includes('exoner'))    return 'bg-secondary';
+  if (o.includes('vacante'))   return 'bg-warning text-dark';
+  if (o.includes('desconhecido')) return 'bg-light text-dark border';
+  return 'bg-secondary';
+}
+
+function renderModalUnidades() {
+  const termFiltro = (document.getElementById('modal-filtro-unidade')?.value || '').toLowerCase().trim();
+  const cdaFiltro  = document.getElementById('modal-filtro-cda')?.value || '';
+  const apenasAtivos = document.getElementById('chk-apenas-ativos')?.checked || false;
+
+  // Build units map: unit → [{numero, cda, nome, obs, ativo}]
+  const unidadesMap = {};
+  RAW.vagas.forEach(v => {
+    const unit = v.unidade || '(sem unidade)';
+    if (!unidadesMap[unit]) unidadesMap[unit] = [];
+    // Last periodo = most recent (list is ASC by data_pub)
+    const last = v.periodos.length > 0 ? v.periodos[v.periodos.length - 1] : null;
+    unidadesMap[unit].push({
+      numero: v.numero,
+      cda: v.cda,
+      nome: last ? (last.nome || '—') : '—',
+      obs:  last ? (last.obs  || '')  : '',
+      ativo: last ? !last.fim : false,
+    });
+  });
+
+  const container = document.getElementById('modal-unidades-body');
+  container.innerHTML = '';
+
+  const unidades = Object.keys(unidadesMap).sort((a, b) => {
+    if (a === '(sem unidade)') return 1;
+    if (b === '(sem unidade)') return -1;
+    return a.localeCompare(b, 'pt');
+  });
+
+  let visCards = 0;
+  let totalVagas = 0;
+
+  unidades.forEach(unit => {
+    let vagas = unidadesMap[unit];
+
+    // CDA filter
+    if (cdaFiltro) vagas = vagas.filter(vg => String(vg.cda) === cdaFiltro);
+
+    // Apenas ativos filter
+    if (apenasAtivos) vagas = vagas.filter(vg => vg.ativo);
+
+    // Text filter: match unit name OR any person name OR vaga number
+    if (termFiltro) {
+      const matchUnit = unit.toLowerCase().includes(termFiltro);
+      const filteredVagas = vagas.filter(vg =>
+        String(vg.numero).includes(termFiltro) ||
+        (vg.nome || '').toLowerCase().includes(termFiltro)
+      );
+      if (!matchUnit && !filteredVagas.length) return;
+      if (!matchUnit) vagas = filteredVagas;
+    }
+
+    if (!vagas.length) return;
+
+    visCards++;
+    totalVagas += vagas.length;
+    const cdas = [...new Set(vagas.map(vg => vg.cda).filter(Boolean))].sort((a, b) => a - b);
+    const ativos = vagas.filter(vg => vg.ativo).length;
+    const uid = 'ucard-' + visCards;
+
+    const card = document.createElement('div');
+    card.className = 'card mb-2';
+    card.innerHTML = `
+      <div class="card-header py-2 d-flex justify-content-between align-items-center"
+           style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#${uid}" aria-expanded="false">
+        <div class="d-flex flex-wrap align-items-center gap-1">
+          <strong>${unit}</strong>
+          <span class="badge bg-secondary">${vagas.length} vaga${vagas.length !== 1 ? 's' : ''}</span>
+          ${cdas.map(c => `<span class="badge bg-primary">${cargoLabel(c)}</span>`).join('')}
+          <span class="badge bg-success">${ativos} ativo${ativos !== 1 ? 's' : ''}</span>
+        </div>
+        <i class="bi bi-chevron-down small text-muted"></i>
+      </div>
+      <div class="collapse" id="${uid}">
+        <div class="card-body p-0">
+          <table class="table table-sm table-hover mb-0" style="font-size:.8rem">
+            <thead class="table-light">
+              <tr>
+                <th style="width:70px">Vaga</th>
+                <th style="width:65px">CDA</th>
+                <th>Titular atual</th>
+                <th style="width:110px">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${vagas.map(vg => `
+                <tr>
+                  <td><strong>${vg.numero}</strong></td>
+                  <td>${vg.cda ? `<span class="badge bg-primary">${cargoLabel(vg.cda)}</span>` : '—'}</td>
+                  <td>${vg.nome || '—'}</td>
+                  <td><span class="badge ${_badgeClass(vg.obs, vg.ativo)}">
+                    ${vg.obs || (vg.ativo ? 'Ativo' : '—')}
+                  </span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  document.getElementById('modal-resumo').textContent =
+    visCards > 0
+      ? `${visCards} unidade${visCards !== 1 ? 's' : ''} · ${totalVagas} vaga${totalVagas !== 1 ? 's' : ''}`
+      : 'Nenhuma unidade encontrada.';
+
+  if (!visCards) {
+    container.innerHTML = '<p class="text-muted text-center py-4">Nenhuma unidade encontrada com os filtros aplicados.</p>';
+  }
+}
+
+// ── Export PDF Unidades ───────────────────────────────────────────────────────────────────────────────
+function exportarPDFUnidades() {
+  const termFiltro  = (document.getElementById('modal-filtro-unidade')?.value || '').toLowerCase().trim();
+  const cdaFiltro   = document.getElementById('modal-filtro-cda')?.value || '';
+  const apenasAtivos = document.getElementById('chk-apenas-ativos')?.checked || false;
+
+  // Rebuild units map
+  const unidadesMap = {};
+  RAW.vagas.forEach(v => {
+    const unit = v.unidade || '(sem unidade)';
+    if (!unidadesMap[unit]) unidadesMap[unit] = [];
+    const last = v.periodos.length > 0 ? v.periodos[v.periodos.length - 1] : null;
+    unidadesMap[unit].push({
+      numero: v.numero, cda: v.cda,
+      nome: last ? (last.nome || '—') : '—',
+      obs:  last ? (last.obs  || '')  : '',
+      ativo: last ? !last.fim : false,
+    });
+  });
+
+  const unidades = Object.keys(unidadesMap).sort((a, b) => {
+    if (a === '(sem unidade)') return 1;
+    if (b === '(sem unidade)') return -1;
+    return a.localeCompare(b, 'pt');
+  });
+
+  const filtradas = [];
+  unidades.forEach(unit => {
+    let vagas = [...unidadesMap[unit]];
+    if (cdaFiltro)   vagas = vagas.filter(vg => String(vg.cda) === cdaFiltro);
+    if (apenasAtivos) vagas = vagas.filter(vg => vg.ativo);
+    if (termFiltro) {
+      const matchUnit = unit.toLowerCase().includes(termFiltro);
+      const filt = vagas.filter(vg =>
+        String(vg.numero).includes(termFiltro) ||
+        (vg.nome || '').toLowerCase().includes(termFiltro)
+      );
+      if (!matchUnit && !filt.length) return;
+      if (!matchUnit) vagas = filt;
+    }
+    if (vagas.length) filtradas.push({ unit, vagas });
+  });
+
+  const dataGer = new Date().toLocaleDateString('pt-BR');
+  const filtroDesc = [
+    termFiltro  ? `Busca: "${termFiltro}"` : '',
+    cdaFiltro   ? cargoLabel(+cdaFiltro) : '',
+    apenasAtivos ? 'Apenas ativos' : '',
+  ].filter(Boolean).join(' · ') || 'Sem filtros';
+
+  const statusLabel = (obs, ativo) => obs || (ativo ? 'Ativo' : '—');
+  const statusColor = (obs, ativo) => {
+    if (ativo) return '#198754';
+    const o = (obs || '').toLowerCase();
+    if (o.includes('exoner'))    return '#6c757d';
+    if (o.includes('vacante'))   return '#fd7e14';
+    return '#6c757d';
+  };
+
+  const blocosHtml = filtradas.map(({unit, vagas}) => {
+    const cdas   = [...new Set(vagas.map(vg => vg.cda).filter(Boolean))].sort((a, b) => a - b);
+    const ativos = vagas.filter(vg => vg.ativo).length;
+    const cdaBadges = cdas.map(c => `<span class="badge-cda">${cargoLabel(c)}</span>`).join(' ');
+    const linhas = vagas.map(vg => `
+      <tr>
+        <td><b>${vg.numero}</b></td>
+        <td>${vg.cda ? cargoLabel(vg.cda) : '—'}</td>
+        <td>${vg.nome || '—'}</td>
+        <td style="color:${statusColor(vg.obs, vg.ativo)};font-weight:600">${statusLabel(vg.obs, vg.ativo)}</td>
+      </tr>`).join('');
+    return `
+      <div class="bloco">
+        <div class="bloco-header">
+          <span class="unit-name">${unit}</span>
+          <span class="badge-count">${vagas.length} vaga${vagas.length !== 1 ? 's' : ''}</span>
+          ${cdaBadges}
+          <span class="badge-ativos">${ativos} ativo${ativos !== 1 ? 's' : ''}</span>
+        </div>
+        <table>
+          <thead><tr><th style="width:70px">Vaga</th><th style="width:75px">CDA</th><th>Titular atual</th><th style="width:110px">Status</th></tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Unidades CDA SMDHC — ${dataGer}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 10pt; color: #212529; padding: 16px 20px; }
+    h1  { font-size: 14pt; color: #0d6efd; margin-bottom: 3px; }
+    .meta { font-size: 8.5pt; color: #6c757d; margin-bottom: 16px; border-bottom: 1px solid #dee2e6; padding-bottom: 8px; }
+    .bloco { margin-bottom: 12px; border: 1px solid #dee2e6; border-radius: 4px; overflow: hidden; page-break-inside: avoid; }
+    .bloco-header { background: #e9ecef; padding: 5px 10px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+    .unit-name { font-weight: 700; font-size: 9.5pt; flex: 1; }
+    .badge-count  { background:#6c757d; color:#fff; border-radius:3px; padding:1px 6px; font-size:8pt; }
+    .badge-cda    { background:#0d6efd; color:#fff; border-radius:3px; padding:1px 6px; font-size:8pt; }
+    .badge-ativos { background:#198754; color:#fff; border-radius:3px; padding:1px 6px; font-size:8pt; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8f9fa; font-size: 8pt; font-weight: 600; padding: 3px 8px; border-bottom: 1px solid #dee2e6; text-align: left; }
+    td { font-size: 9pt; padding: 3px 8px; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    @media print {
+      body { padding: 8mm 10mm; }
+      .bloco { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1><span style="color:#0d6efd">■</span> Unidades CDA — SMDHC</h1>
+  <p class="meta">Gerado em: <b>${dataGer}</b> &nbsp;·&nbsp; Filtros: ${filtroDesc} &nbsp;·&nbsp; ${filtradas.length} unidade${filtradas.length !== 1 ? 's' : ''}</p>
+  ${blocosHtml || '<p style="color:#6c757d;margin-top:20px">Nenhuma unidade encontrada com os filtros aplicados.</p>'}
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { alert('Permita popups nesta página para exportar o PDF.'); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
 </script>
 </body>
 </html>

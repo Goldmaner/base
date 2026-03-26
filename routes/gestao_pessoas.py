@@ -359,7 +359,7 @@ def nomeacoes():
     elif filter_obs in VALID_OBS_VALUES:
         where_parts.append('observacoes = %s')
         where_params.append(filter_obs)
-    if filter_cda and filter_cda.isdigit() and int(filter_cda) in range(1, 7):
+    if filter_cda and filter_cda.isdigit() and int(filter_cda) in range(1, 14):
         where_parts.append('cda = %s')
         where_params.append(int(filter_cda))
     where_clause = ('WHERE ' + ' AND '.join(where_parts)) if where_parts else ''
@@ -657,7 +657,7 @@ def calendario():
         if cur:
             cur.execute("""
                 SELECT numero_vaga, cda, nome_servidor, numero_rf,
-                       data_publicacao, data_encerramento, observacoes, nome_unidade
+                       data_publicacao, data_encerramento, observacoes, unidade
                 FROM gestao_pessoas.smdhc_servidores
                 WHERE numero_vaga IS NOT NULL
                 ORDER BY numero_vaga ASC, data_publicacao ASC NULLS LAST, id ASC
@@ -671,7 +671,7 @@ def calendario():
     for r in registros:
         v = r['numero_vaga']
         if v not in vagas_map:
-            vagas_map[v] = {'cda': r['cda'], 'unidade': r.get('nome_unidade') or '', 'periodos': []}
+            vagas_map[v] = {'cda': r['cda'], 'unidade': r.get('unidade') or '', 'periodos': []}
         if r['data_publicacao']:
             inicio = r['data_publicacao'].isoformat() if hasattr(r['data_publicacao'], 'isoformat') else str(r['data_publicacao'])
             fim = r['data_encerramento'].isoformat() if r['data_encerramento'] and hasattr(r['data_encerramento'], 'isoformat') else (str(r['data_encerramento']) if r['data_encerramento'] else None)
@@ -682,11 +682,11 @@ def calendario():
                 'fim': fim,
                 'obs': r['observacoes'] or '',
             })
-        # Update cda / unidade if not yet set
+        # cda: set once; unidade: always overwrite so latest (ASC order) wins
         if not vagas_map[v]['cda'] and r['cda']:
             vagas_map[v]['cda'] = r['cda']
-        if not vagas_map[v]['unidade'] and r.get('nome_unidade'):
-            vagas_map[v]['unidade'] = r['nome_unidade']
+        if r.get('unidade'):
+            vagas_map[v]['unidade'] = r['unidade']
 
     vagas_list = [
         {'numero': v, 'cda': vagas_map[v]['cda'], 'unidade': vagas_map[v]['unidade'], 'periodos': vagas_map[v]['periodos']}

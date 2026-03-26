@@ -1,10 +1,11 @@
 Foco: 
 
 1. Transferência de todas as notificações DGP (FEITO);
-2. Banco de dados de servidores;
-2. Mudança no layout da tela inicial e login;
+2. Banco de dados de servidores (FEITO);
+2. Terminar relatório do Eliabe;
 3. Criação da página de Manuais e seus status (cada operação, suboperações, andamento, meta, etc.), organização dos manuais existentes;
 4. Criação de relatórios operacionais da unidade;
+4. Demonstrativo - atualizar;
 5. Foco total em orçamento anual e análise de contas.
 
 # Plano de Continuação do Projeto FAF
@@ -45,6 +46,8 @@ Foco:
 
 ### 8. Celebração e DGP
 - Vincular projeto celebrado com Parcerias.html (Fácil)
+- Incluir novas colunas opcionais de data e CNPJ (Fácil)
+- Permitir visualização de qualquer parceria independente do responsável (Fácil)
 
 ### 10. Monitoramento & Avaliação
 - Implementar módulo de monitoramento e avaliação de parcerias e projetos (Difícil)
