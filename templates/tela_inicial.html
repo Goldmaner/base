@@ -4,355 +4,394 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Página Inicial - Módulo</title>
+  <title>FPDH – Ferramenta de Parcerias</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
   <style>
-    body { background-color: #f8f9fa; padding-top:50px; }
-    .main-container { max-width:900px; margin:0 auto; padding:30px; background:#fff; border-radius:10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    .btn-module { 
-      width:100%; 
-      padding:15px 20px; 
-      margin-bottom:10px; 
-      font-size:1rem; 
-      color:white; 
-      border:none; 
-      text-align:left; 
-      display:flex; 
-      align-items:center; 
-      transition: all 0.2s;
-      border-radius: 5px;
+    body { background: #f1f5f9; font-family: 'Segoe UI', sans-serif; margin: 0; }
+
+    /* ===== HEADER ===== */
+    .faf-header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 55%, #7c3aed 100%);
+      padding: 16px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
     }
-    .btn-module:hover {
-      transform: translateX(5px);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    .faf-brand h1 { color: #fff; font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px; margin: 0; }
+    .faf-brand p  { color: rgba(255,255,255,0.6); font-size: 0.7rem; margin: 2px 0 0; }
+    .faf-user-info { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .faf-user-pill {
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 30px; padding: 5px 14px; color: #fff; font-size: 0.78rem;
+      display: flex; align-items: center; gap: 6px;
     }
-    .btn-module i {
-      font-size: 1.3rem;
-      margin-right: 12px;
-      min-width: 24px;
+    .faf-header-btn {
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.28);
+      border-radius: 8px; color: rgba(255,255,255,0.9); padding: 5px 12px;
+      font-size: 0.78rem; cursor: pointer; text-decoration: none;
+      transition: all 0.2s; display: inline-flex; align-items: center; gap: 5px;
     }
-    .accordion-button:not(.collapsed) {
-      background-color: #f8f9fa;
-      color: #000;
+    .faf-header-btn:hover { background: rgba(255,255,255,0.22); color: #fff; }
+    .faf-header-btn.logout:hover { background: rgba(239,68,68,0.45); border-color: rgba(239,68,68,0.6); }
+
+    /* ===== CONTENT ===== */
+    .faf-content { max-width: 1500px; margin: 0 auto; padding: 36px 28px; }
+
+    /* Welcome card */
+    .faf-welcome {
+      background: #fff; border-radius: 14px; padding: 22px 28px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.07); margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-left: 5px solid #2563eb;
     }
-    .accordion-button {
-      font-size: 1.1rem;
-      font-weight: 600;
-      padding: 15px 20px;
+    .faf-welcome h2 { font-size: 1.3rem; font-weight: 900; color: #1e3a5f; margin: 0 0 3px; }
+    .faf-welcome p  { color: #64748b; margin: 0; font-size: 0.85rem; }
+    .faf-welcome-icon { font-size: 2.8rem; color: #e0e7ff; flex-shrink: 0; }
+
+    /* Accordion items */
+    .faf-acc-item {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.055); margin-bottom: 10px; overflow: hidden;
     }
-    .accordion-body {
-      padding: 20px;
-      background-color: #fafbfc;
+    .faf-acc-header {
+      padding: 22px 30px; font-size: 1.1rem; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; gap: 14px;
+      border: none; width: 100%; text-align: left; background: #fff; color: #1e293b;
+      transition: background 0.15s;
     }
-    .section-badge {
-      font-size: 0.75rem;
-      padding: 4px 8px;
-      border-radius: 10px;
-      margin-left: 8px;
+    .faf-acc-header:hover { background: #f8fafc; }
+    .faf-acc-header:not(.collapsed) { border-bottom: 1px solid #f1f5f9; }
+    .faf-acc-header .s-spacer { flex: 1; }
+    .faf-acc-header .s-count {
+      font-size: 0.67rem; padding: 2px 8px; border-radius: 10px;
+      color: #fff; font-weight: 700;
+    }
+    .faf-acc-header .s-chev { font-size: 0.75rem; transition: transform 0.2s; color: #94a3b8; }
+    .faf-acc-header:not(.collapsed) .s-chev { transform: rotate(-180deg); }
+
+    .faf-acc-body {
+      padding: 24px; background: #fafbfd;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+    }
+    .faf-btn {
+      display: flex; align-items: center; gap: 16px;
+      padding: 22px 28px; border-radius: 14px; color: #fff;
+      text-decoration: none; font-size: 1.05rem; font-weight: 600;
+      transition: all 0.2s; border: none; cursor: pointer; width: 100%;
+    }
+    .faf-btn:hover { transform: translateX(4px); filter: brightness(1.12); color: #fff; }
+    .faf-btn i { font-size: 1.45rem; flex-shrink: 0; }
+
+    /* ── Section colour tokens ─────────────────────────────── */
+    /* Geral – Blue */
+    .s-geral  .s-icon { color: #2563eb; }
+    .s-geral  .s-count { background: #2563eb; }
+    .s-geral  .faf-btn  { background: linear-gradient(135deg, #1e3a5f, #2563eb); }
+
+    /* Análise de Contas – Green */
+    .s-analise .s-icon  { color: #059669; }
+    .s-analise .s-count { background: #059669; }
+    .s-analise .faf-btn { background: linear-gradient(135deg, #065f46, #059669); }
+
+    /* Gestão de Parcerias – Purple */
+    .s-gp .s-icon  { color: #7c3aed; }
+    .s-gp .s-count { background: #7c3aed; }
+    .s-gp .faf-btn { background: linear-gradient(135deg, #4c1d95, #7c3aed); }
+
+    /* Departamento de Parcerias – Teal */
+    .s-dp .s-icon  { color: #0891b2; }
+    .s-dp .s-count { background: #0891b2; }
+    .s-dp .faf-btn { background: linear-gradient(135deg, #164e63, #0891b2); }
+
+    /* Gestão de Dados – Amber */
+    .s-dados .s-icon  { color: #d97706; }
+    .s-dados .s-count { background: #d97706; }
+    .s-dados .faf-btn { background: linear-gradient(135deg, #78350f, #d97706); }
+
+    /* Gestão de Pessoas – Indigo */
+    .s-pessoas .s-icon  { color: #4f46e5; }
+    .s-pessoas .s-count { background: #4f46e5; }
+    .s-pessoas .faf-btn { background: linear-gradient(135deg, #312e81, #4f46e5); }
+
+    /* Administrador – Red */
+    .s-admin .s-icon  { color: #dc2626; }
+    .s-admin .s-count { background: #dc2626; }
+    .s-admin .faf-btn { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
+
+    @media (max-width: 640px) {
+      .faf-acc-body { grid-template-columns: 1fr; }
+      .faf-welcome  { flex-direction: column; gap: 10px; }
+      .faf-welcome-icon { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="container main-container">
-    <div class="d-flex justify-content-between align-items-center">
-      <h2>
-        {% if user['tipo_usuario'] == 'Agente DGP' %}
-          Módulo de Divisão de Gestão de Parcerias
-        {% else %}
-          Módulo de Análise de Contas
-        {% endif %}
-      </h2>
-      <div>
-        <small>Logado como: <strong>{{ user['email'] }}</strong></small><br>
-        <small>Tipo: <span class="badge bg-info">{{ user['tipo_usuario'] }}</span></small>
-        {% if user['tipo_usuario'] == 'Agente Público' %}
-        <button type="button" class="btn btn-sm btn-success ms-2" onclick="verUsuariosAtivos()" title="Ver usuários online">
-          <i class="bi bi-people-fill"></i> <span id="badge-usuarios-ativos" class="badge bg-light text-dark">0</span> online
-        </button>
-        <a href="{{ url_for('main.tela_inicial_ideias') }}" class="btn btn-sm btn-outline-warning ms-2" title="Laboratório de design">
-          <i class="bi bi-palette"></i> Design
-        </a>
-        {% endif %}
-        <br>
-        <button type="button" class="btn btn-sm btn-outline-primary mt-2 me-2" data-bs-toggle="modal" data-bs-target="#modalAlterarSenha">
-          <i class="bi bi-key"></i> Alterar Senha
-        </button>
-        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-secondary mt-2">Sair</a>
-      </div>
+
+  <!-- ===== HEADER ===== -->
+  <div class="faf-header">
+    <div class="faf-brand">
+      <h1><i class="bi bi-shield-fill-check me-2"></i>FPDH – Ferramenta de Parcerias de Direitos Humanos</h1>
+      <p>Secretaria Municipal de Direitos Humanos e Cidadania de São Paulo</p>
     </div>
-
-    <div class="mt-4">
-      {% set user_acessos = user.get('acessos', '') %}
-      {% set is_admin = user['tipo_usuario'] == 'Agente Público' %}
-      
-      <!-- Accordion Principal -->
-      <div class="accordion" id="accordionModulos">
-        
-        <!-- Seção: Geral -->
-        <div class="accordion-item">
-          <h2 class="accordion-header">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGeral">
-              <i class="bi bi-house-door me-2"></i> Geral
-              <span class="badge bg-primary section-badge">4</span>
-            </button>
-          </h2>
-          <div id="collapseGeral" class="accordion-collapse collapse show" data-bs-parent="#accordionModulos">
-            <div class="accordion-body">
-              <div class="row g-2">
-                {% if is_admin or 'parcerias' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('parcerias.listar') }}" class="btn btn-module" style="background-color:#0d6efd;">
-                    <i class="bi bi-people-fill"></i> Parcerias
-                  </a>
-                </div>
-                {% endif %}
-                
-                {% if is_admin or 'orcamento' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('orcamento.listar') }}" class="btn btn-module" style="background-color:#0d6efd;">
-                    <i class="bi bi-currency-dollar"></i> Orçamento Anual
-                  </a>
-                </div>
-                {% endif %}
-                
-                {% if is_admin or 'certidoes' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('certidoes.index') }}" class="btn btn-module" style="background-color:#9C27B0;">
-                    <i class="bi bi-file-earmark-check"></i> Central de Certidões
-                  </a>
-                </div>
-                {% endif %}
-                
-                {% if is_admin or 'parcerias_notificacoes' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('parcerias_notificacoes.listar') }}" class="btn btn-module" style="background-color:#fd7e14;">
-                    <i class="bi bi-envelope-fill"></i> Ofícios, Documentos e Notificações
-                  </a>
-                </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Seção: Análise de Contas -->
-        <div class="accordion-item">
-          <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAnalises">
-              <i class="bi bi-clipboard-check me-2"></i> Análise de Contas
-              <span class="badge bg-success section-badge">4</span>
-            </button>
-          </h2>
-          <div id="collapseAnalises" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
-            <div class="accordion-body">
-              <div class="row g-2">
-                {% if is_admin or 'analises' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('analises_pc.meus_processos') }}" class="btn btn-module" style="background-color:#198754;">
-                    <i class="bi bi-plus-circle-fill"></i> Iniciar ou prosseguir análise
-                  </a>
-                </div>
-                <div class="col-md-6">
-                  <a href="{{ url_for('analises.listar') }}" class="btn btn-module" style="background-color:#198754;">
-                    <i class="bi bi-arrow-clockwise"></i> Menu de Prestações de Contas
-                  </a>
-                </div>
-                {% endif %}
-                
-                {% if (is_admin or 'pesquisa_parcerias' in user_acessos) and user['tipo_usuario'] in ['Agente DAC', 'Agente Público'] %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('pesquisa_parcerias.index') }}" class="btn btn-module" style="background-color:#20c997;">
-                    <i class="bi bi-search"></i> Pesquisa de Parcerias
-                  </a>
-                </div>
-                {% endif %}
-                
-                {% if is_admin or 'gestao_financeira' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('gestao_financeira.index') }}" class="btn btn-module" style="background-color:#28a745;">
-                    <i class="bi bi-cash-coin"></i> Gestão Financeira
-                  </a>
-                </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Seção: Gestão de Parcerias -->
-        {% if is_admin or 'cents' in user_acessos or 'celebracao_parcerias' in user_acessos or 'parcerias' in user_acessos or 'dgp_alteracoes' in user_acessos %}
-        <div class="accordion-item">
-          <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGP">
-              <i class="bi bi-building me-2"></i> Gestão de Parcerias
-              <span class="badge bg-purple section-badge" style="background-color:#764ba2;">3</span>
-            </button>
-          </h2>
-          <div id="collapseGP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
-            <div class="accordion-body">
-              <div class="row g-2">
-                {% if is_admin or 'cents' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('cents.index') }}" class="btn btn-module" style="background-color:#764ba2;">
-                    <i class="bi bi-file-earmark-medical"></i> CENTS
-                  </a>
-                </div>
-                {% endif %}
-                {% if is_admin or 'celebracao_parcerias' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('celebracao_parcerias.index') }}" class="btn btn-module" style="background-color:#764ba2;">
-                    <i class="bi bi-people-fill"></i> Celebração de Parcerias
-                  </a>
-                </div>
-                {% endif %}
-                {% if is_admin or 'dgp_alteracoes' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="btn btn-module" style="background-color:#764ba2;">
-                    <i class="bi bi-arrow-repeat"></i> Aditamentos e alterações de parcerias
-                  </a>
-                </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-        
-        <!-- Seção: Departamento de Parcerias -->
-        {% if is_admin or 'editais' in user_acessos or 'gestao_orcamentaria' in user_acessos %}
-        <div class="accordion-item">
-          <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDP">
-              <i class="bi bi-megaphone me-2"></i> Departamento de Parcerias
-              <span class="badge bg-info section-badge">2</span>
-            </button>
-          </h2>
-          <div id="collapseDP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
-            <div class="accordion-body">
-              <div class="row g-2">
-                {% if is_admin or 'editais' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('editais.listar') }}" class="btn btn-module" style="background-color:#0dcaf0; color:#000;">
-                    <i class="bi bi-megaphone"></i> Edital
-                  </a>
-                </div>
-                {% endif %}
-                {% if is_admin or 'gestao_orcamentaria' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('gestao_orcamentaria.index') }}" class="btn btn-module" style="background-color:#764ba2; color:#fff;">
-                    <i class="bi bi-calculator"></i> Gestão Orçamentária
-                  </a>
-                </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-        
-        <!-- Seção: Gestão de Dados -->
-        {% if is_admin or 'listas' in user_acessos or 'modelos_textos' in user_acessos %}
-        <div class="accordion-item">
-          <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDados">
-              <i class="bi bi-database me-2"></i> Gestão de Dados
-              <span class="badge bg-warning text-dark section-badge">2</span>
-            </button>
-          </h2>
-          <div id="collapseDados" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
-            <div class="accordion-body">
-              <div class="row g-2">
-                {% if is_admin or 'listas' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('listas.index') }}" class="btn btn-module" style="background-color:#ffc107; color:#000;">
-                    <i class="bi bi-list-ul"></i> Listas Suspensas
-                  </a>
-                </div>
-                {% endif %}
-                
-                {% if is_admin or 'modelos_textos' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('main.modelos_textos_index') }}" class="btn btn-module" style="background-color:#ffc107; color:#000;">
-                    <i class="bi bi-file-text"></i> Modelos de Texto
-                  </a>
-                </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-        
-        <!-- Seção: Gestão de Pessoas e Usuários -->
-        {% if is_admin or 'usuarios' in user_acessos or 'ferias' in user_acessos or 'gestao_pessoas' in user_acessos %}
-        <div class="accordion-item">
-          <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePessoas">
-              <i class="bi bi-person-badge me-2"></i> Gestão de Pessoas e Usuários
-              <span class="badge bg-secondary section-badge">3</span>
-            </button>
-          </h2>
-          <div id="collapsePessoas" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
-            <div class="accordion-body">
-              <div class="row g-2">
-                {% if is_admin or 'usuarios' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="#" class="btn btn-module" style="background-color:#6f42c1;" data-bs-toggle="modal" data-bs-target="#modalUsuarios">
-                    <i class="bi bi-people"></i> Gerenciar Usuários
-                  </a>
-                </div>
-                {% endif %}
-                
-                {% if is_admin or 'ferias' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('ferias.listar') }}" class="btn btn-module" style="background-color:#6f42c1;">
-                    <i class="bi bi-calendar-check"></i> Férias
-                  </a>
-                </div>
-                {% endif %}
-
-                {% if is_admin or 'gestao_pessoas' in user_acessos %}
-                <div class="col-md-6">
-                  <a href="{{ url_for('gestao_pessoas.nomeacoes') }}" class="btn btn-module" style="background-color:#6f42c1;">
-                    <i class="bi bi-person-badge"></i> Nomeações CDA
-                  </a>
-                </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-        
-        <!-- Seção: Opções de Administrador -->
-        {% if is_admin or 'portarias' in user_acessos %}
-        <div class="accordion-item">
-          <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdmin">
-              <i class="bi bi-gear me-2"></i> Opções de Administrador
-              <span class="badge bg-danger section-badge">1</span>
-            </button>
-          </h2>
-          <div id="collapseAdmin" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
-            <div class="accordion-body">
-              <div class="row g-2">
-                {% if is_admin or 'portarias' in user_acessos %}
-                <div class="col-12">
-                  <a href="{{ url_for('main.gerenciar_portarias') }}" class="btn btn-module" style="background-color:#dc3545;">
-                    <i class="bi bi-file-earmark-text"></i> Gerenciar Portarias/Legislações
-                  </a>
-                </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-        
+    <div class="faf-user-info">
+      <div class="faf-user-pill">
+        <i class="bi bi-person-circle"></i>
+        <span>{{ user['email'] }}</span>
+        <span class="badge bg-light text-dark" style="font-size:0.62rem;">{{ user['tipo_usuario'] }}</span>
       </div>
+      {% if user['tipo_usuario'] == 'Agente Público' %}
+      <button type="button" class="faf-header-btn" onclick="verUsuariosAtivos()" title="Usuários online">
+        <i class="bi bi-people-fill"></i> <span id="badge-usuarios-ativos">0</span> online
+      </button>
+      <a href="{{ url_for('main.tela_inicial_ideias') }}" class="faf-header-btn" title="Laboratório de design">
+        <i class="bi bi-palette"></i> Design
+      </a>
+      {% endif %}
+      <button type="button" class="faf-header-btn" data-bs-toggle="modal" data-bs-target="#modalAlterarSenha">
+        <i class="bi bi-key"></i> Alterar Senha
+      </button>
+      <a href="{{ url_for('auth.logout') }}" class="faf-header-btn logout">
+        <i class="bi bi-box-arrow-right"></i> Sair
+      </a>
     </div>
   </div>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="faf-content">
+
+    {% set user_acessos = user.get('acessos', '') %}
+    {% set is_admin = user['tipo_usuario'] == 'Agente Público' %}
+
+    <!-- Welcome card -->
+    <div class="faf-welcome">
+      <div>
+        <h2>
+          {% if user['tipo_usuario'] == 'Agente DGP' %}
+            Módulo de Divisão de Gestão de Parcerias
+          {% else %}
+            Módulo de Análise de Contas
+          {% endif %}
+        </h2>
+        <p>Selecione um módulo abaixo para acessar o sistema.</p>
+      </div>
+      <div class="faf-welcome-icon">
+        <i class="bi bi-shield-check"></i>
+      </div>
+    </div>
+
+    <!-- ===== ACCORDION ===== -->
+    <div class="accordion" id="accordionModulos">
+
+      <!-- ── GERAL (Azul) ── -->
+      <div class="faf-acc-item s-geral">
+        <button class="faf-acc-header" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGeral">
+          <i class="bi bi-house-door-fill s-icon" style="font-size:1.05rem;"></i>
+          <span>Geral</span>
+          <span class="s-spacer"></span>
+          <span class="s-count">4</span>
+          <i class="bi bi-chevron-down s-chev"></i>
+        </button>
+        <div id="collapseGeral" class="accordion-collapse collapse show" data-bs-parent="#accordionModulos">
+          <div class="faf-acc-body s-geral">
+            {% if is_admin or 'parcerias' in user_acessos %}
+            <a href="{{ url_for('parcerias.listar') }}" class="faf-btn">
+              <i class="bi bi-people-fill"></i> Parcerias
+            </a>
+            {% endif %}
+            {% if is_admin or 'orcamento' in user_acessos %}
+            <a href="{{ url_for('orcamento.listar') }}" class="faf-btn">
+              <i class="bi bi-currency-dollar"></i> Orçamento Anual
+            </a>
+            {% endif %}
+            {% if is_admin or 'certidoes' in user_acessos %}
+            <a href="{{ url_for('certidoes.index') }}" class="faf-btn">
+              <i class="bi bi-file-earmark-check"></i> Central de Certidões
+            </a>
+            {% endif %}
+            {% if is_admin or 'parcerias_notificacoes' in user_acessos %}
+            <a href="{{ url_for('parcerias_notificacoes.listar') }}" class="faf-btn">
+              <i class="bi bi-envelope-fill"></i> Ofícios, Documentos e Notificações
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ANÁLISE DE CONTAS (Verde) ── -->
+      <div class="faf-acc-item s-analise">
+        <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAnalises">
+          <i class="bi bi-clipboard-check-fill s-icon" style="font-size:1.05rem;"></i>
+          <span>Análise de Contas</span>
+          <span class="s-spacer"></span>
+          <span class="s-count">4</span>
+          <i class="bi bi-chevron-down s-chev"></i>
+        </button>
+        <div id="collapseAnalises" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
+          <div class="faf-acc-body s-analise">
+            {% if is_admin or 'analises' in user_acessos %}
+            <a href="{{ url_for('analises_pc.meus_processos') }}" class="faf-btn">
+              <i class="bi bi-plus-circle-fill"></i> Iniciar ou prosseguir análise
+            </a>
+            <a href="{{ url_for('analises.listar') }}" class="faf-btn">
+              <i class="bi bi-arrow-clockwise"></i> Menu de Prestações de Contas
+            </a>
+            {% endif %}
+            {% if (is_admin or 'pesquisa_parcerias' in user_acessos) and user['tipo_usuario'] in ['Agente DAC', 'Agente Público'] %}
+            <a href="{{ url_for('pesquisa_parcerias.index') }}" class="faf-btn">
+              <i class="bi bi-search"></i> Pesquisa de Parcerias
+            </a>
+            {% endif %}
+            {% if is_admin or 'gestao_financeira' in user_acessos %}
+            <a href="{{ url_for('gestao_financeira.index') }}" class="faf-btn">
+              <i class="bi bi-cash-coin"></i> Gestão Financeira
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- ── GESTÃO DE PARCERIAS (Roxo) ── -->
+      {% if is_admin or 'cents' in user_acessos or 'celebracao_parcerias' in user_acessos or 'parcerias' in user_acessos or 'dgp_alteracoes' in user_acessos %}
+      <div class="faf-acc-item s-gp">
+        <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGP">
+          <i class="bi bi-building-fill s-icon" style="font-size:1.05rem;"></i>
+          <span>Gestão de Parcerias</span>
+          <span class="s-spacer"></span>
+          <span class="s-count">3</span>
+          <i class="bi bi-chevron-down s-chev"></i>
+        </button>
+        <div id="collapseGP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
+          <div class="faf-acc-body s-gp">
+            {% if is_admin or 'cents' in user_acessos %}
+            <a href="{{ url_for('cents.index') }}" class="faf-btn">
+              <i class="bi bi-file-earmark-medical"></i> CENTS
+            </a>
+            {% endif %}
+            {% if is_admin or 'celebracao_parcerias' in user_acessos %}
+            <a href="{{ url_for('celebracao_parcerias.index') }}" class="faf-btn">
+              <i class="bi bi-people-fill"></i> Celebração de Parcerias
+            </a>
+            {% endif %}
+            {% if is_admin or 'dgp_alteracoes' in user_acessos %}
+            <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="faf-btn">
+              <i class="bi bi-arrow-repeat"></i> Aditamentos e alterações de parcerias
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ── DEPARTAMENTO DE PARCERIAS (Teal) ── -->
+      {% if is_admin or 'editais' in user_acessos or 'gestao_orcamentaria' in user_acessos %}
+      <div class="faf-acc-item s-dp">
+        <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDP">
+          <i class="bi bi-megaphone-fill s-icon" style="font-size:1.05rem;"></i>
+          <span>Departamento de Parcerias</span>
+          <span class="s-spacer"></span>
+          <span class="s-count">2</span>
+          <i class="bi bi-chevron-down s-chev"></i>
+        </button>
+        <div id="collapseDP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
+          <div class="faf-acc-body s-dp">
+            {% if is_admin or 'editais' in user_acessos %}
+            <a href="{{ url_for('editais.listar') }}" class="faf-btn">
+              <i class="bi bi-megaphone"></i> Edital
+            </a>
+            {% endif %}
+            {% if is_admin or 'gestao_orcamentaria' in user_acessos %}
+            <a href="{{ url_for('gestao_orcamentaria.index') }}" class="faf-btn">
+              <i class="bi bi-calculator"></i> Gestão Orçamentária
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ── GESTÃO DE DADOS (Âmbar) ── -->
+      {% if is_admin or 'listas' in user_acessos or 'modelos_textos' in user_acessos %}
+      <div class="faf-acc-item s-dados">
+        <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDados">
+          <i class="bi bi-database-fill s-icon" style="font-size:1.05rem;"></i>
+          <span>Gestão de Dados</span>
+          <span class="s-spacer"></span>
+          <span class="s-count">2</span>
+          <i class="bi bi-chevron-down s-chev"></i>
+        </button>
+        <div id="collapseDados" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
+          <div class="faf-acc-body s-dados">
+            {% if is_admin or 'listas' in user_acessos %}
+            <a href="{{ url_for('listas.index') }}" class="faf-btn">
+              <i class="bi bi-list-ul"></i> Listas Suspensas
+            </a>
+            {% endif %}
+            {% if is_admin or 'modelos_textos' in user_acessos %}
+            <a href="{{ url_for('main.modelos_textos_index') }}" class="faf-btn">
+              <i class="bi bi-file-text"></i> Modelos de Texto
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ── GESTÃO DE PESSOAS E USUÁRIOS (Índigo) ── -->
+      {% if is_admin or 'usuarios' in user_acessos or 'ferias' in user_acessos or 'gestao_pessoas' in user_acessos %}
+      <div class="faf-acc-item s-pessoas">
+        <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePessoas">
+          <i class="bi bi-person-badge-fill s-icon" style="font-size:1.05rem;"></i>
+          <span>Gestão de Pessoas e Usuários</span>
+          <span class="s-spacer"></span>
+          <span class="s-count">3</span>
+          <i class="bi bi-chevron-down s-chev"></i>
+        </button>
+        <div id="collapsePessoas" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
+          <div class="faf-acc-body s-pessoas">
+            {% if is_admin or 'usuarios' in user_acessos %}
+            <a href="#" class="faf-btn" data-bs-toggle="modal" data-bs-target="#modalUsuarios">
+              <i class="bi bi-people"></i> Gerenciar Usuários
+            </a>
+            {% endif %}
+            {% if is_admin or 'ferias' in user_acessos %}
+            <a href="{{ url_for('ferias.listar') }}" class="faf-btn">
+              <i class="bi bi-calendar-check"></i> Férias
+            </a>
+            {% endif %}
+            {% if is_admin or 'gestao_pessoas' in user_acessos %}
+            <a href="{{ url_for('gestao_pessoas.nomeacoes') }}" class="faf-btn">
+              <i class="bi bi-person-badge"></i> Nomeações CDA
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ── OPÇÕES DE ADMINISTRADOR (Vermelho) ── -->
+      {% if is_admin or 'portarias' in user_acessos %}
+      <div class="faf-acc-item s-admin">
+        <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdmin">
+          <i class="bi bi-gear-fill s-icon" style="font-size:1.05rem;"></i>
+          <span>Opções de Administrador</span>
+          <span class="s-spacer"></span>
+          <span class="s-count">1</span>
+          <i class="bi bi-chevron-down s-chev"></i>
+        </button>
+        <div id="collapseAdmin" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
+          <div class="faf-acc-body s-admin" style="grid-template-columns: 1fr;">
+            {% if is_admin or 'portarias' in user_acessos %}
+            <a href="{{ url_for('main.gerenciar_portarias') }}" class="faf-btn">
+              <i class="bi bi-file-earmark-text"></i> Gerenciar Portarias/Legislações
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+    </div><!-- /accordion -->
+  </div><!-- /faf-content -->
 
   <!-- Modal de Gerenciamento de Usuários -->
   <div class="modal fade" id="modalUsuarios" tabindex="-1" aria-labelledby="modalUsuariosLabel" aria-hidden="true">

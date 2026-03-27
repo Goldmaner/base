@@ -1,110 +1,212 @@
-<!-- templates/login.html -->
+﻿<!-- templates/login.html -->
 <!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Login - Módulo de Análise</title>
+  <title>Login &#8211; FPDH</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
   <style>
-    body { background: #f8f9fa; }
-    .login-container { max-width: 400px; margin: 100px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    .btn-login { background-color: #0d6efd; width:100%; }
-    .link-resetar { cursor: pointer; color: #0d6efd; text-decoration: underline; font-size: 0.9rem; }
-    .link-resetar:hover { color: #0a58ca; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 52%, #7c3aed 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px;
+    }
+
+    /* Layout outer */
+    .login-outer {
+      display: flex; gap: 64px; align-items: center;
+      max-width: 1160px; width: 100%;
+    }
+
+    /* Info side */
+    .login-info { flex: 1; color: #fff; }
+    .login-info .brand-icon {
+      width: 66px; height: 66px;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 16px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.9rem; font-weight: 900; color: #fff; margin-bottom: 22px;
+    }
+    .login-info h1 {
+      font-size: 2.4rem; font-weight: 900; margin: 0 0 10px; line-height: 1.15;
+    }
+    .login-info .subtitle {
+      opacity: 0.75; font-size: 1rem; line-height: 1.7; margin-bottom: 30px;
+    }
+    .login-info ul { list-style: none; padding: 0; margin: 0 0 30px; }
+    .login-info li {
+      display: flex; align-items: center; gap: 12px;
+      opacity: 0.9; font-size: 1rem; margin-bottom: 14px;
+    }
+    .login-info li i { color: #a5b4fc; font-size: 1.15rem; flex-shrink: 0; }
+    .login-tag-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .login-tag {
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.85); font-size: 0.85rem; padding: 5px 14px;
+      border-radius: 20px;
+    }
+
+    /* Card side */
+    .login-card {
+      width: 430px; flex-shrink: 0;
+      background: #fff; border-radius: 20px; padding: 46px 42px;
+      box-shadow: 0 28px 72px rgba(0,0,0,0.32);
+    }
+    .login-card .card-logo {
+      width: 54px; height: 54px;
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; font-weight: 900; color: #fff; margin-bottom: 20px;
+    }
+    .login-card h2 { font-size: 1.6rem; font-weight: 800; color: #1e3a5f; margin: 0 0 4px; }
+    .login-card .card-sub { color: #94a3b8; font-size: 0.95rem; margin-bottom: 28px; }
+    .login-card .form-label { font-size: 0.95rem; font-weight: 600; color: #374151; }
+    .login-card .form-control {
+      border-radius: 9px; font-size: 1rem; border-color: #e5e7eb; padding: 10px 14px;
+    }
+    .login-card .form-control:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+    .btn-login {
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      border: none; border-radius: 10px; color: #fff;
+      width: 100%; padding: 14px; font-weight: 700; font-size: 1rem;
+      cursor: pointer; transition: filter 0.2s;
+    }
+    .btn-login:hover { filter: brightness(1.1); color: #fff; }
+    .link-resetar {
+      cursor: pointer; color: #2563eb; font-size: 0.9rem;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+    }
+    .link-resetar:hover { color: #1e3a5f; text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      .login-info { display: none; }
+      .login-card  { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="login-container">
-      <h2 class="text-center text-primary">Módulo de Análise de Contas</h2>
-      <p class="text-muted text-center">Faça login para continuar</p>
+
+  <div class="login-outer">
+
+    <!-- Info side -->
+    <div class="login-info">
+      <div class="brand-icon"><i class="bi bi-shield-fill-check"></i></div>
+      <h1>FPDH</h1>
+      <p class="subtitle">
+        Ferramenta de Parcerias de Direitos Humanos<br>
+        Secretaria Municipal de Direitos Humanos e Cidadania de S&#227;o Paulo
+      </p>
+      <ul>
+        <li><i class="bi bi-check-circle-fill"></i> Gest&#227;o completa de parcerias com OSCs</li>
+        <li><i class="bi bi-check-circle-fill"></i> Central de certid&#245;es e documentos autom&#225;ticos</li>
+        <li><i class="bi bi-check-circle-fill"></i> Gest&#227;o financeira e an&#225;lise de contas</li>
+        <li><i class="bi bi-check-circle-fill"></i> Editais e gest&#227;o or&#231;ament&#225;ria integrados</li>
+        <li><i class="bi bi-check-circle-fill"></i> Controle de acesso granular por usu&#225;rio</li>
+      </ul>
+      <div class="login-tag-row">
+        <span class="login-tag"><i class="bi bi-people-fill"></i> Parcerias</span>
+        <span class="login-tag"><i class="bi bi-cash-coin"></i> Financeiro</span>
+        <span class="login-tag"><i class="bi bi-clipboard-check"></i> An&#225;lise de Contas</span>
+        <span class="login-tag"><i class="bi bi-file-earmark-check"></i> Certid&#245;es</span>
+        <span class="login-tag"><i class="bi bi-megaphone"></i> Editais</span>
+      </div>
+    </div>
+
+    <!-- Login card -->
+    <div class="login-card">
+      <div class="card-logo">F</div>
+      <h2>Acessar o Sistema</h2>
+      <p class="card-sub">Digite suas credenciais para continuar</p>
+
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for cat, msg in messages %}
-            <div class="alert alert-{{cat}}">{{ msg }}</div>
+            <div class="alert alert-{{ cat }} py-2 mb-3" style="font-size:0.88rem;">{{ msg }}</div>
           {% endfor %}
         {% endif %}
       {% endwith %}
+
       <form method="post" action="{{ url_for('auth.login') }}">
         <div class="mb-3">
-          <label for="username" class="form-label">Usuário (e-mail)</label>
-          <input type="email" class="form-control" id="username" name="username" required>
+          <label for="username" class="form-label">Usu&#225;rio (e-mail)</label>
+          <input type="email" class="form-control" id="username" name="username"
+                 placeholder="seu.email@smdhc.sp.gov.br" required autocomplete="username">
         </div>
         <div class="mb-3">
           <label for="password" class="form-label">Senha</label>
-          <input type="password" class="form-control" id="password" name="password" required>
+          <div class="input-group">
+            <input type="password" class="form-control" id="password" name="password"
+                   placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" required autocomplete="current-password"
+                   style="border-right: none;">
+            <button class="btn btn-outline-secondary" type="button"
+                    onclick="toggleLoginSenha()"
+                    style="border-left:none; border-color:#e5e7eb; border-radius:0 9px 9px 0;">
+              <i class="bi bi-eye" id="icon-login-senha"></i>
+            </button>
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary btn-login">Entrar</button>
+        <button type="submit" class="btn-login mb-3">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Entrar
+        </button>
       </form>
-      
-      <div class="text-center mt-3">
+
+      <div class="text-center">
         <span class="link-resetar" onclick="abrirModalResetar()">
           <i class="bi bi-key"></i> Esqueci minha senha / Resetar senha
         </span>
       </div>
     </div>
+
   </div>
 
   <!-- Modal: Resetar Senha -->
   <div class="modal fade" id="modalResetarSenha" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title">
-            <i class="bi bi-key-fill me-2"></i>Resetar Senha
-          </h5>
+        <div class="modal-header" style="background:linear-gradient(135deg,#1e3a5f,#2563eb); color:#fff;">
+          <h5 class="modal-title"><i class="bi bi-key-fill me-2"></i>Resetar Senha</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <!-- PASSO 1: Solicitar código -->
+          <!-- PASSO 1: Solicitar codigo -->
           <div id="passo1-solicitar" style="display: block;">
             <div class="alert alert-info">
               <small>
-                <strong>📧 Passo 1:</strong><br>
-                Digite seu e-mail para receber um código de reset (válido por 30 minutos)
+                <strong>&#128231; Passo 1:</strong><br>
+                Digite seu e-mail para receber um c&#243;digo de reset (v&#225;lido por 30 minutos)
               </small>
             </div>
-            
             <div class="mb-3">
               <label class="form-label fw-bold">E-mail:</label>
               <input type="email" class="form-control" id="reset-email-solicitar" required>
             </div>
-            
             <button type="button" class="btn btn-primary w-100" onclick="solicitarCodigoReset()">
-              <i class="bi bi-envelope me-2"></i>Enviar Código por E-mail
+              <i class="bi bi-envelope me-2"></i>Enviar C&#243;digo por E-mail
             </button>
-            
             <div class="text-center mt-3">
-              <small class="text-muted">Já tem um código? <a href="#" onclick="mostrarPasso2(); return false;">Clique aqui</a></small>
+              <small class="text-muted">J&#225; tem um c&#243;digo? <a href="#" onclick="mostrarPasso2(); return false;">Clique aqui</a></small>
             </div>
           </div>
-          
-          <!-- PASSO 2: Inserir código e nova senha -->
+          <!-- PASSO 2: Inserir codigo e nova senha -->
           <div id="passo2-resetar" style="display: none;">
             <div class="alert alert-success">
-              <small>
-                <strong>✅ Passo 2:</strong><br>
-                Digite o código recebido por e-mail e sua nova senha
-              </small>
+              <small><strong>&#9989; Passo 2:</strong><br>Digite o c&#243;digo recebido por e-mail e sua nova senha</small>
             </div>
-            
             <form id="formResetarSenha">
               <div class="mb-3">
                 <label class="form-label fw-bold">E-mail:</label>
                 <input type="email" class="form-control" id="reset-email" required>
               </div>
-              
               <div class="mb-3">
-                <label class="form-label fw-bold">Código de 6 dígitos:</label>
-                <input type="text" class="form-control form-control-lg text-center" id="reset-token" 
-                       required maxlength="6" pattern="[0-9]{6}"
-                       placeholder="000000"
+                <label class="form-label fw-bold">C&#243;digo de 6 d&#237;gitos:</label>
+                <input type="text" class="form-control form-control-lg text-center" id="reset-token"
+                       required maxlength="6" pattern="[0-9]{6}" placeholder="000000"
                        style="letter-spacing: 8px; font-size: 24px; font-weight: bold;">
-                <small class="text-muted">Código enviado para seu e-mail</small>
+                <small class="text-muted">C&#243;digo enviado para seu e-mail</small>
               </div>
-              
               <div class="mb-3">
                 <label class="form-label fw-bold">Nova Senha:</label>
                 <div class="input-group">
@@ -113,9 +215,8 @@
                     <i class="bi bi-eye" id="icon-reset-nova-senha"></i>
                   </button>
                 </div>
-                <small class="text-muted">Mínimo 4 caracteres</small>
+                <small class="text-muted">M&#237;nimo 4 caracteres</small>
               </div>
-              
               <div class="mb-3">
                 <label class="form-label fw-bold">Confirmar Nova Senha:</label>
                 <div class="input-group">
@@ -126,15 +227,13 @@
                 </div>
               </div>
             </form>
-            
             <button type="button" class="btn btn-primary w-100" onclick="resetarSenhaComToken()">
               <i class="bi bi-check-circle me-2"></i>Alterar Senha
             </button>
-            
             <div class="text-center mt-3">
               <small class="text-muted">
                 <a href="#" onclick="voltarPasso1(); return false;">
-                  <i class="bi bi-arrow-left me-1"></i>Voltar / Solicitar novo código
+                  <i class="bi bi-arrow-left me-1"></i>Voltar / Solicitar novo c&#243;digo
                 </a>
               </small>
             </div>
@@ -145,184 +244,75 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  
   <script>
-    function abrirModalResetar() {
-      voltarPasso1(); // Resetar para passo 1
-      const modal = new bootstrap.Modal(document.getElementById('modalResetarSenha'));
-      modal.show();
+    function toggleLoginSenha() {
+      const inp = document.getElementById('password');
+      const ic  = document.getElementById('icon-login-senha');
+      if (inp.type === 'password') { inp.type = 'text'; ic.className = 'bi bi-eye-slash'; }
+      else                         { inp.type = 'password'; ic.className = 'bi bi-eye'; }
     }
-    
+
+    function abrirModalResetar() {
+      voltarPasso1();
+      new bootstrap.Modal(document.getElementById('modalResetarSenha')).show();
+    }
     function mostrarPasso2() {
       document.getElementById('passo1-solicitar').style.display = 'none';
       document.getElementById('passo2-resetar').style.display = 'block';
     }
-    
     function voltarPasso1() {
       document.getElementById('passo1-solicitar').style.display = 'block';
       document.getElementById('passo2-resetar').style.display = 'none';
       document.getElementById('reset-email-solicitar').value = '';
       document.getElementById('formResetarSenha').reset();
     }
-    
     function toggleSenha(inputId) {
       const input = document.getElementById(inputId);
-      const icon = document.getElementById('icon-' + inputId);
-      
-      if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
-      } else {
-        input.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
-      }
+      const icon  = document.getElementById('icon-' + inputId);
+      if (input.type === 'password') { input.type = 'text';     icon.classList.replace('bi-eye','bi-eye-slash'); }
+      else                           { input.type = 'password'; icon.classList.replace('bi-eye-slash','bi-eye'); }
     }
-    
     async function solicitarCodigoReset() {
       const email = document.getElementById('reset-email-solicitar').value.trim();
-      
-      if (!email) {
-        alert('❌ Digite seu e-mail');
-        return;
-      }
-      
+      if (!email) { alert(' Digite seu e-mail'); return; }
       try {
-        const btn = event.target;
-        btn.disabled = true;
+        const btn = event.target; btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
-        
-        const response = await fetch('/api/solicitar-reset-senha', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const resp = await fetch('/api/solicitar-reset-senha', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.toLowerCase() })
         });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-          // Transferir e-mail para passo 2
+        const result = await resp.json();
+        if (resp.ok) {
           document.getElementById('reset-email').value = email;
-          
-          alert('✅ ' + result.mensagem + '\n\nVerifique sua caixa de entrada (e spam).');
+          alert(' ' + result.mensagem + '\n\nVerifique sua caixa de entrada (e spam).');
           mostrarPasso2();
-        } else {
-          alert('❌ ' + result.erro);
-        }
-        
+        } else { alert(' ' + result.erro); }
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-envelope me-2"></i>Enviar Código por E-mail';
-        
-      } catch (error) {
-        console.error('Erro:', error);
-        alert('❌ Erro ao solicitar código. Tente novamente.');
-        event.target.disabled = false;
-        event.target.innerHTML = '<i class="bi bi-envelope me-2"></i>Enviar Código por E-mail';
-      }
+      } catch(e) { console.error(e); alert(' Erro ao solicitar código.'); event.target.disabled = false; event.target.innerHTML = '<i class="bi bi-envelope me-2"></i>Enviar Código por E-mail'; }
     }
-    
     async function resetarSenhaComToken() {
       const email = document.getElementById('reset-email').value.trim();
       const token = document.getElementById('reset-token').value.trim();
       const novaSenha = document.getElementById('reset-nova-senha').value;
       const confirmaSenha = document.getElementById('reset-confirma-senha').value;
-      
-      if (!email || !token || !novaSenha || !confirmaSenha) {
-        alert('❌ Preencha todos os campos');
-        return;
-      }
-      
-      if (token.length !== 6 || !/^\d{6}$/.test(token)) {
-        alert('❌ Código deve ter 6 dígitos numéricos');
-        return;
-      }
-      
-      if (novaSenha !== confirmaSenha) {
-        alert('❌ As senhas não coincidem');
-        return;
-      }
-      
-      if (novaSenha.length < 4) {
-        alert('❌ Senha muito curta. Mínimo 4 caracteres');
-        return;
-      }
-      
+      if (!email||!token||!novaSenha||!confirmaSenha) { alert(' Preencha todos os campos'); return; }
+      if (token.length!==6||!/^\d{6}$/.test(token))   { alert(' Código deve ter 6 dígitos numéricos'); return; }
+      if (novaSenha!==confirmaSenha)                   { alert(' As senhas não coincidem'); return; }
+      if (novaSenha.length<4)                          { alert(' Senha muito curta. Mínimo 4 caracteres'); return; }
       try {
-        const response = await fetch('/api/resetar-senha-com-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email.toLowerCase(),
-            token: token,
-            nova_senha: novaSenha,
-            confirma_senha: confirmaSenha
-          })
+        const resp = await fetch('/api/resetar-senha-com-token', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.toLowerCase(), token, nova_senha: novaSenha, confirma_senha: confirmaSenha })
         });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-          alert('✅ ' + result.mensagem);
+        const result = await resp.json();
+        if (resp.ok) {
+          alert(' ' + result.mensagem);
           bootstrap.Modal.getInstance(document.getElementById('modalResetarSenha')).hide();
-          document.getElementById('formResetarSenha').reset();
-          voltarPasso1();
-        } else {
-          alert('❌ ' + result.erro);
-        }
-      } catch (error) {
-        console.error('Erro:', error);
-        alert('❌ Erro ao resetar senha. Tente novamente.');
-      }
-    }
-    
-    // MANTER FUNÇÃO ANTIGA PARA RETROCOMPATIBILIDADE (senha temporária do admin)
-    async function resetarMinhaSenha() {
-      const email = document.getElementById('reset-email').value.trim();
-      const senhaTemp = document.getElementById('reset-senha-temp')?.value || '';
-      const novaSenha = document.getElementById('reset-nova-senha').value;
-      const confirmaSenha = document.getElementById('reset-confirma-senha').value;
-      
-      if (!email || !senhaTemp || !novaSenha || !confirmaSenha) {
-        alert('❌ Preencha todos os campos');
-        return;
-      }
-      
-      if (novaSenha !== confirmaSenha) {
-        alert('❌ As senhas não coincidem');
-        return;
-      }
-      
-      if (novaSenha.length < 4) {
-        alert('❌ Senha muito curta. Mínimo 4 caracteres');
-        return;
-      }
-      
-      try {
-        const response = await fetch('/api/resetar-minha-senha', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email.toLowerCase(),
-            senha_temporaria: senhaTemp,
-            nova_senha: novaSenha,
-            confirma_senha: confirmaSenha
-          })
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-          alert('✅ ' + result.mensagem);
-          bootstrap.Modal.getInstance(document.getElementById('modalResetarSenha')).hide();
-          document.getElementById('formResetarSenha').reset();
-        } else {
-          alert('❌ ' + result.erro);
-        }
-      } catch (error) {
-        console.error('Erro:', error);
-        alert('❌ Erro ao resetar senha. Tente novamente.');
-      }
+          document.getElementById('formResetarSenha').reset(); voltarPasso1();
+        } else { alert(' ' + result.erro); }
+      } catch(e) { console.error(e); alert(' Erro ao resetar senha.'); }
     }
   </script>
 </body>

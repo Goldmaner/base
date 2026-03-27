@@ -2,7 +2,7 @@ Foco:
 
 1. Transferência de todas as notificações DGP (FEITO);
 2. Banco de dados de servidores (FEITO);
-2. Terminar relatório do Eliabe;
+2. Terminar relatório do Eliabe (FEITO);
 3. Criação da página de Manuais e seus status (cada operação, suboperações, andamento, meta, etc.), organização dos manuais existentes;
 4. Criação de relatórios operacionais da unidade;
 4. Demonstrativo - atualizar;

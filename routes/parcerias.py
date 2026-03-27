@@ -1,5 +1,5 @@
-"""
-Blueprint de parcerias (listagem e formulário)
+﻿"""
+Blueprint de parcerias (listagem e formulÃ¡rio)
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, jsonify, session
@@ -27,15 +27,15 @@ def listar():
     """
     Listagem de todas as parcerias/termos com filtros e busca
     """
-    # Obter parâmetros de filtro e busca
+    # Obter parÃ¢metros de filtro e busca
     filtro_termo = request.args.get('filtro_termo', '').strip()
     filtro_osc = request.args.get('filtro_osc', '').strip()
     filtro_projeto = request.args.get('filtro_projeto', '').strip()
-    filtro_tipo_termo = request.args.getlist('filtro_tipo_termo')  # Multi-seleção
-    filtro_status = request.args.getlist('filtro_status')  # Multi-seleção
-    filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')  # Multi-seleção
-    filtro_edital = request.args.getlist('filtro_edital')  # Multi-seleção
-    filtro_endereco = request.args.getlist('filtro_endereco')  # Multi-seleção
+    filtro_tipo_termo = request.args.getlist('filtro_tipo_termo')  # Multi-seleÃ§Ã£o
+    filtro_status = request.args.getlist('filtro_status')  # Multi-seleÃ§Ã£o
+    filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')  # Multi-seleÃ§Ã£o
+    filtro_edital = request.args.getlist('filtro_edital')  # Multi-seleÃ§Ã£o
+    filtro_endereco = request.args.getlist('filtro_endereco')  # Multi-seleÃ§Ã£o
     busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
     busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
     data_assinatura_inicio = request.args.get('data_assinatura_inicio', '').strip()
@@ -45,7 +45,7 @@ def listar():
     data_termino_de = request.args.get('data_termino_de', '').strip()
     data_termino_ate = request.args.get('data_termino_ate', '').strip()
     
-    # Obter parâmetro de paginação (padrão: 100)
+    # Obter parÃ¢metro de paginaÃ§Ã£o (padrÃ£o: 100)
     limite = request.args.get('limite', '100')
     if limite == 'todas':
         limite_sql = None
@@ -75,14 +75,14 @@ def listar():
     """)
     editais_filtro = [row['edital_nome'] for row in cur.fetchall()]
     
-    # DEBUG: Verificar duplicação
+    # DEBUG: Verificar duplicaÃ§Ã£o
     print(f"[DEBUG] Total de tipos_contrato retornados: {len(tipos_contrato)}")
-    print(f"[DEBUG] Tipos únicos: {len(set(tipos_contrato))}")
+    print(f"[DEBUG] Tipos Ãºnicos: {len(set(tipos_contrato))}")
     if len(tipos_contrato) != len(set(tipos_contrato)):
-        print(f"[ALERTA] DUPLICAÇÃO DETECTADA em c_geral_tipo_contrato!")
-        print(f"[DEBUG] Tipos com duplicação: {[t for t in tipos_contrato if tipos_contrato.count(t) > 1]}")
+        print(f"[ALERTA] DUPLICAÃ‡ÃƒO DETECTADA em c_geral_tipo_contrato!")
+        print(f"[DEBUG] Tipos com duplicaÃ§Ã£o: {[t for t in tipos_contrato if tipos_contrato.count(t) > 1]}")
     
-    # Query principal - buscar parcerias com datas como texto para evitar erro de conversão
+    # Query principal - buscar parcerias com datas como texto para evitar erro de conversÃ£o
     query = """
         SELECT
             p.numero_termo,
@@ -152,13 +152,13 @@ def listar():
         params.append(f"%{filtro_projeto}%")
     
     if filtro_tipo_termo:
-        # Múltiplos tipos de termo
+        # MÃºltiplos tipos de termo
         placeholders = ','.join(['%s'] * len(filtro_tipo_termo))
         query += f" AND p.tipo_termo IN ({placeholders})"
         params.extend(filtro_tipo_termo)
     
     if filtro_pessoa_gestora:
-        # Separar filtros especiais de nomes específicos
+        # Separar filtros especiais de nomes especÃ­ficos
         filtros_especiais = []
         nomes_pg = []
         
@@ -170,7 +170,7 @@ def listar():
             else:
                 nomes_pg.append(pg)
         
-        # Construir condições OR
+        # Construir condiÃ§Ãµes OR
         condicoes_pg = []
         
         if 'nenhuma' in filtros_especiais:
@@ -218,12 +218,12 @@ def listar():
         params.append(f"%{busca_sei_pc}%")
     
     if filtro_edital:
-        # Múltiplos editais
+        # MÃºltiplos editais
         placeholders = ','.join(['%s'] * len(filtro_edital))
         query += f" AND p.edital_nome IN ({placeholders})"
         params.extend(filtro_edital)
     
-    # Filtro por endereço
+    # Filtro por endereÃ§o
     if filtro_endereco:
         condicoes_endereco = []
         if 'preenchido' in filtro_endereco:
@@ -256,7 +256,7 @@ def listar():
         )"""
         params.append(data_assinatura_fim)
     
-    # Filtro por data de início
+    # Filtro por data de inÃ­cio
     if data_inicio_de:
         query += " AND p.inicio >= %s"
         params.append(data_inicio_de)
@@ -265,7 +265,7 @@ def listar():
         query += " AND p.inicio <= %s"
         params.append(data_inicio_ate)
     
-    # Filtro por data de término
+    # Filtro por data de tÃ©rmino
     if data_termino_de:
         query += " AND p.final >= %s"
         params.append(data_termino_de)
@@ -274,11 +274,11 @@ def listar():
         query += " AND p.final <= %s"
         params.append(data_termino_ate)
     
-    # Filtro de status baseado em datas (múltiplos status)
+    # Filtro de status baseado em datas (mÃºltiplos status)
     # Vigente: inicio <= HOJE <= final
     # Encerrado: final < HOJE
-    # Não iniciado: inicio > HOJE
-    # Rescindido e Suspenso: deixar para depois (não filtrar por enquanto)
+    # NÃ£o iniciado: inicio > HOJE
+    # Rescindido e Suspenso: deixar para depois (nÃ£o filtrar por enquanto)
     if filtro_status:
         condicoes_status = []
         
@@ -290,7 +290,7 @@ def listar():
             elif status == 'nao_iniciado':
                 condicoes_status.append("(inicio > CURRENT_DATE)")
             elif status in ['rescindido', 'suspenso']:
-                # Por enquanto, não implementado - adiciona condição falsa
+                # Por enquanto, nÃ£o implementado - adiciona condiÃ§Ã£o falsa
                 condicoes_status.append("(1=0)")
         
         if condicoes_status:
@@ -298,7 +298,7 @@ def listar():
     
     query += " ORDER BY numero_termo"
     
-    # Adicionar LIMIT se não for "todas"
+    # Adicionar LIMIT se nÃ£o for "todas"
     if limite_sql is not None:
         query += f" LIMIT {limite_sql}"
     
@@ -318,7 +318,7 @@ def listar():
                 else:
                     parceria['inicio'] = None
             except (ValueError, TypeError) as e:
-                print(f"[ERRO] Data inicio inválida para termo {parceria['numero_termo']}: {parceria['inicio_str']} - {e}")
+                print(f"[ERRO] Data inicio invÃ¡lida para termo {parceria['numero_termo']}: {parceria['inicio_str']} - {e}")
                 parceria['inicio'] = None
             
             try:
@@ -327,7 +327,7 @@ def listar():
                 else:
                     parceria['final'] = None
             except (ValueError, TypeError) as e:
-                print(f"[ERRO] Data final inválida para termo {parceria['numero_termo']}: {parceria['final_str']} - {e}")
+                print(f"[ERRO] Data final invÃ¡lida para termo {parceria['numero_termo']}: {parceria['final_str']} - {e}")
                 parceria['final'] = None
             
             # Converter data_assinatura_termo
@@ -336,14 +336,14 @@ def listar():
                     # Se for string, converter
                     if isinstance(parceria['data_assinatura_termo'], str):
                         parceria['data_assinatura_termo'] = datetime.strptime(parceria['data_assinatura_termo'], '%Y-%m-%d').date()
-                    # Se já for date, manter
+                    # Se jÃ¡ for date, manter
             except (ValueError, TypeError) as e:
-                print(f"[ERRO] Data assinatura inválida para termo {parceria['numero_termo']}: {parceria.get('data_assinatura_termo')} - {e}")
+                print(f"[ERRO] Data assinatura invÃ¡lida para termo {parceria['numero_termo']}: {parceria.get('data_assinatura_termo')} - {e}")
                 parceria['data_assinatura_termo'] = None
         
     except ValueError as e:
         print(f"[ERRO] Erro ao processar datas das parcerias: {e}")
-        print(f"[DEBUG] Tentando identificar registro problemático...")
+        print(f"[DEBUG] Tentando identificar registro problemÃ¡tico...")
         
         # Re-executar query para buscar dados como texto
         query_debug = query.replace("p.inicio", "p.inicio::text as inicio_str, p.inicio")
@@ -356,16 +356,16 @@ def listar():
         except:
             pass
         
-        # Retornar erro ao usuário
+        # Retornar erro ao usuÃ¡rio
         cur.close()
-        return render_template("parcerias.html", 
+        return render_template("parcerias/parcerias.html", 
                              parcerias=[],
                              tipos_contrato=tipos_contrato,
                              pessoas_gestoras_filtro=pessoas_gestoras_filtro,
                              contagem_status={},
                              total_geral=0,
                              limite_atual=limite,
-                             erro=f"Erro ao carregar parcerias: {str(e)}. Há uma data inválida no banco de dados.")
+                             erro=f"Erro ao carregar parcerias: {str(e)}. HÃ¡ uma data invÃ¡lida no banco de dados.")
     
     # Calcular status para cada parceria
     from datetime import date
@@ -376,7 +376,7 @@ def listar():
         status = '-'
         try:
             if parceria['inicio'] and parceria['final']:
-                # Validar se as datas são objetos date válidos
+                # Validar se as datas sÃ£o objetos date vÃ¡lidos
                 inicio = parceria['inicio']
                 final = parceria['final']
                 
@@ -391,7 +391,7 @@ def listar():
                 elif final < hoje:
                     status = 'Encerrado'
                 elif inicio > hoje:
-                    status = 'Não iniciado'
+                    status = 'NÃ£o iniciado'
         except (TypeError, ValueError) as e:
             print(f"[ERRO] Erro ao calcular status para termo {parceria.get('numero_termo', 'N/A')}: {e}")
             print(f"[DEBUG] inicio={parceria.get('inicio')}, final={parceria.get('final')}")
@@ -405,22 +405,22 @@ def listar():
         else:
             contagem_status[status] = 1
     
-    # Obter total geral (sem filtros) para referência
+    # Obter total geral (sem filtros) para referÃªncia
     cur.execute("SELECT COUNT(*) as total FROM Parcerias")
     total_geral = cur.fetchone()['total']
     
     cur.close()
     
-    # DEBUG: Verificar duplicação de parcerias
+    # DEBUG: Verificar duplicaÃ§Ã£o de parcerias
     print(f"[DEBUG] Total de parcerias retornadas: {len(parcerias)}")
     termos = [p['numero_termo'] for p in parcerias]
-    print(f"[DEBUG] Termos únicos: {len(set(termos))}")
+    print(f"[DEBUG] Termos Ãºnicos: {len(set(termos))}")
     if len(termos) != len(set(termos)):
-        print(f"[ALERTA] DUPLICAÇÃO DETECTADA em Parcerias!")
+        print(f"[ALERTA] DUPLICAÃ‡ÃƒO DETECTADA em Parcerias!")
         duplicados = [t for t in termos if termos.count(t) > 1]
         print(f"[DEBUG] Termos duplicados: {set(duplicados)}")
     
-    return render_template("parcerias.html", 
+    return render_template("parcerias/parcerias.html", 
                          parcerias=parcerias,
                          tipos_contrato=tipos_contrato,
                          pessoas_gestoras_filtro=pessoas_gestoras_filtro,
@@ -454,7 +454,7 @@ def nova():
     """
     if request.method == "POST":
         print("[DEBUG NOVA] Recebendo POST para criar nova parceria")
-        print(f"[DEBUG NOVA] Número do termo: {request.form.get('numero_termo')}")
+        print(f"[DEBUG NOVA] NÃºmero do termo: {request.form.get('numero_termo')}")
         
         # Validar datas antes de processar
         data_inicio = request.form.get('inicio', '').strip()
@@ -465,10 +465,10 @@ def nova():
                 from datetime import datetime
                 dt_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
                 if dt_inicio.year > 9999:
-                    flash('❌ Data de início inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
+                    flash('âŒ Data de inÃ­cio invÃ¡lida! O ano nÃ£o pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
                     return redirect(url_for('parcerias.nova'))
             except ValueError:
-                flash('❌ Data de início em formato inválido! Use o formato AAAA-MM-DD.', 'danger')
+                flash('âŒ Data de inÃ­cio em formato invÃ¡lido! Use o formato AAAA-MM-DD.', 'danger')
                 return redirect(url_for('parcerias.nova'))
         
         if data_final:
@@ -476,10 +476,10 @@ def nova():
                 from datetime import datetime
                 dt_final = datetime.strptime(data_final, '%Y-%m-%d')
                 if dt_final.year > 9999:
-                    flash('❌ Data de término inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
+                    flash('âŒ Data de tÃ©rmino invÃ¡lida! O ano nÃ£o pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
                     return redirect(url_for('parcerias.nova'))
             except ValueError:
-                flash('❌ Data de término em formato inválido! Use o formato AAAA-MM-DD.', 'danger')
+                flash('âŒ Data de tÃ©rmino em formato invÃ¡lido! Use o formato AAAA-MM-DD.', 'danger')
                 return redirect(url_for('parcerias.nova'))
         
         try:
@@ -517,7 +517,7 @@ def nova():
                 request.form.get('edital_nome') or None
             )
             
-            print(f"[DEBUG NOVA] Parâmetros do INSERT: {params[:5]}...")  # Primeiros 5 para não lotar o log
+            print(f"[DEBUG NOVA] ParÃ¢metros do INSERT: {params[:5]}...")  # Primeiros 5 para nÃ£o lotar o log
             
             resultado_insert = execute_query(query, params)
             print(f"[DEBUG NOVA] Resultado do INSERT na Parcerias: {resultado_insert}")
@@ -526,9 +526,9 @@ def nova():
                 print("[DEBUG NOVA] INSERT bem-sucedido! Processando auditoria...")
                 numero_termo = request.form.get('numero_termo')
                 
-                # === SALVAR INFORMAÇÕES ADICIONAIS ===
+                # === SALVAR INFORMAÃ‡Ã•ES ADICIONAIS ===
                 try:
-                    # Verificar se já existe registro
+                    # Verificar se jÃ¡ existe registro
                     cur_check = get_cursor()
                     cur_check.execute(
                         "SELECT id FROM public.parcerias_infos_adicionais WHERE numero_termo = %s",
@@ -585,21 +585,21 @@ def nova():
                         )
                     
                     execute_query(infos_query, infos_params)
-                    print(f"[DEBUG NOVA] Informações adicionais salvas para {numero_termo}")
+                    print(f"[DEBUG NOVA] InformaÃ§Ãµes adicionais salvas para {numero_termo}")
                 except Exception as e:
-                    print(f"[ERRO] Falha ao salvar informações adicionais: {e}")
+                    print(f"[ERRO] Falha ao salvar informaÃ§Ãµes adicionais: {e}")
                 
-                # === SALVAR ENDEREÇOS ===
+                # === SALVAR ENDEREÃ‡OS ===
                 try:
-                    # Deletar endereços existentes (caso seja uma atualização)
+                    # Deletar endereÃ§os existentes (caso seja uma atualizaÃ§Ã£o)
                     delete_enderecos = "DELETE FROM public.parcerias_enderecos WHERE numero_termo = %s"
                     execute_query(delete_enderecos, (numero_termo,))
                     
-                    # Verificar se projeto é online
+                    # Verificar se projeto Ã© online
                     projeto_online = request.form.get('projeto_online') == 'on'
                     
                     if not projeto_online:
-                        # Pegar todos os endereços (arrays do formulário)
+                        # Pegar todos os endereÃ§os (arrays do formulÃ¡rio)
                         logradouros = request.form.getlist('parceria_logradouro[]')
                         numeros = request.form.getlist('parceria_numero[]')
                         complementos = request.form.getlist('parceria_complemento[]')
@@ -607,9 +607,9 @@ def nova():
                         distritos = request.form.getlist('parceria_distrito[]')
                         observacoes = request.form.getlist('observacao[]')
                         
-                        # Inserir cada endereço
+                        # Inserir cada endereÃ§o
                         for idx, logradouro in enumerate(logradouros):
-                            if logradouro:  # Só insere se logradouro foi preenchido
+                            if logradouro:  # SÃ³ insere se logradouro foi preenchido
                                 endereco_query = """
                                     INSERT INTO public.parcerias_enderecos (
                                         numero_termo, parceria_logradouro, parceria_complemento, parceria_numero,
@@ -627,9 +627,9 @@ def nova():
                                 )
                                 execute_query(endereco_query, endereco_params)
                         
-                        print(f"[DEBUG NOVA] {len(logradouros)} endereço(s) salvo(s) para {numero_termo}")
+                        print(f"[DEBUG NOVA] {len(logradouros)} endereÃ§o(s) salvo(s) para {numero_termo}")
                 except Exception as e:
-                    print(f"[ERRO] Falha ao salvar endereços: {e}")
+                    print(f"[ERRO] Falha ao salvar endereÃ§os: {e}")
                 
                 # Salvar/atualizar termo_sei_doc e data_assinatura em parcerias_sei se fornecidos
                 termo_sei_doc = request.form.get('termo_sei_doc', '').strip()
@@ -637,7 +637,7 @@ def nova():
                 
                 if termo_sei_doc or data_assinatura:
                     try:
-                        # Verificar se já existe registro para este termo
+                        # Verificar se jÃ¡ existe registro para este termo
                         check_query = """
                             SELECT id FROM public.parcerias_sei 
                             WHERE numero_termo = %s AND aditamento = '-' AND apostilamento = '-'
@@ -670,7 +670,7 @@ def nova():
                 
                 # === SALVAR VEREADORES (EMENDAS PARLAMENTARES) ===
                 try:
-                    # Buscar sei_celeb da parceria recém-criada
+                    # Buscar sei_celeb da parceria recÃ©m-criada
                     cur_sei = get_cursor()
                     cur_sei.execute("SELECT sei_celeb FROM public.parcerias WHERE numero_termo = %s", (numero_termo,))
                     result_sei = cur_sei.fetchone()
@@ -682,7 +682,7 @@ def nova():
                         delete_vereadores = "DELETE FROM public.parcerias_emendas WHERE sei_celeb = %s"
                         execute_query(delete_vereadores, (sei_celeb,))
                         
-                        # Pegar todos os vereadores (arrays do formulário)
+                        # Pegar todos os vereadores (arrays do formulÃ¡rio)
                         vereadores_nomes = request.form.getlist('vereador_nome[]')
                         vereadores_status = request.form.getlist('vereador_status[]')
                         vereadores_valores = request.form.getlist('vereador_valor[]')
@@ -691,16 +691,16 @@ def nova():
                         # Inserir cada vereador
                         count_vereadores = 0
                         for idx, vereador_nome in enumerate(vereadores_nomes):
-                            if vereador_nome and vereador_nome.strip():  # Só insere se nome foi preenchido
+                            if vereador_nome and vereador_nome.strip():  # SÃ³ insere se nome foi preenchido
                                 status = vereadores_status[idx] if idx < len(vereadores_status) else None
                                 valor_str = vereadores_valores[idx] if idx < len(vereadores_valores) else None
                                 observacoes = vereadores_obs[idx] if idx < len(vereadores_obs) else None
                                 
-                                # Converter valor monetário de formato brasileiro para decimal
+                                # Converter valor monetÃ¡rio de formato brasileiro para decimal
                                 valor = None
                                 if valor_str:
                                     try:
-                                        # Remove pontos de milhar e substitui vírgula por ponto
+                                        # Remove pontos de milhar e substitui vÃ­rgula por ponto
                                         valor_clean = valor_str.replace('.', '').replace(',', '.')
                                         valor = float(valor_clean)
                                     except:
@@ -736,9 +736,9 @@ def nova():
                 print(f"[DEBUG NOVA] Valor solicitacao: {solicitacao}")
                 print(f"[DEBUG NOVA] Pessoa gestora: {pessoa_gestora}")
                 
-                if pessoa_gestora:  # Só registrar se foi selecionada uma pessoa gestora
+                if pessoa_gestora:  # SÃ³ registrar se foi selecionada uma pessoa gestora
                     from flask import session
-                    usuario_id = session.get('user_id')  # ID do usuário logado
+                    usuario_id = session.get('user_id')  # ID do usuÃ¡rio logado
                     
                     audit_query = """
                         INSERT INTO parcerias_pg (numero_termo, nome_pg, usuario_id, dado_anterior, solicitacao)
@@ -751,10 +751,10 @@ def nova():
                 print("[DEBUG NOVA] Enviando flash de sucesso e redirecionando...")
                 flash("Parceria criada com sucesso!", "success")
                 
-                # Verificar se veio da página de conferência
+                # Verificar se veio da pÃ¡gina de conferÃªncia
                 origem = request.form.get('origem_conferencia')
                 if origem == 'conferencia':
-                    # Redirecionar para conferência e atualizar
+                    # Redirecionar para conferÃªncia e atualizar
                     return redirect(url_for('parcerias.conferencia_pos_insercao'))
                 else:
                     return redirect(url_for('parcerias.nova'))
@@ -763,12 +763,12 @@ def nova():
                 flash("Erro ao criar parceria no banco de dados!", "danger")
             
         except Exception as e:
-            print(f"[DEBUG NOVA] EXCEÇÃO capturada: {type(e).__name__}: {str(e)}")
+            print(f"[DEBUG NOVA] EXCEÃ‡ÃƒO capturada: {type(e).__name__}: {str(e)}")
             import traceback
             traceback.print_exc()
             flash(f"Erro ao criar parceria: {str(e)}", "danger")
     
-    # GET - retornar formulário vazio (ou com dados pré-preenchidos da conferência)
+    # GET - retornar formulÃ¡rio vazio (ou com dados prÃ©-preenchidos da conferÃªncia)
     # Buscar dados dos dropdowns
     cur = get_cursor()
     cur.execute("SELECT informacao FROM categoricas.c_geral_tipo_contrato ORDER BY informacao")
@@ -780,7 +780,7 @@ def nova():
     cur.execute("SELECT nome_pg, numero_rf, status_pg FROM categoricas.c_geral_pessoa_gestora ORDER BY nome_pg")
     pessoas_gestoras = cur.fetchall()
     
-    # Buscar editais disponíveis
+    # Buscar editais disponÃ­veis
     cur.execute("""
         SELECT DISTINCT edital_nome 
         FROM public.parcerias_edital 
@@ -791,7 +791,7 @@ def nova():
     
     cur.close()
     
-    # Verificar se há parâmetros na query string (vindo da conferência)
+    # Verificar se hÃ¡ parÃ¢metros na query string (vindo da conferÃªncia)
     numero_termo_param = request.args.get('numero_termo', '')
     osc_param = request.args.get('osc', '')
     
@@ -812,21 +812,21 @@ def nova():
         except Exception as e:
             print(f"[ERRO] Falha ao buscar termo_sei_doc: {e}")
     
-    # Criar objeto parceria com dados pré-preenchidos
+    # Criar objeto parceria com dados prÃ©-preenchidos
     parceria_preenchida = {
         'numero_termo': numero_termo_param,
         'osc': osc_param,
-        'cnpj': ''  # Será preenchido via JavaScript no frontend
+        'cnpj': ''  # SerÃ¡ preenchido via JavaScript no frontend
     }
     
-    # Buscar informações adicionais e endereços (vazios para nova)
+    # Buscar informaÃ§Ãµes adicionais e endereÃ§os (vazios para nova)
     infos_adicionais = {}
     enderecos = []
     vereadores_emenda = []
     projeto_online = False
     data_assinatura = None
     
-    return render_template("parcerias_form.html", 
+    return render_template("parcerias/parcerias_form.html", 
                          parceria=parceria_preenchida,
                          tipos_contrato=tipos_contrato,
                          legislacoes=legislacoes,
@@ -847,7 +847,7 @@ def nova():
 @requires_access('parcerias')
 def editar(numero_termo):
     """
-    Formulário completo de edição de parceria
+    FormulÃ¡rio completo de ediÃ§Ã£o de parceria
     """
     if request.method == "POST":
         # Validar datas antes de processar
@@ -859,10 +859,10 @@ def editar(numero_termo):
                 from datetime import datetime
                 dt_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
                 if dt_inicio.year > 9999:
-                    flash('❌ Data de início inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
+                    flash('âŒ Data de inÃ­cio invÃ¡lida! O ano nÃ£o pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
                     return redirect(url_for('parcerias.editar', numero_termo=numero_termo))
             except ValueError:
-                flash('❌ Data de início em formato inválido! Use o formato AAAA-MM-DD.', 'danger')
+                flash('âŒ Data de inÃ­cio em formato invÃ¡lido! Use o formato AAAA-MM-DD.', 'danger')
                 return redirect(url_for('parcerias.editar', numero_termo=numero_termo))
         
         if data_final:
@@ -870,10 +870,10 @@ def editar(numero_termo):
                 from datetime import datetime
                 dt_final = datetime.strptime(data_final, '%Y-%m-%d')
                 if dt_final.year > 9999:
-                    flash('❌ Data de término inválida! O ano não pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
+                    flash('âŒ Data de tÃ©rmino invÃ¡lida! O ano nÃ£o pode ultrapassar 9999. Por favor, corrija a data.', 'danger')
                     return redirect(url_for('parcerias.editar', numero_termo=numero_termo))
             except ValueError:
-                flash('❌ Data de término em formato inválido! Use o formato AAAA-MM-DD.', 'danger')
+                flash('âŒ Data de tÃ©rmino em formato invÃ¡lido! Use o formato AAAA-MM-DD.', 'danger')
                 return redirect(url_for('parcerias.editar', numero_termo=numero_termo))
         
         # Buscar valor anterior da pessoa_gestora para auditoria
@@ -940,9 +940,9 @@ def editar(numero_termo):
             )
             
             if execute_query(query, params):
-                # === SALVAR INFORMAÇÕES ADICIONAIS ===
+                # === SALVAR INFORMAÃ‡Ã•ES ADICIONAIS ===
                 try:
-                    # Verificar se já existe registro
+                    # Verificar se jÃ¡ existe registro
                     cur_check = get_cursor()
                     cur_check.execute(
                         "SELECT id FROM public.parcerias_infos_adicionais WHERE numero_termo = %s",
@@ -999,21 +999,21 @@ def editar(numero_termo):
                         )
                     
                     execute_query(infos_query, infos_params)
-                    print(f"[DEBUG EDITAR] Informações adicionais salvas para {numero_termo}")
+                    print(f"[DEBUG EDITAR] InformaÃ§Ãµes adicionais salvas para {numero_termo}")
                 except Exception as e:
-                    print(f"[ERRO] Falha ao salvar informações adicionais: {e}")
+                    print(f"[ERRO] Falha ao salvar informaÃ§Ãµes adicionais: {e}")
                 
-                # === SALVAR ENDEREÇOS ===
+                # === SALVAR ENDEREÃ‡OS ===
                 try:
-                    # Deletar endereços existentes
+                    # Deletar endereÃ§os existentes
                     delete_enderecos = "DELETE FROM public.parcerias_enderecos WHERE numero_termo = %s"
                     execute_query(delete_enderecos, (numero_termo,))
                     
-                    # Verificar se projeto é online
+                    # Verificar se projeto Ã© online
                     projeto_online = request.form.get('projeto_online') == 'on'
                     
                     if not projeto_online:
-                        # Pegar todos os endereços (arrays do formulário)
+                        # Pegar todos os endereÃ§os (arrays do formulÃ¡rio)
                         logradouros = request.form.getlist('parceria_logradouro[]')
                         numeros = request.form.getlist('parceria_numero[]')
                         complementos = request.form.getlist('parceria_complemento[]')
@@ -1021,9 +1021,9 @@ def editar(numero_termo):
                         distritos = request.form.getlist('parceria_distrito[]')
                         observacoes = request.form.getlist('observacao[]')
                         
-                        # Inserir cada endereço
+                        # Inserir cada endereÃ§o
                         for idx, logradouro in enumerate(logradouros):
-                            if logradouro:  # Só insere se logradouro foi preenchido
+                            if logradouro:  # SÃ³ insere se logradouro foi preenchido
                                 endereco_query = """
                                     INSERT INTO public.parcerias_enderecos (
                                         numero_termo, parceria_logradouro, parceria_complemento, parceria_numero,
@@ -1041,9 +1041,9 @@ def editar(numero_termo):
                                 )
                                 execute_query(endereco_query, endereco_params)
                         
-                        print(f"[DEBUG EDITAR] {len(logradouros)} endereço(s) salvo(s) para {numero_termo}")
+                        print(f"[DEBUG EDITAR] {len(logradouros)} endereÃ§o(s) salvo(s) para {numero_termo}")
                 except Exception as e:
-                    print(f"[ERRO] Falha ao salvar endereços: {e}")
+                    print(f"[ERRO] Falha ao salvar endereÃ§os: {e}")
                 
                 # Salvar/atualizar termo_sei_doc e data_assinatura em parcerias_sei se fornecidos
                 termo_sei_doc = request.form.get('termo_sei_doc', '').strip()
@@ -1051,7 +1051,7 @@ def editar(numero_termo):
                 
                 if termo_sei_doc or data_assinatura:
                     try:
-                        # Verificar se já existe registro para este termo
+                        # Verificar se jÃ¡ existe registro para este termo
                         cur_check = get_cursor()
                         cur_check.execute("""
                             SELECT id FROM public.parcerias_sei 
@@ -1095,7 +1095,7 @@ def editar(numero_termo):
                         delete_vereadores = "DELETE FROM public.parcerias_emendas WHERE sei_celeb = %s"
                         execute_query(delete_vereadores, (sei_celeb,))
                         
-                        # Pegar todos os vereadores (arrays do formulário)
+                        # Pegar todos os vereadores (arrays do formulÃ¡rio)
                         vereadores_nomes = request.form.getlist('vereador_nome[]')
                         vereadores_status = request.form.getlist('vereador_status[]')
                         vereadores_valores = request.form.getlist('vereador_valor[]')
@@ -1104,16 +1104,16 @@ def editar(numero_termo):
                         # Inserir cada vereador
                         count_vereadores = 0
                         for idx, vereador_nome in enumerate(vereadores_nomes):
-                            if vereador_nome and vereador_nome.strip():  # Só insere se nome foi preenchido
+                            if vereador_nome and vereador_nome.strip():  # SÃ³ insere se nome foi preenchido
                                 status = vereadores_status[idx] if idx < len(vereadores_status) else None
                                 valor_str = vereadores_valores[idx] if idx < len(vereadores_valores) else None
                                 observacoes = vereadores_obs[idx] if idx < len(vereadores_obs) else None
                                 
-                                # Converter valor monetário de formato brasileiro para decimal
+                                # Converter valor monetÃ¡rio de formato brasileiro para decimal
                                 valor = None
                                 if valor_str:
                                     try:
-                                        # Remove pontos de milhar e substitui vírgula por ponto
+                                        # Remove pontos de milhar e substitui vÃ­rgula por ponto
                                         valor_clean = valor_str.replace('.', '').replace(',', '.')
                                         valor = float(valor_clean)
                                     except:
@@ -1139,7 +1139,7 @@ def editar(numero_termo):
                 except Exception as e:
                     print(f"[ERRO] Falha ao salvar vereadores: {e}")
                 
-                # Registrar na tabela de auditoria parcerias_pg se houve mudança
+                # Registrar na tabela de auditoria parcerias_pg se houve mudanÃ§a
                 solicitacao_checkbox = request.form.get('solicitacao_alteracao')
                 solicitacao = True if solicitacao_checkbox == 'on' else False
                 
@@ -1161,11 +1161,11 @@ def editar(numero_termo):
                     resultado = execute_query(audit_query, (numero_termo, pessoa_gestora_nova, usuario_id, pessoa_gestora_anterior, solicitacao))
                     print(f"[DEBUG EDITAR] Resultado INSERT (mudou PG): {resultado}")
                 elif pessoa_gestora_nova:
-                    # Se a pessoa gestora não mudou mas a checkbox mudou, atualizar apenas o flag
+                    # Se a pessoa gestora nÃ£o mudou mas a checkbox mudou, atualizar apenas o flag
                     from flask import session
                     usuario_id = session.get('user_id')
                     
-                    print(f"[DEBUG EDITAR] Pessoa gestora NÃO mudou - verificando solicitacao")
+                    print(f"[DEBUG EDITAR] Pessoa gestora NÃƒO mudou - verificando solicitacao")
                     # Verificar o estado atual de solicitacao
                     cur = get_cursor()
                     cur.execute("""
@@ -1191,7 +1191,7 @@ def editar(numero_termo):
                         resultado_insert = execute_query(audit_query, (numero_termo, pessoa_gestora_nova, usuario_id, pessoa_gestora_anterior, solicitacao))
                         print(f"[DEBUG EDITAR] Resultado INSERT (mudou solicitacao): {resultado_insert}")
                     else:
-                        print(f"[DEBUG EDITAR] Solicitacao NÃO mudou - nenhum registro criado")
+                        print(f"[DEBUG EDITAR] Solicitacao NÃƒO mudou - nenhum registro criado")
                 
                 flash("Parceria atualizada com sucesso!", "success")
                 return redirect(url_for('parcerias.listar'))
@@ -1233,7 +1233,7 @@ def editar(numero_termo):
     
     if not parceria:
         cur.close()
-        flash("Parceria não encontrada!", "danger")
+        flash("Parceria nÃ£o encontrada!", "danger")
         return redirect(url_for('parcerias.listar'))
     
     # Buscar pessoa gestora atual de parcerias_pg
@@ -1245,7 +1245,7 @@ def editar(numero_termo):
     """, (numero_termo,))
     pg_result = cur.fetchone()
     
-    # Adicionar pessoa_gestora e solicitacao ao dicionário parceria
+    # Adicionar pessoa_gestora e solicitacao ao dicionÃ¡rio parceria
     if pg_result:
         parceria = dict(parceria)
         parceria['pessoa_gestora'] = pg_result['nome_pg']
@@ -1261,7 +1261,7 @@ def editar(numero_termo):
     cur.execute("SELECT nome_pg, numero_rf, status_pg FROM categoricas.c_geral_pessoa_gestora ORDER BY nome_pg")
     pessoas_gestoras = cur.fetchall()
     
-    # Buscar editais disponíveis
+    # Buscar editais disponÃ­veis
     cur.execute("""
         SELECT DISTINCT edital_nome 
         FROM public.parcerias_edital 
@@ -1278,7 +1278,7 @@ def editar(numero_termo):
         if rf_result:
             rf_pessoa_gestora = rf_result['numero_rf']
     
-    # Buscar informações de rescisão
+    # Buscar informaÃ§Ãµes de rescisÃ£o
     cur.execute("""
         SELECT data_rescisao 
         FROM public.termos_rescisao 
@@ -1310,7 +1310,7 @@ def editar(numero_termo):
     except Exception as e:
         print(f"[ERRO] Falha ao buscar termo_sei_doc e data_assinatura em editar: {e}")
     
-    # Buscar informações adicionais
+    # Buscar informaÃ§Ãµes adicionais
     cur.execute("""
         SELECT parceria_responsavel_legal, parceria_objeto, parceria_beneficiarios_diretos, 
                parceria_beneficiarios_indiretos, parceria_justificativa_projeto, 
@@ -1321,7 +1321,7 @@ def editar(numero_termo):
     infos_result = cur.fetchone()
     infos_adicionais = dict(infos_result) if infos_result else {}
     
-    # Buscar endereços
+    # Buscar endereÃ§os
     cur.execute("""
         SELECT e.id, e.parceria_logradouro, e.parceria_numero, e.parceria_complemento, 
                e.parceria_cep, e.parceria_distrito, e.observacao,
@@ -1333,7 +1333,7 @@ def editar(numero_termo):
     """, (numero_termo,))
     enderecos = cur.fetchall()
     
-    # Verificar se é projeto online
+    # Verificar se Ã© projeto online
     projeto_online = False
     if enderecos and len(enderecos) == 1 and enderecos[0].get('observacao') == 'Projeto Online':
         projeto_online = True
@@ -1353,7 +1353,7 @@ def editar(numero_termo):
     
     cur.close()
     
-    return render_template("parcerias_form.html", 
+    return render_template("parcerias/parcerias_form.html", 
                          parceria=parceria,
                          tipos_contrato=tipos_contrato,
                          legislacoes=legislacoes,
@@ -1375,7 +1375,7 @@ def editar(numero_termo):
 @requires_access('parcerias')
 def api_oscs():
     """
-    API para buscar lista de OSCs únicas para autocomplete
+    API para buscar lista de OSCs Ãºnicas para autocomplete
     """
     from flask import jsonify
     
@@ -1389,7 +1389,7 @@ def api_oscs():
     oscs = cur.fetchall()
     cur.close()
     
-    # Criar dicionário com OSC e CNPJ
+    # Criar dicionÃ¡rio com OSC e CNPJ
     result = {}
     for row in oscs:
         if row['osc']:
@@ -1425,16 +1425,16 @@ def api_sigla_tipo_termo():
 @login_required
 def api_lista_generica(tabela):
     """
-    API genérica para buscar dados de listas categóricas com autocomplete
-    Exemplo: /api/lista/c_geral_vereadores?q=João
+    API genÃ©rica para buscar dados de listas categÃ³ricas com autocomplete
+    Exemplo: /api/lista/c_geral_vereadores?q=JoÃ£o
     """
     from flask import jsonify, request
     
-    # Lista de tabelas permitidas (segurança)
+    # Lista de tabelas permitidas (seguranÃ§a)
     tabelas_permitidas = ['c_geral_vereadores']
     
     if tabela not in tabelas_permitidas:
-        return jsonify({'error': 'Tabela não permitida'}), 403
+        return jsonify({'error': 'Tabela nÃ£o permitida'}), 403
     
     query_param = request.args.get('q', '').strip()
     
@@ -1452,7 +1452,7 @@ def api_lista_generica(tabela):
                 LIMIT 20
             """, (f'%{query_param}%',))
         else:
-            # Se não há busca, retornar os 20 mais recentes
+            # Se nÃ£o hÃ¡ busca, retornar os 20 mais recentes
             cur.execute("""
                 SELECT vereador_nome, partido, legislatura_numero, situacao
                 FROM categoricas.c_geral_vereadores
@@ -1464,7 +1464,7 @@ def api_lista_generica(tabela):
     resultados = cur.fetchall()
     cur.close()
     
-    # Converter para lista de dicionários
+    # Converter para lista de dicionÃ¡rios
     lista = [dict(row) for row in resultados]
     
     return jsonify(lista)
@@ -1478,14 +1478,14 @@ def exportar_csv():
     Exporta parcerias para CSV respeitando os filtros aplicados
     """
     try:
-        # Obter os mesmos parâmetros de filtro da listagem
+        # Obter os mesmos parÃ¢metros de filtro da listagem
         filtro_termo = request.args.get('filtro_termo', '').strip()
         filtro_osc = request.args.get('filtro_osc', '').strip()
         filtro_projeto = request.args.get('filtro_projeto', '').strip()
-        filtro_tipo_termo = request.args.getlist('filtro_tipo_termo')  # Multi-seleção
-        filtro_status = request.args.getlist('filtro_status')  # Multi-seleção
-        filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')  # Multi-seleção
-        filtro_edital = request.args.getlist('filtro_edital')  # Multi-seleção
+        filtro_tipo_termo = request.args.getlist('filtro_tipo_termo')  # Multi-seleÃ§Ã£o
+        filtro_status = request.args.getlist('filtro_status')  # Multi-seleÃ§Ã£o
+        filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')  # Multi-seleÃ§Ã£o
+        filtro_edital = request.args.getlist('filtro_edital')  # Multi-seleÃ§Ã£o
         busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
         busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
         data_assinatura_inicio = request.args.get('data_assinatura_inicio', '').strip()
@@ -1497,7 +1497,7 @@ def exportar_csv():
         
         cur = get_cursor()
         
-        # Construir query com filtros (mesma lógica da listagem)
+        # Construir query com filtros (mesma lÃ³gica da listagem)
         query = """
             SELECT 
                 p.numero_termo,
@@ -1554,13 +1554,13 @@ def exportar_csv():
             params.append(f"%{filtro_projeto}%")
         
         if filtro_tipo_termo:
-            # Múltiplos tipos de termo
+            # MÃºltiplos tipos de termo
             placeholders = ','.join(['%s'] * len(filtro_tipo_termo))
             query += f" AND p.tipo_termo IN ({placeholders})"
             params.extend(filtro_tipo_termo)
         
         if filtro_pessoa_gestora:
-            # Separar filtros especiais de nomes específicos
+            # Separar filtros especiais de nomes especÃ­ficos
             filtros_especiais = []
             nomes_pg = []
             
@@ -1572,7 +1572,7 @@ def exportar_csv():
                 else:
                     nomes_pg.append(pg)
             
-            # Construir condições OR
+            # Construir condiÃ§Ãµes OR
             condicoes_pg = []
             
             if 'nenhuma' in filtros_especiais:
@@ -1620,7 +1620,7 @@ def exportar_csv():
             params.append(f"%{busca_sei_pc}%")
         
         if filtro_edital:
-            # Múltiplos editais
+            # MÃºltiplos editais
             placeholders = ','.join(['%s'] * len(filtro_edital))
             query += f" AND p.edital_nome IN ({placeholders})"
             params.extend(filtro_edital)
@@ -1648,7 +1648,7 @@ def exportar_csv():
             )"""
             params.append(data_assinatura_fim)
         
-        # Filtro por data de início
+        # Filtro por data de inÃ­cio
         if data_inicio_de:
             query += " AND p.inicio >= %s"
             params.append(data_inicio_de)
@@ -1657,7 +1657,7 @@ def exportar_csv():
             query += " AND p.inicio <= %s"
             params.append(data_inicio_ate)
         
-        # Filtro por data de término
+        # Filtro por data de tÃ©rmino
         if data_termino_de:
             query += " AND p.final >= %s"
             params.append(data_termino_de)
@@ -1666,7 +1666,7 @@ def exportar_csv():
             query += " AND p.final <= %s"
             params.append(data_termino_ate)
         
-        # Filtro de status baseado em datas (múltiplos status)
+        # Filtro de status baseado em datas (mÃºltiplos status)
         if filtro_status:
             condicoes_status = []
             
@@ -1689,39 +1689,39 @@ def exportar_csv():
         parcerias = cur.fetchall()
         cur.close()
         
-        # Criar arquivo CSV em memória com BOM UTF-8 para corrigir encoding
+        # Criar arquivo CSV em memÃ³ria com BOM UTF-8 para corrigir encoding
         output = StringIO()
         output.write('\ufeff')  # BOM UTF-8
         writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
         
-        # Verificar se coluna de endereço foi solicitada
+        # Verificar se coluna de endereÃ§o foi solicitada
         incluir_endereco = request.args.get('incluir_endereco', 'false') == 'true'
         
-        # Cabeçalho do CSV
+        # CabeÃ§alho do CSV
         cabecalho = [
-            'Número do Termo',
+            'NÃºmero do Termo',
             'Tipo de Termo',
             'OSC',
             'CNPJ',
             'Projeto',
             'Portaria',
             'Pessoa Gestora',
-            'Solicitação',
-            'Data Início',
-            'Data Término',
+            'SolicitaÃ§Ã£o',
+            'Data InÃ­cio',
+            'Data TÃ©rmino',
             'Meses',
             'Total Previsto',
-            'SEI Celebração',
+            'SEI CelebraÃ§Ã£o',
             'SEI P&C'
         ]
         
         if incluir_endereco:
-            cabecalho.append('Endereço')
+            cabecalho.append('EndereÃ§o')
         
         cabecalho.extend([
             'SEI Plano',
-            'SEI Orçamento',
-            'Transição'
+            'SEI OrÃ§amento',
+            'TransiÃ§Ã£o'
         ])
         
         writer.writerow(cabecalho)
@@ -1738,7 +1738,7 @@ def exportar_csv():
                 parceria['projeto'] or '-',
                 parceria['portaria'] or '-',
                 parceria['pessoa_gestora'] or '-',
-                'Sim' if parceria.get('solicitacao') else 'Não',
+                'Sim' if parceria.get('solicitacao') else 'NÃ£o',
                 parceria['inicio'].strftime('%d/%m/%Y') if parceria['inicio'] else '-',
                 parceria['final'].strftime('%d/%m/%Y') if parceria['final'] else '-',
                 parceria['meses'] if parceria['meses'] is not None else '-',
@@ -1748,13 +1748,13 @@ def exportar_csv():
             ]
             
             if incluir_endereco:
-                endereco = parceria.get('endereco_completo') or 'Não preenchido'
+                endereco = parceria.get('endereco_completo') or 'NÃ£o preenchido'
                 linha.append(endereco)
             
             linha.extend([
                 parceria['sei_plano'] or '-',
                 parceria['sei_orcamento'] or '-',
-                'Sim' if parceria['transicao'] else 'Não'
+                'Sim' if parceria['transicao'] else 'NÃ£o'
             ])
             
             writer.writerow(linha)
@@ -1763,7 +1763,7 @@ def exportar_csv():
         output.seek(0)
         data_atual = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        # Verificar se há filtros aplicados para incluir no nome do arquivo
+        # Verificar se hÃ¡ filtros aplicados para incluir no nome do arquivo
         tem_filtros = any([filtro_termo, filtro_osc, filtro_projeto, filtro_tipo_termo, 
                           filtro_status, filtro_pessoa_gestora, busca_sei_celeb, busca_sei_pc])
         
@@ -1794,14 +1794,14 @@ def exportar_csv():
 @requires_access('parcerias')
 def exportar_pdf():
     """
-    Exporta uma parceria específica para PDF
+    Exporta uma parceria especÃ­fica para PDF
     """
     try:
-        # Obter número do termo da query string
+        # Obter nÃºmero do termo da query string
         numero_termo = request.args.get('numero_termo', '').strip()
         
         if not numero_termo:
-            return "Número do termo não informado", 400
+            return "NÃºmero do termo nÃ£o informado", 400
         
         cur = get_cursor()
         
@@ -1832,9 +1832,9 @@ def exportar_pdf():
         cur.close()
         
         if not parceria:
-            return "Parceria não encontrada", 404
+            return "Parceria nÃ£o encontrada", 404
         
-        # Criar PDF em memória
+        # Criar PDF em memÃ³ria
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, 
                                rightMargin=2*cm, leftMargin=2*cm,
@@ -1844,7 +1844,7 @@ def exportar_pdf():
         elements = []
         styles = getSampleStyleSheet()
         
-        # Estilo personalizado para o título
+        # Estilo personalizado para o tÃ­tulo
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
@@ -1871,7 +1871,7 @@ def exportar_pdf():
             spaceAfter=12
         )
         
-        # Título
+        # TÃ­tulo
         titulo = Paragraph(f"Parceria - {parceria['numero_termo']}", title_style)
         elements.append(titulo)
         elements.append(Spacer(1, 0.5*cm))
@@ -1884,21 +1884,21 @@ def exportar_pdf():
         
         # Dados da parceria em formato de tabela
         dados = [
-            ['Número do Termo:', parceria['numero_termo']],
+            ['NÃºmero do Termo:', parceria['numero_termo']],
             ['Tipo de Termo:', parceria['tipo_termo'] or '-'],
             ['OSC:', parceria['osc'] or '-'],
             ['CNPJ:', parceria['cnpj'] or '-'],
             ['Projeto:', parceria['projeto'] or '-'],
             ['Portaria:', parceria['portaria'] or '-'],
-            ['Data de Início:', data_inicio_fmt],
-            ['Data de Término:', data_termino_fmt],
+            ['Data de InÃ­cio:', data_inicio_fmt],
+            ['Data de TÃ©rmino:', data_termino_fmt],
             ['Meses:', str(parceria['meses']) if parceria['meses'] is not None else '-'],
             ['Total Previsto:', total_previsto_fmt],
-            ['SEI Celebração:', parceria['sei_celeb'] or '-'],
+            ['SEI CelebraÃ§Ã£o:', parceria['sei_celeb'] or '-'],
             ['SEI P&C:', parceria['sei_pc'] or '-'],
             ['SEI Plano:', parceria['sei_plano'] or '-'],
-            ['SEI Orçamento:', parceria['sei_orcamento'] or '-'],
-            ['Transição:', 'Sim' if parceria['transicao'] else 'Não']
+            ['SEI OrÃ§amento:', parceria['sei_orcamento'] or '-'],
+            ['TransiÃ§Ã£o:', 'Sim' if parceria['transicao'] else 'NÃ£o']
         ]
         
         # Criar tabela
@@ -1919,8 +1919,8 @@ def exportar_pdf():
         elements.append(tabela)
         elements.append(Spacer(1, 1*cm))
         
-        # Rodapé
-        data_geracao = datetime.now().strftime('%d/%m/%Y às %H:%M')
+        # RodapÃ©
+        data_geracao = datetime.now().strftime('%d/%m/%Y Ã s %H:%M')
         rodape = Paragraph(f"<i>Documento gerado em {data_geracao}</i>", 
                           ParagraphStyle('Footer', parent=styles['Normal'], 
                                        fontSize=8, textColor=colors.grey))
@@ -1951,7 +1951,7 @@ def exportar_pdf():
 @requires_access('parcerias')
 def conferencia():
     """
-    Rota de conferência de parcerias - agora com input manual de CSV
+    Rota de conferÃªncia de parcerias - agora com input manual de CSV
     """
     return render_template('temp_conferencia.html')
 
@@ -1961,8 +1961,8 @@ def conferencia():
 @requires_access('parcerias')
 def conferencia_processar():
     """
-    Processa o CSV colado pelo usuário e compara com o banco de dados
-    Extrai: Número do Termo (col 1) e Nome da OSC (col 2)
+    Processa o CSV colado pelo usuÃ¡rio e compara com o banco de dados
+    Extrai: NÃºmero do Termo (col 1) e Nome da OSC (col 2)
     """
     try:
         data = request.get_json()
@@ -1971,7 +1971,7 @@ def conferencia_processar():
         if not csv_data:
             return jsonify({'erro': 'Nenhum dado CSV fornecido'}), 400
         
-        # Processa o CSV (pega número do termo E nome da OSC)
+        # Processa o CSV (pega nÃºmero do termo E nome da OSC)
         linhas = csv_data.split('\n')
         termos_csv = {}  # {numero_termo: nome_osc}
         
@@ -1980,7 +1980,7 @@ def conferencia_processar():
             if not linha:
                 continue
             
-            # Pula o cabeçalho (primeira linha)
+            # Pula o cabeÃ§alho (primeira linha)
             if i == 0:
                 continue
             
@@ -1993,7 +1993,7 @@ def conferencia_processar():
                 if numero_termo and numero_termo != '0' and numero_termo.lower() != 'null':
                     termos_csv[numero_termo] = nome_osc
         
-        print(f"[DEBUG CSV] Total de termos extraídos do CSV: {len(termos_csv)}")
+        print(f"[DEBUG CSV] Total de termos extraÃ­dos do CSV: {len(termos_csv)}")
         
         # Busca termos no banco
         cur = get_cursor()
@@ -2016,7 +2016,7 @@ def conferencia_processar():
                 'osc': termos_csv[termo]
             })
         
-        # Termos existentes (só os números)
+        # Termos existentes (sÃ³ os nÃºmeros)
         existentes = sorted(list(set_csv & termos_db_unicos))
         
         print(f"[DEBUG CSV] Faltantes: {len(faltantes)}, Existentes: {len(existentes)}")
@@ -2040,10 +2040,10 @@ def conferencia_processar():
         
     except Exception as e:
         import traceback
-        print(f"[ERRO CONFERENCIA] Exceção capturada: {str(e)}")
+        print(f"[ERRO CONFERENCIA] ExceÃ§Ã£o capturada: {str(e)}")
         print(f"[ERRO CONFERENCIA] Traceback completo:")
         traceback.print_exc()
-        flash(f"Erro ao processar conferência: {str(e)}", "danger")
+        flash(f"Erro ao processar conferÃªncia: {str(e)}", "danger")
         return redirect(url_for('parcerias.listar'))
 
 
@@ -2053,7 +2053,7 @@ def conferencia_processar():
 def atualizar_conferencia():
     """
     Executa o script import_conferencia.py para atualizar os dados
-    e redireciona de volta para a página de conferência
+    e redireciona de volta para a pÃ¡gina de conferÃªncia
     """
     import subprocess
     import os
@@ -2063,7 +2063,7 @@ def atualizar_conferencia():
         script_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'import_conferencia.py')
         
         if not os.path.exists(script_path):
-            flash("Script import_conferencia.py não encontrado.", "danger")
+            flash("Script import_conferencia.py nÃ£o encontrado.", "danger")
             return redirect(url_for('parcerias.conferencia'))
         
         # Executa o script
@@ -2075,7 +2075,7 @@ def atualizar_conferencia():
         )
         
         if result.returncode == 0:
-            flash("Conferência atualizada com sucesso! ✓", "success")
+            flash("ConferÃªncia atualizada com sucesso! âœ“", "success")
         else:
             flash(f"Erro ao executar o script: {result.stderr}", "danger")
         
@@ -2085,7 +2085,7 @@ def atualizar_conferencia():
         flash("Timeout: O script demorou muito para executar.", "danger")
         return redirect(url_for('parcerias.conferencia'))
     except Exception as e:
-        flash(f"Erro ao atualizar conferência: {str(e)}", "danger")
+        flash(f"Erro ao atualizar conferÃªncia: {str(e)}", "danger")
         return redirect(url_for('parcerias.conferencia'))
 
 
@@ -2094,8 +2094,8 @@ def atualizar_conferencia():
 @requires_access('parcerias')
 def conferencia_pos_insercao():
     """
-    Rota intermediária após inserção de parceria vinda da conferência.
-    Executa atualização automática e redireciona para a conferência.
+    Rota intermediÃ¡ria apÃ³s inserÃ§Ã£o de parceria vinda da conferÃªncia.
+    Executa atualizaÃ§Ã£o automÃ¡tica e redireciona para a conferÃªncia.
     """
     import subprocess
     import os
@@ -2105,7 +2105,7 @@ def conferencia_pos_insercao():
         script_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'import_conferencia.py')
         
         if os.path.exists(script_path):
-            # Executa o script para atualizar a conferência
+            # Executa o script para atualizar a conferÃªncia
             result = subprocess.run(
                 ['python', script_path],
                 capture_output=True,
@@ -2114,16 +2114,16 @@ def conferencia_pos_insercao():
             )
             
             if result.returncode == 0:
-                flash("Parceria importada com sucesso! Conferência atualizada automaticamente. ✓", "success")
+                flash("Parceria importada com sucesso! ConferÃªncia atualizada automaticamente. âœ“", "success")
             else:
-                flash("Parceria importada, mas houve erro ao atualizar a conferência.", "warning")
+                flash("Parceria importada, mas houve erro ao atualizar a conferÃªncia.", "warning")
         else:
             flash("Parceria importada com sucesso!", "success")
         
     except subprocess.TimeoutExpired:
-        flash("Parceria importada, mas a atualização da conferência excedeu o tempo limite.", "warning")
+        flash("Parceria importada, mas a atualizaÃ§Ã£o da conferÃªncia excedeu o tempo limite.", "warning")
     except Exception as e:
-        flash(f"Parceria importada, mas houve erro ao atualizar conferência: {str(e)}", "warning")
+        flash(f"Parceria importada, mas houve erro ao atualizar conferÃªncia: {str(e)}", "warning")
     
     return redirect(url_for('parcerias.conferencia'))
 
@@ -2133,11 +2133,11 @@ def conferencia_pos_insercao():
 @requires_access('parcerias')
 def dicionario_oscs():
     """
-    Dicionário de OSCs - permite padronizar e corrigir nomes de OSCs
-    Mostra todas as OSCs únicas com contagem de termos associados
+    DicionÃ¡rio de OSCs - permite padronizar e corrigir nomes de OSCs
+    Mostra todas as OSCs Ãºnicas com contagem de termos associados
     """
     try:
-        # Parâmetros de paginação e filtros
+        # ParÃ¢metros de paginaÃ§Ã£o e filtros
         pagina = request.args.get('pagina', 1, type=int)
         por_pagina = 50
         offset = (pagina - 1) * por_pagina
@@ -2148,7 +2148,7 @@ def dicionario_oscs():
 
         cur = get_cursor()
 
-        # Buscar total de OSCs únicas (agregando Parcerias + CENTS + Celebração por CNPJ)
+        # Buscar total de OSCs Ãºnicas (agregando Parcerias + CENTS + CelebraÃ§Ã£o por CNPJ)
         # CTE canonical_cnpj garante que a mesma OSC com diferentes registros de CNPJ seja unificada
         cur.execute(f"""
             WITH canonical_cnpj AS (
@@ -2170,8 +2170,8 @@ def dicionario_oscs():
         total_oscs = cur.fetchone()['total']
         total_paginas = (total_oscs + por_pagina - 1) // por_pagina
         
-        # Buscar OSCs com contagem de termos, CENTS e Celebração (paginado)
-        # CTE agrupa por CNPJ canônico para eliminar duplicatas entre fontes
+        # Buscar OSCs com contagem de termos, CENTS e CelebraÃ§Ã£o (paginado)
+        # CTE agrupa por CNPJ canÃ´nico para eliminar duplicatas entre fontes
         query = f"""
             WITH canonical_cnpj AS (
                 SELECT osc, MAX(NULLIF(TRIM(cnpj), '')) as cnpj, MAX(data_criacao) as data_mais_recente
@@ -2219,7 +2219,7 @@ def dicionario_oscs():
         oscs = cur.fetchall()
         cur.close()
 
-        return render_template('parcerias_osc_dict.html',
+        return render_template('parcerias/parcerias_osc_dict.html',
                              oscs=oscs,
                              total_oscs=total_oscs,
                              pagina_atual=pagina,
@@ -2228,10 +2228,10 @@ def dicionario_oscs():
                              dias_recentes=dias_recentes)
         
     except Exception as e:
-        print(f"[ERRO] Erro ao carregar dicionário de OSCs: {str(e)}")
+        print(f"[ERRO] Erro ao carregar dicionÃ¡rio de OSCs: {str(e)}")
         import traceback
         traceback.print_exc()
-        flash(f"Erro ao carregar dicionário de OSCs: {str(e)}", "danger")
+        flash(f"Erro ao carregar dicionÃ¡rio de OSCs: {str(e)}", "danger")
         return redirect(url_for('parcerias.listar'))
 
 
@@ -2239,14 +2239,14 @@ def dicionario_oscs():
 @login_required
 def exportar_oscs_csv():
     """
-    Exporta TODAS as OSCs únicas com CNPJ para arquivo CSV
-    Disponível para usuários autenticados
+    Exporta TODAS as OSCs Ãºnicas com CNPJ para arquivo CSV
+    DisponÃ­vel para usuÃ¡rios autenticados
     """
     try:
         cur = get_cursor()
         
-        # Buscar TODAS as OSCs únicas com CNPJ (sem paginação)
-        # Agrupa por CNPJ quando disponível, pega o nome mais recente
+        # Buscar TODAS as OSCs Ãºnicas com CNPJ (sem paginaÃ§Ã£o)
+        # Agrupa por CNPJ quando disponÃ­vel, pega o nome mais recente
         query = """
             SELECT 
                 MAX(osc) as osc,
@@ -2277,7 +2277,7 @@ def exportar_oscs_csv():
         output = io.StringIO()
         output.write('\ufeff')  # BOM UTF-8
         
-        # Cabeçalho
+        # CabeÃ§alho
         output.write('Nome da OSC;CNPJ;Total de Termos;Total CENTS\n')
         
         # Dados
@@ -2287,7 +2287,7 @@ def exportar_oscs_csv():
             total_termos = osc['total_termos'] or 0
             total_cents = osc['total_cents'] or 0
             
-            # Formatar CNPJ como texto para evitar notação científica
+            # Formatar CNPJ como texto para evitar notaÃ§Ã£o cientÃ­fica
             if cnpj:
                 cnpj_formatado = f'="{cnpj}"'
             else:
@@ -2331,7 +2331,7 @@ def buscar_oscs():
         dias_cond = f"AND cc.data_mais_recente >= NOW() - INTERVAL '{dias_recentes} days'" if dias_recentes > 0 else ""
 
         if not termo_busca and not cnpj_busca:
-            return jsonify({'error': 'Informe pelo menos um critério de busca'}), 400
+            return jsonify({'error': 'Informe pelo menos um critÃ©rio de busca'}), 400
 
         cur = get_cursor()
         
@@ -2400,13 +2400,13 @@ def buscar_oscs():
 @requires_access('parcerias')
 def termos_por_osc(osc):
     """
-    API para buscar todos os termos de uma OSC específica
+    API para buscar todos os termos de uma OSC especÃ­fica
     Retorna termos de public.Parcerias e termos de celebracao.celebracao_parcerias
     """
     try:
         cur = get_cursor()
         
-        # ── Termos de public.Parcerias ─────────────────────────────────────────
+        # â”€â”€ Termos de public.Parcerias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         cur.execute("""
             SELECT numero_termo, tipo_termo, projeto, inicio, final, total_previsto
             FROM public.Parcerias
@@ -2415,7 +2415,7 @@ def termos_por_osc(osc):
         """, (osc,))
         termos = cur.fetchall()
         
-        # ── Descobrir CNPJ para busca cruzada ────────────────────────────────
+        # â”€â”€ Descobrir CNPJ para busca cruzada â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         cnpj = None
         cur.execute("""
             SELECT cnpj FROM public.Parcerias
@@ -2446,7 +2446,7 @@ def termos_por_osc(osc):
             if row:
                 cnpj = row['cnpj']
         
-        # ── Termos de celebracao.celebracao_parcerias ────────────────────────
+        # â”€â”€ Termos de celebracao.celebracao_parcerias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if cnpj:
             cur.execute("""
                 SELECT numero_termo, status_generico, tipo_termo, projeto, inicio, final, total_previsto
@@ -2464,7 +2464,7 @@ def termos_por_osc(osc):
         termos_celeb = cur.fetchall()
         cur.close()
         
-        # ── Formatar Parcerias ──────────────────────────────────────────────
+        # â”€â”€ Formatar Parcerias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         termos_formatados = []
         for t in termos:
             td = dict(t)
@@ -2473,7 +2473,7 @@ def termos_por_osc(osc):
             td['total_previsto'] = float(t['total_previsto']) if t['total_previsto'] else 0
             termos_formatados.append(td)
         
-        # ── Formatar Celebração ─────────────────────────────────────────────
+        # â”€â”€ Formatar CelebraÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         termos_celeb_formatados = []
         for t in termos_celeb:
             td = dict(t)
@@ -2508,26 +2508,26 @@ def atualizar_osc():
         osc_nova = data.get('osc_nova', '').strip()
         
         if not osc_antiga or not osc_nova:
-            return jsonify({'error': 'OSC antiga e nova são obrigatórias'}), 400
+            return jsonify({'error': 'OSC antiga e nova sÃ£o obrigatÃ³rias'}), 400
         
         if osc_antiga == osc_nova:
-            return jsonify({'error': 'OSC antiga e nova são iguais'}), 400
+            return jsonify({'error': 'OSC antiga e nova sÃ£o iguais'}), 400
         
         cur = get_cursor()
         
-        # ── public.Parcerias ────────────────────────────────────────────────
+        # â”€â”€ public.Parcerias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         cur.execute("UPDATE public.Parcerias SET osc = %s WHERE osc = %s", (osc_nova, osc_antiga))
         linhas_parcerias = cur.rowcount
         
-        # ── celebracao.gestao_cents ─────────────────────────────────────────
+        # â”€â”€ celebracao.gestao_cents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         cur.execute("UPDATE celebracao.gestao_cents SET osc = %s WHERE osc = %s", (osc_nova, osc_antiga))
         linhas_cents = cur.rowcount
         
-        # ── celebracao.celebracao_parcerias ─────────────────────────────────
+        # â”€â”€ celebracao.celebracao_parcerias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         cur.execute("UPDATE celebracao.celebracao_parcerias SET osc = %s WHERE osc = %s", (osc_nova, osc_antiga))
         linhas_celeb = cur.rowcount
         
-        # ── public.osc_contatos (mantém histórico de contatos vinculado) ────
+        # â”€â”€ public.osc_contatos (mantÃ©m histÃ³rico de contatos vinculado) â”€â”€â”€â”€
         cur.execute("UPDATE public.osc_contatos SET osc = %s WHERE osc = %s", (osc_nova, osc_antiga))
         linhas_contatos = cur.rowcount
         
@@ -2539,14 +2539,14 @@ def atualizar_osc():
         partes = []
         if linhas_parcerias: partes.append(f'{linhas_parcerias} termo(s) celebrado(s)')
         if linhas_cents:     partes.append(f'{linhas_cents} CENTS')
-        if linhas_celeb:     partes.append(f'{linhas_celeb} em celebração')
+        if linhas_celeb:     partes.append(f'{linhas_celeb} em celebraÃ§Ã£o')
         if linhas_contatos:  partes.append(f'{linhas_contatos} contato(s)')
         detalhe = ' | '.join(partes) if partes else 'nenhum registro'
         
-        print(f"[SUCESSO] OSC renomeada: '{osc_antiga}' → '{osc_nova}' ({detalhe})")
+        print(f"[SUCESSO] OSC renomeada: '{osc_antiga}' â†’ '{osc_nova}' ({detalhe})")
         
         return jsonify({
-            'message': f'✅ OSC atualizada em todas as fontes! {detalhe}.',
+            'message': f'âœ… OSC atualizada em todas as fontes! {detalhe}.',
             'linhas_afetadas': linhas_total,
             'detalhe': {'parcerias': linhas_parcerias, 'cents': linhas_cents, 'celebracao': linhas_celeb, 'contatos': linhas_contatos}
         }), 200
@@ -2627,14 +2627,14 @@ def criar_contato():
         osc = data.get('osc', '').strip()
         contatos = data.get('contatos', [])  # Array de contatos completos
         
-        # Validações
+        # ValidaÃ§Ãµes
         if not osc:
-            return jsonify({'error': 'Campo obrigatório: OSC'}), 400
+            return jsonify({'error': 'Campo obrigatÃ³rio: OSC'}), 400
         
         if not contatos or len(contatos) == 0:
             return jsonify({'error': 'Adicione pelo menos um contato'}), 400
         
-        # Pegar d_usuario da sessão
+        # Pegar d_usuario da sessÃ£o
         responsavel = session.get('d_usuario', 'sistema')
         
         cur = get_cursor()
@@ -2665,7 +2665,7 @@ def criar_contato():
         
         if len(ids_criados) == 0:
             cur.close()
-            return jsonify({'error': 'Nenhum contato válido foi fornecido'}), 400
+            return jsonify({'error': 'Nenhum contato vÃ¡lido foi fornecido'}), 400
         
         get_db().commit()
         cur.close()
@@ -2673,7 +2673,7 @@ def criar_contato():
         print(f"[SUCESSO] {len(ids_criados)} contato(s) criado(s) para OSC '{osc}'")
         
         return jsonify({
-            'message': f'✅ {len(ids_criados)} contato(s) adicionado(s) com sucesso!',
+            'message': f'âœ… {len(ids_criados)} contato(s) adicionado(s) com sucesso!',
             'ids': ids_criados
         }), 200
         
@@ -2702,11 +2702,11 @@ def editar_contato(id):
         status = data.get('status', 'Ativo').strip()
         observacao = data.get('observacao', '').strip()
         
-        # Validações
+        # ValidaÃ§Ãµes
         if not all([contato_nome, contato_tipo, contato_info]):
-            return jsonify({'error': 'Campos obrigatórios: Nome, Tipo e Informação de Contato'}), 400
+            return jsonify({'error': 'Campos obrigatÃ³rios: Nome, Tipo e InformaÃ§Ã£o de Contato'}), 400
         
-        # Pegar d_usuario da sessão
+        # Pegar d_usuario da sessÃ£o
         atualizado_por = session.get('d_usuario', 'sistema')
         
         cur = get_cursor()
@@ -2728,14 +2728,14 @@ def editar_contato(id):
         
         if cur.rowcount == 0:
             cur.close()
-            return jsonify({'error': 'Contato não encontrado'}), 404
+            return jsonify({'error': 'Contato nÃ£o encontrado'}), 404
         
         get_db().commit()
         cur.close()
         
         print(f"[SUCESSO] Contato ID {id} atualizado: {contato_nome}")
         
-        return jsonify({'message': f'✅ Contato {contato_nome} atualizado com sucesso!'}), 200
+        return jsonify({'message': f'âœ… Contato {contato_nome} atualizado com sucesso!'}), 200
         
     except Exception as e:
         print(f"[ERRO] Erro ao editar contato: {str(e)}")
@@ -2761,7 +2761,7 @@ def deletar_contato(id):
         
         if not contato:
             cur.close()
-            return jsonify({'error': 'Contato não encontrado'}), 404
+            return jsonify({'error': 'Contato nÃ£o encontrado'}), 404
         
         nome = contato['contato_nome']
         osc = contato['osc']
@@ -2773,7 +2773,7 @@ def deletar_contato(id):
         
         print(f"[SUCESSO] Contato ID {id} deletado: {nome} da OSC '{osc}'")
         
-        return jsonify({'message': f'✅ Contato {nome} excluído com sucesso!'}), 200
+        return jsonify({'message': f'âœ… Contato {nome} excluÃ­do com sucesso!'}), 200
         
     except Exception as e:
         print(f"[ERRO] Erro ao deletar contato: {str(e)}")
@@ -2792,11 +2792,11 @@ def deletar_contato(id):
 @requires_access('dgp_alteracoes')
 def termos_rescindidos():
     """
-    Página de cadastro e listagem de termos rescindidos
+    PÃ¡gina de cadastro e listagem de termos rescindidos
     """
     cur = get_cursor()
     
-    # Buscar termos já rescindidos com responsável
+    # Buscar termos jÃ¡ rescindidos com responsÃ¡vel
     cur.execute("""
         SELECT tr.id, tr.numero_termo, tr.data_rescisao, tr.sei_rescisao, 
                tr.responsavel_rescisao, p.osc as osc_nome
@@ -2816,7 +2816,7 @@ def termos_rescindidos():
     
     cur.close()
     
-    # NÃO carregar todos os termos aqui - usar API de autocomplete
+    # NÃƒO carregar todos os termos aqui - usar API de autocomplete
     return render_template('termos_rescindidos.html',
                          rescisoes=rescisoes,
                          analistas_dgp=analistas_dgp,
@@ -2828,11 +2828,11 @@ def termos_rescindidos():
 @requires_access('dgp_alteracoes')
 def api_termos_disponiveis():
     """
-    API para autocomplete de termos disponíveis (não rescindidos)
-    Busca termos que começam com o texto digitado
+    API para autocomplete de termos disponÃ­veis (nÃ£o rescindidos)
+    Busca termos que comeÃ§am com o texto digitado
     """
     try:
-        # Obter termo de busca (texto digitado pelo usuário)
+        # Obter termo de busca (texto digitado pelo usuÃ¡rio)
         query = request.args.get('q', '').strip().upper()
         
         # Limitar a 50 resultados para performance
@@ -2841,7 +2841,7 @@ def api_termos_disponiveis():
         cur = get_cursor()
         
         if query:
-            # Buscar termos que começam com o texto digitado
+            # Buscar termos que comeÃ§am com o texto digitado
             cur.execute("""
                 SELECT DISTINCT p.numero_termo
                 FROM public.parcerias p
@@ -2853,7 +2853,7 @@ def api_termos_disponiveis():
                 LIMIT %s
             """, (f"{query}%", limite))
         else:
-            # Se não há busca, retornar vazio (não carregar todos)
+            # Se nÃ£o hÃ¡ busca, retornar vazio (nÃ£o carregar todos)
             cur.close()
             return jsonify([])
         
@@ -2863,7 +2863,7 @@ def api_termos_disponiveis():
         return jsonify(termos)
         
     except Exception as e:
-        print(f"[ERRO] Erro ao buscar termos disponíveis: {str(e)}")
+        print(f"[ERRO] Erro ao buscar termos disponÃ­veis: {str(e)}")
         return jsonify({'erro': str(e)}), 500
 
 
@@ -2879,21 +2879,21 @@ def salvar_rescisao():
     sei_rescisao = request.form.get('sei_rescisao', '').strip()
     responsavel_rescisao = request.form.get('responsavel_rescisao', '').strip()
     
-    # Validações
+    # ValidaÃ§Ãµes
     if not numero_termo:
-        flash('Número do termo é obrigatório!', 'danger')
+        flash('NÃºmero do termo Ã© obrigatÃ³rio!', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
     
     if not data_rescisao:
-        flash('Data de rescisão é obrigatória!', 'danger')
+        flash('Data de rescisÃ£o Ã© obrigatÃ³ria!', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
     
     if not sei_rescisao:
-        flash('SEI da rescisão é obrigatório!', 'danger')
+        flash('SEI da rescisÃ£o Ã© obrigatÃ³rio!', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
     
     if not responsavel_rescisao:
-        flash('Responsável pela rescisão é obrigatório!', 'danger')
+        flash('ResponsÃ¡vel pela rescisÃ£o Ã© obrigatÃ³rio!', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
     
     cur = get_cursor()
@@ -2904,18 +2904,18 @@ def salvar_rescisao():
         termo_existe = cur.fetchone()['total'] > 0
         
         if not termo_existe:
-            flash(f'Termo "{numero_termo}" não existe na base de parcerias!', 'danger')
+            flash(f'Termo "{numero_termo}" nÃ£o existe na base de parcerias!', 'danger')
             return redirect(url_for('parcerias.termos_rescindidos'))
         
-        # Verificar se já foi rescindido
+        # Verificar se jÃ¡ foi rescindido
         cur.execute("SELECT COUNT(*) as total FROM public.termos_rescisao WHERE numero_termo = %s", (numero_termo,))
         ja_rescindido = cur.fetchone()['total'] > 0
         
         if ja_rescindido:
-            flash(f'Termo "{numero_termo}" já está cadastrado como rescindido!', 'warning')
+            flash(f'Termo "{numero_termo}" jÃ¡ estÃ¡ cadastrado como rescindido!', 'warning')
             return redirect(url_for('parcerias.termos_rescindidos'))
         
-        # Inserir rescisão
+        # Inserir rescisÃ£o
         cur.execute("""
             INSERT INTO public.termos_rescisao (numero_termo, data_rescisao, sei_rescisao, responsavel_rescisao)
             VALUES (%s, %s, %s, %s)
@@ -2928,11 +2928,11 @@ def salvar_rescisao():
         return redirect(url_for('parcerias.termos_rescindidos'))
         
     except Exception as e:
-        print(f"[ERRO] Erro ao salvar rescisão: {str(e)}")
+        print(f"[ERRO] Erro ao salvar rescisÃ£o: {str(e)}")
         import traceback
         traceback.print_exc()
         get_db().rollback()
-        flash(f'Erro ao salvar rescisão: {str(e)}', 'danger')
+        flash(f'Erro ao salvar rescisÃ£o: {str(e)}', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
 
 
@@ -2946,14 +2946,14 @@ def editar_rescisao(id):
     cur = get_cursor()
     
     if request.method == 'POST':
-        # Processar atualização
+        # Processar atualizaÃ§Ã£o
         data_rescisao = request.form.get('data_rescisao', '').strip()
         sei_rescisao = request.form.get('sei_rescisao', '').strip()
         responsavel_rescisao = request.form.get('responsavel_rescisao', '').strip()
         numero_termo = request.form.get('numero_termo', '').strip()  # Hidden field
         
         if not data_rescisao or not sei_rescisao or not responsavel_rescisao:
-            flash('Todos os campos são obrigatórios!', 'danger')
+            flash('Todos os campos sÃ£o obrigatÃ³rios!', 'danger')
             return redirect(url_for('parcerias.editar_rescisao', id=id))
         
         try:
@@ -2966,16 +2966,16 @@ def editar_rescisao(id):
             get_db().commit()
             cur.close()
             
-            flash(f'Rescisão do termo "{numero_termo}" atualizada com sucesso!', 'success')
+            flash(f'RescisÃ£o do termo "{numero_termo}" atualizada com sucesso!', 'success')
             return redirect(url_for('parcerias.termos_rescindidos'))
             
         except Exception as e:
-            print(f"[ERRO] Erro ao atualizar rescisão: {str(e)}")
+            print(f"[ERRO] Erro ao atualizar rescisÃ£o: {str(e)}")
             get_db().rollback()
-            flash(f'Erro ao atualizar rescisão: {str(e)}', 'danger')
+            flash(f'Erro ao atualizar rescisÃ£o: {str(e)}', 'danger')
             return redirect(url_for('parcerias.editar_rescisao', id=id))
     
-    # GET: Carregar dados para edição
+    # GET: Carregar dados para ediÃ§Ã£o
     cur.execute("""
         SELECT tr.*, p.osc as osc_nome
         FROM public.termos_rescisao tr
@@ -2985,10 +2985,10 @@ def editar_rescisao(id):
     rescisao_editando = cur.fetchone()
     
     if not rescisao_editando:
-        flash('Rescisão não encontrada!', 'danger')
+        flash('RescisÃ£o nÃ£o encontrada!', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
     
-    # Buscar todas as rescisões para a tabela
+    # Buscar todas as rescisÃµes para a tabela
     cur.execute("""
         SELECT tr.id, tr.numero_termo, tr.data_rescisao, tr.sei_rescisao, 
                tr.responsavel_rescisao, p.osc as osc_nome
@@ -3006,7 +3006,7 @@ def editar_rescisao(id):
     """)
     analistas_dgp = [row['nome_analista'] for row in cur.fetchall()]
     
-    # Termos disponíveis (vazio pois está editando)
+    # Termos disponÃ­veis (vazio pois estÃ¡ editando)
     termos_disponiveis = [rescisao_editando['numero_termo']]
     
     cur.close()
@@ -3028,12 +3028,12 @@ def deletar_rescisao(id):
     cur = get_cursor()
     
     try:
-        # Buscar número do termo antes de deletar (para mensagem)
+        # Buscar nÃºmero do termo antes de deletar (para mensagem)
         cur.execute("SELECT numero_termo FROM public.termos_rescisao WHERE id = %s", (id,))
         rescisao = cur.fetchone()
         
         if not rescisao:
-            flash('Rescisão não encontrada!', 'danger')
+            flash('RescisÃ£o nÃ£o encontrada!', 'danger')
             return redirect(url_for('parcerias.termos_rescindidos'))
         
         numero_termo = rescisao['numero_termo']
@@ -3043,18 +3043,18 @@ def deletar_rescisao(id):
         get_db().commit()
         cur.close()
         
-        flash(f'Rescisão do termo "{numero_termo}" excluída com sucesso!', 'success')
+        flash(f'RescisÃ£o do termo "{numero_termo}" excluÃ­da com sucesso!', 'success')
         return redirect(url_for('parcerias.termos_rescindidos'))
         
     except Exception as e:
-        print(f"[ERRO] Erro ao deletar rescisão: {str(e)}")
+        print(f"[ERRO] Erro ao deletar rescisÃ£o: {str(e)}")
         get_db().rollback()
-        flash(f'Erro ao deletar rescisão: {str(e)}', 'danger')
+        flash(f'Erro ao deletar rescisÃ£o: {str(e)}', 'danger')
         return redirect(url_for('parcerias.termos_rescindidos'))
 
 
 # ============================================================================
-# ROTAS DE ALTERAÇÕES DGP
+# ROTAS DE ALTERAÃ‡Ã•ES DGP
 # ============================================================================
 
 @parcerias_bp.route("/dgp_alteracoes", methods=["GET"])
@@ -3062,12 +3062,12 @@ def deletar_rescisao(id):
 @requires_access('dgp_alteracoes')
 def dgp_alteracoes():
     """
-    Página de gerenciamento de alterações em termos de parceria
+    PÃ¡gina de gerenciamento de alteraÃ§Ãµes em termos de parceria
     """
     cur = get_cursor()
     
     try:
-        # Buscar tipos de alteração com seus instrumentos e configurações de campo
+        # Buscar tipos de alteraÃ§Ã£o com seus instrumentos e configuraÃ§Ãµes de campo
         cur.execute("""
             SELECT 
                 alt_tipo, 
@@ -3081,7 +3081,7 @@ def dgp_alteracoes():
         """)
         tipos_alteracao = cur.fetchall()
         
-        # Buscar instrumentos disponíveis
+        # Buscar instrumentos disponÃ­veis
         cur.execute("""
             SELECT DISTINCT instrumento_alteracao 
             FROM categoricas.c_alt_instrumento 
@@ -3107,11 +3107,11 @@ def dgp_alteracoes():
                     analistas_inativos.append(analista_obj)
         except Exception as e:
             print(f"[WARN] Erro ao buscar analistas DGP: {str(e)}")
-            # Fallback para lista estática se tabela não existir
+            # Fallback para lista estÃ¡tica se tabela nÃ£o existir
             analistas_ativos = [{'nome': 'Administrador', 'status': True}, {'nome': 'Sistema', 'status': True}]
             analistas_inativos = []
         
-        # Buscar alterações cadastradas com filtros
+        # Buscar alteraÃ§Ãµes cadastradas com filtros
         filtro_termo = request.args.get('filtro_termo', '').strip()
         filtro_instrumento = request.args.get('filtro_instrumento', '').strip()
         filtro_tipos = request.args.getlist('filtro_tipos[]')
@@ -3189,7 +3189,7 @@ def dgp_alteracoes():
             GROUP BY t.numero_termo, t.instrumento_alteracao, t.alt_numero
         """
         
-        # Paginação
+        # PaginaÃ§Ã£o
         page = request.args.get('page', 1, type=int)
         per_page = 100
         offset = (page - 1) * per_page
@@ -3207,7 +3207,7 @@ def dgp_alteracoes():
         # Adicionar ORDER BY e LIMIT/OFFSET para query principal
         query_base += """
             ORDER BY 
-                CASE WHEN MAX(alt_status) = 'Concluído' THEN 1 ELSE 0 END,
+                CASE WHEN MAX(alt_status) = 'ConcluÃ­do' THEN 1 ELSE 0 END,
                 data_assinatura DESC NULLS LAST, 
                 numero_termo, 
                 alt_numero
@@ -3235,7 +3235,7 @@ def dgp_alteracoes():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f"[ERRO] Erro ao carregar página de alterações: {str(e)}")
+        print(f"[ERRO] Erro ao carregar pÃ¡gina de alteraÃ§Ãµes: {str(e)}")
         flash(f'Erro ao carregar dados: {str(e)}', 'danger')
         cur.close()
         return redirect(url_for('parcerias.listar'))
@@ -3246,21 +3246,21 @@ def dgp_alteracoes():
 @requires_access('dgp_alteracoes')
 def dgp_alteracoes_exportar_csv():
     """
-    Exportar alterações DGP para CSV (respeitando filtros ativos)
+    Exportar alteraÃ§Ãµes DGP para CSV (respeitando filtros ativos)
     """
     from datetime import datetime
     
     cur = get_cursor()
     
     try:
-        # Obter filtros (mesmos da página principal)
+        # Obter filtros (mesmos da pÃ¡gina principal)
         filtro_termo = request.args.get('filtro_termo', '').strip()
         filtro_instrumento = request.args.get('filtro_instrumento', '').strip()
         filtro_tipos = request.args.getlist('filtro_tipos[]')
         filtro_responsavel = request.args.get('filtro_responsavel', '').strip()
         filtro_status = request.args.get('filtro_status', '').strip()
         
-        # Construir query base (mesma da página principal, mas sem paginação)
+        # Construir query base (mesma da pÃ¡gina principal, mas sem paginaÃ§Ã£o)
         query_base = """
             SELECT 
                 t.numero_termo,
@@ -3306,7 +3306,7 @@ def dgp_alteracoes_exportar_csv():
         
         params = []
         
-        # Aplicar filtros (mesma lógica da página principal)
+        # Aplicar filtros (mesma lÃ³gica da pÃ¡gina principal)
         if filtro_termo:
             query_base += " AND t.numero_termo ILIKE %s"
             params.append(f"%{filtro_termo}%")
@@ -3331,7 +3331,7 @@ def dgp_alteracoes_exportar_csv():
         query_base += """
             GROUP BY t.numero_termo, t.instrumento_alteracao, t.alt_numero
             ORDER BY 
-                CASE WHEN MAX(alt_status) = 'Concluído' THEN 1 ELSE 0 END,
+                CASE WHEN MAX(alt_status) = 'ConcluÃ­do' THEN 1 ELSE 0 END,
                 data_assinatura DESC NULLS LAST, 
                 numero_termo, 
                 alt_numero
@@ -3342,26 +3342,26 @@ def dgp_alteracoes_exportar_csv():
         
         cur.close()
         
-        # Gerar CSV com encoding UTF-8-BOM e separador ponto e vírgula (padrão Brasil)
+        # Gerar CSV com encoding UTF-8-BOM e separador ponto e vÃ­rgula (padrÃ£o Brasil)
         output = StringIO()
         writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
         
-        # Cabeçalho
+        # CabeÃ§alho
         writer.writerow([
-            'Número do Termo',
-            'Instrumento Jurídico',
-            'Numeração',
-            'Tipos de Alteração',
+            'NÃºmero do Termo',
+            'Instrumento JurÃ­dico',
+            'NumeraÃ§Ã£o',
+            'Tipos de AlteraÃ§Ã£o',
             'Status',
             'Data Assinatura',
-            'Nº SEI Documento',
-            'Responsáveis',
-            'Observações'
+            'NÂº SEI Documento',
+            'ResponsÃ¡veis',
+            'ObservaÃ§Ãµes'
         ])
         
         # Dados
         for alt in alteracoes:
-            # Formatar numeração
+            # Formatar numeraÃ§Ã£o
             alt_numero = alt['alt_numero']
             if alt_numero == 0:
                 numeracao_texto = 'N/A'
@@ -3388,7 +3388,7 @@ def dgp_alteracoes_exportar_csv():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f'dgp_alteracoes_{timestamp}.csv'
         
-        # Adicionar BOM UTF-8 no início
+        # Adicionar BOM UTF-8 no inÃ­cio
         csv_content = '\ufeff' + output.getvalue()
         
         return Response(
@@ -3413,14 +3413,14 @@ def dgp_alteracoes_exportar_csv():
 def api_termos_parcerias():
     """
     API para buscar termos de parcerias (para Select2)
-    Retorna todos os termos que não estão rescindidos
+    Retorna todos os termos que nÃ£o estÃ£o rescindidos
     """
     termo_busca = request.args.get('q', '').strip()
     
     cur = get_cursor()
     
     try:
-        # Buscar termos que NÃO estão na tabela de rescisão
+        # Buscar termos que NÃƒO estÃ£o na tabela de rescisÃ£o
         query = """
             SELECT DISTINCT p.numero_termo 
             FROM public.parcerias p
@@ -3453,7 +3453,7 @@ def api_termos_parcerias():
 @login_required
 def api_lista_oscs():
     """
-    API para listar todas as OSCs únicas
+    API para listar todas as OSCs Ãºnicas
     """
     cur = get_cursor()
     
@@ -3478,7 +3478,7 @@ def api_lista_oscs():
 @login_required
 def api_lista_pgs():
     """
-    API para listar todas as pessoas gestoras únicas
+    API para listar todas as pessoas gestoras Ãºnicas
     """
     cur = get_cursor()
     
@@ -3504,8 +3504,8 @@ def api_lista_pgs():
 @requires_access('dgp_alteracoes')
 def dgp_alteracoes_futuro():
     """
-    Página de gerenciamento de futuros aditamentos de prorrogação de vigência
-    Mostra apenas Acordos de Cooperação (ACP) e Termos de Colaboração (TCL)
+    PÃ¡gina de gerenciamento de futuros aditamentos de prorrogaÃ§Ã£o de vigÃªncia
+    Mostra apenas Acordos de CooperaÃ§Ã£o (ACP) e Termos de ColaboraÃ§Ã£o (TCL)
     """
     from datetime import datetime, timedelta
     
@@ -3523,7 +3523,7 @@ def dgp_alteracoes_futuro():
         # Debug
         print(f"[DEBUG] Filtros recebidos - mes: '{filtro_mes}', ano: '{filtro_ano}'")
         
-        # Query base - apenas ACC, TCL e Convênios que estão vigentes
+        # Query base - apenas ACC, TCL e ConvÃªnios que estÃ£o vigentes
         query = """
             SELECT 
                 p.numero_termo,
@@ -3535,16 +3535,16 @@ def dgp_alteracoes_futuro():
                 p.final,
                 SUBSTRING(p.numero_termo FROM '/([^/]+)$') as coordenacao
             FROM public.parcerias p
-            WHERE (p.tipo_termo LIKE '%Cooperação%' 
-                   OR p.tipo_termo LIKE '%Colaboração%'
-                   OR p.tipo_termo LIKE '%Convênio%')
+            WHERE (p.tipo_termo LIKE '%CooperaÃ§Ã£o%' 
+                   OR p.tipo_termo LIKE '%ColaboraÃ§Ã£o%'
+                   OR p.tipo_termo LIKE '%ConvÃªnio%')
               AND p.final IS NOT NULL
               AND p.inicio IS NOT NULL
               AND p.inicio <= CURRENT_DATE
               AND p.final >= CURRENT_DATE
         """
         
-        # Aplicar filtros - usando interpolação direta com escape adequado
+        # Aplicar filtros - usando interpolaÃ§Ã£o direta com escape adequado
         if filtro_osc:
             # Escapar aspas simples para prevenir SQL injection
             filtro_osc_safe = filtro_osc.replace("'", "''")
@@ -3558,30 +3558,30 @@ def dgp_alteracoes_futuro():
             filtro_tipo_safe = filtro_tipo_termo.replace("'", "''")
             query += f" AND LOWER(p.tipo_termo) LIKE LOWER('%{filtro_tipo_safe}%')"
         
-        # Filtros de data - usar interpolação direta (valores já validados como int)
+        # Filtros de data - usar interpolaÃ§Ã£o direta (valores jÃ¡ validados como int)
         if filtro_mes and filtro_mes.isdigit() and 1 <= int(filtro_mes) <= 12:
             query += f" AND EXTRACT(MONTH FROM p.final) = {int(filtro_mes)}"
-            print(f"[DEBUG] Filtro de mês aplicado: {filtro_mes}")
+            print(f"[DEBUG] Filtro de mÃªs aplicado: {filtro_mes}")
         
         if filtro_ano and filtro_ano.isdigit() and len(filtro_ano) == 4:
             query += f" AND EXTRACT(YEAR FROM p.final) = {int(filtro_ano)}"
             print(f"[DEBUG] Filtro de ano aplicado: {filtro_ano}")
         
-        # Ordenar por término (mais próximo primeiro)
+        # Ordenar por tÃ©rmino (mais prÃ³ximo primeiro)
         query += " ORDER BY p.final ASC"
         
-        # Executar query (sem parâmetros, tudo interpolado diretamente)
+        # Executar query (sem parÃ¢metros, tudo interpolado diretamente)
         cur.execute(query)
         
         parcerias = cur.fetchall()
         
-        # Calcular nível de urgência para cada parceria
+        # Calcular nÃ­vel de urgÃªncia para cada parceria
         hoje = datetime.now().date()
         for parceria in parcerias:
             if parceria['final']:
                 dias_restantes = (parceria['final'] - hoje).days
                 
-                # Classificar urgência
+                # Classificar urgÃªncia
                 if dias_restantes < 0:
                     parceria['urgencia'] = 'vencido'
                     parceria['urgencia_nivel'] = 5
@@ -3604,15 +3604,15 @@ def dgp_alteracoes_futuro():
                 parceria['urgencia_nivel'] = 0
                 parceria['dias_restantes'] = None
         
-        # Aplicar filtro de urgência se especificado
+        # Aplicar filtro de urgÃªncia se especificado
         if filtro_urgencia:
             parcerias = [p for p in parcerias if p['urgencia'] == filtro_urgencia]
         
-        # Buscar lista de coordenações para o filtro
+        # Buscar lista de coordenaÃ§Ãµes para o filtro
         cur.execute("""
             SELECT DISTINCT SUBSTRING(numero_termo FROM '/([^/]+)$') as coordenacao
             FROM public.parcerias
-            WHERE (tipo_termo LIKE '%Cooperação%' OR tipo_termo LIKE '%Colaboração%')
+            WHERE (tipo_termo LIKE '%CooperaÃ§Ã£o%' OR tipo_termo LIKE '%ColaboraÃ§Ã£o%')
               AND numero_termo LIKE '%/%'
             ORDER BY coordenacao
         """)
@@ -3652,7 +3652,7 @@ def dgp_alteracoes_futuro_csv():
     cur = get_cursor()
     
     try:
-        # Obter filtros (mesmos da página)
+        # Obter filtros (mesmos da pÃ¡gina)
         filtro_osc = request.args.get('filtro_osc', '').strip()
         filtro_coordenacao = request.args.get('filtro_coordenacao', '').strip()
         filtro_tipo_termo = request.args.get('filtro_tipo_termo', '').strip()
@@ -3660,7 +3660,7 @@ def dgp_alteracoes_futuro_csv():
         filtro_mes = request.args.get('filtro_mes', '').strip()
         filtro_ano = request.args.get('filtro_ano', '').strip()
         
-        # Query base - mesma da página principal
+        # Query base - mesma da pÃ¡gina principal
         query = """
             SELECT 
                 p.numero_termo,
@@ -3672,16 +3672,16 @@ def dgp_alteracoes_futuro_csv():
                 p.final,
                 SUBSTRING(p.numero_termo FROM '/([^/]+)$') as coordenacao
             FROM public.parcerias p
-            WHERE (p.tipo_termo LIKE '%Cooperação%' 
-                   OR p.tipo_termo LIKE '%Colaboração%'
-                   OR p.tipo_termo LIKE '%Convênio%')
+            WHERE (p.tipo_termo LIKE '%CooperaÃ§Ã£o%' 
+                   OR p.tipo_termo LIKE '%ColaboraÃ§Ã£o%'
+                   OR p.tipo_termo LIKE '%ConvÃªnio%')
               AND p.final IS NOT NULL
               AND p.inicio IS NOT NULL
               AND p.inicio <= CURRENT_DATE
               AND p.final >= CURRENT_DATE
         """
         
-        # Aplicar filtros - usando interpolação direta com escape adequado
+        # Aplicar filtros - usando interpolaÃ§Ã£o direta com escape adequado
         if filtro_osc:
             filtro_osc_safe = filtro_osc.replace("'", "''")
             query += f" AND LOWER(p.osc) LIKE LOWER('%{filtro_osc_safe}%')"
@@ -3694,7 +3694,7 @@ def dgp_alteracoes_futuro_csv():
             filtro_tipo_safe = filtro_tipo_termo.replace("'", "''")
             query += f" AND LOWER(p.tipo_termo) LIKE LOWER('%{filtro_tipo_safe}%')"
         
-        # Filtros de data - usar interpolação direta (valores já validados como int)
+        # Filtros de data - usar interpolaÃ§Ã£o direta (valores jÃ¡ validados como int)
         if filtro_mes and filtro_mes.isdigit() and 1 <= int(filtro_mes) <= 12:
             query += f" AND EXTRACT(MONTH FROM p.final) = {int(filtro_mes)}"
         
@@ -3703,12 +3703,12 @@ def dgp_alteracoes_futuro_csv():
         
         query += " ORDER BY p.final ASC"
         
-        # Executar query (sem parâmetros, tudo interpolado)
+        # Executar query (sem parÃ¢metros, tudo interpolado)
         cur.execute(query)
         
         parcerias = cur.fetchall()
         
-        # Calcular urgência
+        # Calcular urgÃªncia
         hoje = datetime.now().date()
         for parceria in parcerias:
             if parceria['final']:
@@ -3718,40 +3718,40 @@ def dgp_alteracoes_futuro_csv():
                     parceria['urgencia'] = 'Vencido'
                     parceria['dias_restantes'] = dias_restantes
                 elif dias_restantes <= 30:
-                    parceria['urgencia'] = 'Crítico'
+                    parceria['urgencia'] = 'CrÃ­tico'
                     parceria['dias_restantes'] = dias_restantes
                 elif dias_restantes <= 60:
                     parceria['urgencia'] = 'Alto'
                     parceria['dias_restantes'] = dias_restantes
                 elif dias_restantes <= 90:
-                    parceria['urgencia'] = 'Médio'
+                    parceria['urgencia'] = 'MÃ©dio'
                     parceria['dias_restantes'] = dias_restantes
                 else:
                     parceria['urgencia'] = 'Baixo'
                     parceria['dias_restantes'] = dias_restantes
         
-        # Aplicar filtro de urgência
+        # Aplicar filtro de urgÃªncia
         if filtro_urgencia:
             parcerias = [p for p in parcerias if p['urgencia'].lower() == filtro_urgencia]
         
         cur.close()
         
-        # Gerar CSV com encoding UTF-8-BOM e separador ponto e vírgula (padrão Brasil)
+        # Gerar CSV com encoding UTF-8-BOM e separador ponto e vÃ­rgula (padrÃ£o Brasil)
         output = StringIO()
         writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
         
-        # Cabeçalho
+        # CabeÃ§alho
         writer.writerow([
-            'Número do Termo',
+            'NÃºmero do Termo',
             'OSC',
             'Projeto',
             'Tipo de Contrato',
             'Processo SEI',
-            'Data de Início',
-            'Data de Término',
+            'Data de InÃ­cio',
+            'Data de TÃ©rmino',
             'Dias Restantes',
-            'Urgência',
-            'Coordenação'
+            'UrgÃªncia',
+            'CoordenaÃ§Ã£o'
         ])
         
         # Dados
@@ -3773,7 +3773,7 @@ def dgp_alteracoes_futuro_csv():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f'futuros_aditamentos_{timestamp}.csv'
         
-        # Adicionar BOM UTF-8 no início
+        # Adicionar BOM UTF-8 no inÃ­cio
         csv_content = '\ufeff' + output.getvalue()
         
         return Response(
@@ -3800,22 +3800,22 @@ def dgp_alteracoes_futuro_csv():
 @requires_access('parcerias')
 def buscar_proximo_numero_alteracao():
     """
-    Buscar próximo número de aditamento/apostilamento para um termo
+    Buscar prÃ³ximo nÃºmero de aditamento/apostilamento para um termo
     Consulta as colunas aditamento e apostilamento de public.parcerias_sei
     """
     numero_termo = request.args.get('numero_termo', '').strip()
     instrumento = request.args.get('instrumento', '').strip()
     
     if not numero_termo or not instrumento:
-        return jsonify({'success': False, 'error': 'Parâmetros inválidos'}), 400
+        return jsonify({'success': False, 'error': 'ParÃ¢metros invÃ¡lidos'}), 400
     
     cur = get_cursor()
     
     try:
-        proximo_numero = 1  # Default: primeira alteração
+        proximo_numero = 1  # Default: primeira alteraÃ§Ã£o
         
         if instrumento == 'Termo de Aditamento':
-            # Buscar maior número na coluna aditamento
+            # Buscar maior nÃºmero na coluna aditamento
             cur.execute("""
                 SELECT aditamento
                 FROM public.parcerias_sei
@@ -3834,7 +3834,7 @@ def buscar_proximo_numero_alteracao():
                     proximo_numero = 1
                     
         elif instrumento == 'Termo de Apostilamento':
-            # Buscar maior número na coluna apostilamento
+            # Buscar maior nÃºmero na coluna apostilamento
             cur.execute("""
                 SELECT apostilamento
                 FROM public.parcerias_sei
@@ -3873,7 +3873,7 @@ def buscar_proximo_numero_alteracao():
 @requires_access('dgp_alteracoes')
 def dgp_alteracoes_temp_sei():
     """
-    Relatório editável de parcerias_sei - renderiza apenas o template
+    RelatÃ³rio editÃ¡vel de parcerias_sei - renderiza apenas o template
     """
     # Buscar lista de termos para dropdown
     cur = get_cursor()
@@ -3890,33 +3890,33 @@ def dgp_alteracoes_temp_sei():
 def api_parcerias_sei_dados():
     """
     API para DataTables server-side processing
-    Retorna dados paginados com filtros e ordenação
+    Retorna dados paginados com filtros e ordenaÃ§Ã£o
     """
     try:
-        # Parâmetros DataTables
+        # ParÃ¢metros DataTables
         draw = request.json.get('draw', 1)
         start = request.json.get('start', 0)
         length = request.json.get('length', 25)
         search_value = request.json.get('search', {}).get('value', '')
         order_column_idx = request.json.get('order', [{}])[0].get('column', 1)
-        order_dir = request.json.get('order', [{}])[0].get('dir', 'desc')  # Padrão DESC para mostrar mais recentes
+        order_dir = request.json.get('order', [{}])[0].get('dir', 'desc')  # PadrÃ£o DESC para mostrar mais recentes
         
         # Filtros por coluna
         column_filters = request.json.get('columns', [])
         
-        # Mapeamento de índices para nomes de colunas
+        # Mapeamento de Ã­ndices para nomes de colunas
         columns_map = {
-            0: 'id',  # Checkbox (não filtrável)
+            0: 'id',  # Checkbox (nÃ£o filtrÃ¡vel)
             1: 'numero_termo',
             2: 'termo_sei_doc',
             3: 'data_assinatura',
             4: 'aditamento',
             5: 'apostilamento',
             6: 'termo_tipo_sei',
-            7: 'id'  # Ações (não filtrável)
+            7: 'id'  # AÃ§Ãµes (nÃ£o filtrÃ¡vel)
         }
         
-        order_column = columns_map.get(order_column_idx, 'id')  # Padrão: ordenar por ID (mais recentes)
+        order_column = columns_map.get(order_column_idx, 'id')  # PadrÃ£o: ordenar por ID (mais recentes)
         
         cur = get_cursor()
         
@@ -3952,7 +3952,7 @@ def api_parcerias_sei_dados():
         # Filtros por coluna individual
         for idx, col_filter in enumerate(column_filters):
             col_search = col_filter.get('search', {}).get('value', '')
-            if col_search and idx in [1, 2, 3, 4, 5, 6]:  # Apenas colunas filtráveis
+            if col_search and idx in [1, 2, 3, 4, 5, 6]:  # Apenas colunas filtrÃ¡veis
                 col_name = columns_map[idx]
                 if col_name == 'data_assinatura':
                     query += f" AND CAST({col_name} AS TEXT) ILIKE %s"
@@ -3997,10 +3997,10 @@ def api_parcerias_sei_dados():
         result_filtered = cur.fetchone()
         records_filtered = result_filtered['total'] if result_filtered else 0
         
-        # Ordenação
+        # OrdenaÃ§Ã£o
         query += f" ORDER BY {order_column} {order_dir.upper()}"
         
-        # Paginação
+        # PaginaÃ§Ã£o
         query += " LIMIT %s OFFSET %s"
         params.extend([length, start])
         
@@ -4019,7 +4019,7 @@ def api_parcerias_sei_dados():
                 reg['aditamento'] or '',
                 reg['apostilamento'] or '',
                 reg['termo_tipo_sei'] or '',
-                reg['id']  # Para botão de ação
+                reg['id']  # Para botÃ£o de aÃ§Ã£o
             ])
         
         cur.close()
@@ -4053,7 +4053,7 @@ def api_exportar_parcerias_sei_csv():
     Respeita os mesmos filtros aplicados no DataTables
     """
     try:
-        # Receber parâmetros de filtro (mesma lógica do api_parcerias_sei_dados)
+        # Receber parÃ¢metros de filtro (mesma lÃ³gica do api_parcerias_sei_dados)
         search_value = request.json.get('search', {}).get('value', '')
         column_filters = request.json.get('columns', [])
         
@@ -4119,8 +4119,8 @@ def api_exportar_parcerias_sei_csv():
         output = StringIO()
         writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
         
-        # Cabeçalho
-        writer.writerow(['ID', 'Número Termo', 'SEI Doc', 'Data Assinatura', 'Aditamento', 'Apostilamento'])
+        # CabeÃ§alho
+        writer.writerow(['ID', 'NÃºmero Termo', 'SEI Doc', 'Data Assinatura', 'Aditamento', 'Apostilamento'])
         
         # Dados
         for reg in registros:
@@ -4164,7 +4164,7 @@ def api_exportar_parcerias_sei_csv():
 @requires_access('parcerias')
 def api_atualizar_parcerias_sei():
     """
-    API para atualizar campo específico de registro em parcerias_sei
+    API para atualizar campo especÃ­fico de registro em parcerias_sei
     """
     try:
         data = request.get_json()
@@ -4173,18 +4173,18 @@ def api_atualizar_parcerias_sei():
         valor = data.get('valor')
         
         if not registro_id or not campo:
-            return jsonify({'success': False, 'error': 'Parâmetros inválidos'}), 400
+            return jsonify({'success': False, 'error': 'ParÃ¢metros invÃ¡lidos'}), 400
         
         # Validar campo permitido
         campos_permitidos = ['numero_termo', 'termo_sei_doc', 
                             'data_assinatura', 'aditamento', 'apostilamento', 'termo_tipo_sei']
         if campo not in campos_permitidos:
-            return jsonify({'success': False, 'error': 'Campo não permitido'}), 400
+            return jsonify({'success': False, 'error': 'Campo nÃ£o permitido'}), 400
         
         conn = get_db()
         cur = conn.cursor()
         
-        # Update usando parametrização segura
+        # Update usando parametrizaÃ§Ã£o segura
         query = f"UPDATE public.parcerias_sei SET {campo} = %s WHERE id = %s"
         cur.execute(query, (valor if valor != '' else None, registro_id))
         conn.commit()
@@ -4211,12 +4211,12 @@ def api_excluir_parcerias_sei():
         ids = data.get('ids', [])
         
         if not ids or not isinstance(ids, list):
-            return jsonify({'success': False, 'error': 'IDs inválidos'}), 400
+            return jsonify({'success': False, 'error': 'IDs invÃ¡lidos'}), 400
         
         conn = get_db()
         cur = conn.cursor()
         
-        # Excluir múltiplos IDs
+        # Excluir mÃºltiplos IDs
         placeholders = ','.join(['%s'] * len(ids))
         query = f"DELETE FROM public.parcerias_sei WHERE id IN ({placeholders})"
         cur.execute(query, ids)
@@ -4225,7 +4225,7 @@ def api_excluir_parcerias_sei():
         total_excluidos = cur.rowcount
         cur.close()
         
-        return jsonify({'success': True, 'message': f'{total_excluidos} registro(s) excluído(s)'})
+        return jsonify({'success': True, 'message': f'{total_excluidos} registro(s) excluÃ­do(s)'})
         
     except Exception as e:
         print(f"[ERRO] api_excluir_parcerias_sei: {str(e)}")
@@ -4250,22 +4250,22 @@ def api_inserir_parcerias_sei():
         termo_tipo_sei = data.get('termo_tipo_sei', '').strip()
         data_assinatura = data.get('data_assinatura', '').strip()
         
-        # Validações
+        # ValidaÃ§Ãµes
         if not numero_termo:
-            return jsonify({'success': False, 'error': 'Número do termo é obrigatório'}), 400
+            return jsonify({'success': False, 'error': 'NÃºmero do termo Ã© obrigatÃ³rio'}), 400
         
-        # Validar aditamento (só números ou "-")
+        # Validar aditamento (sÃ³ nÃºmeros ou "-")
         if aditamento and aditamento != '-' and not aditamento.isdigit():
-            return jsonify({'success': False, 'error': 'Aditamento deve conter apenas números ou "-"'}), 400
+            return jsonify({'success': False, 'error': 'Aditamento deve conter apenas nÃºmeros ou "-"'}), 400
         
-        # Validar apostilamento (só números ou "-")
+        # Validar apostilamento (sÃ³ nÃºmeros ou "-")
         if apostilamento and apostilamento != '-' and not apostilamento.isdigit():
-            return jsonify({'success': False, 'error': 'Apostilamento deve conter apenas números ou "-"'}), 400
+            return jsonify({'success': False, 'error': 'Apostilamento deve conter apenas nÃºmeros ou "-"'}), 400
         
         conn = get_db()
         cur = get_cursor()
         
-        # Verificar duplicação - mesmo numero_termo, termo_sei_doc e (aditamento ou apostilamento)
+        # Verificar duplicaÃ§Ã£o - mesmo numero_termo, termo_sei_doc e (aditamento ou apostilamento)
         cur.execute("""
             SELECT id FROM public.parcerias_sei
             WHERE numero_termo = %s
@@ -4278,7 +4278,7 @@ def api_inserir_parcerias_sei():
             cur.close()
             return jsonify({
                 'success': False, 
-                'error': 'Registro duplicado! Já existe um registro com o mesmo número de termo, SEI documento e aditamento/apostilamento.'
+                'error': 'Registro duplicado! JÃ¡ existe um registro com o mesmo nÃºmero de termo, SEI documento e aditamento/apostilamento.'
             }), 400
         
         # Inserir novo registro
@@ -4318,9 +4318,9 @@ def api_inserir_parcerias_sei():
 @requires_access('dgp_alteracoes')
 def salvar_alteracao():
     """
-    Salvar alteração(ões) de termo
-    Cada tipo de alteração selecionado será salvo como um registro separado
-    Se status = "Concluído", atualiza as tabelas originais
+    Salvar alteraÃ§Ã£o(Ãµes) de termo
+    Cada tipo de alteraÃ§Ã£o selecionado serÃ¡ salvo como um registro separado
+    Se status = "ConcluÃ­do", atualiza as tabelas originais
     """
     cur = get_cursor()
     
@@ -4330,27 +4330,27 @@ def salvar_alteracao():
         instrumento_alteracao = request.form.get('instrumento_alteracao', '').strip()
         alt_numero = int(request.form.get('alt_numero', 0))
         alt_status = request.form.get('alt_status', '').strip()
-        # Múltiplos responsáveis concatenados com ;
+        # MÃºltiplos responsÃ¡veis concatenados com ;
         alt_responsaveis = request.form.getlist('alt_responsavel[]')
         alt_responsavel = ';'.join([r.strip() for r in alt_responsaveis if r.strip()])
         alt_observacao = request.form.get('alt_observacao', '').strip()
         
-        # Validar campos obrigatórios
+        # Validar campos obrigatÃ³rios
         if not numero_termo or not instrumento_alteracao or not alt_status or not alt_responsavel:
-            flash('Todos os campos obrigatórios devem ser preenchidos!', 'danger')
+            flash('Todos os campos obrigatÃ³rios devem ser preenchidos!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
-        # Tipos de alteração e informações (arrays)
+        # Tipos de alteraÃ§Ã£o e informaÃ§Ãµes (arrays)
         tipos_alteracao = request.form.getlist('alt_tipo[]')
         alt_infos = request.form.getlist('alt_info[]')
         alt_info_inicios = request.form.getlist('alt_info_inicio[]')
         alt_info_fins = request.form.getlist('alt_info_fim[]')
         
         if not tipos_alteracao or not any(tipos_alteracao):
-            flash('Selecione pelo menos um tipo de alteração!', 'danger')
+            flash('Selecione pelo menos um tipo de alteraÃ§Ã£o!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
-        # VALIDAR DUPLICATAS: verificar se já existe alteração com mesmo termo + instrumento + número
+        # VALIDAR DUPLICATAS: verificar se jÃ¡ existe alteraÃ§Ã£o com mesmo termo + instrumento + nÃºmero
         cur.execute("""
             SELECT COUNT(*) as total FROM public.termos_alteracoes
             WHERE numero_termo = %s 
@@ -4359,10 +4359,10 @@ def salvar_alteracao():
         """, (numero_termo, instrumento_alteracao, alt_numero))
         duplicata = cur.fetchone()
         if duplicata and duplicata['total'] > 0:
-            flash(f'Já existe uma alteração cadastrada para {instrumento_alteracao} nº {alt_numero} do termo {numero_termo}. Por favor, edite o registro existente.', 'warning')
+            flash(f'JÃ¡ existe uma alteraÃ§Ã£o cadastrada para {instrumento_alteracao} nÂº {alt_numero} do termo {numero_termo}. Por favor, edite o registro existente.', 'warning')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
-        # Processar cada tipo de alteração
+        # Processar cada tipo de alteraÃ§Ã£o
         registros_inseridos = 0
         idx_info = 0
         idx_date_range = 0
@@ -4373,7 +4373,7 @@ def salvar_alteracao():
             
             # Determinar o valor de alt_info baseado no tipo
             alt_info = None
-            if alt_tipo == 'Adequação de vigência':
+            if alt_tipo == 'AdequaÃ§Ã£o de vigÃªncia':
                 # Usar date range
                 if idx_date_range < len(alt_info_inicios) and idx_date_range < len(alt_info_fins):
                     alt_info = f"{alt_info_inicios[idx_date_range]}|{alt_info_fins[idx_date_range]}"
@@ -4384,13 +4384,13 @@ def salvar_alteracao():
                     alt_info = alt_infos[idx_info]
                     idx_info += 1
             
-            # Capturar valor antigo se status = "Concluído"
+            # Capturar valor antigo se status = "ConcluÃ­do"
             alt_old_info = None
-            if alt_status == 'Concluído' and alt_info:
+            if alt_status == 'ConcluÃ­do' and alt_info:
                 alt_old_info = _capturar_valor_antigo(cur, numero_termo, alt_tipo)
             
             # Inserir registro
-            data_fim = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+            data_fim = 'NOW()' if alt_status == 'ConcluÃ­do' else 'NULL'
             usuario_atual = session.get('email', 'Sistema')
             
             cur.execute(f"""
@@ -4412,17 +4412,17 @@ def salvar_alteracao():
                 usuario_atual
             ))
             
-            # Se concluído, atualizar tabelas originais (somente se for o mais recente)
-            if alt_status == 'Concluído' and alt_info:
+            # Se concluÃ­do, atualizar tabelas originais (somente se for o mais recente)
+            if alt_status == 'ConcluÃ­do' and alt_info:
                 _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero, instrumento_alteracao)
             
             registros_inseridos += 1
         
-        # === SALVAR NÚMERO SEI DO DOCUMENTO E DATA DE ASSINATURA (se status = Concluído) ===
+        # === SALVAR NÃšMERO SEI DO DOCUMENTO E DATA DE ASSINATURA (se status = ConcluÃ­do) ===
         alt_sei_documento = request.form.get('alt_sei_documento', '').strip()
         alt_data_assinatura = request.form.get('alt_data_assinatura', '').strip()
         
-        if alt_status == 'Concluído' and (alt_sei_documento or alt_data_assinatura):
+        if alt_status == 'ConcluÃ­do' and (alt_sei_documento or alt_data_assinatura):
             try:
                 # Determinar as colunas baseadas no instrumento
                 aditamento = None
@@ -4434,14 +4434,14 @@ def salvar_alteracao():
                 elif instrumento_alteracao == 'Termo de Apostilamento':
                     apostilamento = alt_numero
                 elif instrumento_alteracao == 'Termo de Apostilamento do Aditamento':
-                    # Decompor o número (formato: apostilamento * 100 + aditamento)
+                    # Decompor o nÃºmero (formato: apostilamento * 100 + aditamento)
                     apostilamento = alt_numero // 100
                     aditamento = alt_numero % 100
                 else:
-                    # Para outros instrumentos (Informação DGP, Despacho, etc)
+                    # Para outros instrumentos (InformaÃ§Ã£o DGP, Despacho, etc)
                     termo_tipo_sei = instrumento_alteracao
                 
-                # Verificar se já existe registro
+                # Verificar se jÃ¡ existe registro
                 if aditamento or apostilamento:
                     # Buscar por aditamento/apostilamento (converter para string)
                     cur.execute("""
@@ -4493,20 +4493,20 @@ def salvar_alteracao():
                 
             except Exception as e:
                 print(f"[ERRO] Falha ao salvar SEI do documento: {e}")
-                # Não interromper o fluxo principal
+                # NÃ£o interromper o fluxo principal
         
         get_db().commit()
         cur.close()
         
-        flash(f'{registros_inseridos} alteração(ões) cadastrada(s) com sucesso para o termo {numero_termo}!', 'success')
+        flash(f'{registros_inseridos} alteraÃ§Ã£o(Ãµes) cadastrada(s) com sucesso para o termo {numero_termo}!', 'success')
         return redirect(url_for('parcerias.dgp_alteracoes'))
         
     except Exception as e:
-        print(f"[ERRO] Erro ao salvar alteração: {str(e)}")
+        print(f"[ERRO] Erro ao salvar alteraÃ§Ã£o: {str(e)}")
         import traceback
         traceback.print_exc()
         get_db().rollback()
-        flash(f'Erro ao salvar alteração: {str(e)}', 'danger')
+        flash(f'Erro ao salvar alteraÃ§Ã£o: {str(e)}', 'danger')
         return redirect(url_for('parcerias.dgp_alteracoes'))
 
 
@@ -4519,28 +4519,28 @@ def _capturar_valor_antigo(cur, numero_termo, alt_tipo):
     try:
         mapa = {
             'Nome do projeto': ('public.parcerias', 'projeto'),
-            'Nome da organização': ('public.parcerias', 'osc'),
-            'CNPJ da organização': ('public.parcerias', 'cnpj'),
-            'Nome do responsável legal': ('public.parcerias_infos_adicionais', 'parceria_responsavel_legal'),
-            'Pessoa gestora indicada pela administração pública': ('public.parcerias_pg', 'nome_pg'),
+            'Nome da organizaÃ§Ã£o': ('public.parcerias', 'osc'),
+            'CNPJ da organizaÃ§Ã£o': ('public.parcerias', 'cnpj'),
+            'Nome do responsÃ¡vel legal': ('public.parcerias_infos_adicionais', 'parceria_responsavel_legal'),
+            'Pessoa gestora indicada pela administraÃ§Ã£o pÃºblica': ('public.parcerias_pg', 'nome_pg'),
             'Objeto da parceria': ('public.parcerias_infos_adicionais', 'parceria_objeto'),
-            'Quantidade de beneficiários diretos': ('public.parcerias_infos_adicionais', 'parceria_beneficiarios_diretos'),
+            'Quantidade de beneficiÃ¡rios diretos': ('public.parcerias_infos_adicionais', 'parceria_beneficiarios_diretos'),
             'Aumento de valor total da parceria': ('public.parcerias', 'total_previsto'),
-            'Redução de valor de valor total da parceria': ('public.parcerias', 'total_previsto'),
-            'Remanejamentos sem alteração de valor mensal': ('public.parcerias', 'sei_orcamento'),
+            'ReduÃ§Ã£o de valor de valor total da parceria': ('public.parcerias', 'total_previsto'),
+            'Remanejamentos sem alteraÃ§Ã£o de valor mensal': ('public.parcerias', 'sei_orcamento'),
             'FACC': ('public.parcerias', 'conta'),
-            'Prorrogação de vigência': ('public.parcerias', 'final'),
-            'Adequação de vigência': ('public.parcerias', 'inicio|final'),
-            'Redução de vigência da parceria': ('public.parcerias', 'final'),
-            'Suspensão de vigência da parceria': ('public.parcerias_infos_adicionais', 'parceria_data_suspensao'),
-            'Retomada de vigência da parceria': ('public.parcerias_infos_adicionais', 'parceria_data_retomada'),
+            'ProrrogaÃ§Ã£o de vigÃªncia': ('public.parcerias', 'final'),
+            'AdequaÃ§Ã£o de vigÃªncia': ('public.parcerias', 'inicio|final'),
+            'ReduÃ§Ã£o de vigÃªncia da parceria': ('public.parcerias', 'final'),
+            'SuspensÃ£o de vigÃªncia da parceria': ('public.parcerias_infos_adicionais', 'parceria_data_suspensao'),
+            'Retomada de vigÃªncia da parceria': ('public.parcerias_infos_adicionais', 'parceria_data_retomada'),
             'Justificativa do Projeto': ('public.parcerias_infos_adicionais', 'parceria_justificativa_projeto'),
-            'Abragência geográfica': ('public.parcerias_infos_adicionais', 'parceria_abrangencia_projeto'),
-            'Quantidade de beneficiários indiretos': ('public.parcerias_infos_adicionais', 'parceria_beneficiarios_indiretos'),
+            'AbragÃªncia geogrÃ¡fica': ('public.parcerias_infos_adicionais', 'parceria_abrangencia_projeto'),
+            'Quantidade de beneficiÃ¡rios indiretos': ('public.parcerias_infos_adicionais', 'parceria_beneficiarios_indiretos'),
         }
         
-        # Caso especial para Localização do projeto - capturar todos os endereços
-        if alt_tipo == 'Localização do projeto':
+        # Caso especial para LocalizaÃ§Ã£o do projeto - capturar todos os endereÃ§os
+        if alt_tipo == 'LocalizaÃ§Ã£o do projeto':
             cur.execute("""
                 SELECT 
                     id,
@@ -4577,7 +4577,7 @@ def _capturar_valor_antigo(cur, numero_termo, alt_tipo):
         
         tabela, coluna = mapa[alt_tipo]
         
-        # Adequação de vigência tem duas colunas
+        # AdequaÃ§Ã£o de vigÃªncia tem duas colunas
         if '|' in coluna:
             col1, col2 = coluna.split('|')
             cur.execute(f"SELECT {col1}, {col2} FROM {tabela} WHERE numero_termo = %s", (numero_termo,))
@@ -4604,14 +4604,14 @@ def _capturar_valor_antigo(cur, numero_termo, alt_tipo):
 
 def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero=None, instrumento_alteracao=None):
     """
-    Atualiza a tabela original com o novo valor quando status = "Concluído"
-    IMPORTANTE: Só atualiza se for o aditamento/alteração mais recente (maior número)
+    Atualiza a tabela original com o novo valor quando status = "ConcluÃ­do"
+    IMPORTANTE: SÃ³ atualiza se for o aditamento/alteraÃ§Ã£o mais recente (maior nÃºmero)
     """
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
     
     try:
-        # VALIDAÇÃO: Verificar se este é o maior número de alteração CONCLUÍDO para este tipo
+        # VALIDAÃ‡ÃƒO: Verificar se este Ã© o maior nÃºmero de alteraÃ§Ã£o CONCLUÃDO para este tipo
         if alt_numero is not None and instrumento_alteracao is not None:
             cur.execute("""
                 SELECT alt_numero 
@@ -4619,7 +4619,7 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
                 WHERE numero_termo = %s 
                   AND instrumento_alteracao = %s 
                   AND alt_tipo = %s 
-                  AND alt_status = 'Concluído'
+                  AND alt_status = 'ConcluÃ­do'
                 ORDER BY alt_numero DESC
                 LIMIT 1
             """, (numero_termo, instrumento_alteracao, alt_tipo))
@@ -4627,37 +4627,37 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
             
             if resultado:
                 maior_numero = resultado['alt_numero']
-                # Converter alt_numero para inteiro para comparação
+                # Converter alt_numero para inteiro para comparaÃ§Ã£o
                 try:
                     alt_numero_int = int(alt_numero)
                     maior_numero_int = int(maior_numero)
                     
                     if alt_numero_int < maior_numero_int:
-                        print(f"[INFO] Ignorando atualização de '{alt_tipo}' - Aditamento nº {alt_numero} é anterior ao nº {maior_numero} (mais recente)")
-                        return  # NÃO atualizar se não for o mais recente
+                        print(f"[INFO] Ignorando atualizaÃ§Ã£o de '{alt_tipo}' - Aditamento nÂº {alt_numero} Ã© anterior ao nÂº {maior_numero} (mais recente)")
+                        return  # NÃƒO atualizar se nÃ£o for o mais recente
                 except (ValueError, TypeError):
-                    # Se não conseguir converter para int, prosseguir com atualização (fallback)
+                    # Se nÃ£o conseguir converter para int, prosseguir com atualizaÃ§Ã£o (fallback)
                     pass
         
-        # Mapear tipo de alteração para tabela e coluna
+        # Mapear tipo de alteraÃ§Ã£o para tabela e coluna
         if alt_tipo == 'Nome do projeto':
             cur.execute("UPDATE public.parcerias SET projeto = %s WHERE numero_termo = %s", (alt_info, numero_termo))
         
-        elif alt_tipo == 'Nome da organização':
+        elif alt_tipo == 'Nome da organizaÃ§Ã£o':
             cur.execute("UPDATE public.parcerias SET osc = %s WHERE numero_termo = %s", (alt_info, numero_termo))
         
-        elif alt_tipo == 'CNPJ da organização':
+        elif alt_tipo == 'CNPJ da organizaÃ§Ã£o':
             cur.execute("UPDATE public.parcerias SET cnpj = %s WHERE numero_termo = %s", (alt_info, numero_termo))
         
-        elif alt_tipo == 'Nome do responsável legal':
+        elif alt_tipo == 'Nome do responsÃ¡vel legal':
             cur.execute("""
                 UPDATE public.parcerias_infos_adicionais 
                 SET parceria_responsavel_legal = %s 
                 WHERE numero_termo = %s
             """, (alt_info, numero_termo))
         
-        elif alt_tipo == 'Pessoa gestora indicada pela administração pública':
-            # Inserir nova pessoa gestora (histórico mantido por data_de_criacao)
+        elif alt_tipo == 'Pessoa gestora indicada pela administraÃ§Ã£o pÃºblica':
+            # Inserir nova pessoa gestora (histÃ³rico mantido por data_de_criacao)
             cur.execute("""
                 INSERT INTO public.parcerias_pg (numero_termo, nome_pg)
                 VALUES (%s, %s)
@@ -4670,31 +4670,31 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
                 WHERE numero_termo = %s
             """, (alt_info, numero_termo))
         
-        elif alt_tipo == 'Quantidade de beneficiários diretos':
+        elif alt_tipo == 'Quantidade de beneficiÃ¡rios diretos':
             cur.execute("""
                 UPDATE public.parcerias_infos_adicionais 
                 SET parceria_beneficiarios_diretos = %s 
                 WHERE numero_termo = %s
             """, (int(alt_info), numero_termo))
         
-        elif alt_tipo in ['Aumento de valor total da parceria', 'Redução de valor de valor total da parceria']:
-            # Limpar formatação de moeda
+        elif alt_tipo in ['Aumento de valor total da parceria', 'ReduÃ§Ã£o de valor de valor total da parceria']:
+            # Limpar formataÃ§Ã£o de moeda
             valor = alt_info.replace('R$', '').replace('.', '').replace(',', '.').strip()
             cur.execute("UPDATE public.parcerias SET total_previsto = %s WHERE numero_termo = %s", (float(valor), numero_termo))
         
-        elif alt_tipo == 'Remanejamentos sem alteração de valor mensal':
+        elif alt_tipo == 'Remanejamentos sem alteraÃ§Ã£o de valor mensal':
             cur.execute("UPDATE public.parcerias SET sei_orcamento = %s WHERE numero_termo = %s", (alt_info, numero_termo))
         
         elif alt_tipo == 'FACC':
             cur.execute("UPDATE public.parcerias SET conta = %s WHERE numero_termo = %s", (alt_info, numero_termo))
         
-        elif alt_tipo in ['Prorrogação de vigência', 'Redução de vigência da parceria']:
+        elif alt_tipo in ['ProrrogaÃ§Ã£o de vigÃªncia', 'ReduÃ§Ã£o de vigÃªncia da parceria']:
             # Atualizar data final e recalcular meses
             cur.execute("UPDATE public.parcerias SET final = %s WHERE numero_termo = %s", (alt_info, numero_termo))
             _recalcular_meses(cur, numero_termo)
         
-        elif alt_tipo == 'Adequação de vigência':
-            # Atualizar data de início e fim
+        elif alt_tipo == 'AdequaÃ§Ã£o de vigÃªncia':
+            # Atualizar data de inÃ­cio e fim
             datas = alt_info.split('|')
             if len(datas) == 2:
                 cur.execute("""
@@ -4704,14 +4704,14 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
                 """, (datas[0], datas[1], numero_termo))
                 _recalcular_meses(cur, numero_termo)
         
-        elif alt_tipo == 'Suspensão de vigência da parceria':
+        elif alt_tipo == 'SuspensÃ£o de vigÃªncia da parceria':
             cur.execute("""
                 UPDATE public.parcerias_infos_adicionais 
                 SET parceria_data_suspensao = %s 
                 WHERE numero_termo = %s
             """, (alt_info, numero_termo))
         
-        elif alt_tipo == 'Retomada de vigência da parceria':
+        elif alt_tipo == 'Retomada de vigÃªncia da parceria':
             cur.execute("""
                 UPDATE public.parcerias_infos_adicionais 
                 SET parceria_data_retomada = %s 
@@ -4725,31 +4725,31 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
                 WHERE numero_termo = %s
             """, (alt_info, numero_termo))
         
-        elif alt_tipo == 'Abragência geográfica':
+        elif alt_tipo == 'AbragÃªncia geogrÃ¡fica':
             cur.execute("""
                 UPDATE public.parcerias_infos_adicionais 
                 SET parceria_abrangencia_projeto = %s 
                 WHERE numero_termo = %s
             """, (alt_info, numero_termo))
         
-        elif alt_tipo == 'Quantidade de beneficiários indiretos':
+        elif alt_tipo == 'Quantidade de beneficiÃ¡rios indiretos':
             cur.execute("""
                 UPDATE public.parcerias_infos_adicionais 
                 SET parceria_beneficiarios_indiretos = %s 
                 WHERE numero_termo = %s
             """, (int(alt_info), numero_termo))
         
-        elif alt_tipo == 'Localização do projeto':
-            # Atualizar endereços - alt_info contém JSON com array de endereços
+        elif alt_tipo == 'LocalizaÃ§Ã£o do projeto':
+            # Atualizar endereÃ§os - alt_info contÃ©m JSON com array de endereÃ§os
             import json
             
             try:
                 enderecos_novos = json.loads(alt_info)
                 
-                # IDs dos endereços que devem permanecer
+                # IDs dos endereÃ§os que devem permanecer
                 ids_manter = [end['id'] for end in enderecos_novos if end.get('id') and isinstance(end['id'], int)]
                 
-                # Deletar endereços que não estão na nova lista (foram removidos)
+                # Deletar endereÃ§os que nÃ£o estÃ£o na nova lista (foram removidos)
                 if ids_manter:
                     placeholders = ','.join(['%s'] * len(ids_manter))
                     cur.execute(f"""
@@ -4757,15 +4757,15 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
                         WHERE numero_termo = %s AND id NOT IN ({placeholders})
                     """, (numero_termo, *ids_manter))
                 else:
-                    # Se não há IDs para manter, deletar todos
+                    # Se nÃ£o hÃ¡ IDs para manter, deletar todos
                     cur.execute("DELETE FROM public.parcerias_enderecos WHERE numero_termo = %s", (numero_termo,))
                 
-                # Processar cada endereço
+                # Processar cada endereÃ§o
                 for endereco in enderecos_novos:
                     endereco_id = endereco.get('id')
                     
                     if endereco_id and isinstance(endereco_id, int):
-                        # UPDATE endereço existente
+                        # UPDATE endereÃ§o existente
                         cur.execute("""
                             UPDATE public.parcerias_enderecos SET
                                 parceria_logradouro = %s,
@@ -4786,7 +4786,7 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
                             numero_termo
                         ))
                     else:
-                        # INSERT novo endereço
+                        # INSERT novo endereÃ§o
                         cur.execute("""
                             INSERT INTO public.parcerias_enderecos (
                                 numero_termo, parceria_logradouro, parceria_numero,
@@ -4802,10 +4802,10 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
                             endereco.get('observacao')
                         ))
                 
-                print(f"[INFO] {len(enderecos_novos)} endereço(s) atualizado(s) para {numero_termo}")
+                print(f"[INFO] {len(enderecos_novos)} endereÃ§o(s) atualizado(s) para {numero_termo}")
                 
             except json.JSONDecodeError as je:
-                print(f"[ERRO] Erro ao decodificar JSON de endereços: {str(je)}")
+                print(f"[ERRO] Erro ao decodificar JSON de endereÃ§os: {str(je)}")
                 raise
         
         print(f"[INFO] Tabela original atualizada para {alt_tipo}: {alt_info}")
@@ -4817,7 +4817,7 @@ def _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero
 
 def _recalcular_meses(cur, numero_termo):
     """
-    Recalcula o número de meses entre data de início e fim
+    Recalcula o nÃºmero de meses entre data de inÃ­cio e fim
     """
     from dateutil.relativedelta import relativedelta
     
@@ -4829,7 +4829,7 @@ def _recalcular_meses(cur, numero_termo):
             inicio = row['inicio']
             final = row['final']
             
-            # Calcular diferença em meses
+            # Calcular diferenÃ§a em meses
             diff = relativedelta(final, inicio)
             meses = diff.years * 12 + diff.months
             
@@ -4846,7 +4846,7 @@ def _recalcular_meses(cur, numero_termo):
 @requires_access('parcerias')
 def editar_alteracao():
     """
-    Buscar dados de uma alteração para edição
+    Buscar dados de uma alteraÃ§Ã£o para ediÃ§Ã£o
     """
     numero_termo = request.args.get('numero_termo', '').strip()
     instrumento = request.args.get('instrumento', '').strip()
@@ -4855,7 +4855,7 @@ def editar_alteracao():
     cur = get_cursor()
     
     try:
-        # Buscar todos os registros para esse termo/instrumento/número
+        # Buscar todos os registros para esse termo/instrumento/nÃºmero
         cur.execute("""
             SELECT alt_tipo, alt_status, alt_info, alt_old_info, 
                    alt_responsavel, alt_observacao
@@ -4870,23 +4870,23 @@ def editar_alteracao():
         
         if not rows:
             cur.close()
-            return jsonify({'error': 'Alteração não encontrada'}), 404
+            return jsonify({'error': 'AlteraÃ§Ã£o nÃ£o encontrada'}), 404
         
         # Preparar dados para retornar
         tipos = []
         infos = []
-        status = rows[0]['alt_status']  # Todos têm o mesmo status
-        responsavel = rows[0]['alt_responsavel']  # Todos têm o mesmo responsável
-        observacao = rows[0]['alt_observacao']  # Todos têm a mesma observação
+        status = rows[0]['alt_status']  # Todos tÃªm o mesmo status
+        responsavel = rows[0]['alt_responsavel']  # Todos tÃªm o mesmo responsÃ¡vel
+        observacao = rows[0]['alt_observacao']  # Todos tÃªm a mesma observaÃ§Ã£o
         
         for row in rows:
             tipos.append(row['alt_tipo'])
             infos.append(row['alt_info'] or '')
         
-        # Buscar SEI do documento e data de assinatura se status = Concluído
+        # Buscar SEI do documento e data de assinatura se status = ConcluÃ­do
         sei_documento = None
         data_assinatura = None
-        if status == 'Concluído':
+        if status == 'ConcluÃ­do':
             try:
                 # Determinar como buscar baseado no instrumento
                 aditamento = None
@@ -4938,7 +4938,7 @@ def editar_alteracao():
         })
         
     except Exception as e:
-        print(f"[ERRO] Erro ao buscar alteração: {str(e)}")
+        print(f"[ERRO] Erro ao buscar alteraÃ§Ã£o: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -4947,13 +4947,13 @@ def editar_alteracao():
 @requires_access('parcerias')
 def atualizar_alteracao():
     """
-    Atualizar alteração existente
+    Atualizar alteraÃ§Ã£o existente
     Deleta os registros antigos e cria novos com os dados atualizados
     """
     cur = get_cursor()
     
     try:
-        # Parâmetros originais (para identificar registros a deletar)
+        # ParÃ¢metros originais (para identificar registros a deletar)
         numero_termo_original = request.args.get('numero_termo', '').strip()
         instrumento_original = request.args.get('instrumento', '').strip()
         alt_numero_original = int(request.args.get('alt_numero', 0))
@@ -4963,27 +4963,27 @@ def atualizar_alteracao():
         instrumento_alteracao = request.form.get('instrumento_alteracao', '').strip()
         alt_numero = int(request.form.get('alt_numero', 0))
         alt_status = request.form.get('alt_status', '').strip()
-        # Múltiplos responsáveis concatenados com ;
+        # MÃºltiplos responsÃ¡veis concatenados com ;
         alt_responsaveis = request.form.getlist('alt_responsavel[]')
         alt_responsavel = ';'.join([r.strip() for r in alt_responsaveis if r.strip()])
         alt_observacao = request.form.get('alt_observacao', '').strip()
         
-        # Validar campos obrigatórios
+        # Validar campos obrigatÃ³rios
         if not numero_termo or not instrumento_alteracao or not alt_status or not alt_responsavel:
-            flash('Todos os campos obrigatórios devem ser preenchidos!', 'danger')
+            flash('Todos os campos obrigatÃ³rios devem ser preenchidos!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
-        # Tipos de alteração e informações (arrays)
+        # Tipos de alteraÃ§Ã£o e informaÃ§Ãµes (arrays)
         tipos_alteracao = request.form.getlist('alt_tipo[]')
         alt_infos = request.form.getlist('alt_info[]')
         alt_info_inicios = request.form.getlist('alt_info_inicio[]')
         alt_info_fins = request.form.getlist('alt_info_fim[]')
         
         if not tipos_alteracao or not any(tipos_alteracao):
-            flash('Selecione pelo menos um tipo de alteração!', 'danger')
+            flash('Selecione pelo menos um tipo de alteraÃ§Ã£o!', 'danger')
             return redirect(url_for('parcerias.dgp_alteracoes'))
         
-        # LÓGICA DE REVERSÃO: Buscar tipos que foram removidos e restaurar alt_old_info
+        # LÃ“GICA DE REVERSÃƒO: Buscar tipos que foram removidos e restaurar alt_old_info
         cur.execute("""
             SELECT alt_tipo, alt_old_info, alt_status
             FROM public.termos_alteracoes
@@ -4991,11 +4991,11 @@ def atualizar_alteracao():
               AND instrumento_alteracao = %s 
               AND alt_numero = %s
               AND alt_old_info IS NOT NULL
-              AND alt_status = 'Concluído'
+              AND alt_status = 'ConcluÃ­do'
         """, (numero_termo_original, instrumento_original, alt_numero_original))
         registros_antigos = cur.fetchall()
         
-        # Identificar tipos removidos (estavam antes, não estão agora)
+        # Identificar tipos removidos (estavam antes, nÃ£o estÃ£o agora)
         tipos_antigos = {r['alt_tipo']: r['alt_old_info'] for r in registros_antigos}
         tipos_novos = set([t.strip() for t in tipos_alteracao if t.strip()])
         tipos_removidos = set(tipos_antigos.keys()) - tipos_novos
@@ -5004,7 +5004,7 @@ def atualizar_alteracao():
         for tipo_removido in tipos_removidos:
             valor_antigo = tipos_antigos[tipo_removido]
             if valor_antigo:
-                print(f"[INFO] Revertendo alteração de '{tipo_removido}': restaurando valor '{valor_antigo}'")
+                print(f"[INFO] Revertendo alteraÃ§Ã£o de '{tipo_removido}': restaurando valor '{valor_antigo}'")
                 _atualizar_tabela_original(cur, numero_termo_original, tipo_removido, valor_antigo)
         
         # Deletar registros antigos
@@ -5026,7 +5026,7 @@ def atualizar_alteracao():
             
             # Determinar o valor de alt_info baseado no tipo
             alt_info = None
-            if alt_tipo == 'Adequação de vigência':
+            if alt_tipo == 'AdequaÃ§Ã£o de vigÃªncia':
                 # Usar date range
                 if idx_date_range < len(alt_info_inicios) and idx_date_range < len(alt_info_fins):
                     alt_info = f"{alt_info_inicios[idx_date_range]}|{alt_info_fins[idx_date_range]}"
@@ -5037,13 +5037,13 @@ def atualizar_alteracao():
                     alt_info = alt_infos[idx_info]
                     idx_info += 1
             
-            # Capturar valor antigo se status = "Concluído"
+            # Capturar valor antigo se status = "ConcluÃ­do"
             alt_old_info = None
-            if alt_status == 'Concluído' and alt_info:
+            if alt_status == 'ConcluÃ­do' and alt_info:
                 alt_old_info = _capturar_valor_antigo(cur, numero_termo, alt_tipo)
             
             # Inserir registro
-            data_fim = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+            data_fim = 'NOW()' if alt_status == 'ConcluÃ­do' else 'NULL'
             usuario_atual = session.get('email', 'Sistema')
             
             cur.execute(f"""
@@ -5067,17 +5067,17 @@ def atualizar_alteracao():
                 usuario_atual
             ))
             
-            # Se concluído, atualizar tabelas originais (somente se for o mais recente)
-            if alt_status == 'Concluído' and alt_info:
+            # Se concluÃ­do, atualizar tabelas originais (somente se for o mais recente)
+            if alt_status == 'ConcluÃ­do' and alt_info:
                 _atualizar_tabela_original(cur, numero_termo, alt_tipo, alt_info, alt_numero, instrumento_alteracao)
             
             registros_inseridos += 1
         
-        # === SALVAR/ATUALIZAR NÚMERO SEI DO DOCUMENTO E DATA DE ASSINATURA (se status = Concluído) ===
+        # === SALVAR/ATUALIZAR NÃšMERO SEI DO DOCUMENTO E DATA DE ASSINATURA (se status = ConcluÃ­do) ===
         alt_sei_documento = request.form.get('alt_sei_documento', '').strip()
         alt_data_assinatura = request.form.get('alt_data_assinatura', '').strip()
         
-        if alt_status == 'Concluído' and (alt_sei_documento or alt_data_assinatura):
+        if alt_status == 'ConcluÃ­do' and (alt_sei_documento or alt_data_assinatura):
             try:
                 # Determinar as colunas baseadas no instrumento
                 aditamento = None
@@ -5094,7 +5094,7 @@ def atualizar_alteracao():
                 else:
                     termo_tipo_sei = instrumento_alteracao
                 
-                # Verificar se já existe registro
+                # Verificar se jÃ¡ existe registro
                 if aditamento or apostilamento:
                     cur.execute("""
                         SELECT id FROM public.parcerias_sei
@@ -5138,20 +5138,20 @@ def atualizar_alteracao():
                         VALUES (%s, %s, %s, %s, %s, %s)
                     """, (numero_termo, alt_sei_documento or None, alt_data_assinatura or None, str(aditamento) if aditamento else '-', str(apostilamento) if apostilamento else '-', termo_tipo_sei))
                 
-                print(f"[DEBUG] SEI Documento e Data Assinatura SALVOS na atualização")
+                print(f"[DEBUG] SEI Documento e Data Assinatura SALVOS na atualizaÃ§Ã£o")
             except Exception as e:
-                print(f"[ERRO] Falha ao salvar SEI na atualização: {e}")
+                print(f"[ERRO] Falha ao salvar SEI na atualizaÃ§Ã£o: {e}")
         
         get_db().commit()
         cur.close()
         
-        flash(f'Alteração atualizada com sucesso! {registros_inseridos} tipo(s) de alteração.', 'success')
+        flash(f'AlteraÃ§Ã£o atualizada com sucesso! {registros_inseridos} tipo(s) de alteraÃ§Ã£o.', 'success')
         return redirect(url_for('parcerias.dgp_alteracoes'))
         
     except Exception as e:
-        print(f"[ERRO] Erro ao atualizar alteração: {str(e)}")
+        print(f"[ERRO] Erro ao atualizar alteraÃ§Ã£o: {str(e)}")
         get_db().rollback()
-        flash(f'Erro ao atualizar alteração: {str(e)}', 'danger')
+        flash(f'Erro ao atualizar alteraÃ§Ã£o: {str(e)}', 'danger')
         return redirect(url_for('parcerias.dgp_alteracoes'))
 
 
@@ -5160,8 +5160,8 @@ def atualizar_alteracao():
 @requires_access('dgp_alteracoes')
 def deletar_alteracao():
     """
-    Deletar alteração(ões) de termo
-    Deleta todos os registros com a mesma combinação de termo/instrumento/número
+    Deletar alteraÃ§Ã£o(Ãµes) de termo
+    Deleta todos os registros com a mesma combinaÃ§Ã£o de termo/instrumento/nÃºmero
     """
     numero_termo = request.args.get('numero_termo', '').strip()
     instrumento = request.args.get('instrumento', '').strip()
@@ -5170,7 +5170,7 @@ def deletar_alteracao():
     cur = get_cursor()
     
     try:
-        # Deletar todos os registros com essa combinação
+        # Deletar todos os registros com essa combinaÃ§Ã£o
         cur.execute("""
             DELETE FROM public.termos_alteracoes
             WHERE numero_termo = %s 
@@ -5183,17 +5183,17 @@ def deletar_alteracao():
         get_db().commit()
         cur.close()
         
-        flash(f'Alteração(ões) do termo "{numero_termo}" excluída(s) com sucesso! ({registros_deletados} registro(s))', 'success')
+        flash(f'AlteraÃ§Ã£o(Ãµes) do termo "{numero_termo}" excluÃ­da(s) com sucesso! ({registros_deletados} registro(s))', 'success')
         return redirect(url_for('parcerias.dgp_alteracoes'))
         
     except Exception as e:
-        print(f"[ERRO] Erro ao deletar alteração: {str(e)}")
+        print(f"[ERRO] Erro ao deletar alteraÃ§Ã£o: {str(e)}")
         get_db().rollback()
-        flash(f'Erro ao deletar alteração: {str(e)}', 'danger')
+        flash(f'Erro ao deletar alteraÃ§Ã£o: {str(e)}', 'danger')
         return redirect(url_for('parcerias.dgp_alteracoes'))
 
 
-# ========== APIs para Informações Adicionais e Endereços ==========
+# ========== APIs para InformaÃ§Ãµes Adicionais e EndereÃ§os ==========
 
 @parcerias_bp.route("/api/distritos", methods=["GET"])
 @login_required
@@ -5249,8 +5249,8 @@ def api_distritos():
 @requires_access('parcerias')
 def api_distrito_info(codigo):
     """
-    API para buscar informações de um distrito específico
-    Retorna subprefeitura e região
+    API para buscar informaÃ§Ãµes de um distrito especÃ­fico
+    Retorna subprefeitura e regiÃ£o
     """
     cur = get_cursor()
     
@@ -5285,8 +5285,8 @@ def api_distrito_info(codigo):
 @requires_access('parcerias')
 def api_enderecos_termo(numero_termo):
     """
-    API para buscar todos os endereços de um termo
-    Usado na alteração "Localização do projeto"
+    API para buscar todos os endereÃ§os de um termo
+    Usado na alteraÃ§Ã£o "LocalizaÃ§Ã£o do projeto"
     """
     cur = get_cursor()
     
@@ -5308,7 +5308,7 @@ def api_enderecos_termo(numero_termo):
         enderecos = cur.fetchall()
         cur.close()
         
-        # Converter para lista de dicionários
+        # Converter para lista de dicionÃ¡rios
         resultado = []
         for end in enderecos:
             resultado.append({
@@ -5327,5 +5327,6 @@ def api_enderecos_termo(numero_termo):
         })
         
     except Exception as e:
-        print(f"[ERRO] Erro ao buscar endereços: {str(e)}")
+        print(f"[ERRO] Erro ao buscar endereÃ§os: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
