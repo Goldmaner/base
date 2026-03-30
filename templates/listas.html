@@ -7,63 +7,150 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <style>
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+    body { background-color: #f4f3f8; padding: 20px; }
+    /* ── Header ──────────────────────────────────── */
+    .page-header {
+      background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+      color: #fff; padding: 22px 28px; border-radius: 12px;
+      margin-bottom: 20px; box-shadow: 0 4px 18px rgba(124,58,237,.28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+    /* ── Selector panel ──────────────────────────── */
+    .selector-panel {
+      background: #fff; padding: 20px 24px; border-radius: 10px;
+      margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      border-left: 4px solid #7c3aed;
+    }
+    .selector-input-wrapper { position: relative; }
+    .selector-input-wrapper .bi-search {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: #7c3aed; font-size: 1.05rem; pointer-events: none; z-index: 5;
+    }
+    #inputSeletorTabela { padding-left: 36px; border-color: #d8b4fe; }
+    #inputSeletorTabela:focus { border-color: #7c3aed; box-shadow: 0 0 0 .2rem rgba(124,58,237,.2); }
+    /* ── Content card ────────────────────────────── */
+    .content-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden;
+    }
+    .content-card-header {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+    .content-card-body { padding: 16px; }
+    /* ── Table ───────────────────────────────────── */
+    #tabelaDados thead tr th {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border: none; white-space: nowrap;
+    }
+    #tabelaDados tbody tr:hover { background-color: #f5f0ff; }
+    /* ── Buttons ─────────────────────────────────── */
+    .btn-listas {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 14px; font-weight: 600; font-size: .875rem;
+      transition: opacity .15s; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px;
+      text-decoration: none;
+    }
+    .btn-listas:hover { opacity: .88; color: #fff; }
+    .btn-listas.listas-outline {
+      background: transparent; border: 1.5px solid rgba(255,255,255,.75); color: #fff;
+    }
+    .btn-listas.listas-outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+    .btn-listas.listas-warning { background: linear-gradient(135deg, #b45309, #d97706); }
+    .btn-listas.listas-success { background: linear-gradient(135deg, #065f46, #059669); }
+    /* ── Row color codes ─────────────────────────── */
     tr.row-agente-dp  td { background-color: #cfe2ff !important; color: #084298 !important; }
     tr.row-agente-dac td { background-color: #d1e7dd !important; color: #0a3622 !important; }
     tr.row-agente-dgp td { background-color: #fff3cd !important; color: #664d03 !important; }
+    /* ── Modal header ────────────────────────────── */
+    #modalFormulario .modal-header {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed); color: #fff;
+    }
+    #modalFormulario .modal-header .btn-close { filter: invert(1); }
+    #modalContatosVereador .modal-header {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed); color: #fff;
+    }
+    #modalContatosVereador .modal-header .btn-close { filter: invert(1); }
+    /* ── Form grid ───────────────────────────────── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 768px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .content-card-header { flex-direction: column; align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
-  <div class="container-fluid mt-4">
+  <div class="container-fluid" style="padding: 0 20px 40px;">
+
     <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <div>
-        <h2><i class="bi bi-list-ul"></i> Listas Suspensas</h2>
-        <p class="text-muted">Gerenciamento de tabelas categóricas</p>
+    <div class="page-header mt-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2><i class="bi bi-list-ul me-2"></i>Listas Suspensas</h2>
+          <p>Gerenciamento de tabelas categ&#243;ricas do sistema</p>
+        </div>
+        <a href="{{ url_for('main.index') }}" class="btn-listas listas-outline">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </a>
       </div>
-      <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Voltar
-      </a>
     </div>
 
     <!-- Seleção de Tabela -->
-    <div class="card mb-4">
-      <div class="card-body">
-        <label for="seletorTabela" class="form-label fw-bold">Selecione a tabela:</label>
-        <select id="seletorTabela" class="form-select form-select-lg" onchange="carregarTabela()">
-          <option value="">-- Escolha uma tabela --</option>
-          {% for chave, config in tabelas.items()|sort(attribute='1.nome') %}
-          <option value="{{ chave }}">{{ config.nome }}</option>
-          {% endfor %}
-        </select>
+    <div class="selector-panel">
+      <label for="inputSeletorTabela" class="form-label fw-semibold mb-2">
+        <i class="bi bi-table me-1" style="color:#7c3aed;"></i>Selecione ou digite o nome da tabela:
+      </label>
+      <div class="selector-input-wrapper">
+        <i class="bi bi-search"></i>
+        <input type="text" id="inputSeletorTabela" list="datalist-tabelas"
+               class="form-control form-control-lg"
+               placeholder="Digite para filtrar tabelas..."
+               oninput="handleSeletor(this.value)"
+               autocomplete="off">
+      </div>
+      <datalist id="datalist-tabelas">
+        {% for chave, config in tabelas.items()|sort(attribute='1.nome') %}
+        <option value="{{ config.nome }}"></option>
+        {% endfor %}
+      </datalist>
+      <!-- Hidden: mant&#233;m compatibilidade com JS existente -->
+      <input type="hidden" id="seletorTabela" value="">
+      <div class="mt-2" style="font-size:.82rem; color:#6c757d;">
+        <i class="bi bi-info-circle me-1"></i>
+        {{ tabelas|length }} tabelas dispon&#237;veis &mdash; use as setas ou clique para selecionar
       </div>
     </div>
 
     <!-- Área de conteúdo da tabela -->
     <div id="areaConteudo" style="display: none;">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0" id="tituloTabela"></h5>
-          <div>
-            <button class="btn btn-warning me-2" onclick="limparFiltros()" id="btnLimparFiltros" style="display: none;">
+      <div class="content-card">
+        <div class="content-card-header">
+          <h5 id="tituloTabela"><i class="bi bi-table me-2"></i></h5>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn-listas listas-warning" onclick="limparFiltros()" id="btnLimparFiltros" style="display: none;">
               <i class="bi bi-x-circle"></i> Limpar Filtros
             </button>
-            <button class="btn btn-info me-2" onclick="salvarTodos()" id="btnSalvarTodos" style="display: none;">
+            <button class="btn-listas listas-success" onclick="salvarTodos()" id="btnSalvarTodos" style="display: none;">
               <i class="bi bi-check-all"></i> Salvar Todos
             </button>
-            <button class="btn btn-outline-secondary me-2" onclick="exportarCSV()" title="Exportar para CSV">
+            <button class="btn-listas listas-outline" onclick="exportarCSV()" title="Exportar para CSV">
               <i class="bi bi-download"></i> CSV
             </button>
-            <button class="btn btn-success" onclick="abrirModalCriar()">
+            <button class="btn-listas" onclick="abrirModalCriar()">
               <i class="bi bi-plus-circle"></i> Adicionar
             </button>
           </div>
         </div>
-        <div class="card-body">
+        <div class="content-card-body">
           <div class="table-responsive">
             <table class="table table-hover table-striped" id="tabelaDados">
-              <thead class="table-dark">
+              <thead>
                 <tr id="cabecalhoTabela"></tr>
               </thead>
               <tbody id="corpoTabela"></tbody>
@@ -105,8 +192,43 @@
     let modalFormulario = null;
     const tipoUsuarioLogado = "{{ tipo_usuario_logado }}";
 
+    // Mapa: nome exibido → chave da tabela (para o seletor tipável)
+    const tabelasPorNome = {
+      {% for chave, cfg in tabelas.items() %}
+      {{ cfg.nome | tojson }}: {{ chave | tojson }},
+      {% endfor %}
+    };
+
+    // Seletor tipável: converte nome digitado em chave e aciona carregarTabela
+    function handleSeletor(nomeDigitado) {
+      const chave = tabelasPorNome[nomeDigitado.trim()];
+      const hiddenInput = document.getElementById('seletorTabela');
+      if (chave) {
+        hiddenInput.value = chave;
+        localStorage.setItem('listas_tabela_selecionada_chave', chave);
+        localStorage.setItem('listas_tabela_selecionada_nome', nomeDigitado.trim());
+        carregarTabela();
+      } else {
+        hiddenInput.value = '';
+        if (!nomeDigitado.trim()) {
+          localStorage.removeItem('listas_tabela_selecionada_chave');
+          localStorage.removeItem('listas_tabela_selecionada_nome');
+          document.getElementById('areaConteudo').style.display = 'none';
+        }
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
       modalFormulario = new bootstrap.Modal(document.getElementById('modalFormulario'));
+
+      // Restaurar tabela selecionada do localStorage
+      const chaveSalva = localStorage.getItem('listas_tabela_selecionada_chave');
+      const nomeSalvo  = localStorage.getItem('listas_tabela_selecionada_nome');
+      if (chaveSalva && nomeSalvo && tabelasPorNome[nomeSalvo] === chaveSalva) {
+        document.getElementById('inputSeletorTabela').value = nomeSalvo;
+        document.getElementById('seletorTabela').value = chaveSalva;
+        carregarTabela();
+      }
     });
 
     async function carregarTabela() {

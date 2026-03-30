@@ -998,6 +998,42 @@ TABELAS_CONFIG = {
         'inline_edit': True,
         'inline_columns': ['status']
     },
+    'c_geral_status_documentos': {
+        'nome': 'Geral: Status de Documentos Manuais',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['status_manuais', 'descricao'],
+        'colunas_obrigatorias': ['status_manuais'],
+        'labels': {
+            'status_manuais': 'Status',
+            'descricao': 'Descri\u00e7\u00e3o'
+        },
+        'colunas_filtro': ['status_manuais'],
+        'colunas_ordenacao': ['status_manuais'],
+        'ordem': 'status_manuais',
+        'tipos_campo': {
+            'status_manuais': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 4
+        }
+    },
+    'c_geral_tipos_documentos_manuais': {
+        'nome': 'Geral: Tipos de Documentos Manuais',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['tipos_documentos', 'descricao'],
+        'colunas_obrigatorias': ['tipos_documentos'],
+        'labels': {
+            'tipos_documentos': 'Tipo de Documento',
+            'descricao': 'Descrição'
+        },
+        'colunas_filtro': ['tipos_documentos'],
+        'colunas_ordenacao': ['tipos_documentos'],
+        'ordem': 'tipos_documentos',
+        'tipos_campo': {
+            'tipos_documentos': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 4
+        }
+    },
     'c_geral_certidoes': {
         'nome': 'Geral: Certidões',
         'schema': 'categoricas',
@@ -1280,6 +1316,17 @@ def criar_registro(tabela):
             dados['created_por'] = _sess.get('email', 'sistema')
             from datetime import datetime as _dt
             dados['created_at'] = _dt.now()
+
+        # Auto-popular colunas de auditoria para c_geral_tipos_documentos_manuais
+        if tabela == 'c_geral_tipos_documentos_manuais':
+            from flask import session as _sess
+            from datetime import datetime as _dt
+            _now = _dt.now()
+            _user = _sess.get('email', 'sistema')
+            dados['criado_por'] = _user
+            dados['criado_em'] = _now
+            dados['atualizado_por'] = _user
+            dados['atualizado_em'] = _now
         
         # Montar query de inserção apenas com campos enviados
         colunas_a_inserir = [col for col in config['colunas_editaveis'] if col in dados]
@@ -1295,6 +1342,10 @@ def criar_registro(tabela):
                     colunas_a_inserir.append(_ac)
         if tabela == 'c_dgp_celebracao_substatus':
             for _ac in ['created_por', 'created_at']:
+                if _ac in dados and _ac not in colunas_a_inserir:
+                    colunas_a_inserir.append(_ac)
+        if tabela == 'c_geral_tipos_documentos_manuais':
+            for _ac in ['criado_por', 'criado_em', 'atualizado_por', 'atualizado_em']:
                 if _ac in dados and _ac not in colunas_a_inserir:
                     colunas_a_inserir.append(_ac)
         
@@ -1399,6 +1450,15 @@ def atualizar_registro(tabela, id):
             if _row_old:
                 substatus_antigo_valor = _row_old['substatus']
             cur.close()
+
+        # Adicionar campos de auditoria para c_geral_tipos_documentos_manuais
+        if tabela == 'c_geral_tipos_documentos_manuais':
+            from flask import session as _sess
+            from datetime import datetime as _dt
+            colunas_validas.append('atualizado_por')
+            valores.append(_sess.get('email', 'sistema'))
+            colunas_validas.append('atualizado_em')
+            valores.append(_dt.now())
 
         set_clause = ', '.join([f"{col} = %s" for col in colunas_validas])
         valores.append(id)

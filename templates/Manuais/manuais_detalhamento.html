@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ manual.manual_nome }} - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f0f4ff; padding: 20px; font-size: 1rem; }
+
+    /* ── Header ─────────────────────────────────── */
+    .page-header {
+      background: linear-gradient(135deg, {{ cor.from }} 0%, {{ cor.to }} 100%);
+      color: #fff; padding: 28px 32px; border-radius: 12px;
+      margin-bottom: 28px; box-shadow: 0 4px 18px {{ cor.shadow }};
+    }
+    .page-header h2 { margin: 0; font-size: 1.75rem; font-weight: 700; line-height: 1.3; }
+    .page-header .meta { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+    /* ── Botão ───────────────────────────────────── */
+    .btn-det {
+      background: linear-gradient(135deg, {{ cor.from }}, {{ cor.to }});
+      color: #fff; border: none; border-radius: 8px;
+      padding: 9px 20px; font-weight: 600; font-size: 1rem;
+      display: inline-flex; align-items: center; gap: 7px;
+      text-decoration: none; cursor: pointer; transition: opacity .15s;
+    }
+    .btn-det:hover { opacity: .88; color: #fff; }
+    .btn-det.sm { padding: 7px 16px; font-size: .9rem; }
+    .btn-det.outline {
+      background: transparent; border: 1.5px solid rgba(255,255,255,.75); color: #fff;
+    }
+    .btn-det.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+
+    /* ── Seção de conteúdo ──────────────────────── */
+    .content-section {
+      background: #fff; border-radius: 12px; margin-bottom: 28px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07); overflow: hidden;
+    }
+    .content-section-header {
+      background: linear-gradient(135deg, {{ cor.from }}, {{ cor.to }});
+      color: #fff; padding: 16px 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .content-section-header h5 {
+      margin: 0; font-size: 1.05rem; font-weight: 700;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .content-section-body { padding: 28px 30px; }
+
+    /* ── Badge de tipo/status ───────────────────── */
+    .badge-tipo {
+      font-size: .82rem; font-weight: 600; padding: 4px 14px; border-radius: 20px;
+      background: rgba(255,255,255,.25); color: #fff; border: 1px solid rgba(255,255,255,.4);
+    }
+    .badge-area {
+      font-size: .82rem; padding: 4px 14px; border-radius: 20px;
+      background: rgba(0,0,0,.18); color: #fff;
+    }
+
+    /* ── Descrição ──────────────────────────────── */
+    .desc-text {
+      color: #374151; font-size: 1rem; line-height: 1.75;
+      white-space: pre-line;
+    }
+    .desc-placeholder { color: #9ca3af; font-style: italic; font-size: .97rem; }
+    .desc-edit-area { display: none; }
+
+    /* ── Versões ─────────────────────────────────── */
+    .versao-card {
+      border: 1.5px solid #e5e7eb; border-radius: 10px; overflow: hidden;
+      margin-bottom: 18px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.05);
+    }
+    .versao-card-header {
+      padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid #f1f5f9;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .versao-card-header .versao-nome { font-weight: 700; font-size: 1rem; color: #1e293b; }
+    .badge-versao {
+      font-size: .78rem; padding: 3px 12px; border-radius: 20px; font-weight: 700;
+      background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
+    }
+    .badge-status-v {
+      font-size: .78rem; padding: 3px 12px; border-radius: 20px;
+      background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;
+    }
+    .versao-card-body { padding: 18px 20px; }
+    .versao-card-body .v-desc { font-size: .95rem; color: #4b5563; margin-bottom: 14px; white-space: pre-line; }
+    .versao-links { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .link-item {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: .9rem; color: {{ cor.to }}; text-decoration: none;
+      padding: 6px 14px; border-radius: 6px; border: 1px solid {{ cor.to }}22;
+      background: {{ cor.to }}11; font-weight: 600; transition: background .15s;
+    }
+    .link-item:hover { background: {{ cor.to }}22; }
+    .versao-card-footer {
+      padding: 10px 20px; background: #f8fafc; border-top: 1px solid #f1f5f9;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      font-size: .83rem; color: #94a3b8;
+    }
+
+    /* ── Estado vazio ───────────────────────────── */
+    .empty-state {
+      text-align: center; padding: 50px 20px; color: #9ca3af;
+    }
+    .empty-state i { font-size: 3rem; display: block; margin-bottom: 14px; color: #e2e8f0; }
+
+    /* ── Modal header ───────────────────────────── */
+    .modal-header-det {
+      background: linear-gradient(135deg, {{ cor.from }}, {{ cor.to }});
+      color: #fff;
+    }
+    .modal-header-det .btn-close { filter: invert(1) brightness(2); }
+
+    /* ── Barra de filtros ───────────────────────── */
+    .filter-bar {
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 22px; padding: 14px 18px;
+      background: #f8fafc; border-radius: 10px; border: 1px solid #e5e7eb;
+    }
+    .filter-bar .form-control { font-size: .92rem; height: 40px; padding: 6px 12px; max-width: 260px; }
+    .filter-bar .form-select  { font-size: .92rem; height: 40px; padding: 6px 12px; max-width: 210px; }
+    .filter-bar .btn-limpar   { font-size: .88rem; padding: 6px 18px; flex-shrink: 0; }
+
+    /* ── Badge tipo_doc / publico_alvo / pendências ─ */
+    .badge-tipo-doc {
+      font-size: .78rem; padding: 3px 11px; border-radius: 20px; font-weight: 600;
+      background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+    }
+    .badge-publico {
+      font-size: .78rem; padding: 3px 11px; border-radius: 20px; font-weight: 600;
+      background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd;
+    }
+    .badge-pendencias {
+      font-size: .78rem; padding: 3px 11px; border-radius: 20px; font-weight: 600;
+      background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;
+    }
+    .no-results-msg {
+      text-align: center; padding: 28px 16px; color: #9ca3af;
+      font-size: .95rem; display: none;
+    }
+
+    @media (max-width: 576px) {
+      .content-section-body { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid" style="padding: 0 20px 40px; max-width: 1100px; margin: 0 auto;">
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mt-3">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- ── Cabeçalho ──────────────────────────────────────── -->
+  <div class="page-header mt-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div style="flex: 1; min-width: 0;">
+        <h2>
+          <i class="bi bi-file-earmark-text me-2" style="font-size: 1.2rem;"></i>
+          {{ manual.manual_nome }}
+        </h2>
+        <div class="meta">
+          <span class="badge-tipo">{{ manual.manual_tipo or 'Operação' }}</span>
+          <span class="badge-area"><i class="bi bi-folder2 me-1"></i>{{ manual.manual_area }}</span>
+          {% if manual.manual_status %}
+          <span style="background:rgba(255,255,255,.2); color:#fff; font-size:.72rem;
+                       padding:3px 10px; border-radius:20px; border:1px solid rgba(255,255,255,.4);">
+            {{ manual.manual_status }}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <a href="{{ url_for('manuais.index') }}" class="btn-det outline">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Seção 1: Descrição Central ─────────────────────── -->
+  <div class="content-section">
+    <div class="content-section-header">
+      <h5><i class="bi bi-text-paragraph"></i> Descrição da Operação / Projeto</h5>
+      <button class="btn btn-sm"
+              style="background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.5);
+                     color:#fff; font-size:.78rem; border-radius:6px;"
+              onclick="toggleEditDesc()"
+              id="btnEditarDesc">
+        <i class="bi bi-pencil me-1"></i>Editar
+      </button>
+      <style>
+        #btnEditarDesc, .btn-adicionar-versao {
+          font-size: .88rem !important; padding: 6px 16px !important;
+        }
+      </style>
+    </div>
+    <div class="content-section-body">
+
+      <!-- Modo leitura -->
+      <div id="descDisplay">
+        {% if manual.manual_descricao %}
+          <p class="desc-text mb-0">{{ manual.manual_descricao }}</p>
+        {% else %}
+          <p class="desc-placeholder mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Nenhuma descrição cadastrada para este procedimento.
+            Clique em "Editar" para adicionar.
+          </p>
+        {% endif %}
+      </div>
+
+      <!-- Modo edição (oculto por padrão) -->
+      <div id="descEdit" class="desc-edit-area">
+        <form method="POST"
+              action="{{ url_for('manuais.atualizar_descricao', manual_id=manual.id) }}">
+          <textarea name="manual_descricao" class="form-control mb-3" rows="8"
+                    placeholder="Descreva o procedimento, contexto e objetivo desta operação...">{{ manual.manual_descricao or '' }}</textarea>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn-det sm">
+              <i class="bi bi-check2"></i> Salvar descrição
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="toggleEditDesc()">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Seção 2: Versionamento ─────────────────────────── -->
+  <div class="content-section">
+    <div class="content-section-header">
+      <h5>
+        <i class="bi bi-clock-history"></i>
+        Versões do Manual
+        <span style="background:rgba(255,255,255,.25); border-radius:20px; padding:1px 9px; font-size:.75rem;">
+          {{ versoes|length }}
+        </span>
+      </h5>
+      <button class="btn btn-sm"
+              style="background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.5);
+                     color:#fff; font-size:.78rem; border-radius:6px;"
+              data-bs-toggle="modal" data-bs-target="#modalNovaVersao"
+              class="btn btn-sm btn-adicionar-versao">
+        <i class="bi bi-plus-lg me-1"></i>Adicionar Versão
+      </button>
+    </div>
+    <div class="content-section-body">
+
+      {% if versoes %}
+        <!-- ── Barra de filtros ──────────────────────── -->
+        <div class="filter-bar">
+          <input type="text" id="filtroTexto" class="form-control"
+                 placeholder="&#128269; Buscar por nome..." oninput="filtrarVersoes()" autocomplete="off">
+          <select id="filtroTipo" class="form-select" onchange="filtrarVersoes()">
+            <option value="">Todos os tipos</option>
+            {% for t in tipos_doc_opcoes %}
+            <option value="{{ t | e }}">{{ t }}</option>
+            {% endfor %}
+          </select>
+          <select id="filtroStatus" class="form-select" onchange="filtrarVersoes()">
+            <option value="">Todos os status</option>
+            {% for s in status_opcoes %}
+            <option value="{{ s | e }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+          <select id="filtroPublico" class="form-select" onchange="filtrarVersoes()">
+            <option value="">Todos os públicos</option>
+            <option value="Externo">Externo</option>
+            <option value="Interno (DP)">Interno (DP)</option>
+            <option value="Interno (SMDHC)">Interno (SMDHC)</option>
+          </select>
+          <button class="btn btn-outline-secondary btn-limpar" onclick="limparFiltros()">
+            <i class="bi bi-x-circle me-1"></i>Limpar
+          </button>
+        </div>
+
+        {% for v in versoes %}
+        <div class="versao-card"
+             data-versao-id="{{ v.id }}"
+             data-nome="{{ v.manual_nome | lower | e }}"
+             data-nome-original="{{ v.manual_nome | e }}"
+             data-versao="{{ v.manual_versionamento or '' | e }}"
+             data-tipo="{{ v.tipo_doc or '' | e }}"
+             data-status="{{ v.manual_status or '' | e }}"
+             data-publico="{{ v.publico_alvo or '' | e }}"
+             data-link="{{ v.manual_link or '' | e }}"
+             data-descricao="{{ v.manual_descricao or '' | e }}"
+             data-pendencias="{{ v.manual_pendencias or '' | e }}">
+          <div class="versao-card-header">
+            <span class="versao-nome">{{ v.manual_nome }}</span>
+            {% if v.manual_versionamento %}
+            <span class="badge-versao">v{{ v.manual_versionamento }}</span>
+            {% endif %}
+            {% if v.tipo_doc %}
+            <span class="badge-tipo-doc"><i class="bi bi-tag me-1"></i>{{ v.tipo_doc }}</span>
+            {% endif %}
+            {% if v.manual_status %}
+            <span class="badge-status-v">{{ v.manual_status }}</span>
+            {% endif %}
+            {% if v.publico_alvo %}
+              {% for pub in v.publico_alvo.split(';') %}
+                {% if pub.strip() %}
+            <span class="badge-publico"><i class="bi bi-people me-1"></i>{{ pub.strip() }}</span>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+            {% if v.manual_pendencias %}
+            <span class="badge-pendencias"><i class="bi bi-exclamation-circle me-1"></i>Com pend&#234;ncias</span>
+            {% endif %}
+            <div class="ms-auto">
+              <button class="btn btn-sm btn-outline-secondary"
+                      style="font-size:.85rem; padding:5px 12px;"
+                      onclick="abrirEditarVersao({{ v.id }})"
+                      title="Editar versão">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger ms-1"
+                      style="font-size:.85rem; padding:5px 12px;"
+                      onclick="confirmarExclusao({{ v.id }}, '{{ v.manual_nome | e }}')"
+                      title="Excluir versão">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </div>
+          <div class="versao-card-body">
+            {% if v.manual_descricao %}
+            <p class="v-desc mb-2">{{ v.manual_descricao }}</p>
+            {% endif %}
+            <div class="versao-links">
+              {% if v.manual_doc %}
+              <a href="{{ url_for('manuais.download_doc', versao_id=v.id) }}"
+                 class="link-item" target="_blank">
+                <i class="bi bi-file-earmark-arrow-down"></i>
+                Documento anexo
+              </a>
+              {% endif %}
+              {% if v.manual_link %}
+              <a href="{{ v.manual_link }}" class="link-item" target="_blank" rel="noopener noreferrer">
+                <i class="bi bi-link-45deg"></i>
+                Acessar link
+              </a>
+              {% endif %}
+            </div>
+          </div>
+          <div class="versao-card-footer">
+            <span>
+              <i class="bi bi-calendar3 me-1"></i>
+              {% if v.criado_em %}
+                Criado em {{ v.criado_em.strftime('%d/%m/%Y') }}
+                {% if v.criado_por %} por {{ v.criado_por }}{% endif %}
+              {% endif %}
+            </span>
+            {% if v.atualizado_em %}
+            <span>
+              Atualizado em {{ v.atualizado_em.strftime('%d/%m/%Y') }}
+              {% if v.atualizado_por %} por {{ v.atualizado_por }}{% endif %}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+
+        <!-- Mensagem quando filtros não retornam resultados -->
+        <div class="no-results-msg" id="noResultsMsg">
+          <i class="bi bi-search" style="font-size:1.6rem; display:block; margin-bottom:8px; color:#d1d5db;"></i>
+          Nenhuma versão encontrada com os filtros aplicados.<br>
+          <button class="btn btn-sm btn-outline-secondary mt-2" onclick="limparFiltros()">
+            <i class="bi bi-x-circle me-1"></i>Limpar filtros
+          </button>
+        </div>
+
+      {% else %}
+        <div class="empty-state">
+          <i class="bi bi-journal-x"></i>
+          <strong>Nenhuma versão cadastrada</strong>
+          <p class="mt-2 mb-0" style="font-size:.88rem;">
+            Clique em "Adicionar Versão" para incluir a primeira versão deste manual.
+          </p>
+          <button class="btn-det sm mt-3" data-bs-toggle="modal" data-bs-target="#modalNovaVersao">
+            <i class="bi bi-plus-lg"></i> Adicionar primeira versão
+          </button>
+        </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL: Adicionar / Editar Versão
+     ═══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalNovaVersao" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+
+      <div class="modal-header modal-header-det">
+        <h5 class="modal-title fw-bold" id="modalVersaoTitulo">
+          <i class="bi bi-plus-circle me-2"></i>Nova Versão
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"
+                style="filter: invert(1) brightness(2);"></button>
+      </div>
+
+      <form method="POST" id="formVersao"
+            action="{{ url_for('manuais.criar_versao', manual_id=manual.id) }}"
+            enctype="multipart/form-data">
+        <input type="hidden" name="_method" id="formVersaoMethod" value="POST">
+        <div class="modal-body p-4">
+
+          <div class="row g-3">
+
+            <!-- Tipo de documento (primeiro) -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Tipo de Documento <span class="text-danger">*</span>
+              </label>
+              <select name="tipo_doc" id="v_tipo_doc" class="form-select" required>
+                <option value="">— Selecione o tipo —</option>
+                {% for t in tipos_doc_opcoes %}
+                <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Nome do manual -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Nome do Manual <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="manual_nome" id="v_nome" class="form-control" required
+                     value="{{ manual.manual_nome }}"
+                     placeholder="Título desta versão do manual...">
+            </div>
+
+            <!-- Versão + Status -->
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">Versão</label>
+              <input type="text" name="manual_versionamento" id="v_versao" class="form-control"
+                     placeholder="Ex: 1.0, 2.1...">
+            </div>
+            <div class="col-sm-8">
+              <label class="form-label fw-semibold">Status</label>
+              <select name="manual_status" id="v_status" class="form-select">
+                <option value="">— Sem status —</option>
+                {% for s in status_opcoes %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Público-alvo -->
+            <div class="col-12">
+              <label class="form-label fw-semibold d-block">Público-alvo</label>
+              <div class="d-flex gap-4 flex-wrap">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="publico_alvo"
+                         value="Externo" id="pa_externo">
+                  <label class="form-check-label" for="pa_externo">Externo</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="publico_alvo"
+                         value="Interno (DP)" id="pa_dp">
+                  <label class="form-check-label" for="pa_dp">Interno (DP)</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="publico_alvo"
+                         value="Interno (SMDHC)" id="pa_smdhc">
+                  <label class="form-check-label" for="pa_smdhc">Interno (SMDHC)</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Descrição -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Descrição <span class="text-muted fw-normal">(opcional)</span>
+              </label>
+              <textarea name="manual_descricao" id="v_descricao" class="form-control" rows="4"
+                        placeholder="Descreva o conteúdo ou alterações desta versão..."></textarea>
+            </div>
+
+            <!-- Pendências -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Pendências <span class="text-muted fw-normal">(opcional)</span>
+              </label>
+              <textarea name="manual_pendencias" id="v_pendencias" class="form-control" rows="3"
+                        placeholder="Registre pendências ou observações sobre esta versão..."></textarea>
+            </div>
+
+            <!-- Upload de documento -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Documento <span class="text-muted fw-normal">(PDF, Word, Excel, etc.)</span>
+              </label>
+              <input type="file" name="manual_doc" id="v_doc" class="form-control"
+                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg">
+              <div class="form-text">
+                Formatos aceitos: PDF, Word, Excel, PowerPoint, texto, imagens.
+                O arquivo será salvo em <code>modelos/Manuais/</code>.
+              </div>
+              <div id="docAtualDisplay" class="mt-1" style="display:none; font-size:.82rem; color:#6c757d;">
+                <i class="bi bi-paperclip me-1"></i>
+                Arquivo atual: <span id="docAtualNome"></span>
+                <span class="text-muted ms-1">(envie um novo para substituir)</span>
+              </div>
+            </div>
+
+            <!-- Link externo -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Link externo <span class="text-muted fw-normal">(opcional)</span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                <input type="url" name="manual_link" id="v_link" class="form-control"
+                       placeholder="https://...">
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-det sm">
+            <i class="bi bi-check2-circle"></i>
+            <span id="btnVersaoTexto">Salvar Versão</span>
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL: Confirmação de Exclusão
+     ═══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalConfirmExclusao" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header" style="background:#dc2626; color:#fff;">
+        <h5 class="modal-title fw-bold" style="font-size:.95rem;">
+          <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Exclusão
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                style="filter:invert(1) brightness(2);"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+        <p class="mb-1" style="font-size:.9rem;">
+          Excluir a versão:
+        </p>
+        <strong id="confirmExclusaoNome" class="d-block mb-0" style="font-size:.88rem; color:#374151;"></strong>
+      </div>
+      <div class="modal-footer bg-light justify-content-center">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <form id="formExclusao" method="POST" style="display:inline;">
+          <input type="hidden" name="manual_id" value="{{ manual.id }}">
+          <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-trash3 me-1"></i>Excluir
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  /* ─── Toggle descrição ────────────────────────── */
+  function toggleEditDesc() {
+    const display = document.getElementById('descDisplay');
+    const edit    = document.getElementById('descEdit');
+    const btn     = document.getElementById('btnEditarDesc');
+    // Usa getComputedStyle para ler o display real (inclui valor da CSS class)
+    const editing = window.getComputedStyle(edit).display !== 'none';
+    display.style.display = editing ? '' : 'none';
+    edit.style.display    = editing ? 'none' : 'block';
+    btn.innerHTML = editing
+      ? '<i class="bi bi-pencil me-1"></i>Editar'
+      : '<i class="bi bi-x me-1"></i>Cancelar';
+  }
+
+  /* ─── Modal editar versão ─────────────────────── */
+  function abrirEditarVersao(id) {
+    const card = document.querySelector(`.versao-card[data-versao-id="${id}"]`);
+    if (!card) return;
+
+    const form       = document.getElementById('formVersao');
+    const titulo     = document.getElementById('modalVersaoTitulo');
+    const btnTexto   = document.getElementById('btnVersaoTexto');
+    const docDisplay = document.getElementById('docAtualDisplay');
+
+    form.action    = `/manuais/versao/${id}/editar`;
+    titulo.innerHTML = '<i class="bi bi-pencil me-2"></i>Editar Versão';
+    btnTexto.textContent = 'Salvar Alterações';
+
+    document.getElementById('v_nome').value         = card.dataset.nomeOriginal || '';
+    document.getElementById('v_versao').value        = card.dataset.versao || '';
+    document.getElementById('v_descricao').value     = card.dataset.descricao || '';
+    document.getElementById('v_pendencias').value    = card.dataset.pendencias || '';
+    document.getElementById('v_link').value          = card.dataset.link || '';
+
+    // Seleciona o status correto
+    const sel = document.getElementById('v_status');
+    const statusVal = card.dataset.status || '';
+    for (let opt of sel.options) { opt.selected = (opt.value === statusVal); }
+
+    // Seleciona o tipo de documento
+    const selTipo = document.getElementById('v_tipo_doc');
+    const tipoDocVal = card.dataset.tipo || '';
+    for (let opt of selTipo.options) { opt.selected = (opt.value === tipoDocVal); }
+
+    // Marca os checkboxes de público-alvo
+    const publicoAlvo = card.dataset.publico || '';
+    const valores = publicoAlvo.split(';').map(v => v.trim()).filter(Boolean);
+    document.querySelectorAll('input[name="publico_alvo"]').forEach(cb => {
+      cb.checked = valores.includes(cb.value);
+    });
+
+    docDisplay.style.display = 'none';
+    new bootstrap.Modal(document.getElementById('modalNovaVersao')).show();
+  }
+
+  /* ─── Modal exclusão ──────────────────────────── */
+  function confirmarExclusao(id, nome) {
+    document.getElementById('confirmExclusaoNome').textContent = nome;
+    document.getElementById('formExclusao').action = `/manuais/versao/${id}/deletar`;
+    new bootstrap.Modal(document.getElementById('modalConfirmExclusao')).show();
+  }
+
+  /* ─── Resetar modal ao fechar ─────────────────── */
+  document.getElementById('modalNovaVersao').addEventListener('hidden.bs.modal', function () {
+    const form   = document.getElementById('formVersao');
+    const titulo = document.getElementById('modalVersaoTitulo');
+    form.action  = '{{ url_for("manuais.criar_versao", manual_id=manual.id) }}';
+    titulo.innerHTML = '<i class="bi bi-plus-circle me-2"></i>Nova Versão';
+    document.getElementById('btnVersaoTexto').textContent = 'Salvar Versão';
+    document.getElementById('v_tipo_doc').value  = '';
+    document.getElementById('v_nome').value         = '{{ manual.manual_nome | e }}';
+    document.getElementById('v_versao').value        = '';
+    document.getElementById('v_status').value        = '';
+    document.getElementById('v_link').value          = '';
+    document.getElementById('v_descricao').value     = '';
+    document.getElementById('v_pendencias').value    = '';
+    document.getElementById('docAtualDisplay').style.display = 'none';
+    document.querySelectorAll('input[name="publico_alvo"]').forEach(cb => cb.checked = false);
+  });
+
+  /* ─── Filtros de versões ──────────────────────── */
+  function filtrarVersoes() {
+    const texto   = document.getElementById('filtroTexto').value.toLowerCase().trim();
+    const tipo    = document.getElementById('filtroTipo').value;
+    const status  = document.getElementById('filtroStatus').value;
+    const publico = document.getElementById('filtroPublico').value;
+
+    let visiveis = 0;
+    document.querySelectorAll('.versao-card').forEach(card => {
+      const matchTexto   = !texto   || (card.dataset.nome   || '').includes(texto);
+      const matchTipo    = !tipo    || card.dataset.tipo    === tipo;
+      const matchStatus  = !status  || card.dataset.status  === status;
+      const matchPublico = !publico || (card.dataset.publico || '').includes(publico);
+      const show = matchTexto && matchTipo && matchStatus && matchPublico;
+      card.style.display = show ? '' : 'none';
+      if (show) visiveis++;
+    });
+
+    const noResults = document.getElementById('noResultsMsg');
+    if (noResults) noResults.style.display = visiveis === 0 ? 'block' : 'none';
+  }
+
+  function limparFiltros() {
+    document.getElementById('filtroTexto').value  = '';
+    document.getElementById('filtroTipo').value   = '';
+    document.getElementById('filtroStatus').value = '';
+    document.getElementById('filtroPublico').value = '';
+    filtrarVersoes();
+  }
+</script>
+</body>
+</html>

@@ -430,13 +430,14 @@ def api_orcamento_detalhado():
             }
         
         # 5. Buscar valor disponível de back_reservas, cruzando pelo SEI de celebração
-        # total_disponivel = (vl_saldo_resv + vl_eph) - total_pago
+        # total_disponivel = vl_resv + vl_transf_resv - vl_canc_resv
         try:
             cur.execute("""
                 SELECT cod_nro_pcss_sof,
                        SUM(
-                           REPLACE(vl_saldo_resv::text, ',', '.')::numeric +
-                           REPLACE(vl_eph::text, ',', '.')::numeric
+                           REPLACE(vl_resv::text, ',', '.')::numeric +
+                           REPLACE(vl_transf_resv::text, ',', '.')::numeric -
+                           REPLACE(vl_canc_resv::text, ',', '.')::numeric
                        ) as valor_disponivel
                 FROM gestao_financeira.back_reservas
                 GROUP BY cod_nro_pcss_sof
@@ -456,8 +457,7 @@ def api_orcamento_detalhado():
             sei = item.get('sei_celeb', '-')
             sei_strip = sei.strip() if sei and sei != '-' else None
             valor_disponivel = disponivel_por_sei.get(sei_strip, 0) if sei_strip else 0
-            total_pago_item = float(item.get('total_pago') or 0)
-            td = max(valor_disponivel - total_pago_item, 0)
+            td = max(valor_disponivel, 0)
             item['total_disponivel'] = round(td, 2)
             total_global_item = item.get('total_global') or 0
             residual = td - total_global_item

@@ -43,6 +43,7 @@ Foco:
 - Automatizar texto da primeira parcela (Médio)✅
 - Fazer uma checkbox para tirar os de TCL de COSAN (Fácil)
 - Fazer um relatório completo do que está encaminhado para pagamento, pagos e atrasados (Médio)
+- Colocar um novo ponto CPCA/EMENDAS (Fácil)
 
 ### 8. Celebração e DGP
 - Vincular projeto celebrado com Parcerias.html (Fácil)

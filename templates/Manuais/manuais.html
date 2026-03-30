@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biblioteca Informativa - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f0f4ff; padding: 20px; }
+
+    /* ── Header ──────────────────────────────────── */
+    .page-header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: #fff; padding: 22px 28px; border-radius: 12px;
+      margin-bottom: 24px; box-shadow: 0 4px 18px rgba(37,99,235,.28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+    /* ── Botão padrão ──────────────────────────── */
+    .btn-man {
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600; font-size: .875rem;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; cursor: pointer; transition: opacity .15s;
+    }
+    .btn-man:hover { opacity: .88; color: #fff; }
+    .btn-man.outline {
+      background: transparent; border: 1.5px solid rgba(255,255,255,.75); color: #fff;
+    }
+    .btn-man.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+
+    /* ── Filtros ─────────────────────────────────── */
+    .filter-bar {
+      background: #fff; padding: 16px 20px; border-radius: 10px;
+      margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      border-left: 4px solid #2563eb;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .filter-bar .search-wrap { position: relative; flex: 1; min-width: 220px; }
+    .filter-bar .search-wrap .bi-search {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: #2563eb; pointer-events: none;
+    }
+    .filter-bar input[type=text] { padding-left: 36px; border-color: #bfdbfe; }
+    .filter-bar input[type=text]:focus {
+      border-color: #2563eb; box-shadow: 0 0 0 .2rem rgba(37,99,235,.18);
+    }
+    .filter-bar select { max-width: 220px; border-color: #bfdbfe; }
+    .filter-bar select:focus {
+      border-color: #2563eb; box-shadow: 0 0 0 .2rem rgba(37,99,235,.18);
+    }
+    #resultadoFiltro { font-size: .82rem; color: #6c757d; white-space: nowrap; }
+
+    /* ── Seção de área ───────────────────────────── */
+    .area-section { margin-bottom: 32px; }
+    .area-header {
+      color: #fff; padding: 11px 18px; border-radius: 10px 10px 0 0;
+      font-size: 1rem; font-weight: 700;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .area-header-right {
+      margin-left: auto; display: flex; align-items: center; gap: 8px;
+    }
+    .area-count {
+      background: rgba(255,255,255,.25); border-radius: 20px;
+      padding: 2px 10px; font-size: .8rem; font-weight: 600;
+    }
+    .btn-novo-card {
+      background: rgba(255,255,255,.18); border: 1.5px solid rgba(255,255,255,.6);
+      color: #fff; border-radius: 6px; padding: 3px 10px;
+      font-size: .78rem; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px;
+      transition: background .15s;
+    }
+    .btn-novo-card:hover { background: rgba(255,255,255,.32); }
+    .area-body {
+      background: #fff; border-radius: 0 0 10px 10px;
+      padding: 18px; box-shadow: 0 2px 10px rgba(0,0,0,.07);
+    }
+
+    /* ── Grid de cards ────────────────────────────── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    /* ── Card de manual ──────────────────────────── */
+    .manual-card {
+      background: #fff; border-radius: 10px; border: 1.5px solid #e5e7eb;
+      padding: 0; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,.06);
+      transition: box-shadow .18s, transform .18s;
+      cursor: pointer; text-decoration: none; display: block; color: inherit;
+    }
+    .manual-card:hover {
+      box-shadow: 0 6px 20px rgba(0,0,0,.12); transform: translateY(-2px);
+      text-decoration: none; color: inherit;
+    }
+    .manual-card .card-accent { height: 4px; width: 100%; }
+    .manual-card .card-body-inner { padding: 14px 16px 12px; }
+    .manual-card .card-title {
+      font-size: .88rem; font-weight: 700; color: #1e293b;
+      line-height: 1.35; margin-bottom: 8px;
+    }
+    .manual-card .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .manual-card .badge-tipo {
+      font-size: .68rem; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+      background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
+    }
+    .manual-card .badge-tipo.projeto {
+      background: #fefce8; color: #854d0e; border-color: #fde68a;
+    }
+    .manual-card .badge-status {
+      font-size: .68rem; padding: 2px 8px; border-radius: 20px;
+      background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;
+    }
+    .manual-card .card-desc {
+      font-size: .78rem; color: #64748b; margin-top: 8px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .manual-card .card-footer-inner {
+      padding: 8px 16px; background: #f8fafc; border-top: 1px solid #f1f5f9;
+      font-size: .72rem; color: #94a3b8; display: flex; align-items: center; gap: 4px;
+    }
+    .manual-card[data-hidden="true"] { display: none; }
+
+    /* ── Sem resultado ─────────────────── */
+    .sem-resultado {
+      display: none; text-align: center; padding: 28px; color: #6c757d;
+      font-size: .9rem; grid-column: 1 / -1;
+    }
+    .sem-resultado i { font-size: 2rem; display: block; margin-bottom: 8px; color: #cbd5e1; }
+    .area-section[data-vazia="true"] { display: none; }
+
+    /* ── Modal header ─────────────────── */
+    .modal-header-gradient {
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      color: #fff; border-radius: 0;
+    }
+    .modal-header-gradient .btn-close { filter: invert(1) brightness(2); }
+
+    @media (max-width: 768px) {
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .filter-bar select { max-width: 100%; }
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid" style="padding: 0 20px 40px;">
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mt-3">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Cabeçalho -->
+  <div class="page-header mt-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2><i class="bi bi-journal-bookmark-fill me-2"></i>Biblioteca Informativa</h2>
+        <p>Operações e projetos documentados por área da unidade</p>
+      </div>
+      <a href="{{ url_for('main.index') }}" class="btn-man outline">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+  </div>
+
+  <!-- Barra de Filtros -->
+  <div class="filter-bar">
+    <div class="search-wrap">
+      <i class="bi bi-search"></i>
+      <input type="text" id="filtroBusca" class="form-control"
+             placeholder="Buscar por nome do procedimento..."
+             oninput="aplicarFiltros()" autocomplete="off">
+    </div>
+
+    <select id="filtroArea" class="form-select" onchange="aplicarFiltros()">
+      <option value="">Todas as áreas</option>
+      {% for area in areas_ordem %}
+        {% if area in areas %}
+        <option value="{{ area }}">{{ area }}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+
+    <select id="filtroTipo" class="form-select" style="max-width:160px;" onchange="aplicarFiltros()">
+      <option value="">Todos os tipos</option>
+      <option value="Operação">Operação</option>
+      <option value="Projeto">Projeto</option>
+    </select>
+
+    {% if status_opcoes %}
+    <select id="filtroStatus" class="form-select" style="max-width:180px;" onchange="aplicarFiltros()">
+      <option value="">Todos os status</option>
+      {% for s in status_opcoes %}
+      <option value="{{ s }}">{{ s }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
+    <span id="resultadoFiltro"></span>
+
+    <button class="btn btn-sm btn-outline-secondary" onclick="limparFiltros()" title="Limpar filtros">
+      <i class="bi bi-x-circle"></i>
+    </button>
+  </div>
+
+  <!-- Seções por Área -->
+  {% for area in areas_ordem %}
+    {% if area in areas and areas[area] %}
+    {% set cor = areas_cor.get(area, {'from': '#1e3a5f', 'to': '#2563eb', 'shadow': 'rgba(37,99,235,.25)'}) %}
+    <div class="area-section" data-area="{{ area }}" id="area-{{ loop.index }}">
+      <div class="area-header"
+           style="background: linear-gradient(135deg, {{ cor.from }}, {{ cor.to }}); box-shadow: 0 3px 12px {{ cor.shadow }};">
+        <i class="bi bi-folder2-open"></i>
+        {{ area }}
+        <div class="area-header-right">
+          <button class="btn-novo-card"
+                  onclick="abrirModalNovoCard('{{ area | e }}', '{{ cor.from | e }}', '{{ cor.to | e }}')"
+                  title="Novo procedimento nesta área">
+            <i class="bi bi-plus-lg"></i> Novo
+          </button>
+          <span class="area-count">{{ areas[area]|length }}</span>
+        </div>
+      </div>
+      <div class="area-body">
+        <div class="cards-grid" id="grid-{{ loop.index }}">
+          {% for m in areas[area] %}
+          <a href="{{ url_for('manuais.detalhe', manual_id=m.id) }}"
+             class="manual-card"
+             data-nome="{{ m.manual_nome | lower }}"
+             data-area="{{ area }}"
+             data-tipo="{{ m.manual_tipo or '' }}"
+             data-status="{{ m.manual_status or '' }}">
+            <div class="card-accent"
+                 style="background: linear-gradient(90deg, {{ cor.from }}, {{ cor.to }});"></div>
+            <div class="card-body-inner">
+              <div class="card-title">
+                <i class="bi bi-file-text me-1" style="color: {{ cor.to }}; font-size: .8rem;"></i>
+                {{ m.manual_nome }}
+              </div>
+              <div class="card-meta">
+                <span class="badge-tipo {% if m.manual_tipo == 'Projeto' %}projeto{% endif %}">
+                  {{ m.manual_tipo or 'Operação' }}
+                </span>
+                {% if m.manual_status %}
+                <span class="badge-status">{{ m.manual_status }}</span>
+                {% endif %}
+              </div>
+              {% if m.manual_descricao %}
+              <div class="card-desc">{{ m.manual_descricao }}</div>
+              {% endif %}
+              {% if m.doc_count %}
+              <div class="mt-1" style="font-size:.75rem; color:#6b7280;">
+                <i class="bi bi-file-earmark-text me-1"></i>{{ m.doc_count }} documento{% if m.doc_count != 1 %}s{% endif %}
+              </div>
+              {% endif %}
+            </div>
+            <div class="card-footer-inner">
+              <i class="bi bi-arrow-right-circle"></i>
+              Ver procedimento
+            </div>
+          </a>
+          {% endfor %}
+
+          <div class="sem-resultado" id="semRes-{{ loop.index }}">
+            <i class="bi bi-search"></i>
+            Nenhum procedimento encontrado nesta área
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+
+  <!-- Mensagem geral sem resultados -->
+  <div id="semResultadoGeral" style="display:none; text-align:center; padding:48px; color:#6c757d;">
+    <i class="bi bi-search" style="font-size:2.5rem; display:block; margin-bottom:12px; color:#cbd5e1;"></i>
+    <strong>Nenhum procedimento encontrado</strong>
+    <p class="mt-1 mb-0" style="font-size:.88rem;">Tente outros termos de busca ou limpe os filtros.</p>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL: Novo Procedimento
+     ═══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalNovoCard" tabindex="-1" aria-labelledby="modalNovoCardLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+
+      <div class="modal-header" id="modalNovoCardHeader" style="border-radius: 0;">
+        <h5 class="modal-title fw-bold" id="modalNovoCardLabel">
+          <i class="bi bi-plus-circle me-2"></i>Novo Procedimento
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"
+                style="filter: invert(1) brightness(2);"></button>
+      </div>
+
+      <form method="POST" action="{{ url_for('manuais.criar') }}">
+        <div class="modal-body p-4">
+          <input type="hidden" id="modal_area" name="manual_area">
+
+          <!-- Área (display apenas) -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold text-secondary small text-uppercase ls-1">Área</label>
+            <div id="modal_area_display"
+                 class="px-3 py-2 rounded text-white fw-semibold"
+                 style="font-size:.85rem;">
+            </div>
+          </div>
+
+          <!-- Nome -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              Nome do Procedimento <span class="text-danger">*</span>
+            </label>
+            <input type="text" name="manual_nome" class="form-control" required
+                   placeholder="Ex: Análise de prestações de contas..."
+                   autofocus>
+          </div>
+
+          <!-- Tipo + Status -->
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Tipo</label>
+              <select name="manual_tipo" class="form-select">
+                <option value="Operação">Operação</option>
+                <option value="Projeto">Projeto</option>
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Status</label>
+              <select name="manual_status" class="form-select">
+                <option value="">— Sem status —</option>
+                {% for s in status_opcoes %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <!-- Descrição -->
+          <div class="mb-1">
+            <label class="form-label fw-semibold">Descrição <span class="text-muted fw-normal">(opcional)</span></label>
+            <textarea name="manual_descricao" class="form-control" rows="3"
+                      placeholder="Breve descrição do que este procedimento abrange..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-man" style="font-size:.85rem; padding:6px 20px;">
+            <i class="bi bi-plus-circle"></i> Criar Procedimento
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  /* ─── Filtros ─────────────────────────────────────────── */
+  function aplicarFiltros() {
+    const busca   = document.getElementById('filtroBusca').value.toLowerCase().trim();
+    const area    = document.getElementById('filtroArea').value;
+    const tipo    = document.getElementById('filtroTipo').value;
+    const statusEl = document.getElementById('filtroStatus');
+    const status  = statusEl ? statusEl.value : '';
+
+    const cards = document.querySelectorAll('.manual-card');
+    let totalVisiveis = 0;
+
+    cards.forEach(card => {
+      const nomeMatch   = !busca  || card.dataset.nome.includes(busca);
+      const areaMatch   = !area   || card.dataset.area === area;
+      const tipoMatch   = !tipo   || card.dataset.tipo === tipo;
+      const statusMatch = !status || card.dataset.status === status;
+      const visivel = nomeMatch && areaMatch && tipoMatch && statusMatch;
+      card.dataset.hidden = visivel ? 'false' : 'true';
+      if (visivel) totalVisiveis++;
+    });
+
+    document.querySelectorAll('.area-section').forEach(sec => {
+      const areaName = sec.dataset.area;
+      const semRes = sec.querySelector('.sem-resultado');
+      const visiveis = Array.from(sec.querySelectorAll('.manual-card'))
+                            .filter(c => c.dataset.hidden !== 'true').length;
+      if (area && areaName !== area) { sec.style.display = 'none'; return; }
+      sec.style.display = '';
+      semRes.style.display = visiveis === 0 ? 'block' : 'none';
+    });
+
+    const semGeral = document.getElementById('semResultadoGeral');
+    semGeral.style.display = totalVisiveis === 0 ? 'block' : 'none';
+
+    const countEl = document.getElementById('resultadoFiltro');
+    countEl.textContent = (busca || area || tipo || status)
+      ? totalVisiveis + ' resultado' + (totalVisiveis !== 1 ? 's' : '')
+      : '';
+  }
+
+  function limparFiltros() {
+    document.getElementById('filtroBusca').value = '';
+    document.getElementById('filtroArea').value  = '';
+    document.getElementById('filtroTipo').value  = '';
+    const statusEl = document.getElementById('filtroStatus');
+    if (statusEl) statusEl.value = '';
+    aplicarFiltros();
+  }
+
+  document.getElementById('filtroBusca').addEventListener('keydown', e => {
+    if (e.key === 'Escape') limparFiltros();
+  });
+
+  /* ─── Modal Novo Card ─────────────────────────────────── */
+  function abrirModalNovoCard(area, corFrom, corTo) {
+    document.getElementById('modal_area').value = area;
+
+    const display = document.getElementById('modal_area_display');
+    display.textContent = area;
+    display.style.background = `linear-gradient(135deg, ${corFrom}, ${corTo})`;
+
+    const header = document.getElementById('modalNovoCardHeader');
+    header.style.background = `linear-gradient(135deg, ${corFrom}, ${corTo})`;
+    header.style.color = '#fff';
+
+    new bootstrap.Modal(document.getElementById('modalNovoCard')).show();
+  }
+</script>
+</body>
+</html>
