@@ -88,7 +88,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h1><i class="bi bi-file-earmark-arrow-up"></i> Relatórios SOF</h1>
-                    <p class="mb-0">Importação de arquivos CSV (Dotação, Reservas e Empenhos)</p>
+                    <p class="mb-0">Importação de arquivos CSV (Dotação, Reservas, Empenhos e Liquidação)</p>
                 </div>
                 <div>
                     <a href="{{ url_for('gestao_financeira.index') }}" class="btn btn-light btn-lg">
@@ -178,14 +178,54 @@
             </div>
 
             <form id="formReservas" enctype="multipart/form-data">
+                <p class="text-muted mb-2"><small><i class="bi bi-info-circle me-1"></i>Relatórios sem executor: 5 dotações principais. Relatório como executor: somente 34.10. Os registros únicos de todos os arquivos são mesclados pelo código + ano da reserva.</small></p>
+
+                <h6 class="fw-semibold text-secondary mt-2 mb-2">Sem Executor</h6>
                 <div class="row g-3">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="upload-box">
-                            <label class="upload-label">34.10 (Verba Municipal) - Executor</label>
-                            <input type="file" class="form-control" name="reservas_3410" accept=".csv" required>
+                            <label class="upload-label">34.10 (Verba Municipal)</label>
+                            <input type="file" class="form-control" name="reservas_3410" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.20 (FUMCAF)</label>
+                            <input type="file" class="form-control" name="reservas_3420" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">08.10 (FMID)</label>
+                            <input type="file" class="form-control" name="reservas_0810" accept=".csv">
                         </div>
                     </div>
                 </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">90.10 (FUMCAD)</label>
+                            <input type="file" class="form-control" name="reservas_9010" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">78.10 (FAASP)</label>
+                            <input type="file" class="form-control" name="reservas_7810" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-semibold text-secondary mt-4 mb-2">Como Executor</h6>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.10 (Verba Municipal) - Executor</label>
+                            <input type="file" class="form-control" name="reservas_3410_exec" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="text-end mt-3">
                     <button type="button" class="btn btn-import" onclick="importarSecao('reservas')">
                         <i class="bi bi-cloud-upload me-2"></i>Importar Reservas
@@ -249,7 +289,62 @@
             </form>
         </div>
 
-        <!-- SEÇÃO 4: SINCRONIZAÇÃO COM ACOMPANHAMENTO -->
+        <!-- SEÇÃO 4: LIQUIDAÇÕES -->
+        <div class="section-card">
+            <h3 class="section-title">
+                <i class="bi bi-4-circle-fill me-2"></i>Liquidações
+            </h3>
+
+            <div class="update-info mb-3">
+                <i class="bi bi-clock-history me-2"></i>
+                <strong>Última atualização:</strong>
+                <span id="dataLiquidacao">{{ data_liquidacao or 'Nenhuma importação realizada' }}</span>
+            </div>
+
+            <form id="formLiquidacao" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.10 (Verba Municipal)</label>
+                            <input type="file" class="form-control" name="liquidacao_3410" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.20 (FUMCAF)</label>
+                            <input type="file" class="form-control" name="liquidacao_3420" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">08.10 (FMID)</label>
+                            <input type="file" class="form-control" name="liquidacao_0810" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">90.10 (FUMCAD)</label>
+                            <input type="file" class="form-control" name="liquidacao_9010" accept=".csv">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">78.10 (FAASP)</label>
+                            <input type="file" class="form-control" name="liquidacao_7810" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+                <div class="text-end mt-3">
+                    <button type="button" class="btn btn-import" onclick="importarSecao('liquidacao')">
+                        <i class="bi bi-cloud-upload me-2"></i>Importar Liquidações
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- SEÇÃO 5: SINCRONIZAÇÃO COM ACOMPANHAMENTO -->
         <div class="section-card" style="border: 2px solid #28a745;">
             <h3 class="section-title" style="color: #28a745; border-bottom-color: #28a745;">
                 <i class="bi bi-arrow-left-right me-2"></i>Sincronizar Empenhos com Acompanhamento
@@ -297,10 +392,45 @@
         </div>
 
         <!-- Botão Importação Geral -->
-        <div class="text-center mt-4 mb-5">
+        <div class="text-center mt-4">
             <button type="button" class="btn btn-import-all btn-lg" onclick="importarTodos()">
                 <i class="bi bi-cloud-arrow-up me-2"></i>Importar Todos os Arquivos
             </button>
+        </div>
+
+        <!-- EXPORTAÇÕES -->
+        <div class="section-card mt-4 mb-5">
+            <h3 class="section-title">
+                <i class="bi bi-download me-2"></i>Exportar Relatórios
+            </h3>
+            <p class="text-muted mb-3">Baixe os dados atuais do banco em CSV (individual por seção) ou em XLSX combinado com 4 planilhas.</p>
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <a href="/gestao_orcamentaria/api/dotacoes/csv-completo" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>CSV Dotação
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/gestao_orcamentaria/api/reservas/csv-completo" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>CSV Reservas
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/gestao_orcamentaria/api/empenhos/csv-completo" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>CSV Empenhos
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/gestao_financeira/api/exportar-liquidacao-csv" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>CSV Liquidação
+                    </a>
+                </div>
+            </div>
+            <div class="text-center">
+                <button type="button" class="btn btn-success btn-lg" onclick="window.location.href='/gestao_financeira/api/exportar-xlsx-completo'">
+                    <i class="bi bi-file-earmark-excel me-2"></i>Exportar XLSX Completo (4 planilhas)
+                </button>
+            </div>
         </div>
     </div>
 
@@ -408,6 +538,13 @@
                     formData.append(this.name, this.files[0]);
                 }
             });
+
+            // Liquidação
+            $('#formLiquidacao input[type="file"]').each(function() {
+                if (this.files[0]) {
+                    formData.append(this.name, this.files[0]);
+                }
+            });
             
             $.ajax({
                 url: '/gestao_financeira/api/importar-todos',
@@ -421,6 +558,7 @@
                         mensagem += `Dotação: ${response.dotacao_importados} registros\n`;
                         mensagem += `Reservas: ${response.reservas_importados} registros\n`;
                         mensagem += `Empenhos: ${response.empenhos_importados} registros\n`;
+                        mensagem += `Liquidação: ${response.liquidacao_importados} registros\n`;
                         mensagem += `\nTotal: ${response.total_importados} registros`;
                         
                         alert(mensagem);
@@ -430,10 +568,11 @@
                             $('#dataDotacao').text(response.datas.dotacao || 'N/A');
                             $('#dataReservas').text(response.datas.reservas || 'N/A');
                             $('#dataEmpenhos').text(response.datas.empenhos || 'N/A');
+                            $('#dataLiquidacao').text(response.datas.liquidacao || 'N/A');
                         }
                         
                         // Limpar formulários
-                        $('#formDotacao, #formReservas, #formEmpenhos').each(function() {
+                        $('#formDotacao, #formReservas, #formEmpenhos, #formLiquidacao').each(function() {
                             this.reset();
                         });
                     } else {

@@ -99,6 +99,7 @@ FILTROS = [
     ('filtro_edital',         'edital_nome',            'text'),
     ('filtro_numero_termo',   'numero_termo',           'text'),
     ('filtro_status_generico','status_generico',        'exact'),
+    ('filtro_cnpj',           'cnpj',                   'text'),
 ]
 
 
@@ -190,11 +191,16 @@ def index():
     # Filtros do formulário
     filtros_vals = ler_filtros_request()
 
-    # Filtro por usuário
-    nome_analista, ver_todos = obter_filtro_usuario(cur)
-    nome_filtro_usuario = None if ver_todos else nome_analista
+    # Opções de exibição de colunas
+    mostrar_cnpj = request.args.get('mostrar_cnpj', '0') == '1'
 
-    where_clause, params = construir_where(filtros_vals, nome_filtro_usuario)
+    # Filtro por usuário: pré-preenche responsável para usuários restritos (não bloqueante)
+    # O usuário pode limpar o campo para ver todos os processos
+    nome_analista, ver_todos = obter_filtro_usuario(cur)
+    if not ver_todos and nome_analista and not filtros_vals.get('filtro_responsavel'):
+        filtros_vals['filtro_responsavel'] = nome_analista
+
+    where_clause, params = construir_where(filtros_vals, None)
 
     # Contagem
     cur.execute(
@@ -408,6 +414,7 @@ def index():
         pode_editar_responsavel=pode_editar_responsavel,
         nome_analista_logado=nome_analista,
         ver_todos=ver_todos,
+        mostrar_cnpj=mostrar_cnpj,
         sort_col=sort_col,
         sort_dir=sort_dir,
         **filtros_vals

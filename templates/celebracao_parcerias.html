@@ -216,7 +216,8 @@
             filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
             filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
             filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
-            filtro_status_generico=filtro_status_generico) }}"
+            filtro_status_generico=filtro_status_generico,
+            mostrar_cnpj=mostrar_cnpj) }}"
            class="btn btn-light" title="Exportar CSV">
           <i class="bi bi-download me-1"></i> CSV
         </a>
@@ -363,14 +364,34 @@
                 {% endfor %}
               </select>
             </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">CNPJ</label>
+              <div class="position-relative">
+                <input type="text" class="form-control form-control-sm autocomplete-input"
+                       name="filtro_cnpj" value="{{ filtro_cnpj }}"
+                       placeholder="Buscar CNPJ..." data-campo="cnpj"
+                       autocomplete="off">
+              </div>
+            </div>
           </div>
-          <div class="mt-2 d-flex gap-2">
+          <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
             <button type="submit" class="btn btn-sm btn-primary">
               <i class="bi bi-search me-1"></i> Filtrar
             </button>
             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="limparFiltros()">
               <i class="bi bi-x-circle me-1"></i> Limpar Filtros
             </button>
+            <div class="vr"></div>
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="chkMostrarCnpj"
+                     name="mostrar_cnpj" value="1"
+                     onchange="this.form.submit()"
+                     {% if mostrar_cnpj %}checked{% endif %}>
+              <label class="form-check-label" for="chkMostrarCnpj" style="font-size:.85rem;">
+                Mostrar CNPJ
+              </label>
+            </div>
+
           </div>
         </form>
       </div>
@@ -417,7 +438,8 @@
                    filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
                    filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
                    filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
-                   filtro_status_generico=filtro_status_generico) }}">
+                   filtro_status_generico=filtro_status_generico,
+                   mostrar_cnpj=mostrar_cnpj) }}">
                   {{ label }} <i class="bi {{ icon }}"></i>
                 </a>
               </th>
@@ -430,6 +452,9 @@
             {{ th_sort('osc', 'OSC') }}
             {{ th_sort('projeto', 'Projeto') }}
             {{ th_sort('unidade_gestora', 'Unidade Gestora') }}
+            {% if mostrar_cnpj %}
+            <th>CNPJ</th>
+            {% endif %}
             {% if filtro_status_generico == 'Celebrado' %}
             {{ th_sort('assinatura', 'Data de Assinatura') }}
             {% endif %}
@@ -494,6 +519,9 @@
                 {{ (r.projeto or '-')[:35] }}{% if r.projeto and r.projeto|length > 35 %}...{% endif %}
               </td>
               <td>{{ r.unidade_gestora or '-' }}</td>
+              {% if mostrar_cnpj %}
+              <td style="white-space:nowrap;">{{ r.cnpj or '-' }}</td>
+              {% endif %}
               {% if filtro_status_generico == 'Celebrado' %}
               <td class="text-center">{{ r.assinatura.strftime('%d/%m/%Y') if r.assinatura else '-' }}</td>
               {% endif %}
@@ -556,7 +584,8 @@
            filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
            filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
            filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
-           filtro_status_generico=filtro_status_generico) }}">
+           filtro_status_generico=filtro_status_generico,
+           mostrar_cnpj=mostrar_cnpj) }}">
           <i class="bi bi-chevron-left"></i> Anterior
         </a>
       </li>
@@ -572,7 +601,8 @@
              filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
              filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
              filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
-             filtro_status_generico=filtro_status_generico) }}">1</a>
+             filtro_status_generico=filtro_status_generico,
+             mostrar_cnpj=mostrar_cnpj) }}">1</a>
         </li>
         {% if start_page > 2 %}
           <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -587,7 +617,8 @@
              filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
              filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
              filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
-             filtro_status_generico=filtro_status_generico) }}">{{ p }}</a>
+             filtro_status_generico=filtro_status_generico,
+             mostrar_cnpj=mostrar_cnpj) }}">{{ p }}</a>
         </li>
       {% endfor %}
 
@@ -602,7 +633,8 @@
              filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
              filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
              filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
-             filtro_status_generico=filtro_status_generico) }}">{{ total_pages }}</a>
+             filtro_status_generico=filtro_status_generico,
+             mostrar_cnpj=mostrar_cnpj) }}">{{ total_pages }}</a>
         </li>
       {% endif %}
 
@@ -614,7 +646,8 @@
            filtro_tipo_termo=filtro_tipo_termo, filtro_osc=filtro_osc,
            filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
            filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
-           filtro_status_generico=filtro_status_generico) }}">
+           filtro_status_generico=filtro_status_generico,
+           mostrar_cnpj=mostrar_cnpj) }}">
           Próximo <i class="bi bi-chevron-right"></i>
         </a>
       </li>

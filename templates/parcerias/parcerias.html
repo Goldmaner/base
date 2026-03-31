@@ -7,20 +7,123 @@
   <title>Parcerias - Módulo</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
   <style>
     body { background-color: #f4f3f8; padding: 20px; }
+
+    /* ── Header ─────────────────────────────── */
     .page-header {
       background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
       color: #fff; padding: 22px 28px; border-radius: 12px;
-      margin-bottom: 20px; box-shadow: 0 4px 18px rgba(124,58,237,.28);
+      margin-bottom: 16px; box-shadow: 0 4px 18px rgba(124,58,237,.28);
     }
     .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
     .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
-    .filter-section {
-      background: #fff; padding: 20px; border-radius: 10px;
-      margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+
+    /* ── Botões header ────────────────────────── */
+    .btn-parc {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600; transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-parc:hover { opacity: .88; color: #fff; }
+    .btn-parc.outline {
+      background: transparent; border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+    }
+    .btn-parc.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+
+    /* ── Painel de busca rápida ───────────────── */
+    .quick-search {
+      background: #fff; border-radius: 12px; padding: 16px 20px;
+      margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
       border-left: 4px solid #7c3aed;
     }
+    .quick-search .form-control { font-size: .88rem; }
+    .qs-label { font-size: .72rem; font-weight: 700; text-transform: uppercase;
+                color: #7c3aed; letter-spacing: .5px; margin-bottom: 3px; }
+
+    /* ── Painel avançado ─────────────────────── */
+    .filtros-avancados {
+      background: #fff; border-radius: 12px; margin-bottom: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden;
+    }
+    .filtros-avancados-header {
+      padding: 12px 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #f1f5f9; user-select: none;
+    }
+    .filtros-avancados-header:hover { background: #faf8ff; }
+    .filtros-avancados-body { padding: 20px; }
+
+    /* ── Badge de contagem de filtros ────────── */
+    .badge-filtros {
+      background: #7c3aed; color: #fff; border-radius: 20px;
+      padding: 2px 9px; font-size: .75rem; font-weight: 700;
+      display: none; margin-left: 8px;
+    }
+    .badge-filtros.show { display: inline-block; }
+
+    /* ── Status pills (checkboxes estilizados) ── */
+    .status-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .status-pill input[type="checkbox"] { display: none; }
+    .status-pill label {
+      padding: 5px 14px; border-radius: 20px; font-size: .82rem; font-weight: 600;
+      cursor: pointer; border: 2px solid transparent; transition: all .15s;
+      display: inline-flex; align-items: center; gap: 5px; user-select: none;
+    }
+    .status-pill.vigente   label { background: #dcfce7; color: #166534; border-color: #86efac; }
+    .status-pill.encerrado label { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+    .status-pill.nao_iniciado label { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+    .status-pill.suspenso  label { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+    .status-pill.rescindido label { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+    .status-pill.vigente   input:checked ~ label { background: #16a34a; color: #fff; border-color: #15803d; }
+    .status-pill.encerrado input:checked ~ label { background: #475569; color: #fff; border-color: #334155; }
+    .status-pill.nao_iniciado input:checked ~ label { background: #0284c7; color: #fff; border-color: #0369a1; }
+    .status-pill.suspenso  input:checked ~ label { background: #ca8a04; color: #fff; border-color: #a16207; }
+    .status-pill.rescindido input:checked ~ label { background: #dc2626; color: #fff; border-color: #b91c1c; }
+
+    /* ── Rádio pills (limit + contrapartida) ─── */
+    .radio-pill-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .radio-pill input[type="radio"] { display: none; }
+    .radio-pill label {
+      padding: 5px 14px; border-radius: 20px; font-size: .82rem; font-weight: 600;
+      cursor: pointer; border: 2px solid #e2e8f0; background: #f8fafc;
+      color: #64748b; transition: all .15s; user-select: none;
+    }
+    .radio-pill label:hover { border-color: #7c3aed; color: #7c3aed; }
+    .radio-pill input:checked ~ label { background: #7c3aed; color: #fff; border-color: #6d28d9; }
+
+    /* ── Atalhos de data ─────────────────────── */
+    .date-shortcut {
+      font-size: .75rem; padding: 3px 10px; border-radius: 6px;
+      border: 1px solid #e2e8f0; background: #f8fafc; color: #7c3aed;
+      cursor: pointer; transition: all .15s;
+    }
+    .date-shortcut:hover { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+
+    /* ── Seção dentro do painel avançado ──────── */
+    .filter-section-inner {
+      border: 1px solid #f1f5f9; border-radius: 8px; margin-bottom: 14px;
+      /* sem overflow:hidden para não cortar os dropdowns do Tom Select */
+    }
+    .filter-section-title {
+      background: #f8fafc; padding: 8px 14px; font-size: .82rem;
+      font-weight: 700; color: #4c1d95; display: flex; align-items: center; gap: 6px;
+      border-bottom: 1px solid #f1f5f9;
+      border-radius: 8px 8px 0 0;
+    }
+    .filter-section-content { padding: 14px; }
+
+    /* ── Colunas opcionais ────────────────────── */
+    .col-toggles {
+      background: #fff; border-radius: 10px; padding: 10px 16px;
+      margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+    }
+    .col-toggles .form-check-label { font-size: .85rem; }
+
+    /* ── Tabela ───────────────────────────────── */
     .table-container {
       background: #fff; padding: 20px; border-radius: 10px;
       overflow-x: auto; box-shadow: 0 2px 8px rgba(0,0,0,.07);
@@ -31,344 +134,364 @@
       color: white; white-space: nowrap; border: none;
     }
     .table tbody tr:hover { background-color: #f5f0ff; }
-    .btn-action { padding: 5px 15px; }
     .sei-formatted { font-family: 'Courier New', monospace; }
-    .btn-parc {
-      background: linear-gradient(135deg, #4c1d95, #7c3aed);
-      color: #fff; border: none; border-radius: 8px;
-      padding: 7px 16px; font-weight: 600; transition: opacity .15s;
-      display: inline-flex; align-items: center; gap: 6px;
-    }
-    .btn-parc:hover { opacity: .88; color: #fff; }
-    .btn-parc.outline {
-      background: transparent; border: 1.5px solid rgba(255,255,255,.7);
-      color: #fff;
-    }
-    .btn-parc.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+
+    /* Tom Select overrides */
+    .ts-wrapper .ts-control { border-radius: 6px; font-size: .88rem; }
+    .ts-dropdown { z-index: 9999 !important; }
   </style>
 </head>
 <body>
-  <div class="container-fluid">
-    <!-- Cabeçalho -->
-    <div class="page-header">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h2><i class="bi bi-handshake me-2"></i>Parcerias</h2>
-          <p>Visualização e gerenciamento de todas as parcerias</p>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <a href="{{ url_for('parcerias.dicionario_oscs') }}" class="btn-parc" title="Gerenciar e padronizar nomes de OSCs">
-            <i class="bi bi-building"></i> Dicionário de OSCs
-          </a>
-          <a href="{{ url_for('parcerias.conferencia') }}" class="btn-parc" title="Comparar parcerias do banco externo com o sistema">
-            <i class="bi bi-clipboard-check"></i> Conferir Parcerias
-          </a>
-          <button class="btn-parc" onclick="exportarCSV()">
-            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
-          </button>
-          <a href="{{ url_for('parcerias.nova') }}" class="btn-parc">
-            <i class="bi bi-plus-circle"></i> Adicionar Parceria
-          </a>
-          <a href="{{ url_for('main.index') }}" class="btn-parc outline">
-            <i class="bi bi-arrow-left"></i> Voltar
-          </a>
-        </div>
-      </div>
-    </div>
+<div class="container-fluid">
 
-    <!-- Seção de Filtros -->
-    <div class="filter-section">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">
-          <i class="bi bi-funnel"></i> Filtros
-        </h5>
-        <button class="btn btn-sm" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:8px;padding:6px 14px;" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
-          <i class="bi bi-chevron-down" id="iconFiltros"></i> Mostrar/Ocultar Todos os Filtros
+  <!-- ── Cabeçalho ──────────────────────────────────────── -->
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2><i class="bi bi-handshake me-2"></i>Parcerias</h2>
+        <p>Visualização e gerenciamento de todas as parcerias</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('parcerias.dicionario_oscs') }}" class="btn-parc" title="Gerenciar e padronizar nomes de OSCs">
+          <i class="bi bi-building"></i> Dicionário de OSCs
+        </a>
+        <a href="{{ url_for('parcerias.conferencia') }}" class="btn-parc" title="Comparar parcerias do banco externo com o sistema">
+          <i class="bi bi-clipboard-check"></i> Conferir Parcerias
+        </a>
+        <button class="btn-parc" onclick="exportarCSV()">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
         </button>
+        <a href="{{ url_for('parcerias.nova') }}" class="btn-parc">
+          <i class="bi bi-plus-circle"></i> Adicionar Parceria
+        </a>
+        <a href="{{ url_for('main.index') }}" class="btn-parc outline">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </a>
       </div>
-      
-      <div class="collapse" id="filtrosCollapse">
-        <form method="get" action="{{ url_for('parcerias.listar') }}">
-          
-          <!-- SEÇÃO 1: INFORMAÇÕES GERAIS -->
-          <div class="mb-3">
-            <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoGeral" aria-expanded="true">
-              <span><i class="bi bi-file-text"></i> <strong>Informações Gerais</strong></span>
-              <i class="bi bi-chevron-down"></i>
-            </button>
-            <div class="collapse show" id="secaoGeral">
-              <div class="card card-body mt-2">
-                <div class="row g-3">
-                  <div class="col-md-3">
-                    <label for="filtro_termo" class="form-label">Número do Termo</label>
-                    <input type="text" class="form-control" id="filtro_termo" name="filtro_termo" 
-                           value="{{ filtro_termo or '' }}" placeholder="Ex: TCL/001/2024">
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       FORM — envolve busca rápida + filtros avançados
+       ══════════════════════════════════════════════════════ -->
+  <form method="get" action="{{ url_for('parcerias.listar') }}" id="formFiltros">
+
+    <!-- ── Barra de busca rápida (sempre visível) ─────────── -->
+    <div class="quick-search">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2 col-sm-6">
+          <div class="qs-label">Número do Termo</div>
+          <input type="text" class="form-control form-control-sm" name="filtro_termo" id="filtro_termo"
+                 value="{{ filtro_termo or '' }}" placeholder="Ex: TCL/001/2024">
+        </div>
+        <div class="col-md-2 col-sm-6">
+          <div class="qs-label">OSC</div>
+          <input type="text" class="form-control form-control-sm" name="filtro_osc" id="filtro_osc"
+                 value="{{ filtro_osc or '' }}" placeholder="Nome da OSC">
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div class="qs-label">Projeto</div>
+          <input type="text" class="form-control form-control-sm" name="filtro_projeto" id="filtro_projeto"
+                 value="{{ filtro_projeto or '' }}" placeholder="Nome do projeto">
+        </div>
+        <div class="col-md-2 col-sm-6">
+          <div class="qs-label">SEI Celebração</div>
+          <input type="text" class="form-control form-control-sm" name="busca_sei_celeb" id="busca_sei_celeb"
+                 value="{{ busca_sei_celeb or '' }}" placeholder="6074.2024/...">
+        </div>
+        <div class="col-md-2 col-sm-6">
+          <div class="qs-label">SEI Pagamento</div>
+          <input type="text" class="form-control form-control-sm" name="busca_sei_pc" id="busca_sei_pc"
+                 value="{{ busca_sei_pc or '' }}" placeholder="6074.2024/...">
+        </div>
+        <div class="col-md-1 col-sm-6 d-flex gap-1">
+          <button type="submit" class="btn btn-sm w-100"
+                  style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:8px;">
+            <i class="bi bi-search"></i>
+          </button>
+          <a href="{{ url_for('parcerias.listar') }}" class="btn btn-sm btn-outline-secondary"
+             style="border-radius:8px;" title="Limpar todos os filtros">
+            <i class="bi bi-x-lg"></i>
+          </a>
+        </div>
+      </div>
+
+      <!-- Botão de filtros avançados com badge de contagem -->
+      <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+        <button type="button" class="btn btn-sm" id="btnFiltrosAvancados"
+                style="background:#f3e8ff;color:#6d28d9;border:1.5px solid #ddd6fe;border-radius:8px;"
+                onclick="toggleFiltrosAvancados()">
+          <i class="bi bi-sliders me-1"></i>Filtros avançados
+          <span class="badge-filtros" id="badgeFiltros"></span>
+        </button>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <span style="font-size:.78rem;color:#64748b;">Mostrar:</span>
+          <div class="radio-pill-group">
+            {% for val, lbl in [('10','10'),('50','50'),('100','100'),('1000','1000'),('todas','Todas')] %}
+            <div class="radio-pill">
+              <input type="radio" name="limite" id="lim_{{ val }}" value="{{ val }}"
+                     {% if limite == val %}checked{% endif %} onchange="this.form.submit()">
+              <label for="lim_{{ val }}">{{ lbl }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Painel de filtros avançados (colapsável) ─────────── -->
+    <div class="filtros-avancados" id="filtrosAvancados" style="display:none;">
+      <div class="filtros-avancados-body">
+
+        <!-- STATUS ------------------------------------------ -->
+        <div class="filter-section-inner">
+          <div class="filter-section-title"><i class="bi bi-circle-half"></i> Status do Termo</div>
+          <div class="filter-section-content">
+            <div class="status-group">
+              {% for val, lbl, cls in [
+                ('vigente','Vigente','vigente'),
+                ('encerrado','Encerrado','encerrado'),
+                ('nao_iniciado','Não iniciado','nao_iniciado'),
+                ('suspenso','Suspenso','suspenso'),
+                ('rescindido','Rescindido','rescindido')
+              ] %}
+              <div class="status-pill {{ cls }}">
+                <input type="checkbox" name="filtro_status" value="{{ val }}" id="st_{{ val }}"
+                       {% if val in filtro_status %}checked{% endif %}
+                       onchange="atualizarContadorFiltros()">
+                <label for="st_{{ val }}">{{ lbl }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- CLASSIFICAÇÕES ----------------------------------- -->
+        <div class="filter-section-inner">
+          <div class="filter-section-title"><i class="bi bi-tags"></i> Classificação</div>
+          <div class="filter-section-content">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" style="font-size:.82rem;">Tipo de Termo</label>
+                <select id="filtro_tipo_termo" name="filtro_tipo_termo" multiple placeholder="Todos os tipos...">
+                  {% for tipo in tipos_contrato %}
+                  <option value="{{ tipo }}" {% if tipo in filtro_tipo_termo %}selected{% endif %}>{{ tipo }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" style="font-size:.82rem;">Pessoa Gestora</label>
+                <select id="filtro_pessoa_gestora" name="filtro_pessoa_gestora" multiple placeholder="Todas as gestoras...">
+                  <option value="Nenhuma" {% if 'Nenhuma' in filtro_pessoa_gestora %}selected{% endif %}>— Nenhuma —</option>
+                  <option value="Inativos" {% if 'Inativos' in filtro_pessoa_gestora %}selected{% endif %}>— Inativos —</option>
+                  {% for pg in pessoas_gestoras_filtro %}
+                  <option value="{{ pg }}" {% if pg in filtro_pessoa_gestora %}selected{% endif %}>{{ pg }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" style="font-size:.82rem;">Edital</label>
+                <select id="filtro_edital" name="filtro_edital" multiple placeholder="Todos os editais...">
+                  {% for edital in editais_filtro %}
+                  <option value="{{ edital }}" {% if edital in filtro_edital %}selected{% endif %}>{{ edital }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- IDENTIFICAÇÃO ------------------------------------ -->
+        <div class="filter-section-inner">
+          <div class="filter-section-title"><i class="bi bi-card-text"></i> Identificação</div>
+          <div class="filter-section-content">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label fw-semibold" style="font-size:.82rem;">Portaria</label>
+                <input type="text" class="form-control form-control-sm" name="filtro_portaria" id="filtro_portaria"
+                       value="{{ filtro_portaria or '' }}" placeholder="Número da portaria">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold" style="font-size:.82rem;">CNPJ</label>
+                <input type="text" class="form-control form-control-sm" name="filtro_cnpj" id="filtro_cnpj"
+                       value="{{ filtro_cnpj or '' }}" placeholder="00.000.000/0001-00">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold" style="font-size:.82rem;">Abrangência</label>
+                <select id="filtro_abrangencia" name="filtro_abrangencia" multiple placeholder="Todas...">
+                  {% for ab in abrangencia_opcoes %}
+                  <option value="{{ ab }}" {% if ab in filtro_abrangencia %}selected{% endif %}>{{ ab }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold d-block" style="font-size:.82rem;">Contrapartida</label>
+                <div class="radio-pill-group">
+                  <div class="radio-pill">
+                    <input type="radio" name="filtro_contrapartida" id="cp_todas" value=""
+                           {% if not filtro_contrapartida %}checked{% endif %}>
+                    <label for="cp_todas">Todas</label>
                   </div>
-                  <div class="col-md-3">
-                    <label for="filtro_osc" class="form-label">OSC</label>
-                    <input type="text" class="form-control" id="filtro_osc" name="filtro_osc" 
-                           value="{{ filtro_osc or '' }}" placeholder="Nome da OSC">
+                  <div class="radio-pill">
+                    <input type="radio" name="filtro_contrapartida" id="cp_sim" value="sim"
+                           {% if filtro_contrapartida == 'sim' %}checked{% endif %}>
+                    <label for="cp_sim">Com contrapartida</label>
                   </div>
-                  <div class="col-md-3">
-                    <label for="filtro_projeto" class="form-label">Projeto</label>
-                    <input type="text" class="form-control" id="filtro_projeto" name="filtro_projeto" 
-                           value="{{ filtro_projeto or '' }}" placeholder="Nome do projeto">
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label">Tipo de Termo</label>
-                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="tipo_todos" onchange="toggleAllCheckboxes('tipo', this.checked)">
-                        <label class="form-check-label" for="tipo_todos"><strong>Todos</strong></label>
-                      </div>
-                      <hr class="my-1">
-                      {% for tipo in tipos_contrato %}
-                        <div class="form-check">
-                          <input class="form-check-input tipo-check" type="checkbox" name="filtro_tipo_termo" value="{{ tipo }}" id="tipo_{{ loop.index }}" {% if tipo in filtro_tipo_termo %}checked{% endif %}>
-                          <label class="form-check-label" for="tipo_{{ loop.index }}">{{ tipo }}</label>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label">Status do Termo</label>
-                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="status_todos" onchange="toggleAllCheckboxes('status', this.checked)">
-                        <label class="form-check-label" for="status_todos"><strong>Todos</strong></label>
-                      </div>
-                      <hr class="my-1">
-                      <div class="form-check">
-                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="vigente" id="status_vigente" {% if 'vigente' in filtro_status %}checked{% endif %}>
-                        <label class="form-check-label" for="status_vigente">Vigente</label>
-                      </div>
-                      <div class="form-check">
-                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="encerrado" id="status_encerrado" {% if 'encerrado' in filtro_status %}checked{% endif %}>
-                        <label class="form-check-label" for="status_encerrado">Encerrado</label>
-                      </div>
-                      <div class="form-check">
-                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="nao_iniciado" id="status_nao_iniciado" {% if 'nao_iniciado' in filtro_status %}checked{% endif %}>
-                        <label class="form-check-label" for="status_nao_iniciado">Não iniciado</label>
-                      </div>
-                      <div class="form-check">
-                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="rescindido" id="status_rescindido" {% if 'rescindido' in filtro_status %}checked{% endif %}>
-                        <label class="form-check-label" for="status_rescindido">Rescindido</label>
-                      </div>
-                      <div class="form-check">
-                        <input class="form-check-input status-check" type="checkbox" name="filtro_status" value="suspenso" id="status_suspenso" {% if 'suspenso' in filtro_status %}checked{% endif %}>
-                        <label class="form-check-label" for="status_suspenso">Suspenso</label>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label">Endereço</label>
-                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="endereco_todos" onchange="toggleAllCheckboxes('endereco', this.checked)">
-                        <label class="form-check-label" for="endereco_todos"><strong>Todos</strong></label>
-                      </div>
-                      <hr class="my-1">
-                      <div class="form-check">
-                        <input class="form-check-input endereco-check" type="checkbox" name="filtro_endereco" value="preenchido" id="endereco_preenchido" {% if 'preenchido' in filtro_endereco %}checked{% endif %}>
-                        <label class="form-check-label" for="endereco_preenchido">Preenchido</label>
-                      </div>
-                      <div class="form-check">
-                        <input class="form-check-input endereco-check" type="checkbox" name="filtro_endereco" value="nao_preenchido" id="endereco_nao_preenchido" {% if 'nao_preenchido' in filtro_endereco %}checked{% endif %}>
-                        <label class="form-check-label" for="endereco_nao_preenchido">Não preenchido</label>
-                      </div>
-                    </div>
+                  <div class="radio-pill">
+                    <input type="radio" name="filtro_contrapartida" id="cp_nao" value="nao"
+                           {% if filtro_contrapartida == 'nao' %}checked{% endif %}>
+                    <label for="cp_nao">Sem contrapartida</label>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- SEÇÃO 2: PESSOA GESTORA E EDITAL -->
-          <div class="mb-3">
-            <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoPessoaEdital" aria-expanded="false">
-              <span><i class="bi bi-person-badge"></i> <strong>Pessoa Gestora e Edital</strong></span>
-              <i class="bi bi-chevron-down"></i>
-            </button>
-            <div class="collapse" id="secaoPessoaEdital">
-              <div class="card card-body mt-2">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label">Pessoa Gestora</label>
-                    <div style="max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="pg_todos" onchange="toggleAllCheckboxes('pg', this.checked)">
-                        <label class="form-check-label" for="pg_todos"><strong>Todas</strong></label>
-                      </div>
-                      <hr class="my-1">
-                      <div class="form-check">
-                        <input class="form-check-input pg-check" type="checkbox" name="filtro_pessoa_gestora" value="Nenhuma" id="pg_nenhuma" {% if 'Nenhuma' in filtro_pessoa_gestora %}checked{% endif %}>
-                        <label class="form-check-label" for="pg_nenhuma"><em>Nenhuma</em></label>
-                      </div>
-                      <div class="form-check">
-                        <input class="form-check-input pg-check" type="checkbox" name="filtro_pessoa_gestora" value="Inativos" id="pg_inativos" {% if 'Inativos' in filtro_pessoa_gestora %}checked{% endif %}>
-                        <label class="form-check-label" for="pg_inativos"><em>Inativos</em></label>
-                      </div>
-                      <hr class="my-1">
-                      {% for pg in pessoas_gestoras_filtro %}
-                        <div class="form-check">
-                          <input class="form-check-input pg-check" type="checkbox" name="filtro_pessoa_gestora" value="{{ pg }}" id="pg_{{ loop.index }}" {% if pg in filtro_pessoa_gestora %}checked{% endif %}>
-                          <label class="form-check-label" for="pg_{{ loop.index }}">{{ pg }}</label>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">Edital</label>
-                    <div style="max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;">
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="edital_todos" onchange="toggleAllCheckboxes('edital', this.checked)">
-                        <label class="form-check-label" for="edital_todos"><strong>Todos</strong></label>
-                      </div>
-                      <hr class="my-1">
-                      {% for edital in editais_filtro %}
-                        <div class="form-check">
-                          <input class="form-check-input edital-check" type="checkbox" name="filtro_edital" value="{{ edital }}" id="edital_{{ loop.index }}" {% if edital in filtro_edital %}checked{% endif %}>
-                          <label class="form-check-label" for="edital_{{ loop.index }}">{{ edital }}</label>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  </div>
-                </div>
+        <!-- ENDEREÇO ----------------------------------------- -->
+        <div class="filter-section-inner">
+          <div class="filter-section-title"><i class="bi bi-geo-alt"></i> Endereço</div>
+          <div class="filter-section-content">
+            <div class="radio-pill-group">
+              <div class="radio-pill">
+                <input type="radio" name="filtro_endereco_r" id="end_todos" value=""
+                       {% if not filtro_endereco %}checked{% endif %}
+                       onchange="sincronizarEnderecoCheckbox()">
+                <label for="end_todos">Todos</label>
+              </div>
+              <div class="radio-pill">
+                <input type="radio" name="filtro_endereco_r" id="end_preenchido" value="preenchido"
+                       {% if 'preenchido' in filtro_endereco %}checked{% endif %}
+                       onchange="sincronizarEnderecoCheckbox()">
+                <label for="end_preenchido">Preenchido</label>
+              </div>
+              <div class="radio-pill">
+                <input type="radio" name="filtro_endereco_r" id="end_nao" value="nao_preenchido"
+                       {% if 'nao_preenchido' in filtro_endereco %}checked{% endif %}
+                       onchange="sincronizarEnderecoCheckbox()">
+                <label for="end_nao">Não preenchido</label>
               </div>
             </div>
-          </div>
-
-          <!-- SEÇÃO 3: PROCESSOS SEI -->
-          <div class="mb-3">
-            <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoSEI" aria-expanded="false">
-              <span><i class="bi bi-search"></i> <strong>Processos SEI</strong></span>
-              <i class="bi bi-chevron-down"></i>
-            </button>
-            <div class="collapse" id="secaoSEI">
-              <div class="card card-body mt-2">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label for="busca_sei_celeb" class="form-label">SEI de Celebração</label>
-                    <input type="text" class="form-control" id="busca_sei_celeb" name="busca_sei_celeb" 
-                           value="{{ busca_sei_celeb or '' }}" placeholder="Ex: 6074.2024/0001234-5">
-                  </div>
-                  <div class="col-md-6">
-                    <label for="busca_sei_pc" class="form-label">SEI de Pagamento/PC</label>
-                    <input type="text" class="form-control" id="busca_sei_pc" name="busca_sei_pc" 
-                           value="{{ busca_sei_pc or '' }}" placeholder="Ex: 6074.2024/0005678-9">
-                  </div>
-                </div>
-              </div>
+            <!-- hidden inputs para manter compatibilidade com o backend (getlist) -->
+            <div id="enderecoHiddenInputs">
+              {% if filtro_endereco %}
+                {% for v in filtro_endereco %}
+                <input type="hidden" name="filtro_endereco" value="{{ v }}">
+                {% endfor %}
+              {% endif %}
             </div>
           </div>
+        </div>
 
-          <!-- SEÇÃO 4: FILTROS POR DATAS -->
-          <div class="mb-3">
-            <button class="btn btn-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#secaoDatas" aria-expanded="false">
-              <span><i class="bi bi-calendar-range"></i> <strong>Filtros por Datas</strong></span>
-              <i class="bi bi-chevron-down"></i>
-            </button>
-            <div class="collapse" id="secaoDatas">
-              <div class="card card-body mt-2">
-                <!-- Data de Assinatura -->
-                <div class="row g-3 mb-3">
-                  <div class="col-md-12">
-                    <h6 class="text-muted mb-2"><i class="bi bi-pen"></i> Data de Assinatura</h6>
-                  </div>
-                  <div class="col-md-6">
-                    <label for="data_assinatura_inicio" class="form-label">De</label>
-                    <input type="date" class="form-control" id="data_assinatura_inicio" name="data_assinatura_inicio" 
-                           value="{{ data_assinatura_inicio or '' }}">
-                  </div>
-                  <div class="col-md-6">
-                    <label for="data_assinatura_fim" class="form-label">Até</label>
-                    <input type="date" class="form-control" id="data_assinatura_fim" name="data_assinatura_fim" 
-                           value="{{ data_assinatura_fim or '' }}">
-                  </div>
-                </div>
+        <!-- DATAS -------------------------------------------- -->
+        <div class="filter-section-inner">
+          <div class="filter-section-title"><i class="bi bi-calendar-range"></i> Datas</div>
+          <div class="filter-section-content">
 
-                <hr>
-
-                <!-- Data de Início -->
-                <div class="row g-3 mb-3">
-                  <div class="col-md-12">
-                    <h6 class="text-muted mb-2"><i class="bi bi-play-circle"></i> Data de Início</h6>
-                  </div>
-                  <div class="col-md-6">
-                    <label for="data_inicio_de" class="form-label">De</label>
-                    <input type="date" class="form-control" id="data_inicio_de" name="data_inicio_de" 
-                           value="{{ data_inicio_de or '' }}">
-                  </div>
-                  <div class="col-md-6">
-                    <label for="data_inicio_ate" class="form-label">Até</label>
-                    <input type="date" class="form-control" id="data_inicio_ate" name="data_inicio_ate" 
-                           value="{{ data_inicio_ate or '' }}">
-                  </div>
-                </div>
-
-                <hr>
-
-                <!-- Data de Término -->
-                <div class="row g-3">
-                  <div class="col-md-12">
-                    <h6 class="text-muted mb-2"><i class="bi bi-stop-circle"></i> Data de Término</h6>
-                  </div>
-                  <div class="col-md-6">
-                    <label for="data_termino_de" class="form-label">De</label>
-                    <input type="date" class="form-control" id="data_termino_de" name="data_termino_de" 
-                           value="{{ data_termino_de or '' }}">
-                  </div>
-                  <div class="col-md-6">
-                    <label for="data_termino_ate" class="form-label">Até</label>
-                    <input type="date" class="form-control" id="data_termino_ate" name="data_termino_ate" 
-                           value="{{ data_termino_ate or '' }}">
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Limite de resultados -->
-          <div class="row g-3 mb-3">
-            <div class="col-md-12">
-              <label for="limite" class="form-label"><i class="bi bi-list-ol"></i> Mostrar somente</label>
-              <select class="form-select" id="limite" name="limite" style="width: 200px;">
-                <option value="10" {% if limite == '10' %}selected{% endif %}>10 linhas</option>
-                <option value="50" {% if limite == '50' %}selected{% endif %}>50 linhas</option>
-                <option value="100" {% if limite == '100' %}selected{% endif %}>100 linhas</option>
-                <option value="1000" {% if limite == '1000' %}selected{% endif %}>1000 linhas</option>
-                <option value="todas" {% if limite == 'todas' %}selected{% endif %}>Todas</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Botões de ação -->
-          <div class="row">
-            <div class="col-md-12 d-flex gap-2">
-              <button type="submit" class="btn btn-primary">
-                <i class="bi bi-search"></i> Aplicar Filtros
+            <!-- Atalhos globais -->
+            <div class="d-flex gap-2 flex-wrap mb-3">
+              <span style="font-size:.78rem;color:#64748b;align-self:center;">Atalhos:</span>
+              <button type="button" class="date-shortcut" onclick="aplicarAtalhoDatas('vigente_hoje')">
+                <i class="bi bi-play-circle me-1"></i>Vigentes hoje
               </button>
-              <a href="{{ url_for('parcerias.listar') }}" class="btn btn-secondary">
-                <i class="bi bi-x-circle"></i> Limpar Filtros
-              </a>
+              <button type="button" class="date-shortcut" onclick="aplicarAtalhoDatas('este_ano')">
+                <i class="bi bi-calendar me-1"></i>Início este ano
+              </button>
+              <button type="button" class="date-shortcut" onclick="aplicarAtalhoDatas('ano_passado')">
+                <i class="bi bi-calendar2 me-1"></i>Início ano anterior
+              </button>
+              <button type="button" class="date-shortcut" onclick="aplicarAtalhoDatas('termino_proximo')">
+                <i class="bi bi-alarm me-1"></i>Término próx. 90 dias
+              </button>
+              <button type="button" class="date-shortcut" onclick="limparDatas()">
+                <i class="bi bi-x-circle me-1"></i>Limpar datas
+              </button>
+            </div>
+
+            <div class="row g-3">
+              <!-- Assinatura -->
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" style="font-size:.82rem;"><i class="bi bi-pen me-1"></i>Assinatura</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text" style="font-size:.75rem;">De</span>
+                  <input type="date" class="form-control" name="data_assinatura_inicio" id="data_assinatura_inicio"
+                         value="{{ data_assinatura_inicio or '' }}" onchange="atualizarContadorFiltros()">
+                </div>
+                <div class="input-group input-group-sm mt-1">
+                  <span class="input-group-text" style="font-size:.75rem;">Até</span>
+                  <input type="date" class="form-control" name="data_assinatura_fim" id="data_assinatura_fim"
+                         value="{{ data_assinatura_fim or '' }}" onchange="atualizarContadorFiltros()">
+                </div>
+              </div>
+              <!-- Início -->
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" style="font-size:.82rem;"><i class="bi bi-play-circle me-1"></i>Data de Início</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text" style="font-size:.75rem;">De</span>
+                  <input type="date" class="form-control" name="data_inicio_de" id="data_inicio_de"
+                         value="{{ data_inicio_de or '' }}" onchange="atualizarContadorFiltros()">
+                </div>
+                <div class="input-group input-group-sm mt-1">
+                  <span class="input-group-text" style="font-size:.75rem;">Até</span>
+                  <input type="date" class="form-control" name="data_inicio_ate" id="data_inicio_ate"
+                         value="{{ data_inicio_ate or '' }}" onchange="atualizarContadorFiltros()">
+                </div>
+              </div>
+              <!-- Término -->
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" style="font-size:.82rem;"><i class="bi bi-stop-circle me-1"></i>Data de Término</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text" style="font-size:.75rem;">De</span>
+                  <input type="date" class="form-control" name="data_termino_de" id="data_termino_de"
+                         value="{{ data_termino_de or '' }}" onchange="atualizarContadorFiltros()">
+                </div>
+                <div class="input-group input-group-sm mt-1">
+                  <span class="input-group-text" style="font-size:.75rem;">Até</span>
+                  <input type="date" class="form-control" name="data_termino_ate" id="data_termino_ate"
+                         value="{{ data_termino_ate or '' }}" onchange="atualizarContadorFiltros()">
+                </div>
+              </div>
             </div>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
 
-    <!-- Colunas Opcionais -->
-    <div class="filter-section" style="margin-top: -10px;">
-      <h6 class="mb-2">
-        <i class="bi bi-eye"></i> Colunas Opcionais
-      </h6>
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="chk_endereco" onchange="toggleColunaEndereco()">
-        <label class="form-check-label" for="chk_endereco">
-          Endereço
-        </label>
-      </div>
+        <!-- Botões ------------------------------------------- -->
+        <div class="d-flex gap-2 mt-2">
+          <button type="submit" class="btn btn-sm btn-primary px-4">
+            <i class="bi bi-search me-1"></i>Aplicar Filtros
+          </button>
+          <a href="{{ url_for('parcerias.listar') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-x-circle me-1"></i>Limpar Todos
+          </a>
+        </div>
+
+      </div><!-- /filtros-avancados-body -->
+    </div><!-- /filtros-avancados -->
+
+  </form><!-- /formFiltros -->
+
+  <!-- ── Colunas opcionais (fora do form) ──────────────────── -->
+  <div class="col-toggles">
+    <span style="font-size:.78rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.4px;">
+      <i class="bi bi-eye me-1"></i>Colunas opcionais:
+    </span>
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" id="chk_endereco" onchange="toggleColunaEndereco()">
+      <label class="form-check-label" for="chk_endereco">Endereço</label>
     </div>
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" id="chk_valor_mes" onchange="toggleColunaValorMes()">
+      <label class="form-check-label" for="chk_valor_mes">Valor Mês Detalhado</label>
+    </div>
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" id="chk_valor_mes_23" onchange="toggleColunaValorMes23()">
+      <label class="form-check-label" for="chk_valor_mes_23">Valor Mês 23</label>
+    </div>
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" id="chk_valor_mes_24" onchange="toggleColunaValorMes24()">
+      <label class="form-check-label" for="chk_valor_mes_24">Valor Mês 24</label>
+    </div>
+  </div>
 
     <!-- Tabela de Parcerias -->
     <div class="table-container">
@@ -405,6 +528,9 @@
               <th class="text-center">SEI de Celebração</th>
               <th class="text-center">SEI de Pagamento</th>
               <th class="text-center col-endereco" style="display: none;">Endereço</th>
+              <th class="text-center col-valor-mes" style="display: none;">Valor Mês Detalhado</th>
+              <th class="text-center col-valor-mes-23" style="display: none;">Valor Mês 23</th>
+              <th class="text-center col-valor-mes-24" style="display: none;">Valor Mês 24</th>
               <th class="text-center">Ações</th>
             </tr>
           </thead>
@@ -458,6 +584,15 @@
                     <span class="text-muted">Não preenchido</span>
                   {% endif %}
                 </td>
+                <td class="text-end col-valor-mes" style="display: none;">
+                  R$ {{ parceria.valor_mes_detalhado|format_brl }}
+                </td>
+                <td class="text-end col-valor-mes-23" style="display: none;">
+                  R$ {{ parceria.valor_mes_23|format_brl }}
+                </td>
+                <td class="text-end col-valor-mes-24" style="display: none;">
+                  R$ {{ parceria.valor_mes_24|format_brl }}
+                </td>
                 <td class="text-center">
                   <a class="btn btn-sm" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:6px;" href="{{ url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
                     <i class="bi bi-pencil"></i> Modificar
@@ -505,231 +640,233 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
   <script>
-    // Toggle ícone do collapse de filtros principal
-    document.getElementById('filtrosCollapse').addEventListener('show.bs.collapse', function() {
-      document.getElementById('iconFiltros').className = 'bi bi-chevron-up';
-    });
-    document.getElementById('filtrosCollapse').addEventListener('hide.bs.collapse', function() {
-      document.getElementById('iconFiltros').className = 'bi bi-chevron-down';
-    });
-    
-    // Função para marcar/desmarcar todos os checkboxes de um grupo
-    function toggleAllCheckboxes(group, checked) {
-      const checkboxes = document.querySelectorAll('.' + group + '-check');
-      checkboxes.forEach(cb => cb.checked = checked);
-    }
-    
-    // Toggle ícones dos collapses de seções
-    const secoes = ['secaoGeral', 'secaoPessoaEdital', 'secaoSEI', 'secaoDatas'];
-    secoes.forEach(function(secaoId) {
-      const secaoElement = document.getElementById(secaoId);
-      if (secaoElement) {
-        secaoElement.addEventListener('show.bs.collapse', function() {
-          const button = document.querySelector('[data-bs-target="#' + secaoId + '"]');
-          if (button) {
-            const icon = button.querySelector('.bi-chevron-down, .bi-chevron-up');
-            if (icon) icon.className = 'bi bi-chevron-up';
-          }
-        });
-        secaoElement.addEventListener('hide.bs.collapse', function() {
-          const button = document.querySelector('[data-bs-target="#' + secaoId + '"]');
-          if (button) {
-            const icon = button.querySelector('.bi-chevron-down, .bi-chevron-up');
-            if (icon) icon.className = 'bi bi-chevron-down';
-          }
-        });
+    // ── Inicializar Tom Select ────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+      ['filtro_tipo_termo', 'filtro_pessoa_gestora', 'filtro_edital', 'filtro_abrangencia'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) new TomSelect(el, { plugins: ['remove_button'], maxOptions: 500 });
+      });
+
+      restaurarPreferencias();
+      atualizarContadorFiltros();
+
+      // Abrir painel avançado se há filtros avançados ativos (vindos da URL)
+      if (contarFiltrosAvancados() > 0) {
+        document.getElementById('filtrosAvancados').style.display = 'block';
       }
     });
-    
-    // Toggle da coluna de endereço
+
+    // ── Toggle painel avançado ────────────────────────────────
+    function toggleFiltrosAvancados() {
+      const painel = document.getElementById('filtrosAvancados');
+      const aberto = painel.style.display !== 'none';
+      painel.style.display = aberto ? 'none' : 'block';
+    }
+
+    // ── Contador de filtros ativos ────────────────────────────
+    function contarFiltrosAvancados() {
+      let count = 0;
+
+      // Status pills
+      if (document.querySelectorAll('input[name="filtro_status"]:checked').length > 0) count++;
+
+      // Tom Select multi-selects
+      ['filtro_tipo_termo', 'filtro_pessoa_gestora', 'filtro_edital', 'filtro_abrangencia'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && Array.from(el.options).some(o => o.selected)) count++;
+      });
+
+      // Identificação
+      ['filtro_portaria', 'filtro_cnpj'].forEach(id => {
+        if ((document.getElementById(id)?.value || '').trim()) count++;
+      });
+
+      // Contrapartida
+      const cp = document.querySelector('input[name="filtro_contrapartida"]:checked');
+      if (cp && cp.value !== '') count++;
+
+      // Endereço
+      const end = document.querySelector('input[name="filtro_endereco_r"]:checked');
+      if (end && end.value !== '') count++;
+
+      // Datas (cada par conta como 1)
+      const dataPairs = [
+        ['data_assinatura_inicio', 'data_assinatura_fim'],
+        ['data_inicio_de', 'data_inicio_ate'],
+        ['data_termino_de', 'data_termino_ate']
+      ];
+      dataPairs.forEach(([d1, d2]) => {
+        if ((document.getElementById(d1)?.value || '') || (document.getElementById(d2)?.value || ''))
+          count++;
+      });
+
+      return count;
+    }
+
+    function atualizarContadorFiltros() {
+      const total = contarFiltrosAvancados();
+      const badge = document.getElementById('badgeFiltros');
+      if (total > 0) {
+        badge.textContent = total;
+        badge.classList.add('show');
+      } else {
+        badge.classList.remove('show');
+      }
+    }
+
+    // ── Sincronizar radio endereço → hidden inputs do form ────
+    function sincronizarEnderecoCheckbox() {
+      const val = document.querySelector('input[name="filtro_endereco_r"]:checked')?.value || '';
+      const container = document.getElementById('enderecoHiddenInputs');
+      container.innerHTML = '';
+      if (val) {
+        const inp = document.createElement('input');
+        inp.type  = 'hidden';
+        inp.name  = 'filtro_endereco';
+        inp.value = val;
+        container.appendChild(inp);
+      }
+      atualizarContadorFiltros();
+    }
+
+    // ── Atalhos de datas ──────────────────────────────────────
+    function aplicarAtalhoDatas(tipo) {
+      const hoje = new Date();
+      const anoAtual = hoje.getFullYear();
+
+      const fmt = d => d.toISOString().split('T')[0];
+
+      if (tipo === 'este_ano') {
+        document.getElementById('data_inicio_de').value  = `${anoAtual}-01-01`;
+        document.getElementById('data_inicio_ate').value = `${anoAtual}-12-31`;
+      } else if (tipo === 'ano_passado') {
+        document.getElementById('data_inicio_de').value  = `${anoAtual - 1}-01-01`;
+        document.getElementById('data_inicio_ate').value = `${anoAtual - 1}-12-31`;
+      } else if (tipo === 'vigente_hoje') {
+        document.getElementById('data_inicio_de').value  = '';
+        document.getElementById('data_inicio_ate').value = fmt(hoje);
+        document.getElementById('data_termino_de').value = fmt(hoje);
+        document.getElementById('data_termino_ate').value = '';
+      } else if (tipo === 'termino_proximo') {
+        const em90 = new Date(hoje);
+        em90.setDate(hoje.getDate() + 90);
+        document.getElementById('data_termino_de').value = fmt(hoje);
+        document.getElementById('data_termino_ate').value = fmt(em90);
+      }
+      atualizarContadorFiltros();
+    }
+
+    function limparDatas() {
+      ['data_assinatura_inicio','data_assinatura_fim',
+       'data_inicio_de','data_inicio_ate',
+       'data_termino_de','data_termino_ate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      atualizarContadorFiltros();
+    }
+
+    // ── Colunas opcionais ─────────────────────────────────────
     function toggleColunaEndereco() {
       const mostrar = document.getElementById('chk_endereco').checked;
-      const colunas = document.querySelectorAll('.col-endereco');
-      colunas.forEach(col => {
-        col.style.display = mostrar ? '' : 'none';
-      });
+      document.querySelectorAll('.col-endereco').forEach(col => col.style.display = mostrar ? '' : 'none');
       salvarPreferencias();
     }
-    
-    // Salvar preferências no localStorage
+
+    function toggleColunaValorMes() {
+      const mostrar = document.getElementById('chk_valor_mes').checked;
+      document.querySelectorAll('.col-valor-mes').forEach(col => col.style.display = mostrar ? '' : 'none');
+      salvarPreferencias();
+    }
+
+    function toggleColunaValorMes23() {
+      const mostrar = document.getElementById('chk_valor_mes_23').checked;
+      document.querySelectorAll('.col-valor-mes-23').forEach(col => col.style.display = mostrar ? '' : 'none');
+      salvarPreferencias();
+    }
+
+    function toggleColunaValorMes24() {
+      const mostrar = document.getElementById('chk_valor_mes_24').checked;
+      document.querySelectorAll('.col-valor-mes-24').forEach(col => col.style.display = mostrar ? '' : 'none');
+      salvarPreferencias();
+    }
+
+    // ── Preferências (localStorage) ───────────────────────────
     function salvarPreferencias() {
-      const preferencias = {
+      localStorage.setItem('parcerias_preferencias', JSON.stringify({
         chk_endereco: document.getElementById('chk_endereco').checked,
-        filtro_endereco_preenchido: document.getElementById('endereco_preenchido').checked,
-        filtro_endereco_nao_preenchido: document.getElementById('endereco_nao_preenchido').checked
-      };
-      localStorage.setItem('parcerias_preferencias', JSON.stringify(preferencias));
+        chk_valor_mes: document.getElementById('chk_valor_mes').checked,
+        chk_valor_mes_23: document.getElementById('chk_valor_mes_23').checked,
+        chk_valor_mes_24: document.getElementById('chk_valor_mes_24').checked
+      }));
     }
-    
-    // Restaurar preferências do localStorage
+
     function restaurarPreferencias() {
-      const preferencias = localStorage.getItem('parcerias_preferencias');
-      if (preferencias) {
-        try {
-          const prefs = JSON.parse(preferencias);
-          
-          // Restaurar checkbox de endereço
-          if (prefs.chk_endereco) {
-            document.getElementById('chk_endereco').checked = true;
-            toggleColunaEndereco();
-          }
-          
-          // Restaurar filtros de endereço (apenas se não vieram da URL)
-          const urlParams = new URLSearchParams(window.location.search);
-          const temFiltroEnderecoURL = urlParams.has('filtro_endereco');
-          
-          if (!temFiltroEnderecoURL) {
-            if (prefs.filtro_endereco_preenchido !== undefined) {
-              document.getElementById('endereco_preenchido').checked = prefs.filtro_endereco_preenchido;
-            }
-            if (prefs.filtro_endereco_nao_preenchido !== undefined) {
-              document.getElementById('endereco_nao_preenchido').checked = prefs.filtro_endereco_nao_preenchido;
-            }
-          }
-          
-          // Atualizar checkbox "Todos" de endereço
-          atualizarCheckboxTodosEndereco();
-        } catch (e) {
-          console.error('Erro ao restaurar preferências:', e);
-        }
-      }
+      try {
+        const prefs = JSON.parse(localStorage.getItem('parcerias_preferencias') || '{}');
+        if (prefs.chk_endereco)    { document.getElementById('chk_endereco').checked    = true; toggleColunaEndereco(); }
+        if (prefs.chk_valor_mes)   { document.getElementById('chk_valor_mes').checked   = true; toggleColunaValorMes(); }
+        if (prefs.chk_valor_mes_23){ document.getElementById('chk_valor_mes_23').checked = true; toggleColunaValorMes23(); }
+        if (prefs.chk_valor_mes_24){ document.getElementById('chk_valor_mes_24').checked = true; toggleColunaValorMes24(); }
+      } catch (e) {}
     }
-    
-    // Atualizar checkbox "Todos" de endereço
-    function atualizarCheckboxTodosEndereco() {
-      const checkboxes = document.querySelectorAll('.endereco-check');
-      const todas = Array.from(checkboxes).every(cb => cb.checked);
-      const alguma = Array.from(checkboxes).some(cb => cb.checked);
-      const todosCheckbox = document.getElementById('endereco_todos');
-      
-      if (todosCheckbox) {
-        todosCheckbox.checked = todas;
-        todosCheckbox.indeterminate = alguma && !todas;
-      }
-    }
-    
-    // Adicionar listeners para salvar preferências quando mudar os filtros
-    document.addEventListener('DOMContentLoaded', function() {
-      // Listener para checkboxes de endereço
-      document.querySelectorAll('.endereco-check').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-          salvarPreferencias();
-          atualizarCheckboxTodosEndereco();
-        });
-      });
-    });
-    
-    // Restaurar preferências ao carregar a página
-    document.addEventListener('DOMContentLoaded', function() {
-      restaurarPreferencias();
-    });
-    
+
+    // ── Exportar CSV (preserva filtros atuais da URL) ─────────
     function exportarCSV() {
-      // Mostrar indicador de carregamento
       const btnExportar = event.target.closest('button');
       const textoOriginal = btnExportar.innerHTML;
       btnExportar.disabled = true;
       btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Exportando...';
-      
-      // Construir URL com os mesmos parâmetros de filtro da página atual
       const params = new URLSearchParams(window.location.search);
-      
-      // Adicionar parâmetro de endereço se checkbox estiver marcado
-      const incluirEndereco = document.getElementById('chk_endereco').checked;
-      if (incluirEndereco) {
-        params.set('incluir_endereco', 'true');
-      }
-      
-      const exportUrl = '{{ url_for("parcerias.exportar_csv") }}' + '?' + params.toString();
-      
-      // Fazer requisição para a API de exportação
-      window.location.href = exportUrl;
-      
-      // Restaurar botão após um tempo
-      setTimeout(() => {
-        btnExportar.disabled = false;
-        btnExportar.innerHTML = textoOriginal;
-      }, 2000);
+      if (document.getElementById('chk_endereco').checked) params.set('incluir_endereco', 'true');
+      window.location.href = '{{ url_for("parcerias.exportar_csv") }}?' + params.toString();
+      setTimeout(() => { btnExportar.disabled = false; btnExportar.innerHTML = textoOriginal; }, 2000);
     }
 
-    // Função de ordenação de tabela
-    let sortDirections = {}; // Armazena a direção da ordenação para cada coluna
+    // ── Ordenação de tabela ───────────────────────────────────
+    let sortDirections = {};
 
     function sortTable(columnIndex) {
       const table = document.getElementById('tabelaParcerias');
       const tbody = table.querySelector('tbody');
-      const rows = Array.from(tbody.querySelectorAll('tr'));
-      
-      // Determinar direção da ordenação (alternando entre ascendente/descendente)
-      if (!sortDirections[columnIndex]) {
-        sortDirections[columnIndex] = 'asc';
-      } else {
-        sortDirections[columnIndex] = sortDirections[columnIndex] === 'asc' ? 'desc' : 'asc';
-      }
+      const rows  = Array.from(tbody.querySelectorAll('tr'));
+
+      sortDirections[columnIndex] = sortDirections[columnIndex] === 'asc' ? 'desc' : 'asc';
       const direction = sortDirections[columnIndex];
-      
-      // Ordenar linhas
+
       rows.sort((a, b) => {
-        const cellA = a.cells[columnIndex];
-        const cellB = b.cells[columnIndex];
-        
-        let valueA = cellA.textContent.trim();
-        let valueB = cellB.textContent.trim();
-        
-        // Remover ícones de aviso do texto antes de comparar
-        valueA = valueA.replace(/\s*\u26A0.*$/, '').trim();
-        valueB = valueB.replace(/\s*\u26A0.*$/, '').trim();
-        
-        // Tratar células vazias
+        let valueA = a.cells[columnIndex]?.textContent.trim().replace(/\s*\u26A0.*$/, '').trim() || '';
+        let valueB = b.cells[columnIndex]?.textContent.trim().replace(/\s*\u26A0.*$/, '').trim() || '';
         if (valueA === '-') valueA = '';
         if (valueB === '-') valueB = '';
-        
-        // Detectar tipo de dado e fazer comparação apropriada
+
         let comparison = 0;
-        
-        // Datas no formato dd/mm/yyyy
         if (/^\d{2}\/\d{2}\/\d{4}$/.test(valueA) && /^\d{2}\/\d{2}\/\d{4}$/.test(valueB)) {
-          const [dayA, monthA, yearA] = valueA.split('/').map(Number);
-          const [dayB, monthB, yearB] = valueB.split('/').map(Number);
-          const dateA = new Date(yearA, monthA - 1, dayA);
-          const dateB = new Date(yearB, monthB - 1, dayB);
-          comparison = dateA - dateB;
-        }
-        // Valores monetários (R$ 1.234,56)
-        else if (valueA.startsWith('R$') && valueB.startsWith('R$')) {
-          const numA = parseFloat(valueA.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
-          const numB = parseFloat(valueB.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
-          comparison = numA - numB;
-        }
-        // Números inteiros
-        else if (!isNaN(valueA) && !isNaN(valueB) && valueA !== '' && valueB !== '') {
+          const [dA, mA, yA] = valueA.split('/').map(Number);
+          const [dB, mB, yB] = valueB.split('/').map(Number);
+          comparison = new Date(yA, mA - 1, dA) - new Date(yB, mB - 1, dB);
+        } else if (valueA.startsWith('R$') && valueB.startsWith('R$')) {
+          const n = s => parseFloat(s.replace('R$','').replace(/\./g,'').replace(',','.').trim()) || 0;
+          comparison = n(valueA) - n(valueB);
+        } else if (!isNaN(valueA) && !isNaN(valueB) && valueA !== '' && valueB !== '') {
           comparison = parseFloat(valueA) - parseFloat(valueB);
-        }
-        // Texto
-        else {
+        } else {
           comparison = valueA.localeCompare(valueB, 'pt-BR', { sensitivity: 'base' });
         }
-        
         return direction === 'asc' ? comparison : -comparison;
       });
-      
-      // Reordenar as linhas na tabela
+
       rows.forEach(row => tbody.appendChild(row));
-      
-      // Atualizar ícones de ordenação
-      const headers = table.querySelectorAll('th.sortable');
-      headers.forEach((header, index) => {
+
+      table.querySelectorAll('th.sortable').forEach(header => {
         const icon = header.querySelector('i');
-        if (icon) {
-          // Encontrar qual índice de coluna corresponde a este cabeçalho
-          const headerIndex = Array.from(table.querySelectorAll('th')).indexOf(header);
-          if (headerIndex === columnIndex) {
-            icon.className = direction === 'asc' ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
-          } else {
-            icon.className = 'bi bi-arrow-down-up';
-          }
-        }
+        if (!icon) return;
+        const hi = Array.from(table.querySelectorAll('th')).indexOf(header);
+        icon.className = hi === columnIndex
+          ? (direction === 'asc' ? 'bi bi-arrow-up' : 'bi bi-arrow-down')
+          : 'bi bi-arrow-down-up';
       });
     }
   </script>

@@ -3,7 +3,7 @@ Foco:
 1. Transferência de todas as notificações DGP (FEITO);
 2. Banco de dados de servidores (FEITO);
 2. Terminar relatório do Eliabe (FEITO);
-3. Criação da página de Manuais e seus status (cada operação, suboperações, andamento, meta, etc.), organização dos manuais existentes;
+3. Criação da página de Manuais e seus status (cada operação, suboperações, andamento, meta, etc.), organização dos manuais existentes; (FEITO)
 4. Criação de relatórios operacionais da unidade;
 4. Demonstrativo - atualizar;
 5. Foco total em orçamento anual e análise de contas.
@@ -47,8 +47,8 @@ Foco:
 
 ### 8. Celebração e DGP
 - Vincular projeto celebrado com Parcerias.html (Fácil)
-- Incluir novas colunas opcionais de data e CNPJ (Fácil)
-- Permitir visualização de qualquer parceria independente do responsável (Fácil)
+- Incluir novas colunas opcionais de data e CNPJ (Fácil) ✅
+- Permitir visualização de qualquer parceria independente do responsável (Fácil)✅
 
 ### 10. Monitoramento & Avaliação
 - Implementar módulo de monitoramento e avaliação de parcerias e projetos (Difícil)
@@ -74,7 +74,8 @@ Foco:
 ### 14. Preenchimento de dados e sistema
 - Preenchimento de dados de diversas tables (Médio)
 - Testes automatizados e revisão do código (Difícil)
-- Melhorar o frontend no geral (Fácil)
+- Melhorar o frontend no geral (Fácil) ✅
+- Incluir informações de processos físicos;
 - Fazer tabela do backup.
 
 ### 15. Listas Suspensas

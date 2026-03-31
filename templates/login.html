@@ -124,7 +124,7 @@
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for cat, msg in messages %}
-            <div class="alert alert-{{ cat }} py-2 mb-3" style="font-size:0.88rem;">{{ msg }}</div>
+            <div class="alert alert-{{ cat }} py-2 mb-3" style="font-size:0.88rem;">{{ msg | safe }}</div>
           {% endfor %}
         {% endif %}
       {% endwith %}

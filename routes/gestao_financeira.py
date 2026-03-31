@@ -1120,20 +1120,25 @@ def relatorios_sof():
         cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_empenhos")
         result_empenhos = cur.fetchone()
         data_empenhos = result_empenhos['ultima'] if result_empenhos else None
+
+        cur.execute("SELECT MAX(atualizado_em) as ultima FROM gestao_financeira.back_liquidacao")
+        result_liquidacao = cur.fetchone()
+        data_liquidacao = result_liquidacao['ultima'] if result_liquidacao else None
         
         cur.close()
         
         # Formatar datas em pt-br
-        from datetime import datetime
         data_dotacao_fmt = data_dotacao.strftime('%d/%m/%Y') if data_dotacao else None
         data_reservas_fmt = data_reservas.strftime('%d/%m/%Y') if data_reservas else None
         data_empenhos_fmt = data_empenhos.strftime('%d/%m/%Y') if data_empenhos else None
+        data_liquidacao_fmt = data_liquidacao.strftime('%d/%m/%Y') if data_liquidacao else None
         
         return render_template(
             'gestao_financeira/gestao_financeira_relatorios_sof.html',
             data_dotacao=data_dotacao_fmt,
             data_reservas=data_reservas_fmt,
-            data_empenhos=data_empenhos_fmt
+            data_empenhos=data_empenhos_fmt,
+            data_liquidacao=data_liquidacao_fmt
         )
         
     except Exception as e:
@@ -1144,8 +1149,44 @@ def relatorios_sof():
             'gestao_financeira/gestao_financeira_relatorios_sof.html',
             data_dotacao=None,
             data_reservas=None,
-            data_empenhos=None
+            data_empenhos=None,
+            data_liquidacao=None
         )
+
+
+@gestao_financeira_bp.route('/api/exportar-liquidacao-csv')
+@login_required
+@requires_access('gestao_financeira')
+def api_exportar_liquidacao_csv():
+    """Exporta CSV completo de back_liquidacao."""
+    import csv
+    from io import StringIO
+    from flask import Response
+    try:
+        cur = get_cursor()
+        cur.execute("SELECT * FROM gestao_financeira.back_liquidacao ORDER BY dt_mvto_eph DESC NULLS LAST, cod_idt_eph_mvto DESC")
+        rows = cur.fetchall()
+        cur.close()
+
+        output = StringIO()
+        output.write('\ufeff')
+        if rows:
+            cols = list(rows[0].keys())
+            writer = csv.writer(output, delimiter=';')
+            writer.writerow([c.upper() for c in cols])
+            for row in rows:
+                writer.writerow([
+                    v.strftime('%d/%m/%Y %H:%M') if hasattr(v, 'strftime') else ('' if v is None else v)
+                    for v in (row[c] for c in cols)
+                ])
+
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv; charset=utf-8-sig',
+            headers={'Content-Disposition': 'attachment; filename=liquidacoes_completo.csv'}
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -1371,39 +1412,19 @@ def api_importar_dotacao():
 @requires_access('gestao_financeira')
 def api_importar_reservas():
     """
-    API para importar arquivo CSV de reservas
+    API para importar arquivos CSV de reservas (sem executor e como executor).
+    Deduplica por (COD_RESV_DOTA_SOF, ANO_RESV).
+    fonte_relatorio = 'Executor' se a reserva só aparece no arquivo executor;
+                    = 'Sem Executor' se aparece em qualquer arquivo sem executor.
     """
     import csv
     from io import StringIO
-    
+
     try:
         conn = get_db()
         cur = conn.cursor()
         cur.execute("SET datestyle TO 'ISO, DMY'")
-        total_importados = 0
-        
-        # Processar arquivo único
-        if 'reservas_3410' not in request.files:
-            return jsonify({'success': False, 'error': 'Nenhum arquivo enviado'}), 400
-            
-        arquivo = request.files['reservas_3410']
-        if arquivo.filename == '':
-            return jsonify({'success': False, 'error': 'Arquivo vazio'}), 400
-        
-        # Ler conteúdo do CSV com encoding robusto
-        conteudo_bytes = arquivo.read()
-        for encoding in ['utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
-            try:
-                conteudo = conteudo_bytes.decode(encoding)
-                break
-            except UnicodeDecodeError:
-                continue
-        else:
-            return jsonify({'success': False, 'error': 'Não foi possível decodificar o arquivo'}), 400
-        
-        csv_reader = csv.DictReader(StringIO(conteudo), delimiter=';')
-        
-        # Debug: verificar colunas do CSV
+
         colunas_esperadas = [
             'COD_RESV_DOTA_SOF', 'DT_EFET_RESV', 'ANO_RESV', 'DOTACAO_FORMATADA', 'COD_NRO_PCSS_SOF',
             'HIST_RESV', 'VL_RESV', 'VL_TRANSF_RESV', 'VL_CANC_RESV', 'VL_EPH', 'VL_SALDO_RESV',
@@ -1413,29 +1434,76 @@ def api_importar_reservas():
             'COD_FCAO_GOVR', 'TXT_FCAO_GOVR', 'COD_SUB_FCAO_GOVR', 'TXT_SUB_FCAO_GOVR',
             'COD_PGM_GOVR', 'TXT_PGM_GOVR', 'COD_PROJ_ATVD_SOF', 'COD_CTA_DESP', 'COD_FONT_REC'
         ]
-        
-        primeira_linha = next(csv_reader, None)
-        if primeira_linha:
-            colunas_csv = list(primeira_linha.keys())
-            colunas_faltando = [col for col in colunas_esperadas if col not in colunas_csv]
-            colunas_extras = [col for col in colunas_csv if col not in colunas_esperadas]
-            
-            if colunas_faltando or colunas_extras:
-                conn.rollback()
-                mensagem = ""
-                if colunas_faltando:
-                    mensagem += f"Colunas faltando: {', '.join(colunas_faltando[:5])}{'...' if len(colunas_faltando) > 5 else ''}. "
-                if colunas_extras:
-                    mensagem += f"Colunas extras: {', '.join(colunas_extras[:5])}{'...' if len(colunas_extras) > 5 else ''}. "
-                mensagem += f"Total no CSV: {len(colunas_csv)} colunas, esperado: {len(colunas_esperadas)} colunas."
-                return jsonify({
-                    'success': False,
-                    'error': 'Estrutura do CSV incompatível',
-                    'detalhes': mensagem
-                }), 400
-        
-        # Inserir registros
-        for linha in csv_reader:
+
+        def ler_csv(nome_campo):
+            """Lê e parseia um arquivo CSV do request. Retorna lista de dicts ou None."""
+            if nome_campo not in request.files:
+                return None
+            arq = request.files[nome_campo]
+            if not arq or arq.filename == '':
+                return None
+            conteudo_bytes = arq.read()
+            for encoding in ['utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
+                try:
+                    conteudo = conteudo_bytes.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                raise ValueError(f'Não foi possível decodificar o arquivo "{nome_campo}"')
+            reader = csv.DictReader(StringIO(conteudo), delimiter=';')
+            linhas = list(reader)
+            if linhas:
+                colunas_csv = list(linhas[0].keys())
+                faltando = [c for c in colunas_esperadas if c not in colunas_csv]
+                if faltando:
+                    raise ValueError(f'Arquivo "{nome_campo}" está faltando colunas: {", ".join(faltando[:5])}')
+            return linhas
+
+        # --- Leitura dos arquivos ---
+        campos_sem_exec = ['reservas_3410', 'reservas_3420', 'reservas_0810', 'reservas_9010', 'reservas_7810']
+        campos_exec     = ['reservas_3410_exec']
+
+        dados_sem_exec = {c: ler_csv(c) for c in campos_sem_exec}
+        dados_exec     = {c: ler_csv(c) for c in campos_exec}
+
+        # Verificar se pelo menos um arquivo foi enviado
+        todos_arquivos = list(dados_sem_exec.values()) + list(dados_exec.values())
+        if not any(v for v in todos_arquivos):
+            return jsonify({'success': False, 'error': 'Nenhum arquivo enviado'}), 400
+
+        # --- Deduplicação por (COD_RESV_DOTA_SOF, ANO_RESV) ---
+        # Registros indexados pela chave composta
+        registros = {}        # chave -> linha dict
+        chaves_sem_exec = set()
+
+        # Primeiro: sem executor (maior prioridade na fonte_relatorio)
+        for linhas in dados_sem_exec.values():
+            if not linhas:
+                continue
+            for linha in linhas:
+                cod = (linha.get('COD_RESV_DOTA_SOF') or '').strip()
+                ano = (linha.get('ANO_RESV') or '').strip()
+                chave = (cod, ano)
+                if chave not in registros:
+                    registros[chave] = linha
+                chaves_sem_exec.add(chave)
+
+        # Depois: executor (somente insere se a chave ainda não existe)
+        for linhas in dados_exec.values():
+            if not linhas:
+                continue
+            for linha in linhas:
+                cod = (linha.get('COD_RESV_DOTA_SOF') or '').strip()
+                ano = (linha.get('ANO_RESV') or '').strip()
+                chave = (cod, ano)
+                if chave not in registros:
+                    registros[chave] = linha
+
+        # --- Inserção no banco ---
+        total_importados = 0
+        for chave, linha in registros.items():
+            fonte = 'Sem Executor' if chave in chaves_sem_exec else 'Executor'
             try:
                 cur.execute("""
                     INSERT INTO gestao_financeira.back_reservas (
@@ -1445,12 +1513,16 @@ def api_importar_reservas():
                         COD_UNID_ORCM_SOF_EXEC, TXT_ORG_EMP_EXECT, TXT_UNID_ORCM_EXECT,
                         COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP, COD_SUB_ELEM_CONTA_DESP,
                         COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR,
-                        COD_PGM_GOVR, TXT_PGM_GOVR, COD_PROJ_ATVD_SOF, COD_CTA_DESP, COD_FONT_REC
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                              %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        COD_PGM_GOVR, TXT_PGM_GOVR, COD_PROJ_ATVD_SOF, COD_CTA_DESP, COD_FONT_REC,
+                        fonte_relatorio
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    )
                     ON CONFLICT (COD_RESV_DOTA_SOF) DO UPDATE SET
                         VL_RESV = EXCLUDED.VL_RESV,
                         VL_SALDO_RESV = EXCLUDED.VL_SALDO_RESV,
+                        fonte_relatorio = EXCLUDED.fonte_relatorio,
                         criado_em = NOW()
                 """, (
                     linha.get('COD_RESV_DOTA_SOF'), linha.get('DT_EFET_RESV'), linha.get('ANO_RESV'),
@@ -1464,43 +1536,42 @@ def api_importar_reservas():
                     linha.get('COD_ELEM_DESP'), linha.get('COD_SUB_ELEM_CONTA_DESP'),
                     linha.get('COD_FCAO_GOVR'), linha.get('TXT_FCAO_GOVR'), linha.get('COD_SUB_FCAO_GOVR'),
                     linha.get('TXT_SUB_FCAO_GOVR'), linha.get('COD_PGM_GOVR'), linha.get('TXT_PGM_GOVR'),
-                    linha.get('COD_PROJ_ATVD_SOF'), linha.get('COD_CTA_DESP'), linha.get('COD_FONT_REC')
+                    linha.get('COD_PROJ_ATVD_SOF'), linha.get('COD_CTA_DESP'), linha.get('COD_FONT_REC'),
+                    fonte
                 ))
                 total_importados += 1
             except Exception as e:
                 conn.rollback()
                 return jsonify({
                     'success': False,
-                    'error': f'Erro na linha: {str(e)}',
+                    'error': f'Erro ao inserir linha: {str(e)}',
                     'detalhes': 'Verifique se o CSV tem todas as colunas necessárias.'
                 }), 400
-        
+
         conn.commit()
-        
-        # Buscar data atualizada
+
         cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_reservas")
         result = cur.fetchone()
         data_atual = result[0] if result and result[0] else None
         cur.close()
-        
+
         from datetime import datetime
         data_fmt = data_atual.strftime('%d/%m/%Y') if data_atual else None
-        
+
         return jsonify({
             'success': True,
             'message': 'Reservas importadas com sucesso!',
             'total_importados': total_importados,
             'data_atualizacao': data_fmt
         })
-        
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         print(f"[ERRO] api_importar_reservas: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @gestao_financeira_bp.route('/api/importar-empenhos', methods=['POST'])
@@ -1728,6 +1799,7 @@ def api_importar_todos():
             'dotacao_importados': 0,
             'reservas_importados': 0,
             'empenhos_importados': 0,
+            'liquidacao_importados': 0,
             'datas': {}
         }
         
@@ -1743,7 +1815,10 @@ def api_importar_todos():
                 resultados['datas']['dotacao'] = data.get('data_atualizacao')
         
         # Importar Reservas
-        if 'reservas_3410' in request.files and request.files['reservas_3410'].filename != '':
+        arquivos_reservas = ['reservas_3410', 'reservas_3420', 'reservas_0810', 'reservas_9010', 'reservas_7810', 'reservas_3410_exec']
+        tem_reservas = any(key in request.files and request.files[key].filename != '' for key in arquivos_reservas)
+
+        if tem_reservas:
             resp = api_importar_reservas()
             data = resp.get_json() if hasattr(resp, 'get_json') else {}
             if data.get('success'):
@@ -1760,10 +1835,24 @@ def api_importar_todos():
             if data.get('success'):
                 resultados['empenhos_importados'] = data.get('total_importados', 0)
                 resultados['datas']['empenhos'] = data.get('data_atualizacao')
+
+        # Importar Liquidação
+        arquivos_liquidacao = ['liquidacao_3410', 'liquidacao_3420', 'liquidacao_0810', 'liquidacao_9010', 'liquidacao_7810']
+        tem_liquidacao = any(key in request.files and request.files[key].filename != '' for key in arquivos_liquidacao)
+
+        if tem_liquidacao:
+            resp = api_importar_liquidacao()
+            data = resp.get_json() if hasattr(resp, 'get_json') else {}
+            if data.get('success'):
+                resultados['liquidacao_importados'] = data.get('total_importados', 0)
+                resultados['datas']['liquidacao'] = data.get('data_atualizacao')
         
-        total_geral = sum([resultados['dotacao_importados'], 
-                          resultados['reservas_importados'], 
-                          resultados['empenhos_importados']])
+        total_geral = sum([
+            resultados['dotacao_importados'],
+            resultados['reservas_importados'],
+            resultados['empenhos_importados'],
+            resultados['liquidacao_importados'],
+        ])
         
         return jsonify({
             'success': True,
@@ -1780,6 +1869,235 @@ def api_importar_todos():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@gestao_financeira_bp.route('/api/importar-liquidacao', methods=['POST'])
+@login_required
+@requires_access('gestao_financeira')
+def api_importar_liquidacao():
+    """
+    Importa CSVs de Liquidação (5 dotações sem executor).
+    Deduplica por COD_IDT_EPH_MVTO (PK da tabela).
+    Registra atualizado_por e atualizado_em.
+    """
+    import csv
+    from io import StringIO
+    from datetime import datetime
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SET datestyle TO 'ISO, DMY'")
+
+        colunas_csv = [
+            'COD_IDT_EMP_SOF', 'COD_IDT_EPH_MVTO', 'DT_MVTO_EPH', 'COD_NLP',
+            'COD_NRO_PCSS_SOF', 'COD_CPF_CNPJ_SOF', 'NOM_RZAO_SOCI_SOF', 'COD_EPH', 'ANO_EPH',
+            'COD_NRO_PCSS_SOF_NE', 'ORGAOUNIDADE', 'ORGUNEXECUTORA',
+            'DT_INIC_RLZC_LQDC', 'DT_FIM_RLZC_LQDC', 'COD_REC_SOF', 'VAL_MVTO_EPH',
+            'DT_PREV_PGTO', 'DT_PGTO', 'VAL_ESTN_MVTO', 'COD_NLP_CANC', 'TXT_DCR_DOC_LQDD',
+            'B3', 'B2', 'VL_INSS', 'VL_IRRF', 'VL_ISS', 'VL_OUTROS',
+            'VL_LIQUIDO', 'VL_LIQUIDO_CANC', 'VALOR_BRUTO_CANC',
+            'CODIGO_RETENCAO_IR', 'DESCRICAO_RETENCAO_IR', 'NUMERO_LANCAMENTO_IR',
+            'ANO_LANCAMENTO_IR', 'NUMERO_GUIA_IR', 'ANO_GUIA_IR',
+            'CODIGO_MOTIVO_ISENCAO_IR', 'TEXTO_MOTIVO_ISENCAO_IR',
+            'COD_CTA_DESP', 'COD_SUB_ELEM_DESP', 'COD_IDT_OPEA'
+        ]
+        colunas_data = {'DT_MVTO_EPH', 'DT_INIC_RLZC_LQDC', 'DT_FIM_RLZC_LQDC', 'DT_PREV_PGTO', 'DT_PGTO'}
+        usuario_atual = session.get('username', 'Sistema')
+
+        def ler_csv_liq(nome_campo):
+            if nome_campo not in request.files:
+                return None
+            arq = request.files[nome_campo]
+            if not arq or arq.filename == '':
+                return None
+            b = arq.read()
+            for enc in ['utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
+                try:
+                    conteudo = b.decode(enc)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                raise ValueError(f'Não foi possível decodificar "{nome_campo}"')
+            reader = csv.DictReader(StringIO(conteudo), delimiter=';')
+            linhas = list(reader)
+            if linhas:
+                faltando = [c for c in colunas_csv if c not in linhas[0]]
+                if faltando:
+                    raise ValueError(f'Arquivo "{nome_campo}" sem colunas: {", ".join(faltando[:5])}')
+            return linhas
+
+        campos = ['liquidacao_3410', 'liquidacao_3420', 'liquidacao_0810', 'liquidacao_9010', 'liquidacao_7810']
+        dados = {c: ler_csv_liq(c) for c in campos}
+
+        if not any(v for v in dados.values()):
+            return jsonify({'success': False, 'error': 'Nenhum arquivo de liquidação enviado'}), 400
+
+        # Deduplicação em memória por PK
+        registros = {}
+        for linhas in dados.values():
+            if not linhas:
+                continue
+            for linha in linhas:
+                pk = (linha.get('COD_IDT_EPH_MVTO') or '').strip()
+                if pk and pk not in registros:
+                    registros[pk] = linha
+
+        total_importados = 0
+        agora = datetime.now()
+
+        for pk, linha in registros.items():
+            def val(col):
+                v = (linha.get(col) or '').strip()
+                return v if v else None
+
+            try:
+                cur.execute("""
+                    INSERT INTO gestao_financeira.back_liquidacao (
+                        COD_IDT_EMP_SOF, COD_IDT_EPH_MVTO, DT_MVTO_EPH, COD_NLP,
+                        COD_NRO_PCSS_SOF, COD_CPF_CNPJ_SOF, NOM_RZAO_SOCI_SOF, COD_EPH, ANO_EPH,
+                        COD_NRO_PCSS_SOF_NE, ORGAOUNIDADE, ORGUNEXECUTORA,
+                        DT_INIC_RLZC_LQDC, DT_FIM_RLZC_LQDC, COD_REC_SOF, VAL_MVTO_EPH,
+                        DT_PREV_PGTO, DT_PGTO, VAL_ESTN_MVTO, COD_NLP_CANC, TXT_DCR_DOC_LQDD,
+                        B3, B2, VL_INSS, VL_IRRF, VL_ISS, VL_OUTROS,
+                        VL_LIQUIDO, VL_LIQUIDO_CANC, VALOR_BRUTO_CANC,
+                        CODIGO_RETENCAO_IR, DESCRICAO_RETENCAO_IR, NUMERO_LANCAMENTO_IR,
+                        ANO_LANCAMENTO_IR, NUMERO_GUIA_IR, ANO_GUIA_IR,
+                        CODIGO_MOTIVO_ISENCAO_IR, TEXTO_MOTIVO_ISENCAO_IR,
+                        COD_CTA_DESP, COD_SUB_ELEM_DESP, COD_IDT_OPEA,
+                        atualizado_por, atualizado_em
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+                    )
+                    ON CONFLICT (COD_IDT_EPH_MVTO) DO UPDATE SET
+                        VAL_MVTO_EPH   = EXCLUDED.VAL_MVTO_EPH,
+                        VL_LIQUIDO     = EXCLUDED.VL_LIQUIDO,
+                        DT_PGTO        = EXCLUDED.DT_PGTO,
+                        atualizado_por = EXCLUDED.atualizado_por,
+                        atualizado_em  = EXCLUDED.atualizado_em
+                """, (
+                    val('COD_IDT_EMP_SOF'), val('COD_IDT_EPH_MVTO'), val('DT_MVTO_EPH'), val('COD_NLP'),
+                    val('COD_NRO_PCSS_SOF'), val('COD_CPF_CNPJ_SOF'), val('NOM_RZAO_SOCI_SOF'),
+                    val('COD_EPH'), val('ANO_EPH'), val('COD_NRO_PCSS_SOF_NE'),
+                    val('ORGAOUNIDADE'), val('ORGUNEXECUTORA'),
+                    val('DT_INIC_RLZC_LQDC'), val('DT_FIM_RLZC_LQDC'), val('COD_REC_SOF'),
+                    val('VAL_MVTO_EPH'), val('DT_PREV_PGTO'), val('DT_PGTO'),
+                    val('VAL_ESTN_MVTO'), val('COD_NLP_CANC'), val('TXT_DCR_DOC_LQDD'),
+                    val('B3'), val('B2'), val('VL_INSS'), val('VL_IRRF'), val('VL_ISS'), val('VL_OUTROS'),
+                    val('VL_LIQUIDO'), val('VL_LIQUIDO_CANC'), val('VALOR_BRUTO_CANC'),
+                    val('CODIGO_RETENCAO_IR'), val('DESCRICAO_RETENCAO_IR'), val('NUMERO_LANCAMENTO_IR'),
+                    val('ANO_LANCAMENTO_IR'), val('NUMERO_GUIA_IR'), val('ANO_GUIA_IR'),
+                    val('CODIGO_MOTIVO_ISENCAO_IR'), val('TEXTO_MOTIVO_ISENCAO_IR'),
+                    val('COD_CTA_DESP'), val('COD_SUB_ELEM_DESP'), val('COD_IDT_OPEA'),
+                    usuario_atual, agora
+                ))
+                total_importados += 1
+            except Exception as e:
+                conn.rollback()
+                return jsonify({'success': False, 'error': f'Erro linha (PK={pk}): {str(e)}'}), 400
+
+        conn.commit()
+
+        cur.execute("SELECT MAX(atualizado_em) FROM gestao_financeira.back_liquidacao")
+        result = cur.fetchone()
+        data_atual = result[0] if result and result[0] else None
+        cur.close()
+
+        data_fmt = data_atual.strftime('%d/%m/%Y %H:%M') if data_atual else None
+
+        return jsonify({
+            'success': True,
+            'message': 'Liquidações importadas com sucesso!',
+            'total_importados': total_importados,
+            'data_atualizacao': data_fmt
+        })
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        print(f"[ERRO] api_importar_liquidacao: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@gestao_financeira_bp.route('/api/exportar-xlsx-completo')
+@login_required
+@requires_access('gestao_financeira')
+def api_exportar_xlsx_completo():
+    """
+    Exporta XLSX com 4 abas: Dotação, Reservas, Empenhos, Liquidação.
+    Todos os dados do banco, sem filtros. UTF-8 nativo via openpyxl.
+    """
+    from flask import Response
+    from io import BytesIO
+    from datetime import datetime
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    try:
+        cur = get_cursor()
+
+        def fmt_cell(val):
+            if val is None:
+                return ''
+            if hasattr(val, 'strftime'):
+                try:
+                    return val.strftime('%d/%m/%Y %H:%M') if val.hour != 0 or val.minute != 0 else val.strftime('%d/%m/%Y')
+                except AttributeError:
+                    return val.strftime('%d/%m/%Y')
+            return val
+
+        def estilizar_header(ws):
+            for cell in ws[1]:
+                cell.font = Font(bold=True, color='FFFFFFFF')
+                cell.fill = PatternFill(start_color='FF667EEA', end_color='FF667EEA', fill_type='solid')
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            ws.freeze_panes = 'A2'
+
+        tabelas = [
+            ('Dotação',    'SELECT * FROM gestao_financeira.back_dotacao ORDER BY dotacao_formatada'),
+            ('Reservas',   'SELECT * FROM gestao_financeira.back_reservas ORDER BY dt_efet_resv DESC NULLS LAST, cod_resv_dota_sof DESC'),
+            ('Empenhos',   'SELECT * FROM gestao_financeira.back_empenhos ORDER BY dt_eph DESC NULLS LAST, cod_eph DESC'),
+            ('Liquidação', 'SELECT * FROM gestao_financeira.back_liquidacao ORDER BY dt_mvto_eph DESC NULLS LAST, cod_idt_eph_mvto DESC'),
+        ]
+
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+
+        for nome_aba, query in tabelas:
+            ws = wb.create_sheet(title=nome_aba)
+            cur.execute(query)
+            rows = cur.fetchall()
+            if not rows:
+                ws.append([f'Sem dados em {nome_aba}'])
+                continue
+            colunas = list(rows[0].keys())
+            ws.append([c.upper() for c in colunas])
+            estilizar_header(ws)
+            for row in rows:
+                ws.append([fmt_cell(row[c]) for c in colunas])
+
+        cur.close()
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f'relatorios_sof_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        return Response(
+            output.getvalue(),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+
+    except Exception as e:
+        print(f"[ERRO] api_exportar_xlsx_completo: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @gestao_financeira_bp.route("/api/sincronizar-empenhos", methods=["POST"])

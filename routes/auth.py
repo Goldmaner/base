@@ -39,6 +39,27 @@ def login():
         # senha armazenada é hash
         stored_hash = user["senha"]
         if check_password_hash(stored_hash, senha_input):
+            # Verificar status do usuário (bloqueia se Inativo, Afastado ou Cedido)
+            cur.execute("""
+                SELECT usuario_status FROM gestao_pessoas.usuarios_infos
+                WHERE usuario_email = %s
+            """, (email_input,))
+            info = cur.fetchone()
+            status = (info["usuario_status"] if info else None) or ""
+            BLOQUEADOS = {"Inativo", "Afastado", "Cedido"}
+            if status in BLOQUEADOS:
+                cur.close()
+                msgs = {
+                    "Inativo":  "Seu acesso está <strong>inativo</strong>.",
+                    "Afastado": "Seu acesso está <strong>suspenso por afastamento</strong>.",
+                    "Cedido":   "Seu acesso está <strong>suspenso (cedido)</strong>.",
+                }
+                flash(
+                    f"{msgs[status]} Entre em contato com o administrador do sistema para reativação.",
+                    "danger"
+                )
+                return redirect(url_for("auth.login"))
+
             # Verificar se há sessão ativa em outra máquina
             sessao_ativa = False
             if user["session_token"] and user["data_ultimo_login"]:
@@ -108,9 +129,11 @@ def listar_usuarios():
         print("[DEBUG] Executando query para listar usuários...")
         cur = get_cursor()
         cur.execute("""
-            SELECT id, email, tipo_usuario, d_usuario, data_criacao, acessos
-            FROM gestao_pessoas.usuarios 
-            ORDER BY data_criacao DESC
+            SELECT u.id, u.email, u.tipo_usuario, u.d_usuario, u.data_criacao, u.acessos,
+                   i.usuario_nome, i.usuario_status, i.usuario_aniversario, i.usuario_vinculo
+            FROM gestao_pessoas.usuarios u
+            LEFT JOIN gestao_pessoas.usuarios_infos i ON i.usuario_email = u.email
+            ORDER BY u.data_criacao DESC
         """)
         usuarios = cur.fetchall()
         cur.close()
@@ -126,7 +149,11 @@ def listar_usuarios():
                 "tipo_usuario": user["tipo_usuario"],
                 "d_usuario": user["d_usuario"],
                 "data_criacao": user["data_criacao"].isoformat() if user["data_criacao"] else None,
-                "acessos": user["acessos"]
+                "acessos": user["acessos"],
+                "usuario_nome": user["usuario_nome"] or "",
+                "usuario_status": user["usuario_status"] or "",
+                "usuario_aniversario": user["usuario_aniversario"].isoformat() if user["usuario_aniversario"] else "",
+                "usuario_vinculo": user["usuario_vinculo"] or ""
             })
         
         print(f"[DEBUG] Retornando {len(resultado)} usuários")
@@ -312,6 +339,109 @@ def atualizar_usuario(user_id):
                 print(f"[INFO] Sessão atualizada para usuário ID {user_id}")
         
         return jsonify({"mensagem": "Usuário atualizado com sucesso"}), 200
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({"erro": str(e)}), 500
+
+
+@auth_bp.route("/api/usuarios/<int:user_id>/infos", methods=["GET"])
+@login_required
+def obter_usuario_infos(user_id):
+    """
+    API para obter dados complementares de um usuário (tabela usuarios_infos)
+    """
+    if session.get("tipo_usuario") != "Agente Público":
+        return jsonify({"erro": "Acesso negado"}), 403
+
+    try:
+        cur = get_cursor()
+        # Buscar e-mail do usuário
+        cur.execute("SELECT email FROM gestao_pessoas.usuarios WHERE id = %s", (user_id,))
+        usuario = cur.fetchone()
+        if not usuario:
+            cur.close()
+            return jsonify({"erro": "Usuário não encontrado"}), 404
+
+        cur.execute("""
+            SELECT usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo
+            FROM gestao_pessoas.usuarios_infos
+            WHERE usuario_email = %s
+            ORDER BY id DESC
+            LIMIT 1
+        """, (usuario["email"],))
+        infos = cur.fetchone()
+        cur.close()
+
+        if infos:
+            return jsonify({
+                "usuario_status": infos["usuario_status"] or "",
+                "usuario_nome": infos["usuario_nome"] or "",
+                "usuario_aniversario": infos["usuario_aniversario"].isoformat() if infos["usuario_aniversario"] else "",
+                "usuario_vinculo": infos["usuario_vinculo"] or ""
+            }), 200
+        else:
+            return jsonify({
+                "usuario_status": "",
+                "usuario_nome": "",
+                "usuario_aniversario": "",
+                "usuario_vinculo": ""
+            }), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@auth_bp.route("/api/usuarios/<int:user_id>/infos", methods=["PUT"])
+@login_required
+def salvar_usuario_infos(user_id):
+    """
+    API para salvar/atualizar dados complementares de um usuário (upsert em usuarios_infos)
+    """
+    if session.get("tipo_usuario") != "Agente Público":
+        return jsonify({"erro": "Acesso negado"}), 403
+
+    try:
+        cur = get_cursor()
+        cur.execute("SELECT email FROM gestao_pessoas.usuarios WHERE id = %s", (user_id,))
+        usuario = cur.fetchone()
+        if not usuario:
+            cur.close()
+            return jsonify({"erro": "Usuário não encontrado"}), 404
+
+        email = usuario["email"]
+        data = request.get_json()
+
+        usuario_status = data.get("usuario_status", "").strip() or None
+        usuario_nome = data.get("usuario_nome", "").strip() or None
+        usuario_aniversario = data.get("usuario_aniversario", "").strip() or None
+        usuario_vinculo = data.get("usuario_vinculo", "").strip() or None
+        criado_por = session.get("email")
+
+        # Verificar se já existe registro
+        cur.execute(
+            "SELECT id FROM gestao_pessoas.usuarios_infos WHERE usuario_email = %s",
+            (email,)
+        )
+        existente = cur.fetchone()
+
+        if existente:
+            cur.execute("""
+                UPDATE gestao_pessoas.usuarios_infos
+                SET usuario_status = %s,
+                    usuario_nome = %s,
+                    usuario_aniversario = %s,
+                    usuario_vinculo = %s
+                WHERE usuario_email = %s
+            """, (usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo, email))
+        else:
+            cur.execute("""
+                INSERT INTO gestao_pessoas.usuarios_infos
+                    (usuario_email, usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo, criado_por)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (email, usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo, criado_por))
+
+        get_db().commit()
+        cur.close()
+        return jsonify({"mensagem": "Informações salvas com sucesso"}), 200
     except Exception as e:
         get_db().rollback()
         return jsonify({"erro": str(e)}), 500

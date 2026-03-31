@@ -246,6 +246,36 @@ def atualizar_descricao(manual_id):
 
 
 # ─────────────────────────────────────────────────────────────
+# TOGGLE META
+# ─────────────────────────────────────────────────────────────
+
+@manuais_bp.route('/detalhe/<int:manual_id>/toggle_meta', methods=['POST'])
+@login_required
+@requires_access('manuais')
+def toggle_meta(manual_id):
+    cur = get_cursor()
+    try:
+        cur.execute("SELECT manual_status FROM public.manuais_lista WHERE id = %s", (manual_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            flash('Manual não encontrado.', 'danger')
+            return redirect(url_for('manuais.index'))
+        novo_status = None if row['manual_status'] == 'Meta' else 'Meta'
+        cur.execute(
+            "UPDATE public.manuais_lista SET manual_status = %s WHERE id = %s",
+            (novo_status, manual_id)
+        )
+        cur.connection.commit()
+    except Exception as e:
+        cur.connection.rollback()
+        flash(f'Erro ao alterar status: {str(e)}', 'danger')
+    finally:
+        cur.close()
+    return redirect(url_for('manuais.detalhe', manual_id=manual_id))
+
+
+# ─────────────────────────────────────────────────────────────
 # VERSÕES — CRIAR
 # ─────────────────────────────────────────────────────────────
 
@@ -258,7 +288,8 @@ def criar_versao(manual_id):
     status        = request.form.get('manual_status', '').strip() or None
     descricao     = request.form.get('manual_descricao', '').strip() or None
     pendencias    = request.form.get('manual_pendencias', '').strip() or None
-    link          = request.form.get('manual_link', '').strip() or None
+    links_raw     = request.form.getlist('manual_link')
+    link          = ';'.join(l.strip() for l in links_raw if l.strip()) or None
     tipo_doc      = request.form.get('tipo_doc', '').strip() or None
     publico_alvo_list = request.form.getlist('publico_alvo')
     publico_alvo  = ';'.join(publico_alvo_list) if publico_alvo_list else None
@@ -314,7 +345,8 @@ def editar_versao(versao_id):
     status        = request.form.get('manual_status', '').strip() or None
     descricao     = request.form.get('manual_descricao', '').strip() or None
     pendencias    = request.form.get('manual_pendencias', '').strip() or None
-    link          = request.form.get('manual_link', '').strip() or None
+    links_raw     = request.form.getlist('manual_link')
+    link          = ';'.join(l.strip() for l in links_raw if l.strip()) or None
     tipo_doc      = request.form.get('tipo_doc', '').strip() or None
     publico_alvo_list = request.form.getlist('publico_alvo')
     publico_alvo  = ';'.join(publico_alvo_list) if publico_alvo_list else None

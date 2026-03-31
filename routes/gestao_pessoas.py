@@ -307,6 +307,13 @@ SORT_COLUMNS = {
     'data_enc': 'data_encerramento',
 }
 
+@gestao_pessoas_bp.route('/usuarios', methods=['GET'])
+@login_required
+@requires_access('usuarios')
+def usuarios():
+    return render_template('gestao_pessoas/usuarios.html')
+
+
 @gestao_pessoas_bp.route('/nomeacoes', methods=['GET'])
 @login_required
 @requires_access('gestao_pessoas')

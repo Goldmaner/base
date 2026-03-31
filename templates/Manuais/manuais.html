@@ -117,6 +117,11 @@
       font-size: .68rem; padding: 2px 8px; border-radius: 20px;
       background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;
     }
+    .manual-card .badge-meta {
+      font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+      background: #fef9c3; color: #713f12; border: 1px solid #fde047;
+      display: inline-flex; align-items: center; gap: 3px;
+    }
     .manual-card .card-desc {
       font-size: .78rem; color: #64748b; margin-top: 8px;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -258,8 +263,11 @@
                 <span class="badge-tipo {% if m.manual_tipo == 'Projeto' %}projeto{% endif %}">
                   {{ m.manual_tipo or 'Operação' }}
                 </span>
-                {% if m.manual_status %}
+                {% if m.manual_status and m.manual_status != 'Meta' %}
                 <span class="badge-status">{{ m.manual_status }}</span>
+                {% endif %}
+                {% if m.manual_status == 'Meta' %}
+                <span class="badge-meta"><i class="bi bi-star-fill"></i>META</span>
                 {% endif %}
               </div>
               {% if m.manual_descricao %}

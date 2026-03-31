@@ -1406,23 +1406,50 @@ def api_reservas():
 @login_required
 @requires_access('gestao_orcamentaria')
 def api_reservas_csv_completo():
-    """API para exportar CSV completo de todas as reservas"""
+    """API para exportar CSV completo de todas as reservas (todas as colunas do banco)"""
     from flask import Response
+    import datetime
     conn = get_db()
     cur = get_cursor()
     
     try:
-        # Query para buscar TUDO sem filtros
+        # Query para buscar TODAS as colunas da tabela
         query = """
-            SELECT 
+            SELECT
                 cod_resv_dota_sof,
                 dt_efet_resv,
+                ano_resv,
                 dotacao_formatada,
+                cod_nro_pcss_sof,
                 hist_resv,
                 vl_resv,
                 vl_transf_resv,
                 vl_canc_resv,
-                vl_saldo_resv
+                vl_eph,
+                vl_saldo_resv,
+                cod_org_emp,
+                cod_unid_orcm_sof,
+                orgdesc,
+                txt_unid_orcm,
+                cod_org_emp_exec,
+                cod_unid_orcm_sof_exec,
+                txt_org_emp_exect,
+                txt_unid_orcm_exect,
+                cod_catg_ecmc,
+                cod_grup_desp,
+                cod_modl_aplc,
+                cod_elem_desp,
+                cod_sub_elem_conta_desp,
+                cod_fcao_govr,
+                txt_fcao_govr,
+                cod_sub_fcao_govr,
+                txt_sub_fcao_govr,
+                cod_pgm_govr,
+                txt_pgm_govr,
+                cod_proj_atvd_sof,
+                cod_cta_desp,
+                cod_font_rec,
+                criado_em
             FROM gestao_financeira.back_reservas
             ORDER BY dt_efet_resv DESC, cod_resv_dota_sof DESC
         """
@@ -1430,7 +1457,6 @@ def api_reservas_csv_completo():
         cur.execute(query)
         reservas = cur.fetchall()
         
-        # Converter valores monetários
         def converter_valor(valor_str):
             if not valor_str:
                 return 0
@@ -1441,37 +1467,117 @@ def api_reservas_csv_completo():
                 return 0
         
         def formatar_valor_csv(valor):
-            """Formatar valor para CSV no formato brasileiro"""
             num = float(valor) if valor else 0
             return f"{num:.2f}".replace('.', ',')
+        
+        def formatar_data(data):
+            if not data:
+                return ""
+            try:
+                return data.strftime("%d/%m/%Y") if hasattr(data, 'strftime') else str(data)
+            except:
+                return str(data)
+        
+        def formatar_data_hora(data):
+            if not data:
+                return ""
+            try:
+                return data.strftime("%d/%m/%Y %H:%M") if hasattr(data, 'strftime') else str(data)
+            except:
+                return str(data)
         
         # Criar CSV com BOM UTF-8
         csv_lines = []
         csv_lines.append('\ufeff')  # BOM UTF-8
-        csv_lines.append('Código da Reserva;Data da Reserva;Dotação Formatada;Histórico da Reserva;Valor Reservado;Saldo de Reserva\n')
+        
+        # Cabeçalho com TODAS as colunas
+        cabecalho = [
+            'Código da Reserva',
+            'Data da Reserva',
+            'Ano da Reserva',
+            'Dotação Formatada',
+            'Código Nro Processo SOF',
+            'Histórico da Reserva',
+            'Valor Reservado',
+            'Valor Transferido',
+            'Valor Cancelado',
+            'Valor Empenhado',
+            'Saldo de Reserva',
+            'Código Órgão Empenhador',
+            'Código Unidade Orçamentária SOF',
+            'Descrição Órgão',
+            'Texto Unidade Orçamentária',
+            'Código Órgão Empenhador Exec.',
+            'Código Unidade Orçamentária SOF Exec.',
+            'Texto Órgão Empenhador Exec.',
+            'Texto Unidade Orçamentária Exec.',
+            'Código Categoria Econômica',
+            'Código Grupo Despesa',
+            'Código Modalidade Aplicação',
+            'Código Elemento Despesa',
+            'Código Sub-Elemento Conta Despesa',
+            'Código Função Governo',
+            'Texto Função Governo',
+            'Código Sub-Função Governo',
+            'Texto Sub-Função Governo',
+            'Código Programa Governo',
+            'Texto Programa Governo',
+            'Código Projeto-Atividade SOF',
+            'Código Conta Despesa',
+            'Código Fonte Recurso',
+            'Criado Em'
+        ]
+        csv_lines.append(';'.join(cabecalho) + '\n')
+        
+        campos_monetarios = {'vl_resv', 'vl_transf_resv', 'vl_canc_resv', 'vl_eph', 'vl_saldo_resv'}
         
         for r in reservas:
-            vl_resv = converter_valor(r['vl_resv'])
-            vl_transf = converter_valor(r['vl_transf_resv'])
-            vl_canc = converter_valor(r['vl_canc_resv'])
-            valor_reservado = vl_resv + vl_transf - vl_canc
             linha = [
                 f'"{r["cod_resv_dota_sof"] or ""}"',
-                f'"{r["dt_efet_resv"].strftime("%d/%m/%Y") if r["dt_efet_resv"] else ""}"',
+                f'"{formatar_data(r["dt_efet_resv"])}"',
+                f'"{r["ano_resv"] or ""}"',
                 f'"{r["dotacao_formatada"] or ""}"',
-                f'"{r["hist_resv"] or ""}"',
-                formatar_valor_csv(valor_reservado),
-                formatar_valor_csv(converter_valor(r['vl_saldo_resv']))
+                f'"{r["cod_nro_pcss_sof"] or ""}"',
+                f'"{(r["hist_resv"] or "").replace(chr(34), chr(39))}"',
+                formatar_valor_csv(converter_valor(r['vl_resv'])),
+                formatar_valor_csv(converter_valor(r['vl_transf_resv'])),
+                formatar_valor_csv(converter_valor(r['vl_canc_resv'])),
+                formatar_valor_csv(converter_valor(r['vl_eph'])),
+                formatar_valor_csv(converter_valor(r['vl_saldo_resv'])),
+                f'"{r["cod_org_emp"] or ""}"',
+                f'"{r["cod_unid_orcm_sof"] or ""}"',
+                f'"{r["orgdesc"] or ""}"',
+                f'"{r["txt_unid_orcm"] or ""}"',
+                f'"{r["cod_org_emp_exec"] or ""}"',
+                f'"{r["cod_unid_orcm_sof_exec"] or ""}"',
+                f'"{r["txt_org_emp_exect"] or ""}"',
+                f'"{r["txt_unid_orcm_exect"] or ""}"',
+                f'"{r["cod_catg_ecmc"] or ""}"',
+                f'"{r["cod_grup_desp"] or ""}"',
+                f'"{r["cod_modl_aplc"] or ""}"',
+                f'"{r["cod_elem_desp"] or ""}"',
+                f'"{r["cod_sub_elem_conta_desp"] or ""}"',
+                f'"{r["cod_fcao_govr"] or ""}"',
+                f'"{r["txt_fcao_govr"] or ""}"',
+                f'"{r["cod_sub_fcao_govr"] or ""}"',
+                f'"{r["txt_sub_fcao_govr"] or ""}"',
+                f'"{r["cod_pgm_govr"] or ""}"',
+                f'"{r["txt_pgm_govr"] or ""}"',
+                f'"{r["cod_proj_atvd_sof"] or ""}"',
+                f'"{r["cod_cta_desp"] or ""}"',
+                f'"{r["cod_font_rec"] or ""}"',
+                f'"{formatar_data_hora(r["criado_em"])}"'
             ]
             csv_lines.append(';'.join(linha) + '\n')
         
         csv_content = ''.join(csv_lines)
         
+        filename = f'reservas_completo_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
         return Response(
             csv_content,
             mimetype='text/csv',
             headers={
-                'Content-Disposition': f'attachment; filename=reservas_completo_{__import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                'Content-Disposition': f'attachment; filename={filename}',
                 'Content-Type': 'text/csv; charset=utf-8-sig'
             }
         )
@@ -1584,87 +1690,140 @@ def api_empenhos():
 @gestao_orcamentaria_bp.route('/api/empenhos/csv-completo')
 @requires_access('gestao_orcamentaria')
 def api_empenhos_csv_completo():
-    """API para exportar CSV completo de todos os empenhos"""
+    """API para exportar CSV completo de todos os empenhos (todas as colunas do banco)"""
     from flask import Response
+    import datetime as dt
     try:
         cur = get_cursor()
-        
-        # Query para buscar TUDO sem filtros
-        query = """
-            SELECT 
-                dt_eph,
-                cod_eph,
-                cod_nro_pcss_sof,
-                txt_obs_eph,
-                val_tot_eph,
-                val_tot_canc_eph,
-                val_tot_lqdc_eph,
-                val_tot_pago_eph,
-                cod_item_desp_sof,
-                nom_rzao_soci_sof,
-                cod_cpf_cnpj_sof,
-                txt_dotacao_fmt
+
+        cur.execute("""
+            SELECT
+                cod_idt_eph, dt_eph, cod_eph, ano_eph, cod_tip_eph_sof, cod_nro_pcss_sof,
+                cod_tip_doc, cod_idt_modl_lici, txt_obs_eph,
+                val_tot_eph, val_tot_canc_eph, val_tot_lqdc_eph, val_tot_pago_eph,
+                val_tot_a_liq_eph, val_tot_a_pag_eph,
+                cod_idt_crdr_sof, nom_rzao_soci_sof, cod_nat_crdr, cod_cpf_cnpj_sof,
+                cod_idt_item_desp, cod_item_desp_sof, txt_item_desp,
+                cod_idt_sub_elem, cod_sub_elem_desp, txt_sub_elem,
+                cod_idt_cta_desp, ind_cta_sint_anlt,
+                cod_catg_ecmc, cod_grup_desp, cod_modl_aplc, cod_elem_desp, cod_sub_elem_conta_desp,
+                cod_idt_fcao_govr, cod_idt_sub_fcao, cod_idt_pgm_govr, cod_idt_proj_atvd,
+                cod_org_emp_exect, txt_org_emp_exect, cod_unid_orcm_sof_exect, txt_unid_orcm_exect,
+                txt_dotacao_fmt,
+                cod_fcao_govr, txt_fcao_govr, cod_pgm_govr, txt_pgm_govr,
+                cod_sub_fcao_govr, txt_sub_fcao_govr,
+                cod_proj_atvd_sof_p, txt_proj_atvd_p,
+                cod_modl_lici_sof, txt_modl_lici,
+                cod_emp_pmsp, nom_emp_sof,
+                cod_idt_font_rec, cod_idt_dota, cod_idt_cta_desp1,
+                cod_cta_desp, txt_cta_desp, cod_font_rec, txt_font_rec,
+                cod_font_rec_exec, txt_font_rec_exec,
+                cod_car, desc_car, criado_em
             FROM gestao_financeira.back_empenhos
             ORDER BY dt_eph DESC, cod_eph DESC
-        """
-        
-        cur.execute(query)
+        """)
         empenhos = cur.fetchall()
-        
-        # Converter valores monetários
-        def converter_valor(valor_str):
-            if not valor_str:
-                return 0
+
+        def fmt_data(v):
+            if not v: return ''
+            try: return v.strftime('%d/%m/%Y') if not hasattr(v, 'hour') else v.strftime('%d/%m/%Y %H:%M')
+            except: return str(v)
+
+        def fmt_val(v):
+            if not v: return '0,00'
             try:
-                valor_limpo = str(valor_str).replace(',', '.')
-                return float(valor_limpo)
-            except:
-                return 0
-        
-        def formatar_valor_csv(valor):
-            """Formatar valor para CSV no formato brasileiro"""
-            num = float(valor) if valor else 0
-            return f"{num:.2f}".replace('.', ',')
-        
-        # Criar CSV com BOM UTF-8
-        csv_lines = []
-        csv_lines.append('\ufeff')  # BOM UTF-8
-        csv_lines.append('Data do Empenho;Código;SEI de Celebração;Texto do Empenho;Valor Total;Valor Cancelado;Valor Liquidado;Valor Pago;Cód. Despesa;Razão Social;CNPJ;Dotação Formatada\n')
-        
+                return f"{float(str(v).replace(',', '.')):.2f}".replace('.', ',')
+            except: return str(v)
+
+        campos_monetarios = {
+            'val_tot_eph', 'val_tot_canc_eph', 'val_tot_lqdc_eph', 'val_tot_pago_eph',
+            'val_tot_a_liq_eph', 'val_tot_a_pag_eph'
+        }
+        campos_data = {'dt_eph', 'criado_em'}
+
+        colunas_db = [
+            'cod_idt_eph', 'dt_eph', 'cod_eph', 'ano_eph', 'cod_tip_eph_sof', 'cod_nro_pcss_sof',
+            'cod_tip_doc', 'cod_idt_modl_lici', 'txt_obs_eph',
+            'val_tot_eph', 'val_tot_canc_eph', 'val_tot_lqdc_eph', 'val_tot_pago_eph',
+            'val_tot_a_liq_eph', 'val_tot_a_pag_eph',
+            'cod_idt_crdr_sof', 'nom_rzao_soci_sof', 'cod_nat_crdr', 'cod_cpf_cnpj_sof',
+            'cod_idt_item_desp', 'cod_item_desp_sof', 'txt_item_desp',
+            'cod_idt_sub_elem', 'cod_sub_elem_desp', 'txt_sub_elem',
+            'cod_idt_cta_desp', 'ind_cta_sint_anlt',
+            'cod_catg_ecmc', 'cod_grup_desp', 'cod_modl_aplc', 'cod_elem_desp', 'cod_sub_elem_conta_desp',
+            'cod_idt_fcao_govr', 'cod_idt_sub_fcao', 'cod_idt_pgm_govr', 'cod_idt_proj_atvd',
+            'cod_org_emp_exect', 'txt_org_emp_exect', 'cod_unid_orcm_sof_exect', 'txt_unid_orcm_exect',
+            'txt_dotacao_fmt',
+            'cod_fcao_govr', 'txt_fcao_govr', 'cod_pgm_govr', 'txt_pgm_govr',
+            'cod_sub_fcao_govr', 'txt_sub_fcao_govr',
+            'cod_proj_atvd_sof_p', 'txt_proj_atvd_p',
+            'cod_modl_lici_sof', 'txt_modl_lici',
+            'cod_emp_pmsp', 'nom_emp_sof',
+            'cod_idt_font_rec', 'cod_idt_dota', 'cod_idt_cta_desp1',
+            'cod_cta_desp', 'txt_cta_desp', 'cod_font_rec', 'txt_font_rec',
+            'cod_font_rec_exec', 'txt_font_rec_exec',
+            'cod_car', 'desc_car', 'criado_em'
+        ]
+
+        cabecalho = [
+            'Código ID Empenho', 'Data do Empenho', 'Código do Empenho', 'Ano', 'Tipo Empenho SOF',
+            'Código Nro Processo SOF', 'Tipo Documento', 'Cód. ID Modalidade Licitação', 'Texto Observação',
+            'Valor Total Empenho', 'Valor Total Cancelado', 'Valor Total Liquidado', 'Valor Total Pago',
+            'Valor a Liquidar', 'Valor a Pagar',
+            'Cód. ID Credor SOF', 'Razão Social', 'Natureza Credor', 'CNPJ/CPF',
+            'Cód. ID Item Despesa', 'Cód. Item Despesa SOF', 'Texto Item Despesa',
+            'Cód. ID Sub-Elemento', 'Cód. Sub-Elemento Despesa', 'Texto Sub-Elemento',
+            'Cód. ID Conta Despesa', 'Ind. Conta Sint/Anlt',
+            'Cód. Categoria Econômica', 'Cód. Grupo Despesa', 'Cód. Modalidade Aplicação',
+            'Cód. Elemento Despesa', 'Cód. Sub-Elemento Conta Despesa',
+            'Cód. ID Função Governo', 'Cód. ID Sub-Função', 'Cód. ID Programa Governo',
+            'Cód. ID Projeto-Atividade',
+            'Cód. Órgão Executor', 'Texto Órgão Executor',
+            'Cód. Unidade Orçamentária Exec.', 'Texto Unidade Orçamentária Exec.',
+            'Dotação Formatada',
+            'Cód. Função Governo', 'Texto Função Governo', 'Cód. Programa Governo', 'Texto Programa Governo',
+            'Cód. Sub-Função Governo', 'Texto Sub-Função Governo',
+            'Cód. Projeto-Atividade SOF', 'Texto Projeto-Atividade',
+            'Cód. Modalidade Licitação SOF', 'Texto Modalidade Licitação',
+            'Cód. Empregado PMSP', 'Nome Empregado SOF',
+            'Cód. ID Fonte Recurso', 'Cód. ID Dotação', 'Cód. ID Conta Despesa 1',
+            'Cód. Conta Despesa', 'Texto Conta Despesa', 'Cód. Fonte Recurso', 'Texto Fonte Recurso',
+            'Cód. Fonte Recurso Exec.', 'Texto Fonte Recurso Exec.',
+            'Cód. CAR', 'Descrição CAR', 'Criado Em'
+        ]
+
+        csv_lines = ['\ufeff', ';'.join(cabecalho) + '\n']
+
         for e in empenhos:
-            linha = [
-                f'"{e["dt_eph"].strftime("%d/%m/%Y") if e["dt_eph"] else ""}"',
-                f'"{e["cod_eph"] or ""}"',
-                f'"{e["cod_nro_pcss_sof"] or ""}"',
-                f'"{(e["txt_obs_eph"] or "").replace(chr(34), chr(34)+chr(34))}"',  # Escapar aspas duplas
-                formatar_valor_csv(converter_valor(e['val_tot_eph'])),
-                formatar_valor_csv(converter_valor(e['val_tot_canc_eph'])),
-                formatar_valor_csv(converter_valor(e['val_tot_lqdc_eph'])),
-                formatar_valor_csv(converter_valor(e['val_tot_pago_eph'])),
-                f'"{e["cod_item_desp_sof"] or ""}"',
-                f'"{(e["nom_rzao_soci_sof"] or "").replace(chr(34), chr(34)+chr(34))}"',
-                f'"{e["cod_cpf_cnpj_sof"] or ""}"',
-                f'"{e["txt_dotacao_fmt"] or ""}"'
-            ]
+            linha = []
+            for col in colunas_db:
+                val = e[col]
+                if col in campos_data:
+                    linha.append(f'"{fmt_data(val)}"')
+                elif col in campos_monetarios:
+                    linha.append(fmt_val(val))
+                else:
+                    linha.append(f'"{str(val or "").replace(chr(34), chr(39))}"')
             csv_lines.append(';'.join(linha) + '\n')
-        
+
         csv_content = ''.join(csv_lines)
-        
+        filename = f'empenhos_completo_{dt.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+
         return Response(
             csv_content,
             mimetype='text/csv',
             headers={
-                'Content-Disposition': f'attachment; filename=empenhos_completo_{__import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                'Content-Disposition': f'attachment; filename={filename}',
                 'Content-Type': 'text/csv; charset=utf-8-sig'
             }
         )
-    
+
     except Exception as e:
         print(f"Erro em api_empenhos_csv_completo: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-    
+
     finally:
         cur.close()
 

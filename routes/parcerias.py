@@ -31,11 +31,15 @@ def listar():
     filtro_termo = request.args.get('filtro_termo', '').strip()
     filtro_osc = request.args.get('filtro_osc', '').strip()
     filtro_projeto = request.args.get('filtro_projeto', '').strip()
-    filtro_tipo_termo = request.args.getlist('filtro_tipo_termo')  # Multi-seleÃ§Ã£o
-    filtro_status = request.args.getlist('filtro_status')  # Multi-seleÃ§Ã£o
-    filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')  # Multi-seleÃ§Ã£o
-    filtro_edital = request.args.getlist('filtro_edital')  # Multi-seleÃ§Ã£o
-    filtro_endereco = request.args.getlist('filtro_endereco')  # Multi-seleÃ§Ã£o
+    filtro_tipo_termo = request.args.getlist('filtro_tipo_termo')
+    filtro_status = request.args.getlist('filtro_status')
+    filtro_pessoa_gestora = request.args.getlist('filtro_pessoa_gestora')
+    filtro_edital = request.args.getlist('filtro_edital')
+    filtro_endereco = request.args.getlist('filtro_endereco')
+    filtro_abrangencia = request.args.getlist('filtro_abrangencia')
+    filtro_cnpj = request.args.get('filtro_cnpj', '').strip()
+    filtro_portaria = request.args.get('filtro_portaria', '').strip()
+    filtro_contrapartida = request.args.get('filtro_contrapartida', '').strip()
     busca_sei_celeb = request.args.get('busca_sei_celeb', '').strip()
     busca_sei_pc = request.args.get('busca_sei_pc', '').strip()
     data_assinatura_inicio = request.args.get('data_assinatura_inicio', '').strip()
@@ -44,8 +48,8 @@ def listar():
     data_inicio_ate = request.args.get('data_inicio_ate', '').strip()
     data_termino_de = request.args.get('data_termino_de', '').strip()
     data_termino_ate = request.args.get('data_termino_ate', '').strip()
-    
-    # Obter parÃ¢metro de paginaÃ§Ã£o (padrÃ£o: 100)
+
+    # Obter parâmetro de paginação (padrão: 100)
     limite = request.args.get('limite', '100')
     if limite == 'todas':
         limite_sql = None
@@ -74,8 +78,17 @@ def listar():
         ORDER BY edital_nome
     """)
     editais_filtro = [row['edital_nome'] for row in cur.fetchall()]
-    
-    # DEBUG: Verificar duplicaÃ§Ã£o
+
+    # Buscar opções de abrangência para o filtro
+    cur.execute("""
+        SELECT DISTINCT parceria_abrangencia_projeto
+        FROM public.parcerias_infos_adicionais
+        WHERE parceria_abrangencia_projeto IS NOT NULL
+        ORDER BY parceria_abrangencia_projeto
+    """)
+    abrangencia_opcoes = [row['parceria_abrangencia_projeto'] for row in cur.fetchall()]
+
+    # DEBUG: Verificar duplicação
     print(f"[DEBUG] Total de tipos_contrato retornados: {len(tipos_contrato)}")
     print(f"[DEBUG] Tipos Ãºnicos: {len(set(tipos_contrato))}")
     if len(tipos_contrato) != len(set(tipos_contrato)):
@@ -89,6 +102,9 @@ def listar():
             p.osc,
             p.projeto,
             p.tipo_termo,
+            p.portaria,
+            p.cnpj,
+            p.contrapartida,
             p.inicio::text as inicio_str,
             p.final::text as final_str,
             p.meses,
@@ -131,22 +147,40 @@ def listar():
                 END, ' | ')
              FROM public.parcerias_enderecos pe
              WHERE pe.numero_termo = p.numero_termo
-             LIMIT 1) as endereco_completo
+             LIMIT 1) as endereco_completo,
+            (SELECT COALESCE(SUM(ulc.valor_mes), 0)
+             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
+             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_detalhado,
+            (SELECT COALESCE(SUM(ulc.valor_mes_23), 0)
+             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
+             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_23,
+            (SELECT COALESCE(SUM(ulc.valor_mes_24), 0)
+             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
+             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_24,
+            (SELECT pia.parceria_abrangencia_projeto
+             FROM public.parcerias_infos_adicionais pia
+             WHERE pia.numero_termo = p.numero_termo LIMIT 1) as abrangencia,
+            (SELECT pia.parceria_data_suspensao
+             FROM public.parcerias_infos_adicionais pia
+             WHERE pia.numero_termo = p.numero_termo LIMIT 1) as data_suspensao,
+            (SELECT pia.parceria_data_retomada
+             FROM public.parcerias_infos_adicionais pia
+             WHERE pia.numero_termo = p.numero_termo LIMIT 1) as data_retomada
         FROM Parcerias p
         WHERE 1=1
     """
-    
+
     params = []
-    
+
     # Adicionar filtros se fornecidos
     if filtro_termo:
         query += " AND numero_termo ILIKE %s"
         params.append(f"%{filtro_termo}%")
-    
+
     if filtro_osc:
         query += " AND osc ILIKE %s"
         params.append(f"%{filtro_osc}%")
-    
+
     if filtro_projeto:
         query += " AND projeto ILIKE %s"
         params.append(f"%{filtro_projeto}%")
@@ -212,18 +246,37 @@ def listar():
     if busca_sei_celeb:
         query += " AND sei_celeb ILIKE %s"
         params.append(f"%{busca_sei_celeb}%")
-    
+
     if busca_sei_pc:
         query += " AND sei_pc ILIKE %s"
         params.append(f"%{busca_sei_pc}%")
-    
+
     if filtro_edital:
-        # MÃºltiplos editais
         placeholders = ','.join(['%s'] * len(filtro_edital))
         query += f" AND p.edital_nome IN ({placeholders})"
         params.extend(filtro_edital)
-    
-    # Filtro por endereÃ§o
+
+    if filtro_cnpj:
+        query += " AND p.cnpj ILIKE %s"
+        params.append(f"%{filtro_cnpj}%")
+
+    if filtro_portaria:
+        query += " AND p.portaria ILIKE %s"
+        params.append(f"%{filtro_portaria}%")
+
+    if filtro_abrangencia:
+        placeholders = ','.join(['%s'] * len(filtro_abrangencia))
+        query += f""" AND EXISTS (
+            SELECT 1 FROM public.parcerias_infos_adicionais pia
+            WHERE pia.numero_termo = p.numero_termo
+              AND pia.parceria_abrangencia_projeto IN ({placeholders})
+        )"""
+        params.extend(filtro_abrangencia)
+
+    if filtro_contrapartida == 'sim':
+        query += " AND p.contrapartida = 1"
+    elif filtro_contrapartida == 'nao':
+        query += " AND (p.contrapartida IS NULL OR p.contrapartida = 0)"
     if filtro_endereco:
         condicoes_endereco = []
         if 'preenchido' in filtro_endereco:
@@ -274,25 +327,33 @@ def listar():
         query += " AND p.final <= %s"
         params.append(data_termino_ate)
     
-    # Filtro de status baseado em datas (mÃºltiplos status)
-    # Vigente: inicio <= HOJE <= final
-    # Encerrado: final < HOJE
-    # NÃ£o iniciado: inicio > HOJE
-    # Rescindido e Suspenso: deixar para depois (nÃ£o filtrar por enquanto)
+    # Filtro de status
     if filtro_status:
         condicoes_status = []
-        
         for status in filtro_status:
             if status == 'vigente':
-                condicoes_status.append("(inicio <= CURRENT_DATE AND final >= CURRENT_DATE)")
+                condicoes_status.append("""
+                    (p.inicio <= CURRENT_DATE AND p.final >= CURRENT_DATE
+                     AND NOT EXISTS (
+                         SELECT 1 FROM public.parcerias_infos_adicionais pia
+                         WHERE pia.numero_termo = p.numero_termo
+                           AND pia.parceria_data_suspensao IS NOT NULL
+                           AND (pia.parceria_data_retomada IS NULL OR pia.parceria_data_retomada > CURRENT_DATE)
+                     ))
+                """)
             elif status == 'encerrado':
-                condicoes_status.append("(final < CURRENT_DATE)")
+                condicoes_status.append("(p.final < CURRENT_DATE)")
             elif status == 'nao_iniciado':
-                condicoes_status.append("(inicio > CURRENT_DATE)")
-            elif status in ['rescindido', 'suspenso']:
-                # Por enquanto, nÃ£o implementado - adiciona condiÃ§Ã£o falsa
+                condicoes_status.append("(p.inicio > CURRENT_DATE)")
+            elif status == 'suspenso':
+                condicoes_status.append("""EXISTS (
+                    SELECT 1 FROM public.parcerias_infos_adicionais pia
+                    WHERE pia.numero_termo = p.numero_termo
+                      AND pia.parceria_data_suspensao IS NOT NULL
+                      AND (pia.parceria_data_retomada IS NULL OR pia.parceria_data_retomada > CURRENT_DATE)
+                )""")
+            elif status == 'rescindido':
                 condicoes_status.append("(1=0)")
-        
         if condicoes_status:
             query += " AND (" + " OR ".join(condicoes_status) + ")"
     
@@ -371,39 +432,33 @@ def listar():
     from datetime import date
     hoje = date.today()
     contagem_status = {}
-    
+
     for parceria in parcerias:
         status = '-'
         try:
-            if parceria['inicio'] and parceria['final']:
-                # Validar se as datas sÃ£o objetos date vÃ¡lidos
-                inicio = parceria['inicio']
-                final = parceria['final']
-                
-                # Se forem strings, tentar converter
-                if isinstance(inicio, str):
-                    print(f"[AVISO] inicio como string: {inicio} para termo {parceria.get('numero_termo', 'N/A')}")
-                if isinstance(final, str):
-                    print(f"[AVISO] final como string: {final} para termo {parceria.get('numero_termo', 'N/A')}")
-                
-                if inicio <= hoje <= final:
+            inicio = parceria['inicio']
+            final = parceria['final']
+            data_suspensao = parceria.get('data_suspensao')
+            data_retomada = parceria.get('data_retomada')
+            is_suspenso = (
+                data_suspensao is not None and
+                (data_retomada is None or data_retomada > hoje)
+            )
+            if inicio and final:
+                if is_suspenso:
+                    status = 'Suspenso'
+                elif inicio <= hoje <= final:
                     status = 'Vigente'
                 elif final < hoje:
                     status = 'Encerrado'
                 elif inicio > hoje:
-                    status = 'NÃ£o iniciado'
+                    status = 'Não iniciado'
         except (TypeError, ValueError) as e:
             print(f"[ERRO] Erro ao calcular status para termo {parceria.get('numero_termo', 'N/A')}: {e}")
-            print(f"[DEBUG] inicio={parceria.get('inicio')}, final={parceria.get('final')}")
             status = 'Erro'
-        
+
         parceria['status_calculado'] = status
-        
-        # Contagem por status
-        if status in contagem_status:
-            contagem_status[status] += 1
-        else:
-            contagem_status[status] = 1
+        contagem_status[status] = contagem_status.get(status, 0) + 1
     
     # Obter total geral (sem filtros) para referÃªncia
     cur.execute("SELECT COUNT(*) as total FROM Parcerias")
@@ -420,11 +475,12 @@ def listar():
         duplicados = [t for t in termos if termos.count(t) > 1]
         print(f"[DEBUG] Termos duplicados: {set(duplicados)}")
     
-    return render_template("parcerias/parcerias.html", 
+    return render_template("parcerias/parcerias.html",
                          parcerias=parcerias,
                          tipos_contrato=tipos_contrato,
                          pessoas_gestoras_filtro=pessoas_gestoras_filtro,
                          editais_filtro=editais_filtro,
+                         abrangencia_opcoes=abrangencia_opcoes,
                          filtro_termo=filtro_termo,
                          filtro_osc=filtro_osc,
                          filtro_projeto=filtro_projeto,
@@ -432,6 +488,11 @@ def listar():
                          filtro_status=filtro_status,
                          filtro_pessoa_gestora=filtro_pessoa_gestora,
                          filtro_edital=filtro_edital,
+                         filtro_endereco=filtro_endereco,
+                         filtro_abrangencia=filtro_abrangencia,
+                         filtro_cnpj=filtro_cnpj,
+                         filtro_portaria=filtro_portaria,
+                         filtro_contrapartida=filtro_contrapartida,
                          busca_sei_celeb=busca_sei_celeb,
                          busca_sei_pc=busca_sei_pc,
                          data_assinatura_inicio=data_assinatura_inicio,
