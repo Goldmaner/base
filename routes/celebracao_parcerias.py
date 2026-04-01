@@ -1161,30 +1161,50 @@ def api_emendas_por_sei():
 
     if usar_projeto:
         cur.execute("""
-            SELECT sei_orcamentario, projeto, numero_consulta
+            SELECT id, sei_orcamentario, projeto, numero_consulta
             FROM celebracao.celebracao_emendas
             WHERE unaccent(LOWER(projeto)) = unaccent(LOWER(%s))
             ORDER BY id
         """, [projeto_fb])
-        emendas = [dict(r) for r in cur.fetchall()]
-        cur.execute("""
-            SELECT vereador_nome, valor
-            FROM public.parcerias_emendas
-            WHERE unaccent(LOWER(observacoes)) = unaccent(LOWER(%s))
-        """, [projeto_fb])
+        rows = cur.fetchall()
+        emendas = [dict(r) for r in rows]
+        ce_ids = [r['id'] for r in rows]
+        if ce_ids:
+            cur.execute("""
+                SELECT vereador_nome, valor
+                FROM public.parcerias_emendas
+                WHERE celebracao_emenda_id = ANY(%s)
+                   OR (celebracao_emenda_id IS NULL AND unaccent(LOWER(observacoes)) = unaccent(LOWER(%s)))
+            """, [ce_ids, projeto_fb])
+        else:
+            cur.execute("""
+                SELECT vereador_nome, valor
+                FROM public.parcerias_emendas
+                WHERE unaccent(LOWER(observacoes)) = unaccent(LOWER(%s))
+            """, [projeto_fb])
     else:
         cur.execute("""
-            SELECT sei_orcamentario, projeto, numero_consulta
+            SELECT id, sei_orcamentario, projeto, numero_consulta
             FROM celebracao.celebracao_emendas
             WHERE sei_celeb = %s
             ORDER BY id
         """, [sei_eff])
-        emendas = [dict(r) for r in cur.fetchall()]
-        cur.execute("""
-            SELECT vereador_nome, valor
-            FROM public.parcerias_emendas
-            WHERE sei_celeb = %s
-        """, [sei_eff])
+        rows = cur.fetchall()
+        emendas = [dict(r) for r in rows]
+        ce_ids = [r['id'] for r in rows]
+        if ce_ids:
+            cur.execute("""
+                SELECT vereador_nome, valor
+                FROM public.parcerias_emendas
+                WHERE celebracao_emenda_id = ANY(%s)
+                   OR (celebracao_emenda_id IS NULL AND sei_celeb = %s)
+            """, [ce_ids, sei_eff])
+        else:
+            cur.execute("""
+                SELECT vereador_nome, valor
+                FROM public.parcerias_emendas
+                WHERE sei_celeb = %s
+            """, [sei_eff])
 
     pe = cur.fetchall()
     vereadores = [r['vereador_nome'] for r in pe if r['vereador_nome']]

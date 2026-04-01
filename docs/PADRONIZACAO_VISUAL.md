@@ -265,6 +265,7 @@ Sempre usar Bootstrap 5.3.0 e Bootstrap Icons 1.10.x:
 
 | Arquivo                                    | Módulo      | Cor principal       |
 |--------------------------------------------|-------------|---------------------|
+| `templates/gestao_financeira/gestao_financeira.html` | Gestão Financeira | `#14532d → #16a34a` |
 | `templates/tela_inicial.html`              | Home        | `#1e3a5f → #2563eb` |
 | `templates/login.html`                     | Login       | `#4c1d95 → #7c3aed` |
 | `templates/parcerias/parcerias.html`       | Parcerias   | `#4c1d95 → #7c3aed` |

@@ -247,6 +247,9 @@
             </div>
 
             <form id="formEmpenhos" enctype="multipart/form-data">
+                <p class="text-muted mb-2"><small><i class="bi bi-info-circle me-1"></i>Relatórios sem executor: 5 dotações principais. Relatório como executor: somente 34.10. Os registros únicos de todos os arquivos são mesclados pelo código + ano do empenho.</small></p>
+
+                <h6 class="fw-semibold text-secondary mt-2 mb-2">Sem Executor</h6>
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="upload-box">
@@ -278,6 +281,16 @@
                         <div class="upload-box">
                             <label class="upload-label">78.10 (FAASP)</label>
                             <input type="file" class="form-control" name="empenhos_7810" accept=".csv">
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-semibold text-secondary mt-4 mb-2">Como Executor</h6>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="upload-box">
+                            <label class="upload-label">34.10 (Verba Municipal) - Executor</label>
+                            <input type="file" class="form-control" name="empenhos_3410_exec" accept=".csv">
                         </div>
                     </div>
                 </div>

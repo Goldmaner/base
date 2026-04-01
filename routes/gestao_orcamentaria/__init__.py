@@ -1416,8 +1416,8 @@ def api_reservas_csv_completo():
         # Query para buscar TODAS as colunas da tabela
         query = """
             SELECT
-                cod_resv_dota_sof,
                 dt_efet_resv,
+                cod_resv_dota_sof,
                 ano_resv,
                 dotacao_formatada,
                 cod_nro_pcss_sof,
@@ -1460,9 +1460,13 @@ def api_reservas_csv_completo():
         def converter_valor(valor_str):
             if not valor_str:
                 return 0
-            valor_limpo = str(valor_str).replace(',', '.')
+            s = str(valor_str).strip()
+            if ',' in s and '.' in s:
+                s = s.replace('.', '').replace(',', '.')  # "1.234,56" → "1234.56"
+            elif ',' in s:
+                s = s.replace(',', '.')  # "1234,56" → "1234.56"
             try:
-                return float(valor_limpo)
+                return float(s)
             except:
                 return 0
         
@@ -1732,8 +1736,22 @@ def api_empenhos_csv_completo():
         def fmt_val(v):
             if not v: return '0,00'
             try:
-                return f"{float(str(v).replace(',', '.')):.2f}".replace('.', ',')
+                s = str(v).strip()
+                if ',' in s and '.' in s:
+                    s = s.replace('.', '').replace(',', '.')  # "1.234,56" → "1234.56"
+                elif ',' in s:
+                    s = s.replace(',', '.')  # "1234,56" → "1234.56"
+                return f"{float(s):.2f}".replace('.', ',')
             except: return str(v)
+
+        def fmt_auto(val):
+            """Inteiros do banco sem aspas → Excel reconhece como número; texto com aspas."""
+            if val is None:
+                return ''
+            if isinstance(val, int):
+                return str(val)
+            s = str(val)
+            return f'"{s.replace(chr(34), chr(39))}"'
 
         campos_monetarios = {
             'val_tot_eph', 'val_tot_canc_eph', 'val_tot_lqdc_eph', 'val_tot_pago_eph',

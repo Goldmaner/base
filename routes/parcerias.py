@@ -1555,6 +1555,14 @@ def exportar_csv():
         data_inicio_ate = request.args.get('data_inicio_ate', '').strip()
         data_termino_de = request.args.get('data_termino_de', '').strip()
         data_termino_ate = request.args.get('data_termino_ate', '').strip()
+        filtro_cnpj = request.args.get('filtro_cnpj', '').strip()
+        filtro_portaria = request.args.get('filtro_portaria', '').strip()
+        filtro_abrangencia = request.args.getlist('filtro_abrangencia')
+        filtro_contrapartida = request.args.get('filtro_contrapartida', '').strip()
+        filtro_endereco = request.args.getlist('filtro_endereco')
+        incluir_valor_mes = request.args.get('incluir_valor_mes', 'false') == 'true'
+        incluir_valor_mes_23 = request.args.get('incluir_valor_mes_23', 'false') == 'true'
+        incluir_valor_mes_24 = request.args.get('incluir_valor_mes_24', 'false') == 'true'
         
         cur = get_cursor()
         
@@ -1594,7 +1602,16 @@ def exportar_csv():
                     END, ' | ')
                  FROM public.parcerias_enderecos pe
                  WHERE pe.numero_termo = p.numero_termo
-                 LIMIT 1) as endereco_completo
+                 LIMIT 1) as endereco_completo,
+            (SELECT COALESCE(SUM(ulc.valor_mes), 0)
+             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
+             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_detalhado,
+            (SELECT COALESCE(SUM(ulc.valor_mes_23), 0)
+             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
+             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_23,
+            (SELECT COALESCE(SUM(ulc.valor_mes_24), 0)
+             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
+             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_24
             FROM Parcerias p
             WHERE 1=1
         """
@@ -1726,19 +1743,67 @@ def exportar_csv():
         if data_termino_ate:
             query += " AND p.final <= %s"
             params.append(data_termino_ate)
-        
+
+        if filtro_cnpj:
+            query += " AND p.cnpj ILIKE %s"
+            params.append(f"%{filtro_cnpj}%")
+
+        if filtro_portaria:
+            query += " AND p.portaria ILIKE %s"
+            params.append(f"%{filtro_portaria}%")
+
+        if filtro_abrangencia:
+            placeholders = ','.join(['%s'] * len(filtro_abrangencia))
+            query += f""" AND EXISTS (
+                SELECT 1 FROM public.parcerias_infos_adicionais pia
+                WHERE pia.numero_termo = p.numero_termo
+                  AND pia.parceria_abrangencia_projeto IN ({placeholders})
+            )"""
+            params.extend(filtro_abrangencia)
+
+        if filtro_contrapartida == 'sim':
+            query += " AND p.contrapartida = 1"
+        elif filtro_contrapartida == 'nao':
+            query += " AND (p.contrapartida IS NULL OR p.contrapartida = 0)"
+
+        if filtro_endereco:
+            for v in filtro_endereco:
+                if v == 'preenchido':
+                    query += """ AND EXISTS (
+                        SELECT 1 FROM public.parcerias_enderecos pe
+                        WHERE pe.numero_termo = p.numero_termo
+                    )"""
+                elif v == 'nao_preenchido':
+                    query += """ AND NOT EXISTS (
+                        SELECT 1 FROM public.parcerias_enderecos pe
+                        WHERE pe.numero_termo = p.numero_termo
+                    )"""
+
         # Filtro de status baseado em datas (mÃºltiplos status)
         if filtro_status:
             condicoes_status = []
             
             for status in filtro_status:
                 if status == 'vigente':
-                    condicoes_status.append("(p.inicio <= CURRENT_DATE AND p.final >= CURRENT_DATE)")
+                    condicoes_status.append("""(p.inicio <= CURRENT_DATE AND p.final >= CURRENT_DATE
+                        AND NOT EXISTS (
+                            SELECT 1 FROM public.parcerias_infos_adicionais pia
+                            WHERE pia.numero_termo = p.numero_termo
+                              AND pia.parceria_data_suspensao IS NOT NULL
+                              AND (pia.parceria_data_retomada IS NULL OR pia.parceria_data_retomada > CURRENT_DATE)
+                        ))""")
                 elif status == 'encerrado':
                     condicoes_status.append("(p.final < CURRENT_DATE)")
                 elif status == 'nao_iniciado':
                     condicoes_status.append("(p.inicio > CURRENT_DATE)")
-                elif status in ['rescindido', 'suspenso']:
+                elif status == 'suspenso':
+                    condicoes_status.append("""EXISTS (
+                        SELECT 1 FROM public.parcerias_infos_adicionais pia
+                        WHERE pia.numero_termo = p.numero_termo
+                          AND pia.parceria_data_suspensao IS NOT NULL
+                          AND (pia.parceria_data_retomada IS NULL OR pia.parceria_data_retomada > CURRENT_DATE)
+                    )""")
+                elif status == 'rescindido':
                     condicoes_status.append("(1=0)")
             
             if condicoes_status:
@@ -1778,7 +1843,14 @@ def exportar_csv():
         
         if incluir_endereco:
             cabecalho.append('EndereÃ§o')
-        
+
+        if incluir_valor_mes:
+            cabecalho.append('Valor MÃªs Detalhado')
+        if incluir_valor_mes_23:
+            cabecalho.append('Valor MÃªs 23')
+        if incluir_valor_mes_24:
+            cabecalho.append('Valor MÃªs 24')
+
         cabecalho.extend([
             'SEI Plano',
             'SEI OrÃ§amento',
@@ -1811,7 +1883,17 @@ def exportar_csv():
             if incluir_endereco:
                 endereco = parceria.get('endereco_completo') or 'NÃ£o preenchido'
                 linha.append(endereco)
-            
+
+            if incluir_valor_mes:
+                v = float(parceria.get('valor_mes_detalhado') or 0)
+                linha.append(f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            if incluir_valor_mes_23:
+                v = float(parceria.get('valor_mes_23') or 0)
+                linha.append(f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            if incluir_valor_mes_24:
+                v = float(parceria.get('valor_mes_24') or 0)
+                linha.append(f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
             linha.extend([
                 parceria['sei_plano'] or '-',
                 parceria['sei_orcamento'] or '-',
@@ -1825,8 +1907,9 @@ def exportar_csv():
         data_atual = datetime.now().strftime('%Y%m%d_%H%M%S')
         
         # Verificar se hÃ¡ filtros aplicados para incluir no nome do arquivo
-        tem_filtros = any([filtro_termo, filtro_osc, filtro_projeto, filtro_tipo_termo, 
-                          filtro_status, filtro_pessoa_gestora, busca_sei_celeb, busca_sei_pc])
+        tem_filtros = any([filtro_termo, filtro_osc, filtro_projeto, filtro_tipo_termo,
+                          filtro_status, filtro_pessoa_gestora, busca_sei_celeb, busca_sei_pc,
+                          filtro_cnpj, filtro_portaria, filtro_abrangencia, filtro_contrapartida, filtro_endereco])
         
         if tem_filtros:
             filename = f'parcerias_filtradas_{data_atual}.csv'

@@ -5,169 +5,230 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestão Financeira - FAF</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
         body {
-            background-color: #f8f9fa;
+            background-color: #f0fdf4;
             padding: 20px;
         }
-        .header-section {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            padding: 40px;
+
+        /* === CABEÇALHO === */
+        .page-header {
+            background: linear-gradient(135deg, #14532d 0%, #16a34a 100%);
+            color: #fff;
+            padding: 28px 32px;
             border-radius: 12px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 28px;
+            box-shadow: 0 4px 18px rgba(22, 163, 74, .28);
         }
+        .page-header h2 { margin: 0; font-size: 1.6rem; font-weight: 700; }
+        .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+        /* === BOTÕES === */
+        .btn-fin {
+            background: linear-gradient(135deg, #14532d, #16a34a);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 7px 16px;
+            font-weight: 600;
+            transition: opacity .15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: .875rem;
+        }
+        .btn-fin:hover { opacity: .88; color: #fff; }
+        .btn-fin.outline {
+            background: transparent;
+            border: 1.5px solid rgba(255,255,255,.7);
+            color: #fff;
+        }
+        .btn-fin.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+
+        /* === SEÇÕES === */
+        .section-label {
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: #16a34a;
+            margin-bottom: 10px;
+            padding-left: 2px;
+        }
+        .menu-card .card-body {
+            padding: 2.8rem 2rem !important;
+        }
+            border-top: 2px solid #bbf7d0;
+            margin: 28px 0 20px;
+        }
+
+        /* === CARDS === */
         .menu-card {
             border: none;
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            transition: transform .2s ease, box-shadow .2s ease;
             height: 100%;
+            background: #fff;
         }
         .menu-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-4px);
+            box-shadow: 0 6px 18px rgba(22,163,74,.18);
         }
         .menu-icon {
-            font-size: 3rem;
-            margin-bottom: 20px;
-            color: #28a745;
+            font-size: 3.4rem;
+            margin-bottom: 18px;
         }
         .menu-title {
             font-size: 1.2rem;
-            font-weight: 600;
-            color: #333;
+            font-weight: 700;
+            color: #1a2e1a;
             margin-bottom: 10px;
         }
         .menu-description {
-            color: #666;
-            font-size: 0.9rem;
+            color: #555;
+            font-size: .95rem;
+            line-height: 1.6;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <!-- Cabeçalho -->
-        <div class="header-section">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1><i class="bi bi-cash-coin"></i> Gestão Financeira</h1>
-                    <p class="mb-0">Controle e acompanhamento de recursos financeiros</p>
-                </div>
-                <div>
-                    <a href="{{ url_for('main.index') }}" class="btn btn-light btn-lg">
-                        <i class="bi bi-house"></i> Voltar à Tela Inicial
-                    </a>
-                </div>
+<div class="container-fluid" style="max-width:92%; margin:0 auto;">
+
+    <!-- Cabeçalho -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2><i class="bi bi-cash-coin me-2"></i>Gestão Financeira</h2>
+                <p>Controle e acompanhamento de recursos financeiros</p>
             </div>
-        </div>
-
-        <!-- Mensagens Flash -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <!-- Menu de Opções -->
-        <div class="row g-4">
-            <!-- Card 1: Encaminhamento Reservas e Empenhos -->
-            <div class="col-md-6 col-lg-4">
-                <a href="{{ url_for('gestao_financeira.encaminhamento') }}" class="text-decoration-none">
-                    <div class="card menu-card">
-                        <div class="card-body text-center p-4">
-                            <i class="bi bi-send-check menu-icon" style="color: #20c997;"></i>
-                            <h5 class="menu-title">Encaminhamento Reservas e Empenhos</h5>
-                            <p class="menu-description">
-                                Gerar documentos de encaminhamento automático para reservas e empenhos
-                            </p>
-                        </div>
-                    </div>
+            <div>
+                <a href="{{ url_for('main.index') }}" class="btn-fin outline">
+                    <i class="bi bi-house"></i> Voltar à Tela Inicial
                 </a>
-            </div>
-
-            <!-- Card 2: Relatório de Acompanhamento -->
-            <div class="col-md-6 col-lg-4">
-                <a href="{{ url_for('gestao_financeira.relatorio_empenhos') }}" class="text-decoration-none">
-                    <div class="card menu-card">
-                        <div class="card-body text-center p-4">
-                            <i class="bi bi-graph-up-arrow menu-icon" style="color: #0d6efd;"></i>
-                            <h5 class="menu-title">Relatório de Acompanhamento</h5>
-                            <p class="menu-description">
-                                Acompanhamento de status e valores empenhados por parcela
-                            </p>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Card 3: Relatórios SOF -->
-            <div class="col-md-6 col-lg-4">
-                <a href="{{ url_for('gestao_financeira.relatorios_sof') }}" class="text-decoration-none">
-                    <div class="card menu-card">
-                        <div class="card-body text-center p-4">
-                            <i class="bi bi-file-earmark-arrow-up menu-icon" style="color: #6f42c1;"></i>
-                            <h5 class="menu-title">Relatórios SOF</h5>
-                            <p class="menu-description">
-                                Importação de arquivos CSV (Dotação, Reservas e Empenhos)
-                            </p>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Ultra Liquidações -->
-            <div class="col-md-6 col-lg-4">
-                <a href="{{ url_for('ultra_liquidacoes.index') }}" class="text-decoration-none">
-                    <div class="card menu-card">
-                        <div class="card-body text-center p-4">
-                            <i class="bi bi-cash-coin menu-icon" style="color: #0dcaf0;"></i>
-                            <h5 class="menu-title">Ultra Liquidações</h5>
-                            <p class="menu-description">
-                                Gestão de parcelas, pagamentos e cronogramas financeiros
-                            </p>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Resultados FUMCAD -->
-            <div class="col-md-6 col-lg-4">
-                <a href="{{ url_for('gestao_financeira.relatorio_fumcad') }}" class="text-decoration-none">
-                    <div class="card menu-card">
-                        <div class="card-body text-center p-4">
-                            <i class="bi bi-piggy-bank menu-icon" style="color: #11998e;"></i>
-                            <h5 class="menu-title">Resultados FUMCAD</h5>
-                            <p class="menu-description">
-                                Valores indisponíveis do FUMCAD por instrumento (TFM/TCV/DEA) e cálculo do saldo disponível
-                            </p>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Placeholder para futuros módulos -->
-            <div class="col-md-6 col-lg-4">
-                <div class="card menu-card" style="opacity: 0.6;">
-                    <div class="card-body text-center p-4">
-                        <i class="bi bi-graph-up menu-icon" style="color: #ccc;"></i>
-                        <h5 class="menu-title" style="color: #999;">Em Desenvolvimento</h5>
-                        <p class="menu-description">
-                            Novos módulos financeiros em breve
-                        </p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Mensagens Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- ======================================================= -->
+    <!-- SEÇÃO 1 — OPERAÇÃO                                       -->
+    <!-- ======================================================= -->
+    <p class="section-label"><i class="bi bi-lightning-charge-fill me-1"></i>Operação</p>
+    <div class="row g-4">
+
+        <!-- Ultra Liquidações -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('ultra_liquidacoes.index') }}" class="text-decoration-none">
+                <div class="card menu-card">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-cash-coin menu-icon" style="color:#0891b2;"></i>
+                        <h5 class="menu-title">Ultra Liquidações</h5>
+                        <p class="menu-description">
+                            Gestão de parcelas, pagamentos e cronogramas financeiros
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- ======================================================= -->
+    <!-- SEÇÃO 2 — RESERVAS E EMPENHOS                           -->
+    <!-- ======================================================= -->
+    <p class="section-label"><i class="bi bi-send-check-fill me-1"></i>Reservas e Empenhos</p>
+    <div class="row g-4">
+
+        <!-- Encaminhamento Reservas e Empenhos -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('gestao_financeira.encaminhamento') }}" class="text-decoration-none">
+                <div class="card menu-card">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-send-check menu-icon" style="color:#16a34a;"></i>
+                        <h5 class="menu-title">Encaminhamento Reservas e Empenhos</h5>
+                        <p class="menu-description">
+                            Gerar documentos de encaminhamento automático para reservas e empenhos
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Relatório de Acompanhamento -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('gestao_financeira.relatorio_empenhos') }}" class="text-decoration-none">
+                <div class="card menu-card">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-graph-up-arrow menu-icon" style="color:#2563eb;"></i>
+                        <h5 class="menu-title">Relatório de Acompanhamento</h5>
+                        <p class="menu-description">
+                            Acompanhamento de status e valores empenhados por parcela
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- ======================================================= -->
+    <!-- SEÇÃO 3 — RELATÓRIOS                                    -->
+    <!-- ======================================================= -->
+    <p class="section-label"><i class="bi bi-file-earmark-bar-graph-fill me-1"></i>Relatórios</p>
+    <div class="row g-4 mb-5">
+
+        <!-- Relatórios SOF -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('gestao_financeira.relatorios_sof') }}" class="text-decoration-none">
+                <div class="card menu-card">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-file-earmark-arrow-up menu-icon" style="color:#6f42c1;"></i>
+                        <h5 class="menu-title">Relatórios SOF</h5>
+                        <p class="menu-description">
+                            Importação de arquivos CSV (Dotação, Reservas, Empenhos e Liquidação)
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Resultados FUMCAD -->
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('gestao_financeira.relatorio_fumcad') }}" class="text-decoration-none">
+                <div class="card menu-card">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-piggy-bank menu-icon" style="color:#059669;"></i>
+                        <h5 class="menu-title">Resultados FUMCAD</h5>
+                        <p class="menu-description">
+                            Valores indisponíveis do FUMCAD por instrumento (TFM/TCV/DEA) e cálculo do saldo disponível
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+    </div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

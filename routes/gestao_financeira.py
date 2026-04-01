@@ -1346,10 +1346,53 @@ def api_importar_dotacao():
                                   %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                   %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (COD_IDT_DOTA) DO UPDATE SET
-                            TXT_ORG_EMP = EXCLUDED.TXT_ORG_EMP,
-                            ORCADO_ATUAL = EXCLUDED.ORCADO_ATUAL,
-                            SALDO_DOTACAO = EXCLUDED.SALDO_DOTACAO,
-                            criado_em = NOW()
+                            COD_ORG_EMP             = EXCLUDED.COD_ORG_EMP,
+                            TXT_ORG_EMP             = EXCLUDED.TXT_ORG_EMP,
+                            COD_UNID_ORCM_SOF       = EXCLUDED.COD_UNID_ORCM_SOF,
+                            TXT_UNID_ORCM           = EXCLUDED.TXT_UNID_ORCM,
+                            COD_FCAO_GOVR           = EXCLUDED.COD_FCAO_GOVR,
+                            TXT_FCAO_GOVR           = EXCLUDED.TXT_FCAO_GOVR,
+                            COD_SUB_FCAO_GOVR       = EXCLUDED.COD_SUB_FCAO_GOVR,
+                            TXT_SUB_FCAO_GOVR       = EXCLUDED.TXT_SUB_FCAO_GOVR,
+                            COD_PGM_GOVR            = EXCLUDED.COD_PGM_GOVR,
+                            TXT_PGM_GOVR            = EXCLUDED.TXT_PGM_GOVR,
+                            COD_PROJ_ATVD_SOF       = EXCLUDED.COD_PROJ_ATVD_SOF,
+                            TXT_PROJ_ATVD           = EXCLUDED.TXT_PROJ_ATVD,
+                            COD_CTA_DESP            = EXCLUDED.COD_CTA_DESP,
+                            TXT_CTA_DESP            = EXCLUDED.TXT_CTA_DESP,
+                            COD_FONT_REC            = EXCLUDED.COD_FONT_REC,
+                            TXT_FONT_REC            = EXCLUDED.TXT_FONT_REC,
+                            COD_EX_FONT_REC         = EXCLUDED.COD_EX_FONT_REC,
+                            COD_DSTN_REC            = EXCLUDED.COD_DSTN_REC,
+                            COD_VINC_REC_PMSP       = EXCLUDED.COD_VINC_REC_PMSP,
+                            COD_TIP_CRED_ORCM       = EXCLUDED.COD_TIP_CRED_ORCM,
+                            IND_ACTC_REDC           = EXCLUDED.IND_ACTC_REDC,
+                            IND_CNTR_COTA_PESL      = EXCLUDED.IND_CNTR_COTA_PESL,
+                            IND_COTA_PESL           = EXCLUDED.IND_COTA_PESL,
+                            IND_DOTA_LQDD_PAGO      = EXCLUDED.IND_DOTA_LQDD_PAGO,
+                            DT_CRIA_DOTA            = EXCLUDED.DT_CRIA_DOTA,
+                            VAL_DOTA_AUTR           = EXCLUDED.VAL_DOTA_AUTR,
+                            VAL_TOT_CRED_SPLM       = EXCLUDED.VAL_TOT_CRED_SPLM,
+                            VAL_TOT_CRED_ESPC       = EXCLUDED.VAL_TOT_CRED_ESPC,
+                            VAL_TOT_CRED_EXT        = EXCLUDED.VAL_TOT_CRED_EXT,
+                            VAL_TOT_REDC            = EXCLUDED.VAL_TOT_REDC,
+                            ORCADO_ATUAL            = EXCLUDED.ORCADO_ATUAL,
+                            VAL_TOT_CNGL            = EXCLUDED.VAL_TOT_CNGL,
+                            VAL_TOT_BLOQ_DECR       = EXCLUDED.VAL_TOT_BLOQ_DECR,
+                            ORCADO_DISPONIVEL       = EXCLUDED.ORCADO_DISPONIVEL,
+                            VAL_SLDO_RESV_DOTA      = EXCLUDED.VAL_SLDO_RESV_DOTA,
+                            SALDO_DOTACAO           = EXCLUDED.SALDO_DOTACAO,
+                            VAL_TOT_EPH             = EXCLUDED.VAL_TOT_EPH,
+                            VAL_TOT_CANC_EPH        = EXCLUDED.VAL_TOT_CANC_EPH,
+                            SALDO_EMPENHADO         = EXCLUDED.SALDO_EMPENHADO,
+                            SALDO_RESERVADO         = EXCLUDED.SALDO_RESERVADO,
+                            VAL_TOT_LQDC_EPH        = EXCLUDED.VAL_TOT_LQDC_EPH,
+                            VAL_TOT_PGTO_DOTA       = EXCLUDED.VAL_TOT_PGTO_DOTA,
+                            IND_EMND_ORCM           = EXCLUDED.IND_EMND_ORCM,
+                            DOTACAO_FORMATADA       = EXCLUDED.DOTACAO_FORMATADA,
+                            IND_DVDA_PUBC           = EXCLUDED.IND_DVDA_PUBC,
+                            IND_LANC_RCTA           = EXCLUDED.IND_LANC_RCTA,
+                            criado_em               = NOW()
                     """, (
                         linha.get('COD_IDT_DOTA'), linha.get('COD_ORG_EMP'), linha.get('TXT_ORG_EMP'),
                         linha.get('COD_UNID_ORCM_SOF'), linha.get('TXT_UNID_ORCM'), linha.get('COD_FCAO_GOVR'),
@@ -1473,23 +1516,12 @@ def api_importar_reservas():
             return jsonify({'success': False, 'error': 'Nenhum arquivo enviado'}), 400
 
         # --- Deduplicação por (COD_RESV_DOTA_SOF, ANO_RESV) ---
-        # Registros indexados pela chave composta
+        # Executor tem prioridade MENOR: carregado primeiro.
+        # Sem executor tem prioridade MAIOR: sobrescreve exec linha a linha.
         registros = {}        # chave -> linha dict
         chaves_sem_exec = set()
 
-        # Primeiro: sem executor (maior prioridade na fonte_relatorio)
-        for linhas in dados_sem_exec.values():
-            if not linhas:
-                continue
-            for linha in linhas:
-                cod = (linha.get('COD_RESV_DOTA_SOF') or '').strip()
-                ano = (linha.get('ANO_RESV') or '').strip()
-                chave = (cod, ano)
-                if chave not in registros:
-                    registros[chave] = linha
-                chaves_sem_exec.add(chave)
-
-        # Depois: executor (somente insere se a chave ainda não existe)
+        # Primeiro: executor (prioridade menor — será sobrescrito pelo sem_exec)
         for linhas in dados_exec.values():
             if not linhas:
                 continue
@@ -1499,6 +1531,18 @@ def api_importar_reservas():
                 chave = (cod, ano)
                 if chave not in registros:
                     registros[chave] = linha
+
+        # Depois: sem executor (prioridade maior — sobrescreve TODOS os dados do exec se a chave coincidir)
+        for linhas in dados_sem_exec.values():
+            if not linhas:
+                continue
+            for linha in linhas:
+                cod = (linha.get('COD_RESV_DOTA_SOF') or '').strip()
+                ano = (linha.get('ANO_RESV') or '').strip()
+                chave = (cod, ano)
+                if chave not in chaves_sem_exec:   # primeiro arquivo sem_exec com esta chave vence
+                    registros[chave] = linha       # sobrescreve exec se necessário
+                chaves_sem_exec.add(chave)
 
         # --- Inserção no banco ---
         total_importados = 0
@@ -1520,10 +1564,40 @@ def api_importar_reservas():
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                     )
                     ON CONFLICT (COD_RESV_DOTA_SOF) DO UPDATE SET
-                        VL_RESV = EXCLUDED.VL_RESV,
-                        VL_SALDO_RESV = EXCLUDED.VL_SALDO_RESV,
-                        fonte_relatorio = EXCLUDED.fonte_relatorio,
-                        criado_em = NOW()
+                        DT_EFET_RESV            = EXCLUDED.DT_EFET_RESV,
+                        ANO_RESV                = EXCLUDED.ANO_RESV,
+                        DOTACAO_FORMATADA       = EXCLUDED.DOTACAO_FORMATADA,
+                        COD_NRO_PCSS_SOF        = EXCLUDED.COD_NRO_PCSS_SOF,
+                        HIST_RESV               = EXCLUDED.HIST_RESV,
+                        VL_RESV                 = EXCLUDED.VL_RESV,
+                        VL_TRANSF_RESV          = EXCLUDED.VL_TRANSF_RESV,
+                        VL_CANC_RESV            = EXCLUDED.VL_CANC_RESV,
+                        VL_EPH                  = EXCLUDED.VL_EPH,
+                        VL_SALDO_RESV           = EXCLUDED.VL_SALDO_RESV,
+                        COD_ORG_EMP             = EXCLUDED.COD_ORG_EMP,
+                        COD_UNID_ORCM_SOF       = EXCLUDED.COD_UNID_ORCM_SOF,
+                        ORGDESC                 = EXCLUDED.ORGDESC,
+                        TXT_UNID_ORCM           = EXCLUDED.TXT_UNID_ORCM,
+                        COD_ORG_EMP_EXEC        = EXCLUDED.COD_ORG_EMP_EXEC,
+                        COD_UNID_ORCM_SOF_EXEC  = EXCLUDED.COD_UNID_ORCM_SOF_EXEC,
+                        TXT_ORG_EMP_EXECT       = EXCLUDED.TXT_ORG_EMP_EXECT,
+                        TXT_UNID_ORCM_EXECT     = EXCLUDED.TXT_UNID_ORCM_EXECT,
+                        COD_CATG_ECMC           = EXCLUDED.COD_CATG_ECMC,
+                        COD_GRUP_DESP           = EXCLUDED.COD_GRUP_DESP,
+                        COD_MODL_APLC           = EXCLUDED.COD_MODL_APLC,
+                        COD_ELEM_DESP           = EXCLUDED.COD_ELEM_DESP,
+                        COD_SUB_ELEM_CONTA_DESP = EXCLUDED.COD_SUB_ELEM_CONTA_DESP,
+                        COD_FCAO_GOVR           = EXCLUDED.COD_FCAO_GOVR,
+                        TXT_FCAO_GOVR           = EXCLUDED.TXT_FCAO_GOVR,
+                        COD_SUB_FCAO_GOVR       = EXCLUDED.COD_SUB_FCAO_GOVR,
+                        TXT_SUB_FCAO_GOVR       = EXCLUDED.TXT_SUB_FCAO_GOVR,
+                        COD_PGM_GOVR            = EXCLUDED.COD_PGM_GOVR,
+                        TXT_PGM_GOVR            = EXCLUDED.TXT_PGM_GOVR,
+                        COD_PROJ_ATVD_SOF       = EXCLUDED.COD_PROJ_ATVD_SOF,
+                        COD_CTA_DESP            = EXCLUDED.COD_CTA_DESP,
+                        COD_FONT_REC            = EXCLUDED.COD_FONT_REC,
+                        fonte_relatorio         = EXCLUDED.fonte_relatorio,
+                        criado_em               = NOW()
                 """, (
                     linha.get('COD_RESV_DOTA_SOF'), linha.get('DT_EFET_RESV'), linha.get('ANO_RESV'),
                     linha.get('DOTACAO_FORMATADA'), linha.get('COD_NRO_PCSS_SOF'), linha.get('HIST_RESV'),
@@ -1579,212 +1653,239 @@ def api_importar_reservas():
 @requires_access('gestao_financeira')
 def api_importar_empenhos():
     """
-    API para importar arquivos CSV de empenhos
+    Importa CSVs de Empenhos (5 sem executor + 1 como executor).
+    Deduplica por (COD_EPH, ANO_EPH).
+    fonte_relatorio = 'Sem Executor' ou 'Executor'.
     """
     import csv
     from io import StringIO
-    
+    from datetime import datetime
+
     try:
         conn = get_db()
         cur = conn.cursor()
         cur.execute("SET datestyle TO 'ISO, DMY'")
-        total_importados = 0
-        
-        # Processar cada arquivo enviado
-        arquivos = ['empenhos_3410', 'empenhos_3420', 'empenhos_0810', 'empenhos_9010', 'empenhos_7810']
-        
-        for arquivo_key in arquivos:
-            if arquivo_key not in request.files:
-                continue
-                
-            arquivo = request.files[arquivo_key]
-            if arquivo.filename == '':
-                continue
-            
-            # Ler conteúdo do CSV com encoding robusto
-            conteudo_bytes = arquivo.read()
-            for encoding in ['utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
+
+        # Garantir coluna fonte_relatorio na tabela
+        cur.execute("""
+            ALTER TABLE gestao_financeira.back_empenhos
+            ADD COLUMN IF NOT EXISTS fonte_relatorio VARCHAR(20)
+        """)
+
+        colunas_insert = [
+            'COD_IDT_EPH', 'DT_EPH', 'COD_EPH', 'ANO_EPH', 'COD_TIP_EPH_SOF', 'COD_NRO_PCSS_SOF',
+            'COD_TIP_DOC', 'COD_IDT_MODL_LICI', 'TXT_OBS_EPH', 'VAL_TOT_EPH', 'VAL_TOT_CANC_EPH',
+            'VAL_TOT_LQDC_EPH', 'VAL_TOT_PAGO_EPH', 'VAL_TOT_A_LIQ_EPH', 'VAL_TOT_A_PAG_EPH',
+            'COD_IDT_CRDR_SOF', 'NOM_RZAO_SOCI_SOF', 'COD_NAT_CRDR', 'COD_CPF_CNPJ_SOF',
+            'COD_IDT_ITEM_DESP', 'COD_ITEM_DESP_SOF', 'TXT_ITEM_DESP', 'COD_IDT_SUB_ELEM',
+            'COD_SUB_ELEM_DESP', 'TXT_SUB_ELEM', 'COD_IDT_CTA_DESP', 'IND_CTA_SINT_ANLT',
+            'COD_CATG_ECMC', 'COD_GRUP_DESP', 'COD_MODL_APLC', 'COD_ELEM_DESP',
+            'COD_SUB_ELEM_CONTA_DESP', 'COD_IDT_FCAO_GOVR', 'COD_IDT_SUB_FCAO',
+            'COD_IDT_PGM_GOVR', 'COD_IDT_PROJ_ATVD', 'COD_ORG_EMP_EXECT', 'TXT_ORG_EMP_EXECT',
+            'COD_UNID_ORCM_SOF_EXECT', 'TXT_UNID_ORCM_EXECT', 'TXT_DOTACAO_FMT',
+            'COD_FCAO_GOVR', 'TXT_FCAO_GOVR', 'COD_PGM_GOVR', 'TXT_PGM_GOVR',
+            'COD_SUB_FCAO_GOVR', 'TXT_SUB_FCAO_GOVR', 'COD_PROJ_ATVD_SOF_P', 'TXT_PROJ_ATVD_P',
+            'COD_MODL_LICI_SOF', 'TXT_MODL_LICI', 'COD_EMP_PMSP', 'NOM_EMP_SOF',
+            'COD_IDT_FONT_REC', 'COD_IDT_DOTA', 'COD_IDT_CTA_DESP1', 'COD_CTA_DESP',
+            'TXT_CTA_DESP', 'COD_FONT_REC', 'TXT_FONT_REC', 'COD_FONT_REC_EXEC',
+            'TXT_FONT_REC_EXEC', 'COD_CAR', 'DESC_CAR'
+        ]
+        colunas_integer = {
+            'COD_IDT_EPH', 'COD_EPH', 'ANO_EPH', 'COD_IDT_MODL_LICI', 'COD_IDT_CRDR_SOF',
+            'COD_IDT_ITEM_DESP', 'COD_ITEM_DESP_SOF', 'COD_IDT_SUB_ELEM', 'COD_SUB_ELEM_DESP',
+            'COD_IDT_CTA_DESP', 'COD_CATG_ECMC', 'COD_GRUP_DESP', 'COD_MODL_APLC', 'COD_ELEM_DESP',
+            'COD_SUB_ELEM_CONTA_DESP', 'COD_IDT_FCAO_GOVR', 'COD_IDT_SUB_FCAO', 'COD_IDT_PGM_GOVR',
+            'COD_IDT_PROJ_ATVD', 'COD_ORG_EMP_EXECT', 'COD_UNID_ORCM_SOF_EXECT', 'COD_FCAO_GOVR',
+            'COD_PGM_GOVR', 'COD_SUB_FCAO_GOVR', 'COD_PROJ_ATVD_SOF_P', 'COD_MODL_LICI_SOF',
+            'COD_EMP_PMSP', 'COD_IDT_FONT_REC', 'COD_IDT_DOTA', 'COD_IDT_CTA_DESP1', 'COD_CAR'
+        }
+
+        def ler_csv_emp(nome_campo):
+            if nome_campo not in request.files:
+                return None
+            arq = request.files[nome_campo]
+            if not arq or arq.filename == '':
+                return None
+            b = arq.read()
+            for enc in ['utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
                 try:
-                    conteudo = conteudo_bytes.decode(encoding)
+                    conteudo = b.decode(enc)
                     break
                 except UnicodeDecodeError:
                     continue
             else:
-                return jsonify({'success': False, 'error': f'Não foi possível decodificar o arquivo {arquivo.filename}'}), 400
-            
-            csv_reader = csv.DictReader(StringIO(conteudo), delimiter=';')
-            
-            # Debug: mostrar colunas do CSV
-            primeira_linha = next(csv_reader, None)
-            if primeira_linha:
-                colunas_csv = list(primeira_linha.keys())
-                print(f"[DEBUG] Arquivo {arquivo_key}: CSV tem {len(colunas_csv)} colunas")
-                print(f"[DEBUG] Primeiras 10 colunas: {colunas_csv[:10]}")
-                print(f"[DEBUG] Últimas 10 colunas: {colunas_csv[-10:]}")
-                
-                # Processar primeira linha
-                try:
-                    # Debug: contar colunas e valores
-                    colunas_insert = [
-                        'COD_IDT_EPH', 'DT_EPH', 'COD_EPH', 'ANO_EPH', 'COD_TIP_EPH_SOF', 'COD_NRO_PCSS_SOF',
-                        'COD_TIP_DOC', 'COD_IDT_MODL_LICI', 'TXT_OBS_EPH', 'VAL_TOT_EPH', 'VAL_TOT_CANC_EPH',
-                        'VAL_TOT_LQDC_EPH', 'VAL_TOT_PAGO_EPH', 'VAL_TOT_A_LIQ_EPH', 'VAL_TOT_A_PAG_EPH',
-                        'COD_IDT_CRDR_SOF', 'NOM_RZAO_SOCI_SOF', 'COD_NAT_CRDR', 'COD_CPF_CNPJ_SOF',
-                        'COD_IDT_ITEM_DESP', 'COD_ITEM_DESP_SOF', 'TXT_ITEM_DESP', 'COD_IDT_SUB_ELEM',
-                        'COD_SUB_ELEM_DESP', 'TXT_SUB_ELEM', 'COD_IDT_CTA_DESP', 'IND_CTA_SINT_ANLT',
-                        'COD_CATG_ECMC', 'COD_GRUP_DESP', 'COD_MODL_APLC', 'COD_ELEM_DESP',
-                        'COD_SUB_ELEM_CONTA_DESP', 'COD_IDT_FCAO_GOVR', 'COD_IDT_SUB_FCAO',
-                        'COD_IDT_PGM_GOVR', 'COD_IDT_PROJ_ATVD', 'COD_ORG_EMP_EXECT', 'TXT_ORG_EMP_EXECT',
-                        'COD_UNID_ORCM_SOF_EXECT', 'TXT_UNID_ORCM_EXECT', 'TXT_DOTACAO_FMT',
-                        'COD_FCAO_GOVR', 'TXT_FCAO_GOVR', 'COD_PGM_GOVR', 'TXT_PGM_GOVR',
-                        'COD_SUB_FCAO_GOVR', 'TXT_SUB_FCAO_GOVR', 'COD_PROJ_ATVD_SOF_P', 'TXT_PROJ_ATVD_P',
-                        'COD_MODL_LICI_SOF', 'TXT_MODL_LICI', 'COD_EMP_PMSP', 'NOM_EMP_SOF',
-                        'COD_IDT_FONT_REC', 'COD_IDT_DOTA', 'COD_IDT_CTA_DESP1', 'COD_CTA_DESP',
-                        'TXT_CTA_DESP', 'COD_FONT_REC', 'TXT_FONT_REC', 'COD_FONT_REC_EXEC',
-                        'TXT_FONT_REC_EXEC', 'COD_CAR', 'DESC_CAR'
-                    ]
-                    
-                    # Colunas que são INTEGER e precisam converter string vazia para NULL
-                    colunas_integer = {
-                        'COD_IDT_EPH', 'COD_EPH', 'ANO_EPH', 'COD_IDT_MODL_LICI', 'COD_IDT_CRDR_SOF',
-                        'COD_IDT_ITEM_DESP', 'COD_ITEM_DESP_SOF', 'COD_IDT_SUB_ELEM', 'COD_SUB_ELEM_DESP',
-                        'COD_IDT_CTA_DESP', 'COD_CATG_ECMC', 'COD_GRUP_DESP', 'COD_MODL_APLC', 'COD_ELEM_DESP',
-                        'COD_SUB_ELEM_CONTA_DESP', 'COD_IDT_FCAO_GOVR', 'COD_IDT_SUB_FCAO', 'COD_IDT_PGM_GOVR',
-                        'COD_IDT_PROJ_ATVD', 'COD_ORG_EMP_EXECT', 'COD_UNID_ORCM_SOF_EXECT', 'COD_FCAO_GOVR',
-                        'COD_PGM_GOVR', 'COD_SUB_FCAO_GOVR', 'COD_PROJ_ATVD_SOF_P', 'COD_MODL_LICI_SOF',
-                        'COD_EMP_PMSP', 'COD_IDT_FONT_REC', 'COD_IDT_DOTA', 'COD_IDT_CTA_DESP1', 'COD_CAR'
-                    }
-                    
-                    def limpar_valor(col, val):
-                        # Limpar formato Excel ="número" para apenas número
-                        if val and isinstance(val, str):
-                            # Remove ="..." deixando só o conteúdo
-                            if val.startswith('="') and val.endswith('"'):
-                                val = val[2:-1]  # Remove =" do início e " do fim
-                        
-                        # Converter string vazia para None apenas em colunas INTEGER
-                        if (val == '' or val is None) and col in colunas_integer:
-                            return None
-                        return val
-                    
-                    valores = tuple(limpar_valor(col, primeira_linha.get(col)) for col in colunas_insert)
-                    
-                    print(f"[DEBUG] Colunas INSERT: {len(colunas_insert)}")
-                    print(f"[DEBUG] Valores tuple: {len(valores)}")
-                    print(f"[DEBUG] Colunas faltando no CSV: {[col for col in colunas_insert if col not in primeira_linha.keys()]}")
-                    print(f"[DEBUG] Colunas extras no CSV: {[col for col in primeira_linha.keys() if col not in colunas_insert]}")
-                    
-                    # Debug: mostrar tamanho dos valores VARCHAR
-                    print("\n[DEBUG] Tamanho dos valores VARCHAR:")
-                    for i, col in enumerate(colunas_insert):
-                        val = valores[i]
-                        if val and isinstance(val, str) and len(val) > 50:
-                            print(f"  {col}: {len(val)} chars - '{val[:100]}...'")
-                    
-                    cur.execute("""
-                        INSERT INTO gestao_financeira.back_empenhos (
-                            COD_IDT_EPH, DT_EPH, COD_EPH, ANO_EPH, COD_TIP_EPH_SOF, COD_NRO_PCSS_SOF,
-                            COD_TIP_DOC, COD_IDT_MODL_LICI, TXT_OBS_EPH, VAL_TOT_EPH, VAL_TOT_CANC_EPH,
-                            VAL_TOT_LQDC_EPH, VAL_TOT_PAGO_EPH, VAL_TOT_A_LIQ_EPH, VAL_TOT_A_PAG_EPH,
-                            COD_IDT_CRDR_SOF, NOM_RZAO_SOCI_SOF, COD_NAT_CRDR, COD_CPF_CNPJ_SOF,
-                            COD_IDT_ITEM_DESP, COD_ITEM_DESP_SOF, TXT_ITEM_DESP, COD_IDT_SUB_ELEM,
-                            COD_SUB_ELEM_DESP, TXT_SUB_ELEM, COD_IDT_CTA_DESP, IND_CTA_SINT_ANLT,
-                            COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP,
-                            COD_SUB_ELEM_CONTA_DESP, COD_IDT_FCAO_GOVR, COD_IDT_SUB_FCAO,
-                            COD_IDT_PGM_GOVR, COD_IDT_PROJ_ATVD, COD_ORG_EMP_EXECT, TXT_ORG_EMP_EXECT,
-                            COD_UNID_ORCM_SOF_EXECT, TXT_UNID_ORCM_EXECT, TXT_DOTACAO_FMT,
-                            COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_PGM_GOVR, TXT_PGM_GOVR,
-                            COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR, COD_PROJ_ATVD_SOF_P, TXT_PROJ_ATVD_P,
-                            COD_MODL_LICI_SOF, TXT_MODL_LICI, COD_EMP_PMSP, NOM_EMP_SOF,
-                            COD_IDT_FONT_REC, COD_IDT_DOTA, COD_IDT_CTA_DESP1, COD_CTA_DESP,
-                            TXT_CTA_DESP, COD_FONT_REC, TXT_FONT_REC, COD_FONT_REC_EXEC,
-                            TXT_FONT_REC_EXEC, COD_CAR, DESC_CAR
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                  %s, %s, %s, %s)
-                        ON CONFLICT (COD_IDT_EPH) DO UPDATE SET
-                            VAL_TOT_EPH = EXCLUDED.VAL_TOT_EPH,
-                            VAL_TOT_LQDC_EPH = EXCLUDED.VAL_TOT_LQDC_EPH,
-                            VAL_TOT_PAGO_EPH = EXCLUDED.VAL_TOT_PAGO_EPH,
-                            criado_em = NOW()
-                    """, valores)
-                    total_importados += 1
-                except Exception as e:
-                    print(f"[ERRO] Erro ao inserir primeira linha: {str(e)}")
-                    conn.rollback()
-                    return jsonify({
-                        'success': False,
-                        'error': f'Erro ao inserir dados: {str(e)}',
-                        'detalhes': 'Verifique se o CSV tem todas as colunas necessárias'
-                    }), 400
-            
-            # Inserir restante dos registros
-            for linha in csv_reader:
-                try:
-                    cur.execute("""
-                        INSERT INTO gestao_financeira.back_empenhos (
-                            COD_IDT_EPH, DT_EPH, COD_EPH, ANO_EPH, COD_TIP_EPH_SOF, COD_NRO_PCSS_SOF,
-                            COD_TIP_DOC, COD_IDT_MODL_LICI, TXT_OBS_EPH, VAL_TOT_EPH, VAL_TOT_CANC_EPH,
-                            VAL_TOT_LQDC_EPH, VAL_TOT_PAGO_EPH, VAL_TOT_A_LIQ_EPH, VAL_TOT_A_PAG_EPH,
-                            COD_IDT_CRDR_SOF, NOM_RZAO_SOCI_SOF, COD_NAT_CRDR, COD_CPF_CNPJ_SOF,
-                            COD_IDT_ITEM_DESP, COD_ITEM_DESP_SOF, TXT_ITEM_DESP, COD_IDT_SUB_ELEM,
-                            COD_SUB_ELEM_DESP, TXT_SUB_ELEM, COD_IDT_CTA_DESP, IND_CTA_SINT_ANLT,
-                            COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP,
-                            COD_SUB_ELEM_CONTA_DESP, COD_IDT_FCAO_GOVR, COD_IDT_SUB_FCAO,
-                            COD_IDT_PGM_GOVR, COD_IDT_PROJ_ATVD, COD_ORG_EMP_EXECT, TXT_ORG_EMP_EXECT,
-                            COD_UNID_ORCM_SOF_EXECT, TXT_UNID_ORCM_EXECT, TXT_DOTACAO_FMT,
-                            COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_PGM_GOVR, TXT_PGM_GOVR,
-                            COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR, COD_PROJ_ATVD_SOF_P, TXT_PROJ_ATVD_P,
-                            COD_MODL_LICI_SOF, TXT_MODL_LICI, COD_EMP_PMSP, NOM_EMP_SOF,
-                            COD_IDT_FONT_REC, COD_IDT_DOTA, COD_IDT_CTA_DESP1, COD_CTA_DESP,
-                            TXT_CTA_DESP, COD_FONT_REC, TXT_FONT_REC, COD_FONT_REC_EXEC,
-                            TXT_FONT_REC_EXEC, COD_CAR, DESC_CAR
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                  %s, %s, %s, %s)
-                        ON CONFLICT (COD_IDT_EPH) DO UPDATE SET
-                            VAL_TOT_EPH = EXCLUDED.VAL_TOT_EPH,
-                            VAL_TOT_LQDC_EPH = EXCLUDED.VAL_TOT_LQDC_EPH,
-                            VAL_TOT_PAGO_EPH = EXCLUDED.VAL_TOT_PAGO_EPH,
-                            criado_em = NOW()
-                    """, tuple(limpar_valor(col, linha.get(col)) for col in colunas_insert))
-                    total_importados += 1
-                except Exception as e:
-                    conn.rollback()
-                    return jsonify({
-                        'success': False,
-                        'error': f'Erro na linha: {str(e)}',
-                        'detalhes': 'Verifique se o CSV tem todas as colunas necessárias.'
-                    }), 400
-        
+                raise ValueError(f'Não foi possível decodificar "{nome_campo}"')
+            reader = csv.DictReader(StringIO(conteudo), delimiter=';')
+            return list(reader)
+
+        campos_sem_exec = ['empenhos_3410', 'empenhos_3420', 'empenhos_0810', 'empenhos_9010', 'empenhos_7810']
+        campos_exec     = ['empenhos_3410_exec']
+
+        dados_sem_exec = {c: ler_csv_emp(c) for c in campos_sem_exec}
+        dados_exec     = {c: ler_csv_emp(c) for c in campos_exec}
+
+        if not any(v for v in list(dados_sem_exec.values()) + list(dados_exec.values())):
+            return jsonify({'success': False, 'error': 'Nenhum arquivo de empenhos enviado'}), 400
+
+        # Dedup em memória por (COD_EPH, ANO_EPH)
+        # Executor tem prioridade MENOR: carregado primeiro.
+        # Sem executor tem prioridade MAIOR: sobrescreve exec linha a linha.
+        registros = {}
+        chaves_sem_exec = set()
+
+        # Primeiro: executor (prioridade menor — será sobrescrito pelo sem_exec)
+        for linhas in dados_exec.values():
+            if not linhas:
+                continue
+            for linha in linhas:
+                eph = (linha.get('COD_EPH') or '').strip()
+                ano = (linha.get('ANO_EPH') or '').strip()
+                chave = (eph, ano)
+                if chave not in registros:
+                    registros[chave] = linha
+
+        # Depois: sem executor (prioridade maior — sobrescreve TODOS os dados do exec se a chave coincidir)
+        for linhas in dados_sem_exec.values():
+            if not linhas:
+                continue
+            for linha in linhas:
+                eph = (linha.get('COD_EPH') or '').strip()
+                ano = (linha.get('ANO_EPH') or '').strip()
+                chave = (eph, ano)
+                if chave not in chaves_sem_exec:   # primeiro arquivo sem_exec com esta chave vence
+                    registros[chave] = linha       # sobrescreve exec se necessário
+                chaves_sem_exec.add(chave)
+
+        def val(linha, col):
+            v = (linha.get(col) or '').strip()
+            if v.startswith('="') and v.endswith('"'):
+                v = v[2:-1]
+            if not v and col in colunas_integer:
+                return None
+            return v or None
+
+        total_importados = 0
+        for chave, linha in registros.items():
+            fonte = 'Sem Executor' if chave in chaves_sem_exec else 'Executor'
+            try:
+                cur.execute("""
+                    INSERT INTO gestao_financeira.back_empenhos (
+                        COD_IDT_EPH, DT_EPH, COD_EPH, ANO_EPH, COD_TIP_EPH_SOF, COD_NRO_PCSS_SOF,
+                        COD_TIP_DOC, COD_IDT_MODL_LICI, TXT_OBS_EPH, VAL_TOT_EPH, VAL_TOT_CANC_EPH,
+                        VAL_TOT_LQDC_EPH, VAL_TOT_PAGO_EPH, VAL_TOT_A_LIQ_EPH, VAL_TOT_A_PAG_EPH,
+                        COD_IDT_CRDR_SOF, NOM_RZAO_SOCI_SOF, COD_NAT_CRDR, COD_CPF_CNPJ_SOF,
+                        COD_IDT_ITEM_DESP, COD_ITEM_DESP_SOF, TXT_ITEM_DESP, COD_IDT_SUB_ELEM,
+                        COD_SUB_ELEM_DESP, TXT_SUB_ELEM, COD_IDT_CTA_DESP, IND_CTA_SINT_ANLT,
+                        COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP,
+                        COD_SUB_ELEM_CONTA_DESP, COD_IDT_FCAO_GOVR, COD_IDT_SUB_FCAO,
+                        COD_IDT_PGM_GOVR, COD_IDT_PROJ_ATVD, COD_ORG_EMP_EXECT, TXT_ORG_EMP_EXECT,
+                        COD_UNID_ORCM_SOF_EXECT, TXT_UNID_ORCM_EXECT, TXT_DOTACAO_FMT,
+                        COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_PGM_GOVR, TXT_PGM_GOVR,
+                        COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR, COD_PROJ_ATVD_SOF_P, TXT_PROJ_ATVD_P,
+                        COD_MODL_LICI_SOF, TXT_MODL_LICI, COD_EMP_PMSP, NOM_EMP_SOF,
+                        COD_IDT_FONT_REC, COD_IDT_DOTA, COD_IDT_CTA_DESP1, COD_CTA_DESP,
+                        TXT_CTA_DESP, COD_FONT_REC, TXT_FONT_REC, COD_FONT_REC_EXEC,
+                        TXT_FONT_REC_EXEC, COD_CAR, DESC_CAR, fonte_relatorio
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+                    )
+                    ON CONFLICT (COD_IDT_EPH) DO UPDATE SET
+                        DT_EPH                  = EXCLUDED.DT_EPH,
+                        COD_EPH                 = EXCLUDED.COD_EPH,
+                        ANO_EPH                 = EXCLUDED.ANO_EPH,
+                        COD_TIP_EPH_SOF         = EXCLUDED.COD_TIP_EPH_SOF,
+                        COD_NRO_PCSS_SOF        = EXCLUDED.COD_NRO_PCSS_SOF,
+                        COD_TIP_DOC             = EXCLUDED.COD_TIP_DOC,
+                        COD_IDT_MODL_LICI       = EXCLUDED.COD_IDT_MODL_LICI,
+                        TXT_OBS_EPH             = EXCLUDED.TXT_OBS_EPH,
+                        VAL_TOT_EPH             = EXCLUDED.VAL_TOT_EPH,
+                        VAL_TOT_CANC_EPH        = EXCLUDED.VAL_TOT_CANC_EPH,
+                        VAL_TOT_LQDC_EPH        = EXCLUDED.VAL_TOT_LQDC_EPH,
+                        VAL_TOT_PAGO_EPH        = EXCLUDED.VAL_TOT_PAGO_EPH,
+                        VAL_TOT_A_LIQ_EPH       = EXCLUDED.VAL_TOT_A_LIQ_EPH,
+                        VAL_TOT_A_PAG_EPH       = EXCLUDED.VAL_TOT_A_PAG_EPH,
+                        COD_IDT_CRDR_SOF        = EXCLUDED.COD_IDT_CRDR_SOF,
+                        NOM_RZAO_SOCI_SOF       = EXCLUDED.NOM_RZAO_SOCI_SOF,
+                        COD_NAT_CRDR            = EXCLUDED.COD_NAT_CRDR,
+                        COD_CPF_CNPJ_SOF        = EXCLUDED.COD_CPF_CNPJ_SOF,
+                        COD_IDT_ITEM_DESP       = EXCLUDED.COD_IDT_ITEM_DESP,
+                        COD_ITEM_DESP_SOF       = EXCLUDED.COD_ITEM_DESP_SOF,
+                        TXT_ITEM_DESP           = EXCLUDED.TXT_ITEM_DESP,
+                        COD_IDT_SUB_ELEM        = EXCLUDED.COD_IDT_SUB_ELEM,
+                        COD_SUB_ELEM_DESP       = EXCLUDED.COD_SUB_ELEM_DESP,
+                        TXT_SUB_ELEM            = EXCLUDED.TXT_SUB_ELEM,
+                        COD_IDT_CTA_DESP        = EXCLUDED.COD_IDT_CTA_DESP,
+                        IND_CTA_SINT_ANLT       = EXCLUDED.IND_CTA_SINT_ANLT,
+                        COD_CATG_ECMC           = EXCLUDED.COD_CATG_ECMC,
+                        COD_GRUP_DESP           = EXCLUDED.COD_GRUP_DESP,
+                        COD_MODL_APLC           = EXCLUDED.COD_MODL_APLC,
+                        COD_ELEM_DESP           = EXCLUDED.COD_ELEM_DESP,
+                        COD_SUB_ELEM_CONTA_DESP = EXCLUDED.COD_SUB_ELEM_CONTA_DESP,
+                        COD_IDT_FCAO_GOVR       = EXCLUDED.COD_IDT_FCAO_GOVR,
+                        COD_IDT_SUB_FCAO        = EXCLUDED.COD_IDT_SUB_FCAO,
+                        COD_IDT_PGM_GOVR        = EXCLUDED.COD_IDT_PGM_GOVR,
+                        COD_IDT_PROJ_ATVD       = EXCLUDED.COD_IDT_PROJ_ATVD,
+                        COD_ORG_EMP_EXECT       = EXCLUDED.COD_ORG_EMP_EXECT,
+                        TXT_ORG_EMP_EXECT       = EXCLUDED.TXT_ORG_EMP_EXECT,
+                        COD_UNID_ORCM_SOF_EXECT = EXCLUDED.COD_UNID_ORCM_SOF_EXECT,
+                        TXT_UNID_ORCM_EXECT     = EXCLUDED.TXT_UNID_ORCM_EXECT,
+                        TXT_DOTACAO_FMT         = EXCLUDED.TXT_DOTACAO_FMT,
+                        COD_FCAO_GOVR           = EXCLUDED.COD_FCAO_GOVR,
+                        TXT_FCAO_GOVR           = EXCLUDED.TXT_FCAO_GOVR,
+                        COD_PGM_GOVR            = EXCLUDED.COD_PGM_GOVR,
+                        TXT_PGM_GOVR            = EXCLUDED.TXT_PGM_GOVR,
+                        COD_SUB_FCAO_GOVR       = EXCLUDED.COD_SUB_FCAO_GOVR,
+                        TXT_SUB_FCAO_GOVR       = EXCLUDED.TXT_SUB_FCAO_GOVR,
+                        COD_PROJ_ATVD_SOF_P     = EXCLUDED.COD_PROJ_ATVD_SOF_P,
+                        TXT_PROJ_ATVD_P         = EXCLUDED.TXT_PROJ_ATVD_P,
+                        COD_MODL_LICI_SOF       = EXCLUDED.COD_MODL_LICI_SOF,
+                        TXT_MODL_LICI           = EXCLUDED.TXT_MODL_LICI,
+                        COD_EMP_PMSP            = EXCLUDED.COD_EMP_PMSP,
+                        NOM_EMP_SOF             = EXCLUDED.NOM_EMP_SOF,
+                        COD_IDT_FONT_REC        = EXCLUDED.COD_IDT_FONT_REC,
+                        COD_IDT_DOTA            = EXCLUDED.COD_IDT_DOTA,
+                        COD_IDT_CTA_DESP1       = EXCLUDED.COD_IDT_CTA_DESP1,
+                        COD_CTA_DESP            = EXCLUDED.COD_CTA_DESP,
+                        TXT_CTA_DESP            = EXCLUDED.TXT_CTA_DESP,
+                        COD_FONT_REC            = EXCLUDED.COD_FONT_REC,
+                        TXT_FONT_REC            = EXCLUDED.TXT_FONT_REC,
+                        COD_FONT_REC_EXEC       = EXCLUDED.COD_FONT_REC_EXEC,
+                        TXT_FONT_REC_EXEC       = EXCLUDED.TXT_FONT_REC_EXEC,
+                        COD_CAR                 = EXCLUDED.COD_CAR,
+                        DESC_CAR                = EXCLUDED.DESC_CAR,
+                        fonte_relatorio         = EXCLUDED.fonte_relatorio,
+                        criado_em               = NOW()
+                """, tuple(val(linha, c) for c in colunas_insert) + (fonte,))
+                total_importados += 1
+            except Exception as e:
+                conn.rollback()
+                return jsonify({'success': False, 'error': f'Erro na linha (EPH={chave[0]}, ANO={chave[1]}): {str(e)}'}), 400
+
         conn.commit()
-        
-        # Buscar data atualizada
+
         cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_empenhos")
         result = cur.fetchone()
         data_atual = result[0] if result and result[0] else None
         cur.close()
-        
-        from datetime import datetime
+
         data_fmt = data_atual.strftime('%d/%m/%Y') if data_atual else None
-        
+
         return jsonify({
             'success': True,
             'message': 'Empenhos importados com sucesso!',
             'total_importados': total_importados,
             'data_atualizacao': data_fmt
         })
-        
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         print(f"[ERRO] api_importar_empenhos: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @gestao_financeira_bp.route('/api/importar-todos', methods=['POST'])
@@ -1826,7 +1927,7 @@ def api_importar_todos():
                 resultados['datas']['reservas'] = data.get('data_atualizacao')
         
         # Importar Empenhos
-        arquivos_empenhos = ['empenhos_3410', 'empenhos_3420', 'empenhos_0810', 'empenhos_9010', 'empenhos_7810']
+        arquivos_empenhos = ['empenhos_3410', 'empenhos_3420', 'empenhos_0810', 'empenhos_9010', 'empenhos_7810', 'empenhos_3410_exec']
         tem_empenhos = any(key in request.files and request.files[key].filename != '' for key in arquivos_empenhos)
         
         if tem_empenhos:
@@ -1895,7 +1996,7 @@ def api_importar_liquidacao():
             'COD_NRO_PCSS_SOF_NE', 'ORGAOUNIDADE', 'ORGUNEXECUTORA',
             'DT_INIC_RLZC_LQDC', 'DT_FIM_RLZC_LQDC', 'COD_REC_SOF', 'VAL_MVTO_EPH',
             'DT_PREV_PGTO', 'DT_PGTO', 'VAL_ESTN_MVTO', 'COD_NLP_CANC', 'TXT_DCR_DOC_LQDD',
-            'B3', 'B2', 'VL_INSS', 'VL_IRRF', 'VL_ISS', 'VL_OUTROS',
+            ':B3', ':B2', 'VL_INSS', 'VL_IRRF', 'VL_ISS', 'VL_OUTROS',
             'VL_LIQUIDO', 'VL_LIQUIDO_CANC', 'VALOR_BRUTO_CANC',
             'CODIGO_RETENCAO_IR', 'DESCRICAO_RETENCAO_IR', 'NUMERO_LANCAMENTO_IR',
             'ANO_LANCAMENTO_IR', 'NUMERO_GUIA_IR', 'ANO_GUIA_IR',
@@ -1985,7 +2086,7 @@ def api_importar_liquidacao():
                     val('DT_INIC_RLZC_LQDC'), val('DT_FIM_RLZC_LQDC'), val('COD_REC_SOF'),
                     val('VAL_MVTO_EPH'), val('DT_PREV_PGTO'), val('DT_PGTO'),
                     val('VAL_ESTN_MVTO'), val('COD_NLP_CANC'), val('TXT_DCR_DOC_LQDD'),
-                    val('B3'), val('B2'), val('VL_INSS'), val('VL_IRRF'), val('VL_ISS'), val('VL_OUTROS'),
+                    val(':B3'), val(':B2'), val('VL_INSS'), val('VL_IRRF'), val('VL_ISS'), val('VL_OUTROS'),
                     val('VL_LIQUIDO'), val('VL_LIQUIDO_CANC'), val('VALOR_BRUTO_CANC'),
                     val('CODIGO_RETENCAO_IR'), val('DESCRICAO_RETENCAO_IR'), val('NUMERO_LANCAMENTO_IR'),
                     val('ANO_LANCAMENTO_IR'), val('NUMERO_GUIA_IR'), val('ANO_GUIA_IR'),
@@ -2059,7 +2160,7 @@ def api_exportar_xlsx_completo():
 
         tabelas = [
             ('Dotação',    'SELECT * FROM gestao_financeira.back_dotacao ORDER BY dotacao_formatada'),
-            ('Reservas',   'SELECT * FROM gestao_financeira.back_reservas ORDER BY dt_efet_resv DESC NULLS LAST, cod_resv_dota_sof DESC'),
+            ('Reservas',   'SELECT dt_efet_resv, cod_resv_dota_sof, ano_resv, dotacao_formatada, cod_nro_pcss_sof, hist_resv, vl_resv, vl_transf_resv, vl_canc_resv, vl_eph, vl_saldo_resv, cod_org_emp, cod_unid_orcm_sof, orgdesc, txt_unid_orcm, cod_org_emp_exec, cod_unid_orcm_sof_exec, txt_org_emp_exect, txt_unid_orcm_exect, cod_catg_ecmc, cod_grup_desp, cod_modl_aplc, cod_elem_desp, cod_sub_elem_conta_desp, cod_fcao_govr, txt_fcao_govr, cod_sub_fcao_govr, txt_sub_fcao_govr, cod_pgm_govr, txt_pgm_govr, cod_proj_atvd_sof, cod_cta_desp, cod_font_rec, fonte_relatorio, criado_em FROM gestao_financeira.back_reservas ORDER BY dt_efet_resv DESC NULLS LAST, cod_resv_dota_sof DESC'),
             ('Empenhos',   'SELECT * FROM gestao_financeira.back_empenhos ORDER BY dt_eph DESC NULLS LAST, cod_eph DESC'),
             ('Liquidação', 'SELECT * FROM gestao_financeira.back_liquidacao ORDER BY dt_mvto_eph DESC NULLS LAST, cod_idt_eph_mvto DESC'),
         ]
@@ -2158,6 +2259,7 @@ def api_sincronizar_empenhos():
                 dt_eph
             FROM gestao_financeira.back_empenhos
             WHERE cod_nro_pcss_sof IS NOT NULL
+              AND cod_cta_desp = '33503900'
             ORDER BY cod_nro_pcss_sof, cod_item_desp_sof, cod_eph
         """)
         
@@ -2169,13 +2271,36 @@ def api_sincronizar_empenhos():
             print(f"[DEBUG] Tipo do primeiro elemento: {type(empenhos_sof[0])}")
             print(f"[DEBUG] Primeiro elemento: {empenhos_sof[0]}")
         
+        # Helper robusto: converte qualquer representação de número para float
+        # Suporta float/int/Decimal nativos e strings PT-BR ("1.234,56")
+        def _to_float(v):
+            if v is None:
+                return 0.0
+            if isinstance(v, (int, float)):
+                return float(v)
+            try:
+                from decimal import Decimal
+                if isinstance(v, Decimal):
+                    return float(v)
+            except Exception:
+                pass
+            s = str(v).strip()
+            if ',' in s and '.' in s:
+                s = s.replace('.', '').replace(',', '.')
+            elif ',' in s:
+                s = s.replace(',', '.')
+            try:
+                return float(s)
+            except (ValueError, TypeError):
+                return 0.0
+
         # Organizar empenhos por processo normalizado
         empenhos_por_processo = {}
         for emp in empenhos_sof:
             # Acessar por nome de coluna (compatível com RealDictCursor)
             try:
                 processo_norm = normalizar_processo(emp['cod_nro_pcss_sof'])
-                elemento = emp['cod_item_desp_sof']  # pode ser 23 ou 24
+                elemento = str(emp['cod_item_desp_sof'])  # normalizado como string '23' ou '24'
                 ne = emp['cod_eph']  # número da nota de empenho
                 val_total = emp['val_tot_eph']
                 val_canc = emp['val_tot_canc_eph']
@@ -2183,25 +2308,22 @@ def api_sincronizar_empenhos():
             except (KeyError, TypeError):
                 # Se falhar, tentar acesso por índice (tupla normal)
                 processo_norm = normalizar_processo(emp[1])
-                elemento = emp[3]
+                elemento = str(emp[3])
                 ne = emp[2]
                 val_total = emp[4]
                 val_canc = emp[5]
                 dt_eph = emp[6]
             
             # Calcular valor líquido (total - cancelado)
-            val_total_str = str(val_total or '0').replace('.', '').replace(',', '.')
-            val_canc_str = str(val_canc or '0').replace('.', '').replace(',', '.')
-            
             try:
-                valor_liquido = float(val_total_str) - float(val_canc_str)
-            except (ValueError, TypeError):
+                valor_liquido = _to_float(val_total) - _to_float(val_canc)
+            except Exception:
                 print(f"[AVISO] Erro ao converter valores para empenho {ne}: total={val_total}, canc={val_canc}")
                 valor_liquido = 0
             
             # ⚠️ IGNORAR empenhos totalmente cancelados (valor_liquido = 0)
             if valor_liquido <= 0:
-                print(f"[INFO] Empenho {ne} ignorado (totalmente cancelado ou zerado): total={val_total_str}, canc={val_canc_str}")
+                print(f"[INFO] Empenho {ne} ignorado (totalmente cancelado ou zerado): total={val_total}, canc={val_canc}")
                 continue
             
             if processo_norm not in empenhos_por_processo:
@@ -2255,7 +2377,7 @@ def api_sincronizar_empenhos():
                 valor_previsto
             FROM gestao_financeira.ultra_liquidacoes
             WHERE parcela_tipo = 'Programada'
-              AND EXTRACT(YEAR FROM vigencia_inicial) = 2026
+              AND EXTRACT(YEAR FROM vigencia_inicial) = EXTRACT(YEAR FROM CURRENT_DATE)
             ORDER BY numero_termo, id
         """)
         
@@ -2284,12 +2406,7 @@ def api_sincronizar_empenhos():
             
             # Converter VARCHAR para float
             def converter_valor_sync(val):
-                if not val:
-                    return 0
-                try:
-                    return float(str(val).replace(',', '.'))
-                except (ValueError, AttributeError):
-                    return 0
+                return _to_float(val)
             
             parcelas_por_termo[termo].append({
                 'id_reserva': id_reserva,
@@ -2383,8 +2500,8 @@ def api_sincronizar_empenhos():
             relatorio['total_parcelas'] += qtd_parcelas
             
             # Somar totais empenhados por elemento
-            total_empenhado_23 = sum([e['valor'] for e in empenhos_elementos.get(23, [])])
-            total_empenhado_24 = sum([e['valor'] for e in empenhos_elementos.get(24, [])])
+            total_empenhado_23 = sum([e['valor'] for e in empenhos_elementos.get('23', [])])
+            total_empenhado_24 = sum([e['valor'] for e in empenhos_elementos.get('24', [])])
             
             # Somar totais previstos por elemento
             total_previsto_23 = sum([p['previsto_23'] for p in parcelas_reservas])
@@ -2414,8 +2531,8 @@ def api_sincronizar_empenhos():
             saldo_24 = total_empenhado_24
             
             # Concatenar notas de empenho
-            nes_23 = ';'.join([str(e['ne']) for e in empenhos_elementos.get(23, [])])
-            nes_24 = ';'.join([str(e['ne']) for e in empenhos_elementos.get(24, [])])
+            nes_23 = ';'.join([str(e['ne']) for e in empenhos_elementos.get('23', [])])
+            nes_24 = ';'.join([str(e['ne']) for e in empenhos_elementos.get('24', [])])
             
             # DISTRIBUIÇÃO EM CASCATA (ordem sequencial)
             for i in range(qtd_parcelas):
@@ -2465,8 +2582,8 @@ def api_sincronizar_empenhos():
                             status = %s
                         WHERE id = %s
                     """, (
-                        empenhado_23, ne_23_parcela.split(';')[0] if ne_23_parcela else None,
-                        empenhado_24, ne_24_parcela.split(';')[0] if ne_24_parcela else None,
+                        empenhado_23, ne_23_parcela if ne_23_parcela else None,
+                        empenhado_24, ne_24_parcela if ne_24_parcela else None,
                         empenhado_23, empenhado_24, status,
                         parcela_enviada['id']
                     ))

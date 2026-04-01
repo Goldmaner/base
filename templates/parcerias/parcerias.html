@@ -216,6 +216,26 @@
         </div>
       </div>
 
+      <!-- Status pills (visíveis na busca rápida) -->
+      <div class="mt-2">
+        <div class="qs-label mb-1">Status:</div>
+        <div class="status-group">
+          {% for val, lbl, cls in [
+            ('vigente','Vigente','vigente'),
+            ('encerrado','Encerrado','encerrado'),
+            ('nao_iniciado','Não iniciado','nao_iniciado'),
+            ('suspenso','Suspenso','suspenso'),
+            ('rescindido','Rescindido','rescindido')
+          ] %}
+          <div class="status-pill {{ cls }}">
+            <input type="checkbox" name="filtro_status" value="{{ val }}" id="st_{{ val }}"
+                   {% if val in filtro_status %}checked{% endif %}>
+            <label for="st_{{ val }}">{{ lbl }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
       <!-- Botão de filtros avançados com badge de contagem -->
       <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
         <button type="button" class="btn btn-sm" id="btnFiltrosAvancados"
@@ -242,29 +262,6 @@
     <!-- ── Painel de filtros avançados (colapsável) ─────────── -->
     <div class="filtros-avancados" id="filtrosAvancados" style="display:none;">
       <div class="filtros-avancados-body">
-
-        <!-- STATUS ------------------------------------------ -->
-        <div class="filter-section-inner">
-          <div class="filter-section-title"><i class="bi bi-circle-half"></i> Status do Termo</div>
-          <div class="filter-section-content">
-            <div class="status-group">
-              {% for val, lbl, cls in [
-                ('vigente','Vigente','vigente'),
-                ('encerrado','Encerrado','encerrado'),
-                ('nao_iniciado','Não iniciado','nao_iniciado'),
-                ('suspenso','Suspenso','suspenso'),
-                ('rescindido','Rescindido','rescindido')
-              ] %}
-              <div class="status-pill {{ cls }}">
-                <input type="checkbox" name="filtro_status" value="{{ val }}" id="st_{{ val }}"
-                       {% if val in filtro_status %}checked{% endif %}
-                       onchange="atualizarContadorFiltros()">
-                <label for="st_{{ val }}">{{ lbl }}</label>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
 
         <!-- CLASSIFICAÇÕES ----------------------------------- -->
         <div class="filter-section-inner">
@@ -669,9 +666,6 @@
     function contarFiltrosAvancados() {
       let count = 0;
 
-      // Status pills
-      if (document.querySelectorAll('input[name="filtro_status"]:checked').length > 0) count++;
-
       // Tom Select multi-selects
       ['filtro_tipo_termo', 'filtro_pessoa_gestora', 'filtro_edital', 'filtro_abrangencia'].forEach(id => {
         const el = document.getElementById(id);
@@ -821,6 +815,9 @@
       btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Exportando...';
       const params = new URLSearchParams(window.location.search);
       if (document.getElementById('chk_endereco').checked) params.set('incluir_endereco', 'true');
+      if (document.getElementById('chk_valor_mes').checked) params.set('incluir_valor_mes', 'true');
+      if (document.getElementById('chk_valor_mes_23').checked) params.set('incluir_valor_mes_23', 'true');
+      if (document.getElementById('chk_valor_mes_24').checked) params.set('incluir_valor_mes_24', 'true');
       window.location.href = '{{ url_for("parcerias.exportar_csv") }}?' + params.toString();
       setTimeout(() => { btnExportar.disabled = false; btnExportar.innerHTML = textoOriginal; }, 2000);
     }
