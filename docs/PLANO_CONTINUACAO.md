@@ -37,7 +37,8 @@ Foco:
 
 ### 6. Ofícios, Documentos e Notificações
 - Incluir modelos e automação para documentos de DGP e DP (Difícil)
-- Incluir as notificações da DGP na ferramenta (Fácil)
+- Incluir as notificações da DGP na ferramenta (Fácil)✅
+
 
 ### 7. Gestão Financeira
 - Automatizar texto da primeira parcela (Médio)✅

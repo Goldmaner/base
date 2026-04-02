@@ -3,7 +3,7 @@
 Script para importar dados de notificações do arquivo CSV
 para public.parcerias_notificacoes
 
-Arquivo: C:\\Users\\d843702\\Downloads\\import_notificacoes.csv
+Arquivo: C:\\Users\\d843702\\Downloads\\import_not_monit.csv
 Formato: UTF-8, delimitador TAB
 Destino: public.parcerias_notificacoes
 
@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from app import app
 from db import get_db, get_cursor
 
-ARQUIVO_CSV = r"C:\Users\d843702\Downloads\import_notificacoes.csv"
+ARQUIVO_CSV = r"C:\Users\d843702\Downloads\import_not_monit.csv"
 
 
 def converter_data_br(data_str):

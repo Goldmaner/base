@@ -109,6 +109,48 @@ def meus_processos():
         """)
         areas_tematicas = cur.fetchall()
         
+        # Modo gerenciar: admin edita analistas de todos os processos atribuídos
+        modo_gerenciar = request.args.get('modo') == 'gerenciar' and is_admin
+        if modo_gerenciar:
+            cur.execute("""
+                SELECT 
+                    ct.numero_termo,
+                    ct.meses_analisados,
+                    STRING_AGG(DISTINCT ca.nome_analista, ', ' ORDER BY ca.nome_analista) as analistas,
+                    COUNT(DISTINCT ca.nome_analista) as total_analistas,
+                    ARRAY_AGG(DISTINCT ca.nome_analista ORDER BY ca.nome_analista) as analistas_arr,
+                    MAX(p.sei_pc) as sei_pc
+                FROM analises_pc.checklist_termo ct
+                LEFT JOIN analises_pc.checklist_analista ca 
+                    ON ct.numero_termo = ca.numero_termo 
+                    AND ct.meses_analisados = ca.meses_analisados
+                LEFT JOIN public.parcerias p ON ct.numero_termo = p.numero_termo
+                GROUP BY ct.numero_termo, ct.meses_analisados
+                ORDER BY ct.numero_termo DESC, ct.meses_analisados DESC
+            """)
+            processos = []
+            for r in cur.fetchall():
+                proc = dict(r)
+                arr = proc.get('analistas_arr') or []
+                proc['analistas_arr'] = [a for a in arr if a is not None]
+                processos.append(proc)
+            cur.close()
+            return render_template('analises_pc/meus_processos.html',
+                                   processos=processos,
+                                   todos_analistas=todos_analistas,
+                                   tipos_contrato=tipos_contrato,
+                                   areas_tematicas=areas_tematicas,
+                                   is_admin=is_admin,
+                                   modo_gerenciar=True,
+                                   mostrar_nao_atribuidos=False,
+                                   ocultar_encerrados=False,
+                                   responsabilidade_filtro='',
+                                   filtro_termo='',
+                                   filtro_tipo_contrato='',
+                                   filtro_area_tematica='',
+                                   analista_selecionado='',
+                                   mensagem=None)
+
         # Verificar se foi solicitado visualização de processos não atribuídos
         mostrar_nao_atribuidos = request.args.get('nao_atribuidos') == 'true' and is_admin
         ocultar_encerrados = request.args.get('ocultar_encerrados', 'true') == 'true'
@@ -211,6 +253,7 @@ def meus_processos():
                                            tipos_contrato=tipos_contrato,
                                            areas_tematicas=areas_tematicas,
                                            is_admin=is_admin,
+                                           modo_gerenciar=False,
                                            mostrar_nao_atribuidos=mostrar_nao_atribuidos,
                                            mensagem="Você não possui R.F. cadastrado. Entre em contato com o administrador.")
                 
@@ -240,6 +283,7 @@ def meus_processos():
                                            tipos_contrato=tipos_contrato,
                                            areas_tematicas=areas_tematicas,
                                            is_admin=is_admin,
+                                           modo_gerenciar=False,
                                            mostrar_nao_atribuidos=mostrar_nao_atribuidos,
                                            mensagem="Nenhum analista cadastrado corresponde ao seu R.F.")
                 
@@ -328,6 +372,7 @@ def meus_processos():
                                tipos_contrato=tipos_contrato,
                                areas_tematicas=areas_tematicas,
                                is_admin=is_admin,
+                               modo_gerenciar=False,
                                mostrar_nao_atribuidos=mostrar_nao_atribuidos,
                                ocultar_encerrados=ocultar_encerrados,
                                responsabilidade_filtro=responsabilidade_filtro,
@@ -348,8 +393,75 @@ def meus_processos():
                                tipos_contrato=[],
                                areas_tematicas=[],
                                is_admin=False,
+                               modo_gerenciar=False,
                                mostrar_nao_atribuidos=False,
                                mensagem=f"Erro ao carregar processos: {str(e)}")
+
+
+@analises_pc_bp.route('/api/atualizar_analistas', methods=['POST'])
+def atualizar_analistas():
+    """Atualiza os analistas atribuídos a um processo já existente (somente admin)"""
+    if 'email' not in session:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    try:
+        cur.execute("SELECT tipo_usuario FROM gestao_pessoas.usuarios WHERE email = %s", (session['email'],))
+        user_data = cur.fetchone()
+        if not user_data or user_data['tipo_usuario'] != 'Agente Público':
+            cur.close()
+            return jsonify({'error': 'Acesso negado. Apenas administradores podem gerenciar atribuições.'}), 403
+
+        data = request.get_json()
+        numero_termo = data.get('numero_termo')
+        meses_analisados = data.get('meses_analisados')
+        analistas = data.get('analistas', [])
+
+        if not numero_termo or not meses_analisados:
+            cur.close()
+            return jsonify({'error': 'Dados incompletos'}), 400
+
+        if not analistas:
+            cur.close()
+            return jsonify({'error': 'É necessário ao menos um analista'}), 400
+
+        # Buscar analistas atuais para auditoria
+        cur.execute("""
+            SELECT nome_analista FROM analises_pc.checklist_analista
+            WHERE numero_termo = %s AND meses_analisados = %s
+        """, (numero_termo, meses_analisados))
+        analistas_antigos = [r['nome_analista'] for r in cur.fetchall()]
+
+        # Deletar e reinserir
+        cur.execute("""
+            DELETE FROM analises_pc.checklist_analista
+            WHERE numero_termo = %s AND meses_analisados = %s
+        """, (numero_termo, meses_analisados))
+
+        values_placeholders = ','.join(['(%s, %s, %s)'] * len(analistas))
+        params = []
+        for analista in analistas:
+            params.extend([numero_termo, meses_analisados, analista])
+        cur.execute(f"""
+            INSERT INTO analises_pc.checklist_analista (numero_termo, meses_analisados, nome_analista)
+            VALUES {values_placeholders}
+        """, params)
+
+        try:
+            audit_log.audit_checklist_analistas(conn, numero_termo, meses_analisados, analistas_antigos, analistas)
+        except Exception as audit_e:
+            print(f"[AVISO] Auditoria falhou (não crítico): {audit_e}")
+
+        conn.commit()
+        cur.close()
+        return jsonify({'success': True, 'message': f'Analistas de {numero_termo} ({meses_analisados}) atualizados com sucesso!'})
+
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        return jsonify({'error': str(e)}), 500
 
 
 @analises_pc_bp.route('/api/criar_pasta_modelo', methods=['POST'])

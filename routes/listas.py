@@ -18,6 +18,10 @@ def converter_valor_para_db(valor, campo, config):
     if isinstance(valor, str) and valor.strip() == '':
         return None
 
+    # Se a tabela marca explicitamente que o campo é boolean no DB, converter
+    if isinstance(valor, str) and campo in (config or {}).get('colunas_boolean', []):
+        return valor.lower() in ['ativo', 'true', '1', 'sim']
+
     # Se o campo for 'status' e valor for string, converter para boolean
     # EXCETO se a tabela tem opções explícitas (coluna TEXT, não BOOLEAN)
     if campo == 'status' and isinstance(valor, str):
@@ -210,6 +214,7 @@ TABELAS_CONFIG = {
         'nome': 'DGP: Agentes DGP',
         'schema': 'categoricas',
         'colunas_editaveis': ['nome_analista', 'rf', 'email', 'status'],
+        'colunas_boolean': ['status'],
         'labels': {
             'nome_analista': 'Nome do Agente',
             'rf': 'R.F.',
@@ -624,6 +629,7 @@ TABELAS_CONFIG = {
         'nome': 'DGP: Agentes DGP',
         'schema': 'categoricas',
         'colunas_editaveis': ['nome_analista', 'rf', 'email', 'status'],
+        'colunas_boolean': ['status'],
         'labels': {
             'nome_analista': 'Nome do Agente',
             'rf': 'R.F.',

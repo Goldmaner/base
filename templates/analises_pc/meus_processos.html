@@ -69,17 +69,38 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h2 class="mb-2">
+                        {% if modo_gerenciar %}
+                        <i class="bi bi-people-fill me-2"></i>Gerenciar Atribuições
+                        {% else %}
                         <i class="bi bi-clipboard-check me-2"></i>Meus Processos
+                        {% endif %}
                     </h2>
-                    <p class="mb-0">Checklists de Análise de Prestação de Contas atribuídos a você</p>
+                    <p class="mb-0">
+                        {% if modo_gerenciar %}
+                        Edite os analistas atribuídos a cada processo
+                        {% else %}
+                        Checklists de Análise de Prestação de Contas atribuídos a você
+                        {% endif %}
+                    </p>
                 </div>
                 <div>
+                    {% if modo_gerenciar %}
+                    <a href="{{ url_for('analises_pc.meus_processos') }}" class="btn btn-light me-2">
+                        <i class="bi bi-arrow-left me-2"></i>Voltar para Meus Processos
+                    </a>
+                    {% else %}
+                    {% if is_admin %}
+                    <a href="{{ url_for('analises_pc.meus_processos') }}?modo=gerenciar" class="btn btn-warning me-2">
+                        <i class="bi bi-people-fill me-2"></i>Gerenciar Atribuição
+                    </a>
+                    {% endif %}
                     <a href="{{ url_for('analises_pc.index') }}" class="btn btn-light me-2">
                         <i class="bi bi-plus-circle me-2"></i>Novo Checklist
                     </a>
                     <a href="{{ url_for('analises_pc.index') }}" class="btn btn-outline-light">
                         <i class="bi bi-arrow-left me-2"></i>Voltar
                     </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -93,7 +114,7 @@
         {% endif %}
 
         <!-- Filtro de Analista (apenas para Admin) -->
-        {% if is_admin %}
+        {% if is_admin and not modo_gerenciar %}
         <div class="card mb-4">
             <div class="card-header bg-secondary text-white">
                 <h5 class="mb-0">
@@ -238,13 +259,40 @@
         </div>
         {% endif %}
 
+        <!-- Filtros do modo Gerenciar -->
+        {% if modo_gerenciar %}
+        <div class="card mb-3" id="cardFiltrosGerenciar">
+            <div class="card-body py-2">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label mb-1 small fw-bold">Nº do Termo</label>
+                        <input type="text" class="form-control form-control-sm" id="gerFiltroTermo" placeholder="Filtrar por termo...">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label mb-1 small fw-bold">Analista</label>
+                        <input type="text" class="form-control form-control-sm" id="gerFiltroAnalista" placeholder="Filtrar por analista...">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label mb-1 small fw-bold">SEI PC</label>
+                        <input type="text" class="form-control form-control-sm" id="gerFiltroSei" placeholder="Filtrar por SEI...">
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button class="btn btn-sm btn-outline-secondary w-100" onclick="limparFiltrosGerenciar()" title="Limpar filtros">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Tabela de Processos -->
         {% if processos and processos|length > 0 %}
         <div class="card">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
-                    <i class="bi bi-list-task me-2"></i>Processos Atribuídos
-                    <span class="badge bg-light text-primary ms-2">{{ processos|length }}</span>
+                    {% if modo_gerenciar %}<i class="bi bi-people-fill me-2"></i>Todos os Processos Atribuídos{% else %}<i class="bi bi-list-task me-2"></i>Processos Atribuídos{% endif %}
+                    <span class="badge bg-light text-primary ms-2" id="contadorProcessos">{{ processos|length }}</span>
                 </h5>
             </div>
             <div class="card-body p-0">
@@ -252,23 +300,30 @@
                     <table class="table table-hover table-processos mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th width="20%">Número do Termo</th>
-                                <th width="12%">SEI PC</th>
-                                <th width="10%">Meses</th>
-                                {% if not mostrar_nao_atribuidos %}
-                                <th width="15%">Analistas</th>
+                                <th>Número do Termo</th>
+                                <th>SEI PC</th>
+                                <th>Meses</th>
+                                {% if modo_gerenciar %}
+                                <th>Analistas</th>
+                                {% elif not mostrar_nao_atribuidos %}
+                                <th>Analistas</th>
                                 {% else %}
-                                <th width="15%">Responsável Prévio</th>
+                                <th>Responsável Prévio</th>
                                 {% endif %}
-                                <th width="10%" class="text-center">Notificado</th>
-                                <th width="10%" class="text-center">Parecer</th>
-                                <th width="10%" class="text-center">Encerramento</th>
-                                <th width="13%" class="text-center">Ações</th>
+                                {% if not modo_gerenciar %}
+                                <th class="text-center">Notificado</th>
+                                <th class="text-center">Parecer</th>
+                                <th class="text-center">Encerramento</th>
+                                {% endif %}
+                                <th class="text-center">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for processo in processos %}
-                            <tr>
+                            <tr class="linha-processo"
+                                data-termo="{{ processo.numero_termo | lower }}"
+                                data-analistas="{{ (processo.analistas or '') | lower }}"
+                                data-sei="{{ (processo.sei_pc or '') | lower }}">
                                 <td>
                                     <strong class="text-primary">{{ processo.numero_termo }}</strong>
                                 </td>
@@ -300,6 +355,7 @@
                                     </small>
                                     {% endif %}
                                 </td>
+                                {% if not modo_gerenciar %}
                                 <!-- Notificado e Enviado -->
                                 <td class="text-center">
                                     {% if processo.documentos_sei_1 %}
@@ -336,9 +392,19 @@
                                     </span>
                                     {% endif %}
                                 </td>
+                                {% endif %}
                                 <!-- Botão Ações -->
                                 <td class="text-center">
-                                    {% if mostrar_nao_atribuidos and is_admin %}
+                                    {% if modo_gerenciar %}
+                                    <!-- Botão Editar Analistas no modo gerenciar -->
+                                    <button class="btn btn-sm btn-warning btn-editar-analistas" 
+                                            data-termo="{{ processo.numero_termo }}"
+                                            data-meses="{{ processo.meses_analisados }}"
+                                            data-analistas='{{ processo.analistas_arr | tojson }}'
+                                            title="Editar Analistas">
+                                        <i class="bi bi-pencil-fill"></i> Editar
+                                    </button>
+                                    {% elif mostrar_nao_atribuidos and is_admin %}
                                     <!-- Botão Atribuir para processos não atribuídos -->
                                     <button class="btn btn-sm btn-success" 
                                             onclick="abrirModalAtribuir('{{ processo.numero_termo }}')"
@@ -436,6 +502,47 @@
         </div>
     </div>
 
+    <!-- Modal de Gerenciamento de Analistas -->
+    <div class="modal fade" id="modalGerenciarAnalistas" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-people-fill me-2"></i>Editar Analistas do Processo
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Número do Termo:</strong></label>
+                        <input type="text" class="form-control" id="gerenciarNumeroTermoDisplay" readonly>
+                        <input type="hidden" id="gerenciarNumeroTermo">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Período:</strong></label>
+                        <input type="text" class="form-control" id="gerenciarMesesDisplay" readonly>
+                        <input type="hidden" id="gerenciarMeses">
+                    </div>
+                    <div class="mb-3">
+                        <label for="gerenciarAnalistas" class="form-label"><strong>Analistas *</strong></label>
+                        <select id="gerenciarAnalistas" class="form-select" multiple required>
+                            {% for analista in todos_analistas %}
+                            <option value="{{ analista.nome_analista }}">{{ analista.nome_analista }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Selecione um ou mais analistas</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" onclick="confirmarGerenciarAnalistas()">
+                        <i class="bi bi-check-circle me-2"></i>Salvar Alterações
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -455,13 +562,26 @@
                 closeOnSelect: false,
                 width: '100%'
             });
+
+            // Inicializar Select2 no modal de gerenciamento
+            $('#gerenciarAnalistas').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Selecione um ou mais analistas...',
+                closeOnSelect: false,
+                width: '100%'
+            });
             
             // Toggle dos filtros baseado no tipo de visualização
             toggleFiltros();
+
+            // Restaurar filtros do modo gerenciar
+            restaurarFiltrosGerenciar();
         });
         
         function toggleFiltros() {
-            const naoAtribuidos = document.getElementById('visNaoAtribuidos').checked;
+            const visEl = document.getElementById('visNaoAtribuidos');
+            if (!visEl) return;
+            const naoAtribuidos = visEl.checked;
             document.getElementById('hiddenNaoAtribuidos').value = naoAtribuidos ? 'true' : 'false';
             
             // Mostrar/esconder filtros apropriados
@@ -551,6 +671,118 @@
             // Redirecionar para a página do checklist com parâmetros pré-preenchidos e autoload
             const url = `{{ url_for('analises_pc.index') }}?termo=${encodeURIComponent(numeroTermo)}&meses=${encodeURIComponent(mesesAnalisados)}&autoload=true`;
             window.location.href = url;
+        }
+
+        // ── Botões Editar via delegação (evita onclick com tojson) ──────────────
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-editar-analistas');
+            if (!btn) return;
+            const termo = btn.dataset.termo;
+            const meses = btn.dataset.meses;
+            const analistasAtuais = JSON.parse(btn.dataset.analistas || '[]');
+            abrirGerenciarAnalistas(termo, meses, analistasAtuais);
+        });
+
+        function abrirGerenciarAnalistas(numeroTermo, meses, analistasAtuais) {
+            document.getElementById('gerenciarNumeroTermo').value = numeroTermo;
+            document.getElementById('gerenciarNumeroTermoDisplay').value = numeroTermo;
+            document.getElementById('gerenciarMeses').value = meses;
+            document.getElementById('gerenciarMesesDisplay').value = meses;
+            // Pré-selecionar analistas atuais
+            $('#gerenciarAnalistas').val(analistasAtuais).trigger('change');
+            const modal = new bootstrap.Modal(document.getElementById('modalGerenciarAnalistas'));
+            modal.show();
+        }
+
+        // ── Filtros lado-cliente para modo gerenciar (localStorage) ────────────
+        const LS_TERMO    = 'faf_ger_termo';
+        const LS_ANALISTA = 'faf_ger_analista';
+        const LS_SEI      = 'faf_ger_sei';
+
+        function aplicarFiltrosGerenciar() {
+            const termo    = (document.getElementById('gerFiltroTermo')?.value    || '').toLowerCase().trim();
+            const analista = (document.getElementById('gerFiltroAnalista')?.value || '').toLowerCase().trim();
+            const sei      = (document.getElementById('gerFiltroSei')?.value      || '').toLowerCase().trim();
+
+            localStorage.setItem(LS_TERMO,    termo);
+            localStorage.setItem(LS_ANALISTA, analista);
+            localStorage.setItem(LS_SEI,      sei);
+
+            let visiveis = 0;
+            document.querySelectorAll('tr.linha-processo').forEach(tr => {
+                const tTermo    = tr.dataset.termo    || '';
+                const tAnalista = tr.dataset.analistas || '';
+                const tSei      = tr.dataset.sei      || '';
+                const ok = tTermo.includes(termo) && tAnalista.includes(analista) && tSei.includes(sei);
+                tr.style.display = ok ? '' : 'none';
+                if (ok) visiveis++;
+            });
+            const cont = document.getElementById('contadorProcessos');
+            if (cont) cont.textContent = visiveis;
+        }
+
+        function limparFiltrosGerenciar() {
+            ['gerFiltroTermo','gerFiltroAnalista','gerFiltroSei'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            localStorage.removeItem(LS_TERMO);
+            localStorage.removeItem(LS_ANALISTA);
+            localStorage.removeItem(LS_SEI);
+            aplicarFiltrosGerenciar();
+        }
+
+        function restaurarFiltrosGerenciar() {
+            const elTermo    = document.getElementById('gerFiltroTermo');
+            const elAnalista = document.getElementById('gerFiltroAnalista');
+            const elSei      = document.getElementById('gerFiltroSei');
+            if (!elTermo) return;  // não está no modo gerenciar
+            elTermo.value    = localStorage.getItem(LS_TERMO)    || '';
+            elAnalista.value = localStorage.getItem(LS_ANALISTA) || '';
+            elSei.value      = localStorage.getItem(LS_SEI)      || '';
+            aplicarFiltrosGerenciar();
+        }
+
+        // Bind inputs para filtro em tempo real
+        ['gerFiltroTermo','gerFiltroAnalista','gerFiltroSei'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', aplicarFiltrosGerenciar);
+        });
+
+        async function confirmarGerenciarAnalistas() {
+            const numeroTermo = document.getElementById('gerenciarNumeroTermo').value;
+            const meses = document.getElementById('gerenciarMeses').value;
+            const analistas = $('#gerenciarAnalistas').val();
+
+            if (!analistas || analistas.length === 0) {
+                alert('Por favor, selecione pelo menos um analista!');
+                return;
+            }
+
+            try {
+                const response = await fetch('/analises_pc/api/atualizar_analistas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        meses_analisados: meses,
+                        analistas: analistas
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✓ ' + data.message);
+                    bootstrap.Modal.getInstance(document.getElementById('modalGerenciarAnalistas')).hide();
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao atualizar analistas!');
+            }
         }
     </script>
 </body>

@@ -214,13 +214,10 @@
                                 <input type="text" 
                                        class="form-control" 
                                        id="numeroTermo" 
-                                       list="datalistNumerosTermo" 
-                                       placeholder="Digite para buscar..." 
+                                       readonly
+                                       style="background-color:#e9ecef;cursor:default;"
                                        autocomplete="off"
                                        onchange="calcularPrazoFormulario()">
-                                <datalist id="datalistNumerosTermo">
-                                    <!-- Preenchido via JavaScript -->
-                                </datalist>
                             </div>
 
                             <!-- Linha 2 -->
@@ -232,8 +229,12 @@
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label for="processoDoc" class="form-label">Nº Processo do Processo SEI</label>
-                                <input type="text" class="form-control" id="processoDoc" placeholder="Ex: SEI 6019.2021/0001234-5">
+                                <label for="processoDoc" class="form-label">Nº Processo do Processo SEI
+                                    <span id="processoDocStatus" class="ms-1"></span>
+                                </label>
+                                <input type="text" class="form-control" id="processoDoc"
+                                       placeholder="Ex: SEI 6019.2021/0001234-5"
+                                       oninput="buscarTermoPorProcesso(this.value)">
                             </div>
                             <div class="col-md-4">
                                 <label for="seiDoc" class="form-label">SEI do Documento</label>
@@ -251,7 +252,7 @@
                             </div>
                             <div class="col-md-4">
                                 <label for="dataEmailAr" class="form-label">Data do E-mail ou AR</label>
-                                <input type="datetime-local" class="form-control" id="dataEmailAr" onchange="calcularPrazoFormulario()">
+                                <input type="date" class="form-control" id="dataEmailAr" onchange="calcularPrazoFormulario()">
                             </div>
                             <div class="col-md-3">
                                 <label for="prazoCalculado" class="form-label">Prazo Calculado</label>
@@ -501,17 +502,7 @@
                 numerosTermo = await response.json();
                 console.log('[DEBUG] Números de termo recebidos:', numerosTermo.length);
                 
-                // Preencher datalist do formulário
-                const datalist = document.getElementById('datalistNumerosTermo');
-                datalist.innerHTML = '';
-                
-                numerosTermo.forEach(termo => {
-                    const option = document.createElement('option');
-                    option.value = termo;
-                    datalist.appendChild(option);
-                });
-                
-                // Preencher select do filtro (mantém como select)
+                // Preencher select do filtro
                 const selectFiltro = document.getElementById('filtroTermo');
                 selectFiltro.innerHTML = '<option value="">Todos</option>';
                 
@@ -522,23 +513,7 @@
                     selectFiltro.appendChild(option);
                 });
                 
-                console.log('[DEBUG] Datalist de número de termo populado com', numerosTermo.length, 'opções');
                 termosCarregados = true;
-                
-                // Adicionar event listener para autocomplete dinâmico
-                const inputTermo = document.getElementById('numeroTermo');
-                if (inputTermo) {
-                    console.log('[DEBUG] ✅ Input numeroTermo encontrado! Adicionando event listener...');
-                    inputTermo.addEventListener('input', function() {
-                        console.log('[DEBUG] Input event disparado! Valor:', this.value, 'Length:', this.value.length);
-                        if (this.value.length >= 2) {
-                            buscarNumerosTermo(this.value);
-                        }
-                    });
-                    console.log('[DEBUG] ✅ Event listener adicionado com sucesso!');
-                } else {
-                    console.error('[DEBUG] ❌ Input numeroTermo NÃO encontrado!');
-                }
             } catch (error) {
                 console.error('[ERRO] ao carregar números de termo:', error);
                 alert('Erro ao carregar números de termo: ' + error.message);
@@ -762,14 +737,15 @@
             // Limpar campo de número (será preenchido quando tipo_doc for selecionado)
             document.getElementById('numeroDoc').value = '';
             
+            document.getElementById('processoDocStatus').innerHTML = '';
+            
             // Pré-preencher responsável com o nome do analista logado
             if (NOME_ANALISTA_LOGADO) {
                 document.getElementById('nomeResponsavel').value = NOME_ANALISTA_LOGADO;
             }
             
-            // Agente DGP sem visualizacao_geral: bloquear número do termo e responsável
+            // Agente DGP sem visualizacao_geral: bloquear apenas responsável
             const isDGPRestrito = (TIPO_USUARIO === 'Agente DGP' && !PODE_EDITAR);
-            document.getElementById('numeroTermo').disabled = isDGPRestrito;
             document.getElementById('nomeResponsavel').disabled = isDGPRestrito;
             
             modalNotificacao.show();
@@ -793,7 +769,7 @@
                 document.getElementById('seiDoc').value = notif.sei_doc || '';
                 document.getElementById('dataDoc').value = notif.data_doc || '';
                 document.getElementById('dataPub').value = notif.data_pub || '';
-                document.getElementById('dataEmailAr').value = notif.data_email_ar ? notif.data_email_ar.replace(' ', 'T').substring(0, 16) : '';
+                document.getElementById('dataEmailAr').value = notif.data_email_ar ? notif.data_email_ar.substring(0, 10) : '';
                 document.getElementById('observacoes').value = notif.observacoes || '';
                 
                 // Selecionar tipo de documento
@@ -808,10 +784,13 @@
                 selectResp.value = notif.nome_responsavel || '';
                 console.log('[DEBUG] Valor do select após seleção:', selectResp.value);
 
-                // Agente DGP sem visualizacao_geral: bloquear número do termo e responsável
+                // Agente DGP sem visualizacao_geral: bloquear apenas responsável
                 const isDGPRestrito = (TIPO_USUARIO === 'Agente DGP' && !PODE_EDITAR);
-                document.getElementById('numeroTermo').disabled = isDGPRestrito;
+                document.getElementById('numeroTermo').disabled = false;
                 selectResp.disabled = isDGPRestrito;
+                
+                // Limpar helper ao editar
+                document.getElementById('processoDocStatus').innerHTML = '';
                 
                 if (notif.dilacao) {
                     document.getElementById('dilacaoSim').checked = true;
@@ -926,6 +905,34 @@
                 console.error('Erro ao excluir notificação:', error);
                 alert('Erro ao excluir notificação: ' + error.message);
             }
+        }
+
+        // Buscar Nº Termo pelo campo Processo SEI (sei_celeb ou sei_pc)
+        let timeoutProcessoDoc = null;
+        async function buscarTermoPorProcesso(valor) {
+            const statusEl = document.getElementById('processoDocStatus');
+            if (!valor || valor.trim().length < 3) {
+                statusEl.innerHTML = '';
+                return;
+            }
+            if (timeoutProcessoDoc) clearTimeout(timeoutProcessoDoc);
+            timeoutProcessoDoc = setTimeout(async () => {
+                statusEl.innerHTML = '<span class="text-muted small">...</span>';
+                try {
+                    const resp = await fetch(`/parcerias_notificacoes/api/buscar-termo-por-sei?sei=${encodeURIComponent(valor.trim())}`);
+                    const data = await resp.json();
+                    if (data.numero_termo) {
+                        document.getElementById('numeroTermo').value = data.numero_termo;
+                        statusEl.innerHTML = '<i class="bi bi-check-circle-fill text-success" title="Nº Termo preenchido automaticamente"></i>';
+                        calcularPrazoFormulario();
+                    } else {
+                        // Não encontrado: limpa o termo apenas se estava vazio antes
+                        statusEl.innerHTML = '<i class="bi bi-dash-circle text-secondary" title="Nenhum termo encontrado"></i>';
+                    }
+                } catch(e) {
+                    statusEl.innerHTML = '<i class="bi bi-exclamation-circle text-warning"></i>';
+                }
+            }, 400);
         }
 
         // Toggle dias de dilação

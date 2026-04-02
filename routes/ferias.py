@@ -425,6 +425,27 @@ def calendario():
         """)
         anos_disponiveis = [int(row['ano']) for row in cur.fetchall()]
         
+        # Buscar aniversariantes (dia+mês de usuario_aniversario)
+        aniversarios = []
+        try:
+            cur.execute("""
+                SELECT usuario_nome,
+                       EXTRACT(MONTH FROM usuario_aniversario)::int AS mes,
+                       EXTRACT(DAY   FROM usuario_aniversario)::int AS dia
+                FROM gestao_pessoas.usuarios_infos
+                WHERE usuario_aniversario IS NOT NULL
+                  AND usuario_nome IS NOT NULL AND trim(usuario_nome) != ''
+                ORDER BY mes, dia
+            """)
+            for r in cur.fetchall():
+                aniversarios.append({
+                    'nome': r['usuario_nome'],
+                    'mes': int(r['mes']),
+                    'dia': int(r['dia']),
+                })
+        except Exception as e_aniv:
+            print(f'[ferias] Erro ao carregar aniversários: {e_aniv}')
+
         cur.close()
         
         # Converter para formato JSON para o calendário
@@ -444,7 +465,8 @@ def calendario():
             'ferias_calendario.html',
             eventos=eventos,
             ano_atual=ano_filtro,
-            anos_disponiveis=anos_disponiveis
+            anos_disponiveis=anos_disponiveis,
+            aniversarios=aniversarios
         )
         
     except Exception as e:

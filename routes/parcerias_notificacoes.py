@@ -205,42 +205,37 @@ def api_listar_notificacoes():
             prazo_calculado = None
             prazo_dias_valor = item.get('prazo_dias')
             status_prazo = 'Não aplicável'  # Default para documentos sem prazo definido
-            
-            if prazo_dias_valor:
-                # Usar data_pub como prioridade, senão data_email_ar
-                data_base = item.get('data_pub') or item.get('data_email_ar')
-                
-                if data_base:
-                    # Converter datetime para date se necessário
-                    if isinstance(data_base, datetime):
-                        data_base = data_base.date()
-                    
-                    data_prazo = data_base + timedelta(days=prazo_dias_valor)
-                    item['prazo_final'] = data_prazo.strftime('%d/%m/%Y')
-                    item['prazo_info'] = f"{data_prazo.strftime('%d/%m/%Y')} ({prazo_dias_valor} dias)"
-                    
-                    # Calcular status (comparar com data de hoje)
-                    hoje = date.today()
-                    if item.get('doc_respondido'):
-                        status_prazo = 'Respondido'
-                    elif data_prazo < hoje:
-                        status_prazo = 'Atrasado'
-                    else:
-                        status_prazo = 'No prazo'
+
+            # Usar data_pub como prioridade; se ausente, usar data_email_ar
+            data_base = item.get('data_pub') or item.get('data_email_ar')
+            if isinstance(data_base, datetime):
+                data_base = data_base.date()
+
+            if prazo_dias_valor and data_base:
+                data_prazo = data_base + timedelta(days=prazo_dias_valor)
+                item['prazo_final'] = data_prazo.strftime('%d/%m/%Y')
+                item['prazo_info'] = f"{data_prazo.strftime('%d/%m/%Y')} ({prazo_dias_valor} dias)"
+
+                # Calcular status (comparar com data de hoje)
+                hoje = date.today()
+                if item.get('doc_respondido'):
+                    status_prazo = 'Respondido'
+                elif data_prazo < hoje:
+                    status_prazo = 'Atrasado'
                 else:
-                    item['prazo_final'] = '-'
-                    item['prazo_info'] = '-'
+                    status_prazo = 'No prazo'
             else:
                 item['prazo_final'] = '-'
                 item['prazo_info'] = '-'
-            
+
             item['status_prazo'] = status_prazo
-            
-            # Documento respondido (só mostra se tem prazo definido)
-            if prazo_dias_valor:
-                item['doc_respondido_texto'] = 'Sim' if item.get('doc_respondido') else 'Não'
-            else:
+
+            # Documento respondido: sempre mostra Sim/Não se valor estiver definido no banco
+            doc_resp = item.get('doc_respondido')
+            if doc_resp is None:
                 item['doc_respondido_texto'] = '-'
+            else:
+                item['doc_respondido_texto'] = 'Sim' if doc_resp else 'Não'
             
             # Converter datas para string ISO para JSON
             if item.get('data_doc'):
@@ -726,3 +721,25 @@ def api_calcular_prazo():
         import traceback
         traceback.print_exc()
         return jsonify({'erro': str(e), 'prazo_info': '-'}), 500
+
+
+@bp.route('/api/buscar-termo-por-sei', methods=['GET'])
+@login_required
+def api_buscar_termo_por_sei():
+    """Busca numero_termo em public.parcerias pelo sei_celeb ou sei_pc"""
+    sei = request.args.get('sei', '').strip()
+    if not sei:
+        return jsonify({'numero_termo': None}), 200
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT numero_termo
+            FROM public.parcerias
+            WHERE sei_celeb = %s OR sei_pc = %s
+            LIMIT 1
+        """, (sei, sei))
+        row = cur.fetchone()
+        return jsonify({'numero_termo': row['numero_termo'] if row else None}), 200
+    except Exception as e:
+        print(f"[ERRO] buscar-termo-por-sei: {e}")
+        return jsonify({'erro': str(e), 'numero_termo': None}), 500

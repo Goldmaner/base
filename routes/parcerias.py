@@ -3679,9 +3679,9 @@ def dgp_alteracoes_futuro():
                 p.final,
                 SUBSTRING(p.numero_termo FROM '/([^/]+)$') as coordenacao
             FROM public.parcerias p
-            WHERE (p.tipo_termo LIKE '%CooperaÃ§Ã£o%' 
-                   OR p.tipo_termo LIKE '%ColaboraÃ§Ã£o%'
-                   OR p.tipo_termo LIKE '%ConvÃªnio%')
+            WHERE (p.tipo_termo ILIKE '%coopera%'
+                   OR p.tipo_termo ILIKE '%colabora%'
+                   OR p.tipo_termo ILIKE '%conv%')
               AND p.final IS NOT NULL
               AND p.inicio IS NOT NULL
               AND p.inicio <= CURRENT_DATE
@@ -3756,7 +3756,7 @@ def dgp_alteracoes_futuro():
         cur.execute("""
             SELECT DISTINCT SUBSTRING(numero_termo FROM '/([^/]+)$') as coordenacao
             FROM public.parcerias
-            WHERE (tipo_termo LIKE '%CooperaÃ§Ã£o%' OR tipo_termo LIKE '%ColaboraÃ§Ã£o%')
+            WHERE (tipo_termo ILIKE '%coopera%' OR tipo_termo ILIKE '%colabora%')
               AND numero_termo LIKE '%/%'
             ORDER BY coordenacao
         """)
@@ -3816,9 +3816,9 @@ def dgp_alteracoes_futuro_csv():
                 p.final,
                 SUBSTRING(p.numero_termo FROM '/([^/]+)$') as coordenacao
             FROM public.parcerias p
-            WHERE (p.tipo_termo LIKE '%CooperaÃ§Ã£o%' 
-                   OR p.tipo_termo LIKE '%ColaboraÃ§Ã£o%'
-                   OR p.tipo_termo LIKE '%ConvÃªnio%')
+            WHERE (p.tipo_termo ILIKE '%coopera%'
+                   OR p.tipo_termo ILIKE '%colabora%'
+                   OR p.tipo_termo ILIKE '%conv%')
               AND p.final IS NOT NULL
               AND p.inicio IS NOT NULL
               AND p.inicio <= CURRENT_DATE
