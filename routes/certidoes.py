@@ -162,27 +162,33 @@ def index():
         # Tentar match por unaccent
         nome_real = None
         
-        # Tentar primeiras 3 palavras
-        if len(palavras) >= 3:
-            busca_3 = ' '.join(palavras[:3])
-            for norm, real in mapa_oscs.items():
-                if busca_3 in norm:
-                    nome_real = real
-                    break
+        # Tentar do nome mais completo para o menor (evita match ambíguo)
+        # Estratégia: reduzir palavras gradualmente até encontrar correspondência única
+        max_palavras = len(palavras)
+        for n in range(max_palavras, 2, -1):
+            busca_n = ' '.join(palavras[:n])
+            candidatos = [(norm, real) for norm, real in mapa_oscs.items() if busca_n in norm]
+            if len(candidatos) == 1:
+                nome_real = candidatos[0][1]
+                break
+            elif len(candidatos) > 1:
+                # Múltiplos candidatos: favorece o que tem maior sobreposição
+                melhor = max(candidatos, key=lambda x: len(x[0]))
+                nome_real = melhor[1]
+                break
         
-        # Tentar nome completo
+        # Fallback: nome completo
         if not nome_real:
             for norm, real in mapa_oscs.items():
                 if nome_busca in norm or norm.startswith(nome_busca):
                     nome_real = real
                     break
         
-        # Tentar primeira palavra
+        # Fallback final: primeira palavra
         if not nome_real and palavras:
-            for norm, real in mapa_oscs.items():
-                if norm.startswith(palavras[0]):
-                    nome_real = real
-                    break
+            candidatos = [(norm, real) for norm, real in mapa_oscs.items() if norm.startswith(palavras[0])]
+            if candidatos:
+                nome_real = candidatos[0][1]
 
         # Tentativa final: comparar pelo nome que secure_filename geraria
         # Isso cobre OSCs com caracteres especiais como @ que unaccent não trata
@@ -1290,8 +1296,10 @@ def juntar_pdfs(nome_pasta):
             pasta_fisica = os.path.join(UPLOAD_FOLDER, nome_pasta)
             
             if os.path.exists(pasta_fisica):
-                arquivos_pdf = [f for f in os.listdir(pasta_fisica) if f.lower().endswith('.pdf')]
-                print(f"[DEBUG PDF] OPÇÃO 3 - Pasta existe com {len(arquivos_pdf)} arquivo(s) PDF")
+                todos_arquivos = os.listdir(pasta_fisica)
+                arquivos_pdf = [f for f in todos_arquivos if f.lower().endswith('.pdf')]
+                print(f"[DEBUG PDF] OPÇÃO 3 - Pasta existe. Total arquivos: {len(todos_arquivos)}, PDFs: {len(arquivos_pdf)}")
+                print(f"[DEBUG PDF] OPÇÃO 3 - Arquivos na pasta: {todos_arquivos}")
                 
                 if len(arquivos_pdf) > 0:
                     # Criar osc_data fictício com nome da pasta

@@ -561,7 +561,7 @@ def api_dotacoes():
         return jsonify({'success': False, 'error': str(e)})
 
 
-@editais_bp.route("/orcamento/api/edital/<edital_nome>", methods=["GET"])
+@editais_bp.route("/orcamento/api/edital/<path:edital_nome>", methods=["GET"])
 @login_required
 @requires_access('editais')
 def api_edital_detalhes(edital_nome):
@@ -699,7 +699,7 @@ def orcamento_criar():
         return redirect(url_for('editais.orcamento_listar'))
 
 
-@editais_bp.route("/orcamento/deletar/<edital_nome>", methods=["POST"])
+@editais_bp.route("/orcamento/deletar/<path:edital_nome>", methods=["POST"])
 @login_required
 @requires_access('editais')
 def orcamento_deletar(edital_nome):
@@ -729,7 +729,7 @@ def orcamento_deletar(edital_nome):
         return redirect(url_for('editais.orcamento_listar'))
 
 
-@editais_bp.route("/orcamento/editar/<edital_nome>", methods=["POST"])
+@editais_bp.route("/orcamento/editar/<path:edital_nome>", methods=["POST"])
 @login_required
 @requires_access('editais')
 def orcamento_editar(edital_nome):

@@ -10,7 +10,7 @@ from flask import Blueprint, render_template, request, jsonify, session
 from db import get_db
 from utils import login_required
 import traceback
-from datetime import date
+from datetime import date, datetime
 
 sei_orcamentario_bp = Blueprint(
     'sei_orcamentario',

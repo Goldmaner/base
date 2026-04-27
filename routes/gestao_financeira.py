@@ -1108,6 +1108,7 @@ def relatorios_sof():
     cur = get_cursor()
     
     try:
+        cur.execute("SET statement_timeout = 0")  # MAX() em tabelas grandes
         # Buscar data da última atualização de cada tabela
         cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_dotacao")
         result_dotacao = cur.fetchone()
@@ -1664,6 +1665,7 @@ def api_importar_empenhos():
     try:
         conn = get_db()
         cur = conn.cursor()
+        cur.execute("SET statement_timeout = 0")  # Importação em lote — sem timeout
         cur.execute("SET datestyle TO 'ISO, DMY'")
 
         # Garantir coluna fonte_relatorio na tabela
@@ -1914,6 +1916,9 @@ def api_importar_todos():
             if data.get('success'):
                 resultados['dotacao_importados'] = data.get('total_importados', 0)
                 resultados['datas']['dotacao'] = data.get('data_atualizacao')
+            else:
+                try: get_db().rollback()
+                except: pass
         
         # Importar Reservas
         arquivos_reservas = ['reservas_3410', 'reservas_3420', 'reservas_0810', 'reservas_9010', 'reservas_7810', 'reservas_3410_exec']
@@ -1925,6 +1930,9 @@ def api_importar_todos():
             if data.get('success'):
                 resultados['reservas_importados'] = data.get('total_importados', 0)
                 resultados['datas']['reservas'] = data.get('data_atualizacao')
+            else:
+                try: get_db().rollback()
+                except: pass
         
         # Importar Empenhos
         arquivos_empenhos = ['empenhos_3410', 'empenhos_3420', 'empenhos_0810', 'empenhos_9010', 'empenhos_7810', 'empenhos_3410_exec']
@@ -1936,6 +1944,9 @@ def api_importar_todos():
             if data.get('success'):
                 resultados['empenhos_importados'] = data.get('total_importados', 0)
                 resultados['datas']['empenhos'] = data.get('data_atualizacao')
+            else:
+                try: get_db().rollback()
+                except: pass
 
         # Importar Liquidação
         arquivos_liquidacao = ['liquidacao_3410', 'liquidacao_3420', 'liquidacao_0810', 'liquidacao_9010', 'liquidacao_7810']
@@ -1947,6 +1958,9 @@ def api_importar_todos():
             if data.get('success'):
                 resultados['liquidacao_importados'] = data.get('total_importados', 0)
                 resultados['datas']['liquidacao'] = data.get('data_atualizacao')
+            else:
+                try: get_db().rollback()
+                except: pass
         
         total_geral = sum([
             resultados['dotacao_importados'],

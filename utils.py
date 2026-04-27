@@ -54,6 +54,13 @@ def login_required(f):
         except Exception as e:
             # Não interromper a execução se falhar atualizar atividade
             print(f"[AVISO] Falha ao atualizar ultima_atividade: {e}")
+            # Invalidar conexão para que o próximo get_db() crie uma nova
+            try:
+                if g.get('db') is not None:
+                    g.db.close()
+            except Exception:
+                pass
+            g.db = None
         
         return f(*args, **kwargs)
     return decorated

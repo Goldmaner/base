@@ -6,6 +6,8 @@
     <title>Ofícios, Documentos e Notificações - FAF</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <style>
         body {
             background-color: #f8f9fa;
@@ -312,6 +314,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         let notificacoes = [];
         let tiposDocumento = [];
@@ -385,8 +389,20 @@
                     selectFiltro.appendChild(optionFiltro);
                 });
                 
-                console.log('[DEBUG] Selects de tipo de documento populados com', tiposDocumento.length, 'opções');
                 tiposCarregados = true;
+
+                // Inicializar Select2
+                $('#tipoDoc').select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#modalNotificacao'),
+                    placeholder: '-- Selecione --',
+                    allowClear: true
+                });
+                $('#filtroTipo').select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Todos',
+                    allowClear: true
+                });
             } catch (error) {
                 console.error('[ERRO] ao carregar tipos de documento:', error);
                 alert('Erro ao carregar tipos de documento: ' + error.message);
@@ -479,8 +495,20 @@
                     selectFiltro.appendChild(option);
                 });
                 
-                console.log('[DEBUG] Selects de responsável populados com', analistas.length, 'opções');
                 analistasCarregados = true;
+
+                // Inicializar Select2
+                $('#nomeResponsavel').select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#modalNotificacao'),
+                    placeholder: '-- Selecione --',
+                    allowClear: true
+                });
+                $('#filtroResponsavel').select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Todos',
+                    allowClear: true
+                });
             } catch (error) {
                 console.error('[ERRO] ao carregar analistas:', error);
                 alert('Erro ao carregar analistas: ' + error.message);
@@ -705,11 +733,11 @@
 
         // Limpar filtros
         function limparFiltros() {
-            document.getElementById('filtroTipo').value = '';  // volta a "Todos" do setor
+            $('#filtroTipo').val('').trigger('change');
             document.getElementById('filtroAno').value = '';
             document.getElementById('filtroNumero').value = '';
             document.getElementById('filtroTermo').value = '';
-            document.getElementById('filtroResponsavel').value = '';
+            $('#filtroResponsavel').val('').trigger('change');
             document.getElementById('filtroStatus').value = '';
             document.getElementById('filtroDocRespondido').value = '';
             carregarNotificacoes(); // orgaoFilterDefault é reaplicado automaticamente
@@ -725,6 +753,8 @@
         // Abrir modal para nova notificação
         function abrirModalNovo() {
             document.getElementById('formNotificacao').reset();
+            $('#tipoDoc').trigger('change');
+            $('#nomeResponsavel').trigger('change');
             document.getElementById('notifId').value = '';
             document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Nova Numeração de Documento';
             document.getElementById('dilacaoDias').disabled = true;
@@ -741,12 +771,12 @@
             
             // Pré-preencher responsável com o nome do analista logado
             if (NOME_ANALISTA_LOGADO) {
-                document.getElementById('nomeResponsavel').value = NOME_ANALISTA_LOGADO;
+                $('#nomeResponsavel').val(NOME_ANALISTA_LOGADO).trigger('change');
             }
             
             // Agente DGP sem visualizacao_geral: bloquear apenas responsável
             const isDGPRestrito = (TIPO_USUARIO === 'Agente DGP' && !PODE_EDITAR);
-            document.getElementById('nomeResponsavel').disabled = isDGPRestrito;
+            $('#nomeResponsavel').prop('disabled', isDGPRestrito).trigger('change');
             
             modalNotificacao.show();
         }
@@ -773,21 +803,13 @@
                 document.getElementById('observacoes').value = notif.observacoes || '';
                 
                 // Selecionar tipo de documento
-                console.log('[DEBUG] Selecionando tipo de documento:', notif.tipo_doc);
-                const selectTipo = document.getElementById('tipoDoc');
-                selectTipo.value = notif.tipo_doc || '';
-                console.log('[DEBUG] Valor do select após seleção:', selectTipo.value);
+                $('#tipoDoc').val(notif.tipo_doc || '').trigger('change');
                 
                 // Selecionar responsável
-                console.log('[DEBUG] Selecionando responsável:', notif.nome_responsavel);
-                const selectResp = document.getElementById('nomeResponsavel');
-                selectResp.value = notif.nome_responsavel || '';
-                console.log('[DEBUG] Valor do select após seleção:', selectResp.value);
-
-                // Agente DGP sem visualizacao_geral: bloquear apenas responsável
                 const isDGPRestrito = (TIPO_USUARIO === 'Agente DGP' && !PODE_EDITAR);
+                $('#nomeResponsavel').val(notif.nome_responsavel || '').trigger('change');
                 document.getElementById('numeroTermo').disabled = false;
-                selectResp.disabled = isDGPRestrito;
+                $('#nomeResponsavel').prop('disabled', isDGPRestrito).trigger('change');
                 
                 // Limpar helper ao editar
                 document.getElementById('processoDocStatus').innerHTML = '';

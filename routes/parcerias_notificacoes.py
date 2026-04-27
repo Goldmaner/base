@@ -524,30 +524,34 @@ def api_listar_analistas():
                 SELECT DISTINCT nome_analista
                 FROM categoricas.c_dac_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
+                  AND status IN ('Ativo', 'true')
                 UNION
                 SELECT DISTINCT nome_analista
                 FROM categoricas.c_dgp_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
+                  AND status::text = 'true'
                 ORDER BY nome_analista
             """)
             analistas = cur.fetchall()
             
         elif user_tipo == 'Agente DAC':
-            # Apenas analistas DAC
+            # Apenas analistas DAC ativos
             cur.execute("""
                 SELECT DISTINCT nome_analista
                 FROM categoricas.c_dac_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
+                  AND status IN ('Ativo', 'true')
                 ORDER BY nome_analista
             """)
             analistas = cur.fetchall()
             
         elif user_tipo == 'Agente DGP':
-            # Apenas analistas DGP
+            # Apenas analistas DGP ativos
             cur.execute("""
                 SELECT DISTINCT nome_analista
                 FROM categoricas.c_dgp_analistas
                 WHERE nome_analista IS NOT NULL AND nome_analista != ''
+                  AND status::text = 'true'
                 ORDER BY nome_analista
             """)
             analistas = cur.fetchall()

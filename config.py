@@ -15,7 +15,13 @@ DB_CONFIG = {
     'database': os.environ.get('DB_DATABASE', 'projeto_parcerias'),
     'user': os.environ.get('DB_USER', 'postgres'),
     'password': os.environ.get('DB_PASSWORD', ''),
-    'sslmode': os.environ.get('DB_SSLMODE', 'prefer')
+    'sslmode': os.environ.get('DB_SSLMODE', 'prefer'),
+    # Keepalives TCP: evita que o SO/firewall/NAT encerre conexões ociosas silenciosamente
+    'keepalives': 1,
+    'keepalives_idle': 60,      # envia keepalive após 60s de idle
+    'keepalives_interval': 10,  # re-envia a cada 10s se sem resposta
+    'keepalives_count': 5,      # fecha após 5 tentativas sem resposta
+    'connect_timeout': 10,      # falha rápida se o servidor não responder
 }
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-padrao')

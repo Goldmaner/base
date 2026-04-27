@@ -27,7 +27,31 @@ def get_cursor():
 
         def execute(self, query, params=None):
             t0 = time.time()
-            self._cur.execute(query, params)
+            try:
+                self._cur.execute(query, params)
+            except psycopg2.OperationalError as e:
+                # Conexão SSL caiu — reconectar e repetir com backoff
+                if 'SSL' in str(e) or 'connection' in str(e).lower():
+                    print(f"[DB] Reconectando após queda SSL: {e}")
+                    last_err = e
+                    for tentativa, espera in enumerate([0.3, 1.0, 2.0], start=1):
+                        try:
+                            time.sleep(espera)
+                            new_conn = psycopg2.connect(**DB_CONFIG)
+                            new_conn.autocommit = False
+                            g.db = new_conn
+                            self._cur = g.db.cursor(cursor_factory=RealDictCursor)
+                            self._cur.execute(query, params)
+                            print(f"[DB] Reconexão bem-sucedida na tentativa {tentativa}")
+                            last_err = None
+                            break
+                        except Exception as e2:
+                            print(f"[DB] Tentativa {tentativa} falhou: {e2}")
+                            last_err = e2
+                    if last_err is not None:
+                        raise last_err
+                else:
+                    raise
             elapsed = time.time() - t0
             if elapsed >= SLOW_QUERY_THRESHOLD:
                 print(f"[SLOW QUERY {elapsed:.2f}s] {str(query)[:200]}")
@@ -54,14 +78,33 @@ def get_db():
     Cria uma nova conexão se não existir uma no contexto da aplicação.
     Reconecta automaticamente se a conexão foi encerrada pelo servidor (ex: timeout SSL).
     """
-    if "db" not in g or g.db is None or g.db.closed != 0:
+    db = g.get('db', None)
+
+    # Verificar se conexão está fechada ou inválida
+    if db is None or db.closed != 0:
+        db = None
+    else:
         try:
-            g.db = psycopg2.connect(**DB_CONFIG)
-            g.db.autocommit = False  # Para controlar transações manualmente
+            # poll() não envia dados — apenas verifica o estado do socket
+            db.poll()
+        except Exception:
+            try:
+                db.close()
+            except Exception:
+                pass
+            db = None
+
+    if db is None:
+        try:
+            db = psycopg2.connect(**DB_CONFIG)
+            db.autocommit = False
+            g.db = db
         except Exception as e:
             print(f"[ERRO] Falha ao conectar no banco: {e}")
             g.db = None
-    return g.db
+            return None
+
+    return db
 
 
 def execute_query(query, params=None):

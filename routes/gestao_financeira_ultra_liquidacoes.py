@@ -132,6 +132,7 @@ def calcular_empenhos_disponiveis(cur, hoje):
             return {}, {}, avisos
         
         # Buscar TODOS os empenhos de uma vez via JOIN (evita N+1 queries por termo)
+        cur.execute("SET statement_timeout = 0")  # Query pesada — sem timeout
         cur.execute("""
             SELECT
                 REGEXP_REPLACE(p.sei_celeb, '[-./]', '', 'g') AS cod_sof,
@@ -246,13 +247,15 @@ def index():
         """)
         oscs = [r['osc'] for r in cur.fetchall()]
         
+        from flask import session as flask_session
         return render_template(
             'gestao_financeira/ultra_liquidacoes.html',
             termos=termos,
             tipos_parcela=tipos_parcela,
             tipos_contrato=tipos_contrato,
             status_disponiveis=status_disponiveis,
-            oscs=oscs
+            oscs=oscs,
+            current_user_id=flask_session.get('user_id', 0)
         )
     
     finally:
@@ -765,8 +768,18 @@ def api_listar_parcelas():
         cur_empenhos = get_cursor()
         try:
             empenhos_disponiveis, pagos_por_elemento, avisos_empenhos = calcular_empenhos_disponiveis(cur_empenhos, hoje)
+        except Exception as e_emp:
+            print(f"[AVISO] calcular_empenhos_disponiveis falhou: {e_emp} — continuando sem empenhos")
+            try:
+                get_db().rollback()
+            except Exception:
+                pass
+            empenhos_disponiveis, pagos_por_elemento, avisos_empenhos = {}, {}, []
         finally:
-            cur_empenhos.close()
+            try:
+                cur_empenhos.close()
+            except Exception:
+                pass
         
         # Salvar avisos no session para o relatório DEBUG (última execução)
         session['debug_avisos_empenhos'] = avisos_empenhos
@@ -915,6 +928,10 @@ def api_listar_parcelas():
         except Exception as e_pagas:
             print(f"[ERRO CASCADE parcelas_pagas] {e_pagas}")
             import traceback; traceback.print_exc()
+            try:
+                get_db().rollback()
+            except Exception:
+                pass
         
         # PASSO 3: Distribuir saldo disponível para parcelas "Encaminhado para Pagamento"
         controle_cascata = defaultdict(lambda: {'pago_23': 0, 'pago_24': 0})
@@ -2581,9 +2598,9 @@ def api_status_pagamento():
         cur = get_cursor()  # ⚡ CORRETO: usar get_cursor() que já tem RealDictCursor
         
         cur.execute("""
-            SELECT DISTINCT parcela_status, status_secundario
+            SELECT DISTINCT status_principal, status_secundario
             FROM categoricas.c_dac_status_pagamento
-            ORDER BY parcela_status
+            ORDER BY status_principal
         """)
         
         status = cur.fetchall()

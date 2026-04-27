@@ -12,6 +12,11 @@ scripts_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 's
 if scripts_path not in sys.path:
     sys.path.insert(0, scripts_path)
 
+# Ensure the parent directory is also in the path
+parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_path not in sys.path:
+    sys.path.insert(0, parent_path)
+
 try:
     from funcoes_texto import (
         processar_texto_automatico, 
