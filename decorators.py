@@ -1,8 +1,112 @@
 """
-Decorators para controle de acesso por módulo
+Decorators para controle de acesso por módulo e captura de erros
 """
 from functools import wraps
-from flask import session, redirect, url_for, flash
+from threading import Thread
+import json
+import traceback as _traceback
+from flask import session, redirect, url_for, flash, request, current_app
+
+
+# =============================================================================
+# LOGGING DE ERROS ASSÍNCRONO
+# =============================================================================
+
+def _salvar_erro_async(dados, app_instance):
+    """Grava um registro em gestao_pessoas.log_erros em thread daemon."""
+    conn = None
+    try:
+        with app_instance.app_context():
+            from db import get_db
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO gestao_pessoas.log_erros (
+                    tipo_erro, endpoint, metodo, status_codigo, usuario_email,
+                    ip_address, duracao_ms, query_preview, api_nome, api_endpoint,
+                    mensagem, detalhes
+                ) VALUES (
+                    %(tipo_erro)s, %(endpoint)s, %(metodo)s, %(status_codigo)s,
+                    %(usuario_email)s, %(ip_address)s, %(duracao_ms)s,
+                    %(query_preview)s, %(api_nome)s, %(api_endpoint)s,
+                    %(mensagem)s, %(detalhes)s
+                )
+            """, dados)
+            conn.commit()
+    except Exception as e:
+        print(f"[LOG_ERROS_AVISO] Falha ao salvar erro (não afeta aplicação): {e}")
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+
+def registrar_erro(tipo_erro, **kwargs):
+    """
+    Registra um erro de forma assíncrona em gestao_pessoas.log_erros.
+    Pode ser chamado de qualquer lugar com contexto Flask ativo.
+
+    Args:
+        tipo_erro (str): 'http_erro', 'query_lenta' ou 'api_externa'
+        **kwargs: endpoint, metodo, status_codigo, usuario_email, ip_address,
+                  duracao_ms, query_preview, api_nome, api_endpoint,
+                  mensagem, detalhes (dict/list serializado para JSONB)
+    """
+    detalhes_raw = kwargs.get('detalhes')
+    dados = {
+        'tipo_erro':     tipo_erro,
+        'endpoint':      kwargs.get('endpoint'),
+        'metodo':        kwargs.get('metodo'),
+        'status_codigo': kwargs.get('status_codigo'),
+        'usuario_email': kwargs.get('usuario_email'),
+        'ip_address':    kwargs.get('ip_address'),
+        'duracao_ms':    kwargs.get('duracao_ms'),
+        'query_preview': kwargs.get('query_preview'),
+        'api_nome':      kwargs.get('api_nome'),
+        'api_endpoint':  kwargs.get('api_endpoint'),
+        'mensagem':      kwargs.get('mensagem'),
+        'detalhes':      json.dumps(detalhes_raw, ensure_ascii=False)
+                         if detalhes_raw is not None else None,
+    }
+    try:
+        app = current_app._get_current_object()
+        Thread(
+            target=_salvar_erro_async,
+            args=(dados, app),
+            daemon=True
+        ).start()
+    except Exception as e:
+        print(f"[LOG_ERROS_AVISO] Não foi possível disparar thread de erro: {e}")
+
+
+def capture_errors(f):
+    """
+    Decorator que captura exceções não tratadas numa rota Flask,
+    grava em gestao_pessoas.log_erros e re-propaga o erro.
+    Não engole a exceção — o handler de erro padrão do Flask ainda é acionado.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as exc:
+            tb = _traceback.format_exc()
+            try:
+                registrar_erro(
+                    tipo_erro='http_erro',
+                    endpoint=request.path,
+                    metodo=request.method,
+                    status_codigo=500,
+                    usuario_email=session.get('email'),
+                    ip_address=request.remote_addr,
+                    mensagem=f"{type(exc).__name__}: {str(exc)}",
+                    detalhes={'traceback': tb[-2000:]},
+                )
+            except Exception:
+                pass
+            raise
+    return decorated
 
 def requires_access(modulo):
     """

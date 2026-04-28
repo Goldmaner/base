@@ -21,32 +21,16 @@ def index():
     cur.execute("SELECT id, email, tipo_usuario, data_criacao, acessos FROM gestao_pessoas.usuarios WHERE id = %s", (session["user_id"],))
     user = cur.fetchone()
     cur.close()
-    
+
+    # Sessão referencia usuário inexistente (deletado ou corrompido) — encerrar
+    if user is None:
+        session.clear()
+        return redirect(url_for('auth.login'))
+
     # Preparar variáveis de controle de acesso
     is_admin = user['tipo_usuario'] == 'Agente Público'
     user_acessos = (user['acessos'] or '').split(';') if user['acessos'] else []
-    
-    # DEBUG DETALHADO
-    print("\n" + "="*80)
-    print("🔍 DEBUG - TELA INICIAL - CONTROLE DE ACESSO")
-    print("="*80)
-    print(f"👤 Usuário ID: {user['id']}")
-    print(f"📧 Email: {user['email']}")
-    print(f"🏷️  Tipo: {user['tipo_usuario']}")
-    print(f"🔐 String de acessos (raw): '{user['acessos']}'")
-    print(f"📋 Lista de acessos: {user_acessos}")
-    print(f"👑 É Admin (Agente Público)?: {is_admin}")
-    print("-"*80)
-    print("🔍 VERIFICAÇÕES DE EXIBIÇÃO DE BOTÕES:")
-    print(f"   ✓ 'listas' in user_acessos: {'listas' in user_acessos}")
-    print(f"   ✓ is_admin: {is_admin}")
-    print(f"   ✓ Condição final (is_admin OR 'listas' in user_acessos): {is_admin or 'listas' in user_acessos}")
-    print("-"*80)
-    print("📊 Todos os acessos individuais:")
-    for i, acesso in enumerate(user_acessos, 1):
-        print(f"   {i}. '{acesso}' (length: {len(acesso)})")
-    print("="*80 + "\n")
-    
+
     return render_template("tela_inicial.html", user=user, is_admin=is_admin, user_acessos=user_acessos)
 
 

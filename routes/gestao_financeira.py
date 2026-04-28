@@ -1668,11 +1668,20 @@ def api_importar_empenhos():
         cur.execute("SET statement_timeout = 0")  # Importação em lote — sem timeout
         cur.execute("SET datestyle TO 'ISO, DMY'")
 
-        # Garantir coluna fonte_relatorio na tabela
+        # Garantir coluna fonte_relatorio na tabela (só executa DDL se necessário)
         cur.execute("""
-            ALTER TABLE gestao_financeira.back_empenhos
-            ADD COLUMN IF NOT EXISTS fonte_relatorio VARCHAR(20)
+            SELECT EXISTS (
+                SELECT FROM information_schema.columns
+                WHERE table_schema = 'gestao_financeira'
+                  AND table_name   = 'back_empenhos'
+                  AND column_name  = 'fonte_relatorio'
+            )
         """)
+        if not cur.fetchone()[0]:
+            cur.execute("""
+                ALTER TABLE gestao_financeira.back_empenhos
+                ADD COLUMN fonte_relatorio VARCHAR(20)
+            """)
 
         colunas_insert = [
             'COD_IDT_EPH', 'DT_EPH', 'COD_EPH', 'ANO_EPH', 'COD_TIP_EPH_SOF', 'COD_NRO_PCSS_SOF',

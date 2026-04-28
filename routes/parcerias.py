@@ -97,6 +97,67 @@ def listar():
     
     # Query principal - buscar parcerias com datas como texto para evitar erro de conversÃ£o
     query = """
+        WITH
+        last_pg AS (
+            SELECT DISTINCT ON (pg.numero_termo)
+                pg.numero_termo,
+                pg.nome_pg    AS pessoa_gestora,
+                pg.solicitacao,
+                cpg.status_pg
+            FROM public.parcerias_pg pg
+            LEFT JOIN categoricas.c_geral_pessoa_gestora cpg
+                   ON cpg.nome_pg = pg.nome_pg
+            ORDER BY pg.numero_termo, pg.data_de_criacao DESC
+        ),
+        total_pago AS (
+            SELECT numero_termo,
+                   COALESCE(SUM(valor_previsto), 0) AS total_pago
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE parcela_status = 'Pago'
+            GROUP BY numero_termo
+        ),
+        assinatura AS (
+            SELECT DISTINCT ON (numero_termo)
+                numero_termo,
+                data_assinatura AS data_assinatura_termo
+            FROM public.parcerias_sei
+            WHERE (aditamento = '-' OR aditamento IS NULL)
+              AND (apostilamento = '-' OR apostilamento IS NULL)
+              AND termo_tipo_sei IS NULL
+            ORDER BY numero_termo, id ASC
+        ),
+        enderecos AS (
+            SELECT
+                numero_termo,
+                STRING_AGG(
+                    COALESCE(parceria_logradouro, '') ||
+                    CASE WHEN parceria_numero IS NOT NULL
+                         THEN ', ' || parceria_numero::text
+                         ELSE ''
+                    END,
+                    ' | '
+                ) AS endereco_completo
+            FROM public.parcerias_enderecos
+            GROUP BY numero_termo
+        ),
+        cronograma AS (
+            SELECT
+                numero_termo,
+                COALESCE(SUM(valor_mes),    0) AS valor_mes_detalhado,
+                COALESCE(SUM(valor_mes_23), 0) AS valor_mes_23,
+                COALESCE(SUM(valor_mes_24), 0) AS valor_mes_24
+            FROM gestao_financeira.ultra_liquidacoes_cronograma
+            GROUP BY numero_termo
+        ),
+        infos AS (
+            SELECT DISTINCT ON (numero_termo)
+                numero_termo,
+                parceria_abrangencia_projeto AS abrangencia,
+                parceria_data_suspensao      AS data_suspensao,
+                parceria_data_retomada       AS data_retomada
+            FROM public.parcerias_infos_adicionais
+            ORDER BY numero_termo
+        )
         SELECT
             p.numero_termo,
             p.osc,
@@ -105,68 +166,31 @@ def listar():
             p.portaria,
             p.cnpj,
             p.contrapartida,
-            p.inicio::text as inicio_str,
-            p.final::text as final_str,
+            p.inicio::text AS inicio_str,
+            p.final::text  AS final_str,
             p.meses,
             p.total_previsto,
-            (SELECT COALESCE(SUM(ul.valor_previsto), 0)
-             FROM gestao_financeira.ultra_liquidacoes ul
-             WHERE ul.numero_termo = p.numero_termo
-               AND ul.parcela_status = 'Pago') AS total_pago,
+            COALESCE(tp.total_pago, 0)           AS total_pago,
             p.sei_celeb,
             p.sei_pc,
-            (SELECT pg.nome_pg 
-             FROM parcerias_pg pg 
-             WHERE pg.numero_termo = p.numero_termo 
-             ORDER BY pg.data_de_criacao DESC 
-             LIMIT 1) as pessoa_gestora,
-            (SELECT cpg.status_pg 
-             FROM parcerias_pg pg 
-             LEFT JOIN categoricas.c_geral_pessoa_gestora cpg ON cpg.nome_pg = pg.nome_pg
-             WHERE pg.numero_termo = p.numero_termo 
-             ORDER BY pg.data_de_criacao DESC 
-             LIMIT 1) as status_pg,
-            (SELECT pg.solicitacao 
-             FROM parcerias_pg pg 
-             WHERE pg.numero_termo = p.numero_termo 
-             ORDER BY pg.data_de_criacao DESC 
-             LIMIT 1) as solicitacao,
-            (SELECT ps.data_assinatura
-             FROM public.parcerias_sei ps
-             WHERE ps.numero_termo = p.numero_termo
-               AND (ps.aditamento = '-' OR ps.aditamento IS NULL)
-               AND (ps.apostilamento = '-' OR ps.apostilamento IS NULL)
-               AND ps.termo_tipo_sei IS NULL
-             ORDER BY ps.id ASC
-             LIMIT 1) as data_assinatura_termo,
-            (SELECT STRING_AGG(
-                COALESCE(pe.parceria_logradouro, '') || 
-                CASE WHEN pe.parceria_numero IS NOT NULL 
-                     THEN ', ' || pe.parceria_numero::text 
-                     ELSE '' 
-                END, ' | ')
-             FROM public.parcerias_enderecos pe
-             WHERE pe.numero_termo = p.numero_termo
-             LIMIT 1) as endereco_completo,
-            (SELECT COALESCE(SUM(ulc.valor_mes), 0)
-             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
-             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_detalhado,
-            (SELECT COALESCE(SUM(ulc.valor_mes_23), 0)
-             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
-             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_23,
-            (SELECT COALESCE(SUM(ulc.valor_mes_24), 0)
-             FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
-             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_24,
-            (SELECT pia.parceria_abrangencia_projeto
-             FROM public.parcerias_infos_adicionais pia
-             WHERE pia.numero_termo = p.numero_termo LIMIT 1) as abrangencia,
-            (SELECT pia.parceria_data_suspensao
-             FROM public.parcerias_infos_adicionais pia
-             WHERE pia.numero_termo = p.numero_termo LIMIT 1) as data_suspensao,
-            (SELECT pia.parceria_data_retomada
-             FROM public.parcerias_infos_adicionais pia
-             WHERE pia.numero_termo = p.numero_termo LIMIT 1) as data_retomada
-        FROM Parcerias p
+            lpg.pessoa_gestora,
+            lpg.status_pg,
+            lpg.solicitacao,
+            asg.data_assinatura_termo,
+            end_.endereco_completo,
+            COALESCE(cro.valor_mes_detalhado, 0) AS valor_mes_detalhado,
+            COALESCE(cro.valor_mes_23, 0)        AS valor_mes_23,
+            COALESCE(cro.valor_mes_24, 0)        AS valor_mes_24,
+            inf.abrangencia,
+            inf.data_suspensao,
+            inf.data_retomada
+        FROM public.Parcerias p
+        LEFT JOIN last_pg   lpg  ON lpg.numero_termo  = p.numero_termo
+        LEFT JOIN total_pago tp  ON tp.numero_termo   = p.numero_termo
+        LEFT JOIN assinatura asg ON asg.numero_termo  = p.numero_termo
+        LEFT JOIN enderecos end_ ON end_.numero_termo = p.numero_termo
+        LEFT JOIN cronograma cro ON cro.numero_termo  = p.numero_termo
+        LEFT JOIN infos inf      ON inf.numero_termo  = p.numero_termo
         WHERE 1=1
     """
 

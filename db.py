@@ -5,11 +5,25 @@ Módulo de gerenciamento de conexão com o banco de dados PostgreSQL LOCAL
 from flask import g
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2.pool import ThreadedConnectionPool, PoolError
 from config import DB_CONFIG
 import time
 
 # Queries que demorem mais que este valor (em segundos) serão logadas
 SLOW_QUERY_THRESHOLD = 1.0
+
+# ---------------------------------------------------------------------------
+# Connection Pool (criado uma única vez por processo)
+# ---------------------------------------------------------------------------
+_pool: ThreadedConnectionPool = None
+
+
+def _get_pool() -> ThreadedConnectionPool:
+    """Retorna o pool de conexões, inicializando-o na primeira chamada."""
+    global _pool
+    if _pool is None:
+        _pool = ThreadedConnectionPool(minconn=2, maxconn=10, **DB_CONFIG)
+    return _pool
 
 
 def get_cursor():
@@ -37,7 +51,12 @@ def get_cursor():
                     for tentativa, espera in enumerate([0.3, 1.0, 2.0], start=1):
                         try:
                             time.sleep(espera)
-                            new_conn = psycopg2.connect(**DB_CONFIG)
+                            # Descarta a conexão corrompida do pool
+                            try:
+                                _get_pool().putconn(g.db, close=True)
+                            except Exception:
+                                pass
+                            new_conn = _get_pool().getconn()
                             new_conn.autocommit = False
                             g.db = new_conn
                             self._cur = g.db.cursor(cursor_factory=RealDictCursor)
@@ -55,6 +74,16 @@ def get_cursor():
             elapsed = time.time() - t0
             if elapsed >= SLOW_QUERY_THRESHOLD:
                 print(f"[SLOW QUERY {elapsed:.2f}s] {str(query)[:200]}")
+                try:
+                    from decorators import registrar_erro
+                    registrar_erro(
+                        tipo_erro='query_lenta',
+                        duracao_ms=int(elapsed * 1000),
+                        query_preview=str(query)[:500],
+                        mensagem=f'Query lenta: {elapsed:.2f}s',
+                    )
+                except Exception:
+                    pass
 
         def executemany(self, query, params_list):
             t0 = time.time()
@@ -96,11 +125,15 @@ def get_db():
 
     if db is None:
         try:
-            db = psycopg2.connect(**DB_CONFIG)
+            db = _get_pool().getconn()
             db.autocommit = False
             g.db = db
+        except PoolError:
+            print("[ERRO] Pool de conexões esgotado — tente novamente em instantes")
+            g.db = None
+            return None
         except Exception as e:
-            print(f"[ERRO] Falha ao conectar no banco: {e}")
+            print(f"[ERRO] Falha ao obter conexão do pool: {e}")
             g.db = None
             return None
 
@@ -193,8 +226,14 @@ def execute_batch(query, params_list):
 
 def close_db(e=None):
     """
-    Fecha a conexão com o banco de dados ao final do contexto da aplicação.
+    Devolve a conexão ao pool ao final do contexto da aplicação.
     """
     db = g.pop("db", None)
     if db is not None:
-        db.close()
+        try:
+            _get_pool().putconn(db)
+        except Exception:
+            try:
+                db.close()
+            except Exception:
+                pass

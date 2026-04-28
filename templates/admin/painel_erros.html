@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Erros - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #fef2f2; padding: 20px; }
+
+    /* ── Page header ── */
+    .page-header {
+      background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%);
+      color: #fff;
+      padding: 22px 28px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 18px rgba(220, 38, 38, .28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+    /* ── Botões ── */
+    .btn-admin {
+      background: linear-gradient(135deg, #7f1d1d, #dc2626);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600; transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; cursor: pointer; font-size: .875rem;
+    }
+    .btn-admin:hover { opacity: .88; color: #fff; }
+    .btn-admin.outline {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+    }
+    .btn-admin.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+    .btn-sm-admin {
+      background: linear-gradient(135deg, #7f1d1d, #dc2626);
+      color: #fff; border: none; border-radius: 6px;
+      padding: 3px 10px; font-size: .78rem; font-weight: 600;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-sm-admin:hover { opacity: .85; }
+    .btn-success-sm {
+      background: linear-gradient(135deg, #065f46, #059669);
+      color: #fff; border: none; border-radius: 6px;
+      padding: 3px 10px; font-size: .78rem; font-weight: 600;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    }
+
+    /* ── Stat cards ── */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      padding: 16px 18px;
+      border-top: 4px solid #dc2626;
+    }
+    .stat-card.verde { border-top-color: #059669; }
+    .stat-card.amarelo { border-top-color: #d97706; }
+    .stat-card.azul { border-top-color: #2563eb; }
+    .stat-card .stat-num { font-size: 1.8rem; font-weight: 700; color: #1e293b; line-height: 1; }
+    .stat-card .stat-label { font-size: .78rem; color: #64748b; margin-top: 4px; }
+
+    /* ── Filter section ── */
+    .filter-section {
+      background: #fff; padding: 16px 20px; border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      border-left: 4px solid #dc2626;
+    }
+
+    /* ── Content card ── */
+    .content-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden; }
+    .content-card-header {
+      background: linear-gradient(135deg, #7f1d1d, #dc2626);
+      color: #fff; padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+    }
+    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+    .content-card-body { padding: 0; }
+
+    /* ── Table ── */
+    #tabelaErros thead tr th {
+      background: linear-gradient(135deg, #7f1d1d, #dc2626);
+      color: #fff; border: none; white-space: nowrap; font-size: .8rem;
+    }
+    #tabelaErros tbody tr:hover { background-color: #fff1f2; }
+    #tabelaErros td { font-size: .82rem; vertical-align: middle; }
+
+    /* ── Badges de tipo ── */
+    .badge-http    { background-color: #dc2626; color: #fff; }
+    .badge-query   { background-color: #d97706; color: #fff; }
+    .badge-api     { background-color: #2563eb; color: #fff; }
+    .badge-ok      { background-color: #059669; color: #fff; }
+    .badge-tip { padding: 3px 8px; border-radius: 12px; font-size: .72rem; font-weight: 700; }
+
+    /* ── Detalhes collapse ── */
+    .detalhe-pre {
+      background: #1e293b; color: #e2e8f0;
+      border-radius: 6px; padding: 10px 14px;
+      font-size: .75rem; white-space: pre-wrap; word-break: break-all;
+      max-height: 200px; overflow-y: auto;
+    }
+
+    /* ── Paginação ── */
+    .pagination .page-link { color: #dc2626; }
+    .pagination .page-item.active .page-link {
+      background: linear-gradient(135deg, #7f1d1d, #dc2626);
+      border-color: #dc2626; color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== PAGE HEADER ===== -->
+<div class="page-header">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h2><i class="bi bi-bug-fill me-2"></i>Painel de Erros &amp; Saúde do Sistema</h2>
+      <p>Monitoramento de erros HTTP, queries lentas e falhas em APIs externas</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('admin.painel_testes') }}" class="btn-admin outline">
+        <i class="bi bi-check2-circle"></i> Testes de Regressão
+      </a>
+      <a href="{{ url_for('main.index') }}" class="btn-admin outline">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STAT CARDS ===== -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-num">{{ stats.hoje or 0 }}</div>
+    <div class="stat-label"><i class="bi bi-calendar-day text-danger me-1"></i>Erros hoje</div>
+  </div>
+  <div class="stat-card amarelo">
+    <div class="stat-num">{{ stats.semana or 0 }}</div>
+    <div class="stat-label"><i class="bi bi-calendar-week me-1" style="color:#d97706"></i>Últimos 7 dias</div>
+  </div>
+  <div class="stat-card" style="border-top-color:#7f1d1d;">
+    <div class="stat-num">{{ stats.pendentes or 0 }}</div>
+    <div class="stat-label"><i class="bi bi-exclamation-circle me-1" style="color:#7f1d1d"></i>Pendentes</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ stats.http_erros or 0 }}</div>
+    <div class="stat-label"><i class="bi bi-cloud-slash me-1" style="color:#dc2626"></i>Erros HTTP</div>
+  </div>
+  <div class="stat-card amarelo">
+    <div class="stat-num">{{ stats.queries_lentas or 0 }}</div>
+    <div class="stat-label"><i class="bi bi-hourglass-split me-1" style="color:#d97706"></i>Queries lentas</div>
+  </div>
+  <div class="stat-card azul">
+    <div class="stat-num">{{ stats.api_erros or 0 }}</div>
+    <div class="stat-label"><i class="bi bi-plug me-1" style="color:#2563eb"></i>Erros de API</div>
+  </div>
+</div>
+
+<!-- ===== FILTROS ===== -->
+<div class="filter-section">
+  <h6 class="mb-3">
+    <i class="bi bi-funnel me-1" style="color:#dc2626;"></i>Filtros
+  </h6>
+  <form method="GET" class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label mb-1" style="font-size:.8rem;font-weight:600;">Tipo de Erro</label>
+      <select name="tipo" class="form-select form-select-sm" style="min-width:160px;">
+        <option value="" {% if not tipo_filtro %}selected{% endif %}>Todos os tipos</option>
+        <option value="http_erro"   {% if tipo_filtro == 'http_erro'   %}selected{% endif %}>Erros HTTP</option>
+        <option value="query_lenta" {% if tipo_filtro == 'query_lenta' %}selected{% endif %}>Queries Lentas</option>
+        <option value="api_externa" {% if tipo_filtro == 'api_externa' %}selected{% endif %}>API Externa</option>
+      </select>
+    </div>
+    <div class="col-auto">
+      <label class="form-label mb-1" style="font-size:.8rem;font-weight:600;">Status</label>
+      <select name="resolvido" class="form-select form-select-sm" style="min-width:160px;">
+        <option value="pendentes"  {% if resolvido_filtro == 'pendentes'  %}selected{% endif %}>Pendentes</option>
+        <option value="todos"      {% if resolvido_filtro == 'todos'      %}selected{% endif %}>Todos</option>
+        <option value="resolvidos" {% if resolvido_filtro == 'resolvidos' %}selected{% endif %}>Resolvidos</option>
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn-admin" style="padding:6px 14px;">
+        <i class="bi bi-search"></i> Filtrar
+      </button>
+    </div>
+    {% if tipo_filtro or resolvido_filtro != 'pendentes' %}
+    <div class="col-auto">
+      <a href="{{ url_for('admin.painel_erros') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x-circle"></i> Limpar
+      </a>
+    </div>
+    {% endif %}
+    {% if stats.pendentes > 0 %}
+    <div class="col-auto ms-auto">
+      <button type="button" class="btn-admin" style="background:linear-gradient(135deg,#065f46,#059669);padding:6px 14px;"
+              onclick="resolverTodos()">
+        <i class="bi bi-check-all"></i> Marcar todos como resolvidos
+      </button>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<!-- ===== TABELA ===== -->
+<div class="content-card">
+  <div class="content-card-header">
+    <h5><i class="bi bi-list-ul me-2"></i>Registro de Erros
+      <span class="badge bg-light text-dark ms-2" style="font-size:.75rem;">{{ total }}</span>
+    </h5>
+  </div>
+  <div class="content-card-body">
+    {% if erros %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="tabelaErros">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Tipo</th>
+            <th>Data/Hora</th>
+            <th>Endpoint / API</th>
+            <th>Status</th>
+            <th>Duração</th>
+            <th>Usuário</th>
+            <th>Mensagem</th>
+            <th>Detalhes</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in erros %}
+          <tr id="row-{{ e.id }}" {% if e.resolvido %}style="opacity:.5;"{% endif %}>
+            <td class="text-muted">{{ e.id }}</td>
+            <td>
+              {% if e.tipo_erro == 'http_erro' %}
+                <span class="badge-tip badge-http">HTTP</span>
+              {% elif e.tipo_erro == 'query_lenta' %}
+                <span class="badge-tip badge-query">QUERY</span>
+              {% else %}
+                <span class="badge-tip badge-api">API</span>
+              {% endif %}
+            </td>
+            <td style="white-space:nowrap;">
+              {{ e.created_at.strftime('%d/%m/%y %H:%M') if e.created_at else '—' }}
+            </td>
+            <td style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                title="{{ e.endpoint or e.api_endpoint or '—' }}">
+              {% if e.api_nome %}
+                <span class="text-primary fw-semibold">{{ e.api_nome }}</span>
+                {% if e.api_endpoint %}<br><small class="text-muted">{{ e.api_endpoint[:60] }}</small>{% endif %}
+              {% else %}
+                <span class="fw-semibold">{{ (e.metodo or '') }}</span>
+                <span class="text-muted ms-1">{{ (e.endpoint or '—')[:50] }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if e.status_codigo %}
+                <span class="badge {% if e.status_codigo >= 500 %}bg-danger{% elif e.status_codigo >= 400 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                  {{ e.status_codigo }}
+                </span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if e.duracao_ms %}
+                <span class="{% if e.duracao_ms > 3000 %}text-danger fw-bold{% elif e.duracao_ms > 1000 %}text-warning fw-semibold{% endif %}">
+                  {{ e.duracao_ms }}ms
+                </span>
+              {% else %}—{% endif %}
+            </td>
+            <td style="font-size:.75rem;">{{ e.usuario_email or '—' }}</td>
+            <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                title="{{ e.mensagem or '' }}">
+              {{ (e.mensagem or '—')[:80] }}
+            </td>
+            <td>
+              {% if e.detalhes or e.query_preview %}
+              <button class="btn btn-outline-secondary btn-sm py-0 px-2"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#det-{{ e.id }}">
+                <i class="bi bi-chevron-down" style="font-size:.7rem;"></i>
+              </button>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if not e.resolvido %}
+              <button class="btn-success-sm" onclick="resolver({{ e.id }})">
+                <i class="bi bi-check-lg"></i> OK
+              </button>
+              {% else %}
+              <span class="badge-tip badge-ok">Resolvido</span>
+              {% if e.resolvido_por %}
+                <br><small class="text-muted">{{ e.resolvido_por.split('@')[0] }}</small>
+              {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+          {% if e.detalhes or e.query_preview %}
+          <tr class="collapse" id="det-{{ e.id }}">
+            <td colspan="10" class="p-0">
+              <div class="p-3 bg-light border-top">
+                {% if e.query_preview %}
+                <p class="mb-1" style="font-size:.78rem;font-weight:600;color:#64748b;">Query:</p>
+                <pre class="detalhe-pre">{{ e.query_preview }}</pre>
+                {% endif %}
+                {% if e.detalhes %}
+                <p class="mb-1 mt-2" style="font-size:.78rem;font-weight:600;color:#64748b;">Detalhes:</p>
+                <pre class="detalhe-pre">{{ e.detalhes | tojson(indent=2) if e.detalhes is mapping else e.detalhes }}</pre>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginação -->
+    {% if total_paginas > 1 %}
+    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+      <small class="text-muted">
+        Página {{ pagina }} de {{ total_paginas }} — {{ total }} registros
+      </small>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item {% if pagina == 1 %}disabled{% endif %}">
+            <a class="page-link" href="?tipo={{ tipo_filtro }}&resolvido={{ resolvido_filtro }}&pagina={{ pagina - 1 }}">
+              <i class="bi bi-chevron-left"></i>
+            </a>
+          </li>
+          {% for p in range([1, pagina - 2]|max, [total_paginas + 1, pagina + 3]|min) %}
+          <li class="page-item {% if p == pagina %}active{% endif %}">
+            <a class="page-link" href="?tipo={{ tipo_filtro }}&resolvido={{ resolvido_filtro }}&pagina={{ p }}">{{ p }}</a>
+          </li>
+          {% endfor %}
+          <li class="page-item {% if pagina == total_paginas %}disabled{% endif %}">
+            <a class="page-link" href="?tipo={{ tipo_filtro }}&resolvido={{ resolvido_filtro }}&pagina={{ pagina + 1 }}">
+              <i class="bi bi-chevron-right"></i>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5">
+      <i class="bi bi-check-circle-fill text-success" style="font-size:2.5rem;"></i>
+      <p class="mt-2 text-muted">Nenhum erro encontrado para os filtros selecionados.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Toast de feedback -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="toastFeedback" class="toast align-items-center text-white border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMsg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function mostrarToast(msg, sucesso) {
+    const t = document.getElementById('toastFeedback');
+    t.classList.remove('bg-success', 'bg-danger');
+    t.classList.add(sucesso ? 'bg-success' : 'bg-danger');
+    document.getElementById('toastMsg').textContent = msg;
+    new bootstrap.Toast(t, {delay: 2500}).show();
+  }
+
+  function resolver(id) {
+    fetch(`/admin/painel-erros/${id}/resolver`, {method: 'POST'})
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          const row = document.getElementById(`row-${id}`);
+          if (row) row.style.opacity = '0.4';
+          mostrarToast('Marcado como resolvido', true);
+        } else {
+          mostrarToast(d.erro || 'Erro ao resolver', false);
+        }
+      })
+      .catch(() => mostrarToast('Falha na requisição', false));
+  }
+
+  function resolverTodos() {
+    if (!confirm('Marcar todos os erros pendentes como resolvidos?')) return;
+    const tipo = document.querySelector('select[name="tipo"]').value;
+    fetch('/admin/painel-erros/resolver-todos', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tipo_erro: tipo || null}),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          mostrarToast('Todos marcados como resolvidos!', true);
+          setTimeout(() => location.reload(), 1200);
+        } else {
+          mostrarToast(d.erro || 'Erro', false);
+        }
+      });
+  }
+</script>
+</body>
+</html>

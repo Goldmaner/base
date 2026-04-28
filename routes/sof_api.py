@@ -7,6 +7,7 @@ Consulta contratos e empenhos da Prefeitura de São Paulo
 from flask import Blueprint, render_template, request, jsonify, session
 from utils import login_required
 from config import SOF_API_USERNAME, SOF_API_PASSWORD, SOF_AUTH_BASE64
+from decorators import registrar_erro
 import requests
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -86,10 +87,24 @@ def obter_token_sof():
             return access_token
         else:
             print(f"[SOF_API] ERRO ao obter token: {response.status_code} - {response.text}")
+            registrar_erro(
+                tipo_erro='api_externa',
+                api_nome='SOF',
+                api_endpoint=SOF_TOKEN_URL,
+                status_codigo=response.status_code,
+                mensagem=f'Falha ao obter token: HTTP {response.status_code}',
+                detalhes={'resposta': response.text[:500]},
+            )
             return None
             
     except Exception as e:
         print(f"[SOF_API] EXCEÇÃO ao obter token: {type(e).__name__} - {str(e)}")
+        registrar_erro(
+            tipo_erro='api_externa',
+            api_nome='SOF',
+            api_endpoint=SOF_TOKEN_URL,
+            mensagem=f'Exceção ao obter token: {type(e).__name__}: {str(e)}',
+        )
         return None
 
 
@@ -179,6 +194,14 @@ def consultar_contratos_sof(filtros):
             return dados
         else:
             print(f"[SOF_API] ERRO na consulta: {response.status_code} - {response.text}")
+            registrar_erro(
+                tipo_erro='api_externa',
+                api_nome='SOF',
+                api_endpoint=url,
+                status_codigo=response.status_code,
+                mensagem=f'Erro na consulta de contratos: HTTP {response.status_code}',
+                detalhes={'resposta': response.text[:500], 'params': params},
+            )
             return {
                 'erro': True,
                 'mensagem': f'Erro na API: {response.status_code}',
@@ -187,6 +210,12 @@ def consultar_contratos_sof(filtros):
     
     except Exception as e:
         print(f"[SOF_API] EXCEÇÃO na consulta: {type(e).__name__} - {str(e)}")
+        registrar_erro(
+            tipo_erro='api_externa',
+            api_nome='SOF',
+            api_endpoint=f"{SOF_BASE_URL}/contratos",
+            mensagem=f'Exceção na consulta de contratos: {type(e).__name__}: {str(e)}',
+        )
         return {
             'erro': True,
             'mensagem': f'Exceção: {type(e).__name__}',
@@ -265,6 +294,14 @@ def consultar_empenhos_sof(filtros):
             return data
         else:
             print(f"[SOF_API] ERRO na consulta: {response.status_code} - {response.text}")
+            registrar_erro(
+                tipo_erro='api_externa',
+                api_nome='SOF',
+                api_endpoint=url,
+                status_codigo=response.status_code,
+                mensagem=f'Erro na consulta de empenhos: HTTP {response.status_code}',
+                detalhes={'resposta': response.text[:500], 'params': params},
+            )
             return {
                 'erro': True,
                 'mensagem': f'Erro na API: {response.status_code}',
@@ -273,6 +310,12 @@ def consultar_empenhos_sof(filtros):
     
     except Exception as e:
         print(f"[SOF_API] EXCEÇÃO na consulta de empenhos: {type(e).__name__} - {str(e)}")
+        registrar_erro(
+            tipo_erro='api_externa',
+            api_nome='SOF',
+            api_endpoint=f"{SOF_BASE_URL}/empenhos",
+            mensagem=f'Exceção na consulta de empenhos: {type(e).__name__}: {str(e)}',
+        )
         return {
             'erro': True,
             'mensagem': f'Exceção: {type(e).__name__}',

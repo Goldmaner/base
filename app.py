@@ -44,6 +44,7 @@ from routes.sei_orcamentario import sei_orcamentario_bp
 from routes.sof_api import sof_api_bp
 from routes.gestao_pessoas import gestao_pessoas_bp
 from routes.manuais import manuais_bp
+from routes.admin import admin_bp
 
 
 # ============================================================================
@@ -286,6 +287,7 @@ def create_app():
     app.register_blueprint(sof_api_bp)
     app.register_blueprint(gestao_pessoas_bp)
     app.register_blueprint(manuais_bp)
+    app.register_blueprint(admin_bp)
     
     # ========================================================================
     # HOOKS GLOBAIS PARA LOGGING AUTOMÁTICO
