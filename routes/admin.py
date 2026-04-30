@@ -154,6 +154,92 @@ def resolver_todos():
     return jsonify({'success': True})
 
 
+@admin_bp.route('/painel-erros/exportar/<formato>')
+@login_required
+def exportar_erros(formato):
+    """Exporta os erros pendentes (não resolvidos) em JSON ou Markdown."""
+    if not _apenas_admin():
+        return jsonify({'erro': 'Acesso negado'}), 403
+
+    if formato not in ('json', 'md'):
+        return jsonify({'erro': 'Formato inválido. Use: json, md'}), 400
+
+    cur = get_cursor()
+    cur.execute("""
+        SELECT id, tipo_erro, created_at, endpoint, metodo, status_codigo,
+               usuario_email, ip_address, duracao_ms, query_preview,
+               api_nome, api_endpoint, mensagem, detalhes
+        FROM gestao_pessoas.log_erros
+        WHERE resolvido = FALSE
+        ORDER BY created_at DESC
+    """)
+    erros = cur.fetchall()
+    cur.close()
+
+    data_str = datetime.now().strftime('%Y%m%d_%H%M')
+
+    # ── JSON ─────────────────────────────────────────────────────────────
+    if formato == 'json':
+        def _serialize(obj):
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            return str(obj)
+        payload = json.dumps(
+            [dict(e) for e in erros],
+            ensure_ascii=False, indent=2, default=_serialize
+        )
+        return Response(
+            payload,
+            mimetype='application/json',
+            headers={'Content-Disposition': f'attachment; filename=erros_pendentes_{data_str}.json'}
+        )
+
+    # ── Markdown ─────────────────────────────────────────────────────────
+    if formato == 'md':
+        tipo_labels = {'http_erro': 'HTTP', 'query_lenta': 'QUERY', 'api_externa': 'API'}
+        tipo_icons  = {'http_erro': '🔴', 'query_lenta': '🟡', 'api_externa': '🔵'}
+
+        lines = [
+            '# Erros Pendentes — FAF',
+            '',
+            f'**Exportado em:** {datetime.now().strftime("%d/%m/%Y %H:%M")}  ',
+            f'**Total pendente:** {len(erros)}  ',
+            '',
+            '---',
+            '',
+        ]
+
+        for e in erros:
+            tipo   = e.get('tipo_erro', '')
+            icon   = tipo_icons.get(tipo, '⚪')
+            label  = tipo_labels.get(tipo, tipo.upper())
+            dt     = e['created_at'].strftime('%d/%m/%Y %H:%M') if e.get('created_at') else 'N/A'
+            dur    = f"{e['duracao_ms']}ms" if e.get('duracao_ms') else '—'
+            ep     = e.get('endpoint') or e.get('api_endpoint') or '—'
+
+            lines += [
+                f'## {icon} [{label}] #{e["id"]} — {dt}',
+                '',
+                f'- **Endpoint:** `{ep}`',
+                f'- **Duração:** {dur}',
+                f'- **Usuário:** {e.get("usuario_email") or "—"}',
+                f'- **Mensagem:** {e.get("mensagem") or "—"}',
+            ]
+            if e.get('query_preview'):
+                lines += ['', '**Query:**', '```sql', e['query_preview'].strip(), '```']
+            if e.get('detalhes'):
+                det = json.dumps(e['detalhes'], ensure_ascii=False, indent=2) \
+                      if isinstance(e['detalhes'], dict) else str(e['detalhes'])
+                lines += ['', '**Detalhes:**', '```json', det, '```']
+            lines.append('')
+
+        return Response(
+            '\n'.join(lines),
+            mimetype='text/markdown; charset=utf-8',
+            headers={'Content-Disposition': f'attachment; filename=erros_pendentes_{data_str}.md'}
+        )
+
+
 # =============================================================================
 # TESTES DE REGRESSÃO
 # =============================================================================

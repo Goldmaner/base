@@ -1040,6 +1040,27 @@ TABELAS_CONFIG = {
             'rows_descricao': 4
         }
     },
+    'c_geral_eventos': {
+        'nome': 'Geral: Tipos de Eventos (Datas Importantes)',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['nome_data', 'descricao_nome_data', 'status'],
+        'colunas_obrigatorias': ['nome_data'],
+        'labels': {
+            'nome_data': 'Nome do Tipo',
+            'descricao_nome_data': 'Descrição',
+            'status': 'Status'
+        },
+        'colunas_filtro': ['nome_data', 'status'],
+        'colunas_ordenacao': ['nome_data', 'status'],
+        'ordem': 'nome_data',
+        'tipos_campo': {
+            'nome_data': 'text',
+            'descricao_nome_data': 'textarea',
+            'rows_descricao_nome_data': 3,
+            'status': 'select',
+            'opcoes_status': ['ativo', 'inativo']
+        }
+    },
     'c_geral_certidoes': {
         'nome': 'Geral: Certidões',
         'schema': 'categoricas',

@@ -26,6 +26,8 @@
 - [Troubleshooting](#-troubleshooting)
 - [Contribuindo](#-contribuindo)
 
+> **Última atualização:** 28/04/2026 — [ver commits recentes](#commits-recentes)
+
 ---
 
 ## 🎯 Sobre o Projeto
@@ -40,10 +42,14 @@ O **FPDH** é uma plataforma web enterprise desenvolvida para gerenciar todo o c
 - ✅ Orçamento anual com dicionário inteligente de categorias
 - ✅ Conciliação bancária com IA para categorização
 - ✅ Análises de prestações de contas com geração automática de textos
-- ✅ **Sistema de Férias** - Gestão de calendário e substituições
+- ✅ **Sistema de Férias** - Gestão de calendário e substituições com aniversários
 - ✅ Controle de acesso granular por módulo
 - ✅ Performance otimizada com bulk queries (< 1s para 100+ OSCs)
 - ✅ Backup automático incremental
+- ✅ **Painel de Erros** - Log centralizado de erros HTTP, queries lentas e falhas em APIs
+- ✅ **Painel de Testes de Regressão** - Execução e exportação de resultados de testes
+- ✅ **SOF API** - Integração com Sistema de Orçamento e Finanças da PMSP
+- ✅ Índices de performance otimizados (10 novos índices estratégicos)
 
 ---
 
@@ -123,12 +129,13 @@ O **FPDH** é uma plataforma web enterprise desenvolvida para gerenciar todo o c
 - Dados base com preenchimento automático
 - Exportação em Word/PDF
 
-### 8. **Sistema de Férias** 🏖️ 🆕
+### 8. **Sistema de Férias** 🏖️
 - Calendário anual visual
 - Cadastro de períodos de férias por pessoa
 - Sistema de substituições automático
 - Alertas de conflitos
 - Exportação para impressão
+- **Aniversários integrados ao calendário** (exibição de datas de aniversário dos servidores)
 
 ### 9. **Administração** ⚙️
 - Gerenciamento de usuários (Agente Público / Pessoa Gestora)
@@ -138,6 +145,13 @@ O **FPDH** é uma plataforma web enterprise desenvolvida para gerenciar todo o c
 - Modelos de texto com variáveis dinâmicas
 - Auditoria de ações (log completo)
 - Painel de estatísticas
+- **🆕 Painel de Erros** (`/admin/painel-erros`) - Visualização, filtragem e resolução de erros registrados
+- **🆕 Painel de Testes de Regressão** (`/admin/painel-testes`) - Execução de testes e exportação (JSON, CSV, Markdown)
+
+### 10. **SOF API** 🆕
+- Integração com o Sistema de Orçamento e Finanças da PMSP
+- Importação de dotações, reservas, empenhos e liquidações
+- Relatórios orçamentários com exportação CSV
 
 ---
 
@@ -155,6 +169,7 @@ O **FPDH** é uma plataforma web enterprise desenvolvida para gerenciar todo o c
 - **pdfplumber** 0.11.4 (extração de dados de PDFs)
 - **beautifulsoup4** 4.12.3 (parsing HTML)
 - **num2words** 0.5.13 (números por extenso)
+- **pytest** (testes de regressão — `requirements-dev.txt`)
 
 ### **Frontend**
 - **HTML5/CSS3** + Bootstrap 5.3.0
@@ -324,9 +339,11 @@ FPDH/
 │   ├── conc_exportacao.py      # Exportação de dados
 │   ├── conc_relatorio.py       # Relatório final
 │   │
-│   ├── gestao_financeira.py    # 🆕 Gestão financeira principal
-│   ├── gestao_financeira_ultra_liquidacoes.py  # 🆕 Ultra liquidações
-│   ├── gestao_financeira_anuencia.py           # 🆕 Anuências
+│   ├── gestao_financeira.py    # Gestão financeira principal
+│   ├── gestao_financeira_ultra_liquidacoes.py  # Ultra liquidações
+│   ├── gestao_financeira_anuencia.py           # Anuências
+│   ├── sof_api.py              # 🆕 Integração SOF (exportação CSV)
+│   ├── admin.py                # 🆕 Painel de erros e painel de testes
 │   │
 │   ├── ocr_testes.py           # Testes de OCR (experimental)
 │   │
@@ -380,10 +397,13 @@ FPDH/
 │   │   ├── checklist.html
 │   │   └── textos_sei.html
 │   │
-│   ├── gestao_financeira/      # 🆕 Templates gestão financeira
-│   │   ├── ultra_liquidacoes.html  # Cronogramas (6500+ linhas)
+│   ├── gestao_financeira/      # Templates gestão financeira
+│   │   ├── ultra_liquidacoes.html  # Cronogramas
 │   │   ├── anuencia.html
 │   │   └── relatorios.html
+│   ├── admin/                  # 🆕 Templates de administração
+│   │   ├── painel_erros.html   # Log de erros HTTP/queries/APIs
+│   │   └── painel_testes.html  # Painel de testes de regressão
 │   │
 │   ├── gestao_orcamentaria/    # 🆕 Templates gestão orçamentária
 │   │   ├── dotacoes.html
@@ -666,6 +686,33 @@ FPDH/
 #### **19. OCR Testes** (`ocr_testes.py`)
 - Extração de dados de PDFs (experimental)
 
+#### **20. SOF API** (`sof_api.py`) 🆕
+- Integração com Sistema de Orçamento e Finanças da PMSP
+- Exportação de dados orçamentários em CSV
+
+**Rotas:**
+- `GET /sof_api/dotacoes` - Exportação de dotações
+- `GET /sof_api/empenhos` - Exportação de empenhos
+- `GET /sof_api/reservas` - Exportação de reservas
+- `GET /sof_api/liquidacoes` - Exportação de liquidações
+
+#### **21. Administração Avançada** (`admin.py`) 🆕
+
+**Painel de Erros:**
+- Log centralizado: erros HTTP, queries lentas, falhas em APIs externas
+- Filtragem por tipo, período, usuário
+- Marcação como resolvido
+- Paginação
+
+**Painel de Testes de Regressão:**
+- Execução de suíte de testes automatizados
+- Exportação de resultados em JSON, CSV e Markdown
+- Histórico de execuções
+
+**Rotas:**
+- `GET /admin/painel-erros` - Painel de erros
+- `GET /admin/painel-testes` - Painel de testes
+
 ---
 
 ## 🔐 Controle de Acesso
@@ -699,10 +746,11 @@ Baseado em decorador `@requires_access(modulo)` que controla acesso por módulo.
 'gestao_financeira',  # Ultra liquidações
 'gestao_orcamentaria', # Dotações e empenhos
 
-# Novos Módulos 🆕
+# Módulos de Gestão
 'certidoes',          # Central de certidões
 'editais',            # Sistema de editais
 'ferias',             # Gestão de férias
+'sof_api',            # Integração SOF
 
 # Pesquisa e Relatórios
 'pesquisa',           # Pesquisa avançada
@@ -752,129 +800,117 @@ WHERE username = 'gestor1';
 
 ## 🗄️ Banco de Dados
 
+> 📖 **Referência completa:** [docs/GUIA_BANCO_DADOS.md](docs/GUIA_BANCO_DADOS.md) — Schema detalhado com todas as 89 tabelas, colunas, tipos e relacionamentos.
+
 ### **PostgreSQL 17 - Arquitetura**
 
-**5 Schemas:**
+**7 Schemas de aplicação (89 tabelas):**
 
-#### **1. Schema `public`** (Parcerias e Core)
+| Schema | Tabelas | Descrição |
+|--------|---------|----------|
+| `public` | 15 | Parcerias, certidões, editais, despesas, SEI |
+| `analises_pc` | 14 | Conciliação bancária, checklists, inconsistências |
+| `gestao_financeira` | 8 | Ultra liquidações, cronogramas, backups SOF |
+| `gestao_pessoas` | 6 | Usuários, férias, log de atividades e erros |
+| `categoricas` | 32 | Listas suspensas e 40+ catálogos editáveis |
+| `celebracao` | 6 | Processo de celebração de novos termos |
+| `auditoria_memoria` | 1 | Auditoria de encaminhamentos de pagamento |
+
+**Chave de relacionamento universal:** `numero_termo` (ex: `TFM 001/2024`) — presente em todas as tabelas que se relacionam com uma parceria.
+
+### **Tabelas Principais**
+
 ```sql
--- Parcerias principais
-parcerias                      -- Termos (TFM, TCC, TAP)
-parcerias_infos_adicionais     -- Responsável, objeto, beneficiários
-parcerias_enderecos            -- Múltiplos endereços por termo
-parcerias_despesas             -- Despesas mensais por rubrica
-parcerias_pg                   -- Pessoas gestoras (histórico)
+-- Core
+public.parcerias                          -- Termos (TFM, TCC, TAP)
+public.parcerias_infos_adicionais         -- Objeto, beneficiários, responsável legal
+public.parcerias_enderecos                -- Múltiplos endereços por termo
+public.parcerias_despesas                 -- Despesas mensais por rubrica
+public.parcerias_pg                       -- Histórico de pessoas gestoras
+public.parcerias_sei                      -- Documentos SEI vinculados
+public.parcerias_analises                 -- Controle de prestações de contas
+public.parcerias_notificacoes             -- Notificações e comunicados
+public.termos_alteracoes                  -- ⭐ 25+ tipos de alterações DGP
+public.termos_rescisao                    -- Termos rescindidos
+public.certidoes                          -- 7 certidões obrigatórias por OSC
+public.parcerias_edital                   -- Editais
 
--- Alterações DGP
-termos_alteracoes              -- ⭐ 25+ tipos de alteração com histórico
-termos_alteracoes_historico    -- Valores antigos (antes/depois)
+-- Gestão Financeira
+gestao_financeira.ultra_liquidacoes       -- ⭐ Cronograma de parcelas/liquidações
+gestao_financeira.ultra_liquidacoes_cronograma  -- Detalhamento mensal FASE 1/2/3
+gestao_financeira.temp_reservas_empenhos  -- Controle de reservas/empenhos
+gestao_financeira.temp_acomp_empenhos     -- Acompanhamento de notas de empenho
+gestao_financeira.back_dotacao            -- Backups importados do SOF
+gestao_financeira.back_empenhos           -- Backups importados do SOF
+gestao_financeira.back_reservas           -- Backups importados do SOF
+gestao_financeira.back_liquidacao         -- Backups importados do SOF
 
--- Gestão
-termos_rescindidos             -- Termos rescindidos com análise
-usuarios                       -- Controle de acesso e autenticação
-certidoes                      -- 🆕 Certidões por OSC
-editais                        -- 🆕 Gestão de editais
-ferias                         -- 🆕 Períodos de férias
-```
+-- Análises de PC
+analises_pc.checklist_termo               -- 15 etapas do checklist
+analises_pc.conc_extrato                  -- Extrato bancário importado
+analises_pc.conc_analise                  -- Avaliação de comprovantes
+analises_pc.lista_inconsistencias         -- Inconsistências identificadas
+analises_pc.lista_inconsistencias_globais -- Inconsistências consolidadas
 
-#### **2. Schema `analises_pc`** (Análises de Prestação)
-```sql
-conc_extrato                   -- Movimentações bancárias
-conc_rendimentos               -- Rendimentos aplicados
-conc_contrapartida             -- Contrapartida da OSC
-conc_demonstrativo             -- Demonstrativo consolidado
-dados_base                     -- Dados base da análise
-checklist                      -- Etapas do checklist
-analistas                      -- Analistas responsáveis
-textos_sei                     -- Textos gerados
-```
+-- Pessoas / Acesso
+gestao_pessoas.usuarios                   -- Autenticação e permissões
+gestao_pessoas.usuarios_infos             -- Nome, aniversário, vínculo
+gestao_pessoas.datas_ferias               -- Períodos de férias
+gestao_pessoas.log_atividades             -- ⭐ Auditoria completa de ações
+gestao_pessoas.log_erros                  -- 🆕 Log de erros e queries lentas
 
-#### **3. Schema `categoricas`** (40+ Catálogos)
-```sql
--- DGP
-c_dgp_analistas                -- Agentes DGP
-c_dgp_cents_status             -- 🆕 Status de CENTS
-
--- DAC
-c_dac_analistas                -- Analistas DAC
-c_dac_despesas_analise         -- Categorias de despesa
-c_dac_modelo_textos_inconsistencias -- Modelos de texto
-
--- Alterações
-c_alt_tipo                     -- ⭐ 25+ tipos de alteração
-c_alt_instrumento              -- Instrumentos jurídicos
-c_alt_normas                   -- Normas e regimentos
-
--- Geral
-c_geral_pessoa_gestora         -- Pessoas gestoras
-c_geral_tipo_contrato          -- Tipos de contrato
-c_geral_legislacao             -- Portarias e leis
-c_geral_regionalizacao         -- Distritos de SP
-c_geral_certidoes              -- ⭐ 7 tipos de certidão
-c_geral_coordenadores          -- Coordenadores por setor
-
--- E 30+ outras tabelas...
-```
-
-#### **4. Schema `gestao_financeira`** 🆕
-```sql
-ultra_liquidacoes              -- ⭐ Cronogramas FASE 1/2/3
-  - Campos: numero_termo, mes_ano, valor_elemento_53_23, 
-            valor_elemento_53_24, parcela_tipo, parcela_status,
-            vigencia_inicial, vigencia_final
-
-anuencia                       -- Anuências de desembolso
-relatorios_financeiros         -- Relatórios consolidados
-```
-
-#### **5. Schema `gestao_orcamentaria`** 🆕
-```sql
-dotacoes                       -- Dotações orçamentárias
-reservas                       -- Reservas orçamentárias
-empenhos                       -- Empenhos realizados
-cronograma_desembolso          -- Cronograma de pagamentos
+-- Celebração
+celebracao.celebracao_parcerias           -- Processo de celebração (pré-assinatura)
+celebracao.gestao_cents                   -- Gestão de CENTS por OSC
 ```
 
 ### **Relacionamentos Principais**
 
 ```
-parcerias (1) ←→ (N) parcerias_despesas
-parcerias (1) ←→ (N) parcerias_enderecos
-parcerias (1) ←→ (1) parcerias_infos_adicionais
-parcerias (1) ←→ (N) parcerias_pg
-parcerias (1) ←→ (N) termos_alteracoes
-parcerias (1) ←→ (N) certidoes
-parcerias (1) ←→ (N) gestao_financeira.ultra_liquidacoes
+public.parcerias.numero_termo
+    ├── parcerias_infos_adicionais  (1:1)
+    ├── parcerias_enderecos         (1:N)
+    ├── parcerias_despesas          (1:N)
+    ├── parcerias_pg                (1:N histórico)
+    ├── parcerias_sei               (1:N)
+    ├── parcerias_analises          (1:N)
+    ├── parcerias_notificacoes      (1:N)
+    ├── termos_alteracoes           (1:N)
+    ├── termos_rescisao             (1:1)
+    ├── analises_pc.checklist_termo (1:N por período)
+    ├── analises_pc.conc_extrato    (1:N)
+    └── gestao_financeira.ultra_liquidacoes (1:N)
 
-termos_alteracoes (1) ←→ (N) termos_alteracoes_historico
+gestao_financeira.ultra_liquidacoes.parcela_numero
+    └── ultra_liquidacoes_cronograma (1:N)
 
-usuarios (1) ←→ (N) parcerias_pg
-usuarios (1) ←→ (N) analises_pc.analistas
+gestao_pessoas.usuarios.email
+    └── usuarios_infos (1:1)
 ```
 
 ### **Índices Otimizados**
 
 ```sql
--- Performance de busca
-CREATE INDEX idx_parcerias_numero_termo ON parcerias(numero_termo);
-CREATE INDEX idx_parcerias_osc ON parcerias USING gin(to_tsvector('portuguese', osc));
+-- Parcerias (10 índices estratégicos aplicados em 27/04/2026)
+CREATE INDEX idx_parcerias_pg_termo_data ON public.parcerias_pg(numero_termo, data_de_criacao DESC);
+CREATE INDEX idx_parcerias_sei_termo_id ON public.parcerias_sei(numero_termo, id ASC);
+CREATE INDEX idx_parcerias_enderecos_termo ON public.parcerias_enderecos(numero_termo);
+CREATE INDEX idx_despesas_numero_termo ON public.parcerias_despesas(numero_termo);
 
--- Certidões: busca sem acentos
-CREATE INDEX idx_parcerias_osc_unaccent ON parcerias(unaccent(LOWER(osc)));
+-- Ultra Liquidações
+CREATE INDEX idx_ultra_liq_termo_status ON gestao_financeira.ultra_liquidacoes(numero_termo, parcela_status);
+CREATE INDEX idx_ulc_numero_termo ON gestao_financeira.ultra_liquidacoes_cronograma(numero_termo);
 
--- Ultra liquidações
-CREATE INDEX idx_ultra_liq_termo ON gestao_financeira.ultra_liquidacoes(numero_termo);
-CREATE INDEX idx_ultra_liq_vigencia ON gestao_financeira.ultra_liquidacoes(vigencia_inicial);
+-- Log / Auditoria
+CREATE INDEX idx_log_recurso_tipo_id ON gestao_pessoas.log_atividades(recurso_tipo, recurso_id);
+CREATE INDEX idx_log_detalhes_gin ON gestao_pessoas.log_atividades USING GIN (detalhes);
 ```
 
 ### **Extensões PostgreSQL**
 
 ```sql
--- Busca sem acentos (macedonia = macedônia)
-CREATE EXTENSION IF NOT EXISTS unaccent;
-
--- Busca por similaridade (fuzzy search)
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS unaccent;  -- Busca sem acentos
+CREATE EXTENSION IF NOT EXISTS pg_trgm;   -- Busca por similaridade
 ```
 
 ---
@@ -925,6 +961,8 @@ Migrations e populações já executadas:
 - `03_criar_gestao_financeira.sql` - Schema gestão financeira
 - `add_unique_constraint_*.sql` - Constraints adicionados
 - `aumentar_colunas_empenhos.sql` - Alterações de schema
+- `create_log_erros.sql` - Tabela de log de erros (28/04/2026)
+- `criar_indices_performance.sql` - 10 índices estratégicos (27/04/2026)
 
 ---
 
@@ -1572,18 +1610,18 @@ app.register_blueprint(novo_modulo_bp)
 
 | Métrica | Valor |
 |---------|-------|
-| **Linhas de código** | ~25.000+ |
-| **Blueprints** | 24 módulos |
-| **Templates** | 45+ arquivos |
-| **Rotas** | 150+ endpoints |
-| **Tabelas** | 35+ (5 schemas) |
+| **Linhas de código** | ~30.000+ |
+| **Blueprints** | 26+ módulos |
+| **Templates** | 50+ arquivos |
+| **Rotas** | 160+ endpoints |
+| **Tabelas** | 89 (7 schemas) |
 | **Listas catalogas** | 40+ catálogos |
-| **Scripts ativos** | 6 utilitários |
+| **Scripts ativos** | 8 utilitários |
 | **Tipos alteração** | 25+ tipos |
-| **Módulos com controle acesso** | 24 módulos |
+| **Módulos com controle acesso** | 24+ módulos |
 | **Usuários ativos** | 25+ |
 | **Tempo de desenvolvimento** | 2+ anos |
-| **Última atualização** | Fevereiro/2026 |
+| **Última atualização** | Abril/2026 |
 
 ---
 
@@ -1600,6 +1638,55 @@ app.register_blueprint(novo_modulo_bp)
 - [ ] Integração com SEI (API oficial)
 - [ ] App mobile (Flutter)
 - [ ] Sistema de workflows
+
+---
+
+## 📝 Commits Recentes {#commits-recentes}
+
+> Histórico das últimas alterações significativas (a partir de `b91c2ff` — origin/main).
+
+### `e703818` — 28/04/2026
+**feat: add error logging system and regression test panel**
+- Criada tabela `gestao_pessoas.log_erros` para registro de erros HTTP, queries lentas e falhas em APIs externas
+- Novo módulo `routes/admin.py` (365 linhas) com painel de erros e painel de testes de regressão
+- Templates `painel_erros.html` e `painel_testes.html` com filtragem, paginação e exportação
+- `decorators.py` expandido com novos decoradores de logging
+- `db.py` atualizado com captura automática de queries lentas
+- Novo `routes/sof_api.py` com exportação CSV de dados do SOF
+- Script `scripts/_verify_indexes.py` para diagnóstico de índices
+- Guia `docs/GUIA_TESTES_REGRESSAO.md` criado
+
+### `9595f86` — 27/04/2026
+**feat: Enhance database connection handling and improve performance with new indices**
+- 10 novos índices estratégicos criados (`scripts/criar_indices_performance.sql`)
+- Melhorias no tratamento de conexões em `db.py` e `config.py`
+- Notificações de parcerias refatoradas com novo template
+- Melhorias em `gestao_financeira.py`, `certidoes.py`, `editais.py` e `utils.py`
+
+### `396e5a0` — 02/04/2026
+**feat: Add birthday tracking to vacation calendar and improve UI**
+- Aniversários dos servidores exibidos no calendário de férias
+- Legenda de cores expandida por duração de férias
+- Nova rota de busca de termos por SEI nas notificações
+- Novo submenu `analises_pc/meus_processos.html` (266 linhas)
+- Refatoração do formulário de notificações com busca em tempo real
+- Link para calendário geral na tela inicial
+
+### `9a780e2` — 01/04/2026
+**feat: Enhance CSV export functionality and improve UI**
+- Novos filtros no export CSV de parcerias: CNPJ, Portaria, Abrangência, Contrapartida, Endereço
+- Valores mensais detalhados de reservas/empenhos no CSV
+- Template `gestao_financeira.html` com novo cabeçalho e rótulos de seção
+- Pílulas de status rápido na listagem de parcerias
+- Seção de upload de relatórios SOF aprimorada
+
+### `993a68c` — 31/03/2026
+**Refactor: code structure for improved readability and maintainability**
+- `auth.py` refatorado (138 linhas alteradas)
+- Novo template `gestao_pessoas/usuarios.html` (1.026 linhas)
+- `templates/parcerias/parcerias.html` reestruturado (1.119 linhas)
+- `templates/tela_inicial.html` simplificado
+- Melhorias em `gestao_financeira.py`, `gestao_orcamentaria/__init__.py` e `parcerias.py`
 - [ ] BI integrado (Power BI/Metabase)
 
 ### **Concluído** ✅

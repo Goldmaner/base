@@ -198,7 +198,7 @@ def listar():
 
     # Adicionar filtros se fornecidos
     if filtro_termo:
-        query += " AND numero_termo ILIKE %s"
+        query += " AND p.numero_termo ILIKE %s"
         params.append(f"%{filtro_termo}%")
 
     if filtro_osc:
@@ -381,7 +381,7 @@ def listar():
         if condicoes_status:
             query += " AND (" + " OR ".join(condicoes_status) + ")"
     
-    query += " ORDER BY numero_termo"
+    query += " ORDER BY p.numero_termo"
     
     # Adicionar LIMIT se nÃ£o for "todas"
     if limite_sql is not None:

@@ -5,52 +5,79 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Calendário Geral - FAF</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css' rel='stylesheet' />
   <style>
-    body { 
-      background-color: #f8f9fa; 
-      padding: 20px; 
+    body {
+      background-color: #f4f3f8;
+      padding: 20px;
     }
-    .header-section { 
-      background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+    .header-section {
+      background: linear-gradient(135deg, #312e81 0%, #4f46e5 100%);
       color: white;
-      padding: 30px; 
-      border-radius: 8px; 
+      padding: 30px;
+      border-radius: 12px;
       margin-bottom: 20px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 18px rgba(79,70,229,.28);
     }
-    .calendar-section { 
-      background: #fff; 
-      padding: 30px; 
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    .btn-parc {
+      background: linear-gradient(135deg, #312e81, #4f46e5);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600; transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; cursor: pointer; font-size: .875rem;
+    }
+    .btn-parc:hover { opacity: .88; color: #fff; }
+    .btn-parc.outline {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+    }
+    .btn-parc.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+
+    .calendar-section {
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
       min-height: 700px;
     }
-    #calendar {
-      max-width: 100%;
-      margin: 0 auto;
+    #calendar { max-width: 100%; margin: 0 auto; }
+    .fc-event { cursor: pointer; }
+    .fc-event-title { font-weight: 500; }
+
+    /* Filtros de tipo */
+    .filtros-tipo .btn-filtro {
+      border-radius: 20px; padding: 5px 14px; font-size: .82rem;
+      font-weight: 600; border: 2px solid transparent; cursor: pointer;
+      transition: all .15s;
     }
-    .fc-event {
-      cursor: pointer;
+    .filtros-tipo .btn-filtro.ativo { opacity: 1; }
+    .filtros-tipo .btn-filtro:not(.ativo) { opacity: .45; }
+
+    .modal .modal-header {
+      background: linear-gradient(135deg, #312e81, #4f46e5); color: #fff;
     }
-    .fc-event-title {
-      font-weight: 500;
-    }
+    .modal .modal-header .btn-close { filter: invert(1); }
   </style>
 </head>
 <body>
   <div class="container-fluid">
     <!-- Cabeçalho -->
     <div class="header-section">
-      <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h2><i class="bi bi-calendar3"></i> Calendário Geral</h2>
-          <p class="mb-0">Férias e aniversários da equipe</p>
+          <p class="mb-0">Férias, aniversários e datas importantes da equipe</p>
         </div>
-        <div class="d-flex gap-2">
-          <a href="{{ url_for('ferias.listar') }}" class="btn btn-light">
-            <i class="bi bi-arrow-left"></i> Voltar para Lista
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ url_for('ferias.listar') }}" class="btn-parc outline">
+            <i class="bi bi-calendar-check"></i> Férias
+          </a>
+          <a href="{{ url_for('datas_importantes.index') }}" class="btn-parc outline">
+            <i class="bi bi-calendar-event"></i> Datas Importantes
+          </a>
+          <a href="{{ url_for('main.index') }}" class="btn-parc outline">
+            <i class="bi bi-arrow-left"></i> Início
           </a>
         </div>
       </div>
@@ -68,26 +95,59 @@
       {% endif %}
     {% endwith %}
 
-    <!-- Filtro de Ano -->
+    <!-- Filtros -->
     <div class="mb-3">
-      <div class="card">
-        <div class="card-body">
-          <div class="row align-items-center">
-            <div class="col-md-3">
-              <label for="filtroAno" class="form-label mb-0">
-                <i class="bi bi-calendar3"></i> <strong>Filtrar por Ano:</strong>
+      <div class="card shadow-sm">
+        <div class="card-body py-3">
+          <div class="row align-items-center g-2">
+            <div class="col-md-2">
+              <label for="filtroAno" class="form-label mb-0 fw-semibold">
+                <i class="bi bi-calendar3"></i> Ano:
               </label>
-            </div>
-            <div class="col-md-3">
-              <select class="form-select" id="filtroAno" onchange="alterarAno()">
+              <select class="form-select form-select-sm" id="filtroAno" onchange="alterarAno()">
                 {% for ano in anos_disponiveis %}
                   <option value="{{ ano }}" {{ 'selected' if ano == ano_atual }}>{{ ano }}</option>
                 {% endfor %}
               </select>
             </div>
-            <div class="col-md-6 text-end">
-              <div class="d-flex justify-content-end align-items-center gap-3">
-                <span class="badge bg-primary">{{ eventos|length }} período(s) de férias</span>
+            <div class="col-md-10">
+              <label class="form-label mb-1 fw-semibold"><i class="bi bi-funnel"></i> Filtrar por tipo:</label>
+              <div class="d-flex flex-wrap gap-2 filtros-tipo">
+                <button class="btn-filtro ativo" data-tipo="tudo"
+                        style="background:#6366f1;color:#fff;border-color:#6366f1;"
+                        onclick="filtrarTipo('tudo',this)">
+                  <i class="bi bi-grid-3x3-gap"></i> Tudo
+                </button>
+                <button class="btn-filtro" data-tipo="ferias"
+                        style="background:hsl(142,62%,44%);color:#fff;border-color:hsl(142,62%,44%);"
+                        onclick="filtrarTipo('ferias',this)">
+                  <i class="bi bi-sun"></i> Férias
+                </button>
+                <button class="btn-filtro" data-tipo="abono"
+                        style="background:#0891b2;color:#fff;border-color:#0891b2;"
+                        onclick="filtrarTipo('abono',this)">
+                  <i class="bi bi-patch-check"></i> Abonos
+                </button>
+                <button class="btn-filtro" data-tipo="folga"
+                        style="background:#ea580c;color:#fff;border-color:#ea580c;"
+                        onclick="filtrarTipo('folga',this)">
+                  <i class="bi bi-clock-history"></i> Folgas
+                </button>
+                <button class="btn-filtro" data-tipo="consulta"
+                        style="background:#7c3aed;color:#fff;border-color:#7c3aed;"
+                        onclick="filtrarTipo('consulta',this)">
+                  <i class="bi bi-heart-pulse"></i> Consultas
+                </button>
+                <button class="btn-filtro" data-tipo="evento"
+                        style="background:#ca8a04;color:#fff;border-color:#ca8a04;"
+                        onclick="filtrarTipo('evento',this)">
+                  <i class="bi bi-calendar-star"></i> Eventos
+                </button>
+                <button class="btn-filtro" data-tipo="aniversario"
+                        style="background:#dc3545;color:#fff;border-color:#dc3545;"
+                        onclick="filtrarTipo('aniversario',this)">
+                  <i class="bi bi-gift"></i> Aniversários
+                </button>
               </div>
             </div>
           </div>
@@ -102,16 +162,16 @@
 
     <!-- Legenda -->
     <div class="mt-3">
-      <div class="card">
-        <div class="card-body">
-          <h6 class="card-title"><i class="bi bi-palette"></i> Legenda de Cores:</h6>
-          <div class="row g-2">
-            <div class="col-md-2"><span class="badge" style="background:hsl(142,40%,72%);color:#1a4a2e">&#9632;</span> 1–5 dias</div>
-            <div class="col-md-2"><span class="badge" style="background:hsl(142,52%,58%)">&#9632;</span> 6–10 dias</div>
-            <div class="col-md-2"><span class="badge" style="background:hsl(142,62%,44%)">&#9632;</span> 11–19 dias</div>
-            <div class="col-md-2"><span class="badge" style="background:hsl(142,72%,32%)">&#9632;</span> 20–29 dias</div>
-            <div class="col-md-2"><span class="badge" style="background:hsl(142,80%,20%)">&#9632;</span> 30+ dias</div>
-            <div class="col-md-2"><span class="badge" style="background:#dc3545">&#9632;</span> Aniversário 🎂</div>
+      <div class="card shadow-sm">
+        <div class="card-body py-2">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <strong class="small"><i class="bi bi-palette me-1"></i>Legenda:</strong>
+            <span class="small"><span class="badge" style="background:hsl(142,62%,44%)">&#9632;</span> Férias</span>
+            <span class="small"><span class="badge" style="background:#0891b2">&#9632;</span> Abono</span>
+            <span class="small"><span class="badge" style="background:#ea580c">&#9632;</span> Folga</span>
+            <span class="small"><span class="badge" style="background:#7c3aed">&#9632;</span> Consulta Médica</span>
+            <span class="small"><span class="badge" style="background:#ca8a04">&#9632;</span> Evento</span>
+            <span class="small"><span class="badge" style="background:#dc3545">&#9632;</span> Aniversário 🎂</span>
           </div>
         </div>
       </div>
@@ -122,11 +182,11 @@
   <div class="modal fade" id="modalDetalhes" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
-        <div class="modal-header bg-primary text-white">
+        <div class="modal-header">
           <h5 class="modal-title">
-            <i class="bi bi-info-circle"></i> Detalhes das Férias
+            <i class="bi bi-info-circle"></i> Detalhes
           </h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body" id="detalhesConteudo">
           <!-- Será preenchido via JavaScript -->
@@ -144,38 +204,50 @@
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const calendarEl = document.getElementById('calendar');
-      
-      // Eventos do backend
-      const eventos = {{ eventos|tojson }};
-      const ANIVERSARIOS = {{ aniversarios|tojson }};
-      const ANO_ATUAL = {{ ano_atual }};
 
-      // Green gradient by duration
-      function corPorDias(dias) {
+      // Dados do backend
+      const eventos          = {{ eventos|tojson }};
+      const ANIVERSARIOS     = {{ aniversarios|tojson }};
+      const DATAS_IMPORTANTES = {{ datas_importantes|tojson }};
+      const ANO_ATUAL        = {{ ano_atual }};
+
+      // ── Cores por tipo de data ─────────────────────────────────────────────
+      const COR_TIPO = {
+        'Abono':          { bg: '#0891b2', fg: '#fff' },
+        'Folga':          { bg: '#ea580c', fg: '#fff' },
+        'Consulta Médica':{ bg: '#7c3aed', fg: '#fff' },
+        'Evento':         { bg: '#ca8a04', fg: '#fff' },
+      };
+
+      // Férias: gradiente verde por duração
+      function corFerias(dias) {
         const ratio = Math.min(dias / 30, 1);
-        const L = Math.round(72 - ratio * 52);   // 72% (light) → 20% (dark)
-        const S = Math.round(40 + ratio * 40);   // 40% → 80%
+        const L = Math.round(72 - ratio * 52);
+        const S = Math.round(40 + ratio * 40);
         return { bg: `hsl(142, ${S}%, ${L}%)`, fg: L < 55 ? '#fff' : '#1a4a2e' };
       }
 
-      // Processar eventos de férias
-      const eventosProcessados = eventos.map(evento => {
-        const dias = evento.extendedProps.dias;
-        const cor = corPorDias(dias);
-        return {
-          ...evento,
+      // ── Montar lista completa de eventos ──────────────────────────────────
+      let todosEventos = [];
+
+      // Férias
+      eventos.forEach(ev => {
+        const dias = ev.extendedProps.dias;
+        const cor  = corFerias(dias);
+        todosEventos.push({
+          ...ev,
           backgroundColor: cor.bg,
           borderColor: cor.bg,
-          textColor: cor.fg
-        };
+          textColor: cor.fg,
+          extendedProps: { ...ev.extendedProps, tipo: 'ferias' }
+        });
       });
 
-      // Adicionar aniversários do ano exibido
-      ANIVERSARIOS.forEach(({nome, mes, dia}) => {
+      // Aniversários
+      ANIVERSARIOS.forEach(({ nome, mes, dia }) => {
         const dateStr = `${ANO_ATUAL}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
-        const firstName = nome.split(' ')[0];
-        eventosProcessados.push({
-          title: `🎂 ${firstName}`,
+        todosEventos.push({
+          title: `🎂 ${nome.split(' ')[0]}`,
           start: dateStr,
           allDay: true,
           backgroundColor: '#dc3545',
@@ -184,7 +256,37 @@
           extendedProps: { tipo: 'aniversario', nomeCompleto: nome, mes, dia }
         });
       });
-      
+
+      // Datas Importantes (abonos, folgas, consultas, eventos)
+      DATAS_IMPORTANTES.forEach(d => {
+        const cor    = COR_TIPO[d.nome_data] || { bg: '#6b7280', fg: '#fff' };
+        const tipo   = d.nome_data.toLowerCase().replace(' ', '_');
+        const endVal = d.data_fim ? d.data_fim : d.data_inicio;
+        // FullCalendar: end é exclusivo para allDay, somar 1 dia
+        const endDate = new Date(endVal + 'T00:00:00');
+        endDate.setDate(endDate.getDate() + 1);
+
+        todosEventos.push({
+          title: `${d.nome_data}${d.usuario_nome ? ' — ' + d.usuario_nome : (d.d_usuario ? ' — ' + d.d_usuario : '')}`,  
+          start: d.data_inicio,
+          end: endDate.toISOString().split('T')[0],
+          allDay: true,
+          backgroundColor: cor.bg,
+          borderColor: cor.bg,
+          textColor: cor.fg,
+          extendedProps: {
+            tipo: tipo,
+            nome_data: d.nome_data,
+            d_usuario: d.d_usuario,
+            usuario_nome: d.usuario_nome,
+            horario_inicio: d.horario_inicio,
+            horario_fim: d.horario_fim,
+            observacoes: d.observacoes,
+          }
+        });
+      });
+
+      // ── Instanciar calendário ─────────────────────────────────────────────
       const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         locale: 'pt-br',
@@ -194,18 +296,13 @@
           center: 'title',
           right: 'dayGridMonth,timeGridWeek,listMonth'
         },
-        buttonText: {
-          today: 'Hoje',
-          month: 'Mês',
-          week: 'Semana',
-          list: 'Lista'
-        },
-        events: eventosProcessados,
+        buttonText: { today: 'Hoje', month: 'Mês', week: 'Semana', list: 'Lista' },
+        events: todosEventos,
         eventClick: function(info) {
-          const evento = info.event;
-          const props = evento.extendedProps;
+          const ev    = info.event;
+          const props = ev.extendedProps;
+          let html = '';
 
-          let html;
           if (props.tipo === 'aniversario') {
             html = `
               <div class="text-center py-2">
@@ -213,45 +310,86 @@
                 <h5 class="mt-2">${props.nomeCompleto}</h5>
                 <span class="badge bg-danger">${String(props.dia).padStart(2,'0')}/${String(props.mes).padStart(2,'0')}</span>
               </div>`;
-          } else {
+          } else if (props.tipo === 'ferias') {
             html = `
+              <div class="mb-3"><strong><i class="bi bi-person-fill me-1"></i>Nome:</strong><br>${ev.title}</div>
+              <div class="mb-3"><strong><i class="bi bi-card-text me-1"></i>Registro:</strong><br><code>${props.d_usuario}</code></div>
               <div class="mb-3">
-                <strong><i class="bi bi-person-fill"></i> Nome:</strong><br>${evento.title}
+                <strong><i class="bi bi-calendar-range me-1"></i>Período:</strong><br>
+                ${formatarData(ev.start)} até ${formatarData(new Date(ev.end.getTime() - 86400000))}
               </div>
-              <div class="mb-3">
-                <strong><i class="bi bi-card-text"></i> Registro:</strong><br><code>${props.d_usuario}</code>
-              </div>
-              <div class="mb-3">
-                <strong><i class="bi bi-calendar-range"></i> Período:</strong><br>
-                ${formatarData(evento.start)} até ${formatarData(new Date(evento.end.getTime() - 86400000))}
-              </div>
-              <div class="mb-3">
-                <strong><i class="bi bi-clock-history"></i> Duração:</strong><br>
-                <span class="badge bg-primary">${props.dias} dia(s)</span>
+              <div><strong><i class="bi bi-clock-history me-1"></i>Duração:</strong>
+                <span class="badge bg-success ms-1">${props.dias} dia(s)</span>
               </div>`;
+          } else {
+            const icones = { abono:'patch-check', folga:'clock-history', consulta_médica:'heart-pulse', evento:'calendar-star' };
+            const icone = icones[props.tipo] || 'calendar-event';
+            html = `
+              <div class="mb-2">
+                <span class="badge fs-6 px-3 py-2" style="background:${COR_TIPO[props.nome_data]?.bg || '#6b7280'}">
+                  <i class="bi bi-${icone} me-1"></i>${props.nome_data}
+                </span>
+              </div>
+              ${props.usuario_nome ? `<div class="mb-2"><strong>Servidor(a):</strong> ${props.usuario_nome}</div>` : (props.d_usuario ? `<div class="mb-2"><strong>Registro:</strong> <code>${props.d_usuario}</code></div>` : '')}
+              <div class="mb-2">
+                <strong><i class="bi bi-calendar2 me-1"></i>Data:</strong>
+                ${formatarData(ev.start)}${ev.end ? ' até ' + formatarData(new Date(ev.end.getTime() - 86400000)) : ''}
+              </div>
+              ${props.horario_inicio ? `<div class="mb-2"><strong><i class="bi bi-clock me-1"></i>Horário:</strong>
+                ${props.horario_inicio}${props.horario_fim ? ' – ' + props.horario_fim : ''}</div>` : ''}
+              ${props.observacoes ? `<div class="mb-2"><strong>Obs:</strong><br><span class="text-muted">${props.observacoes}</span></div>` : ''}`;
           }
 
           document.getElementById('detalhesConteudo').innerHTML = html;
           new bootstrap.Modal(document.getElementById('modalDetalhes')).show();
-        },
-        eventDidMount: function(info) {
-          // Adicionar tooltip
-          info.el.title = `${info.event.title} - ${info.event.extendedProps.dias} dia(s)`;
         }
       });
-      
+
       calendar.render();
-      
-      // Função auxiliar para formatar data
-      function formatarData(date) {
-        return date.toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
+
+      // ── Filtros por tipo ──────────────────────────────────────────────────
+      window._tipoAtivo = 'tudo';
+
+      window.filtrarTipo = function(tipo, btn) {
+        window._tipoAtivo = tipo;
+
+        // Atualizar visual dos botões
+        document.querySelectorAll('.filtros-tipo .btn-filtro').forEach(b => {
+          b.classList.toggle('ativo', b.dataset.tipo === tipo);
         });
+
+        // Filtrar eventos no calendário
+        calendar.getEvents().forEach(ev => {
+          const t = ev.extendedProps.tipo || '';
+          let visivel = false;
+
+          if (tipo === 'tudo') {
+            visivel = true;
+          } else if (tipo === 'ferias') {
+            visivel = t === 'ferias';
+          } else if (tipo === 'aniversario') {
+            visivel = t === 'aniversario';
+          } else if (tipo === 'abono') {
+            visivel = t === 'abono';
+          } else if (tipo === 'folga') {
+            visivel = t === 'folga';
+          } else if (tipo === 'consulta') {
+            visivel = t === 'consulta_médica';
+          } else if (tipo === 'evento') {
+            visivel = t === 'evento';
+          }
+
+          ev.setProp('display', visivel ? 'auto' : 'none');
+        });
+      };
+
+      // ── Helpers ───────────────────────────────────────────────────────────
+      function formatarData(date) {
+        if (!date) return '—';
+        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
       }
     });
-    
+
     function alterarAno() {
       const ano = document.getElementById('filtroAno').value;
       window.location.href = `{{ url_for('ferias.calendario') }}?ano=${ano}`;

@@ -2,6 +2,7 @@
 Blueprint principal (tela inicial, dashboard)
 """
 
+from datetime import date, timedelta
 from flask import Blueprint, render_template, session, request, redirect, url_for, flash, jsonify
 from db import get_cursor, get_db
 from utils import login_required
@@ -31,7 +32,79 @@ def index():
     is_admin = user['tipo_usuario'] == 'Agente Público'
     user_acessos = (user['acessos'] or '').split(';') if user['acessos'] else []
 
-    return render_template("tela_inicial.html", user=user, is_admin=is_admin, user_acessos=user_acessos)
+    # Lembretes: eventos de hoje e amanhã
+    lembretes_hoje = []
+    lembretes_amanha = []
+    try:
+        hoje = date.today()
+        amanha = hoje + timedelta(days=1)
+        tipo_usuario_logado = user['tipo_usuario']
+        eh_gerente = tipo_usuario_logado in ['Agente Público', 'admin']
+
+        # Also check visualizar_todos_eventos flag in DB
+        if not eh_gerente:
+            cur_chk = get_cursor()
+            cur_chk.execute(
+                "SELECT visualizar_todos_eventos FROM gestao_pessoas.usuarios_infos WHERE usuario_email = %s",
+                (session.get('email'),)
+            )
+            row_chk = cur_chk.fetchone()
+            cur_chk.close()
+            if row_chk and row_chk['visualizar_todos_eventos']:
+                eh_gerente = True
+
+        cur2 = get_cursor()
+        # Datas importantes (pessoais)
+        if eh_gerente:
+            cur2.execute("""
+                SELECT 'pessoal' AS tipo, di.nome_data AS titulo, di.data_inicio,
+                       di.horario_inicio AS horario, ui.usuario_nome
+                FROM public.datas_importantes di
+                LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = di.usuario_email
+                WHERE di.data_inicio IN (%s, %s)
+                ORDER BY di.data_inicio, di.horario_inicio NULLS LAST
+            """, (hoje, amanha))
+        else:
+            cur2.execute("""
+                SELECT 'pessoal' AS tipo, di.nome_data AS titulo, di.data_inicio,
+                       di.horario_inicio AS horario, ui.usuario_nome
+                FROM public.datas_importantes di
+                LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = di.usuario_email
+                WHERE di.tipo_usuario = %s AND di.data_inicio IN (%s, %s)
+                ORDER BY di.data_inicio, di.horario_inicio NULLS LAST
+            """, (tipo_usuario_logado, hoje, amanha))
+        datas_imp = list(cur2.fetchall())
+
+        # Eventos institucionais
+        if eh_gerente:
+            cur2.execute("""
+                SELECT 'evento' AS tipo, de.nome_atividade AS titulo, de.data_inicio,
+                       NULL AS horario, ui.usuario_nome
+                FROM public.datas_eventos de
+                LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = de.usuario_email
+                WHERE de.data_inicio IN (%s, %s)
+                ORDER BY de.data_inicio
+            """, (hoje, amanha))
+        else:
+            cur2.execute("""
+                SELECT 'evento' AS tipo, de.nome_atividade AS titulo, de.data_inicio,
+                       NULL AS horario, ui.usuario_nome
+                FROM public.datas_eventos de
+                LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = de.usuario_email
+                WHERE de.tipo_usuario = %s AND de.data_inicio IN (%s, %s)
+                ORDER BY de.data_inicio
+            """, (tipo_usuario_logado, hoje, amanha))
+        datas_ev = list(cur2.fetchall())
+        cur2.close()
+
+        todos = datas_imp + datas_ev
+        lembretes_hoje = [r for r in todos if r['data_inicio'] == hoje]
+        lembretes_amanha = [r for r in todos if r['data_inicio'] == amanha]
+    except Exception:
+        pass
+
+    return render_template("tela_inicial.html", user=user, is_admin=is_admin, user_acessos=user_acessos,
+                           lembretes_hoje=lembretes_hoje, lembretes_amanha=lembretes_amanha)
 
 
 @main_bp.route("/tela-inicial-ideias", methods=["GET"])

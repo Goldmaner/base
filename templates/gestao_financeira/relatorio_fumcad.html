@@ -15,7 +15,7 @@
         }
 
         .main-container {
-            max-width: 860px;
+            max-width: 1200px;
             margin: 0 auto;
         }
 
@@ -192,6 +192,45 @@
             margin-top: 4px;
         }
 
+        /* ── Guia orientativo ── */
+        .guide-card {
+            background: #f8f9fe;
+            border: 1px solid #e0e4f5;
+            border-radius: 16px;
+            padding: 28px 30px;
+            margin-bottom: 20px;
+        }
+
+        .guide-card h5 {
+            color: #667eea;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .guide-card p, .guide-card li {
+            font-size: 0.9rem;
+            color: #495057;
+            line-height: 1.6;
+        }
+
+        .guide-table th {
+            background: #eef0fb;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #495057;
+            padding: 8px 12px;
+        }
+
+        .guide-table td {
+            font-size: 0.85rem;
+            padding: 7px 12px;
+            vertical-align: middle;
+        }
+
+        .badge-sim   { background: #d4edda; color: #155724; border-radius: 4px; padding: 2px 7px; font-size: 0.78rem; font-weight: 600; }
+        .badge-nao   { background: #f8d7da; color: #721c24; border-radius: 4px; padding: 2px 7px; font-size: 0.78rem; font-weight: 600; }
+        .badge-cond  { background: #fff3cd; color: #856404; border-radius: 4px; padding: 2px 7px; font-size: 0.78rem; font-weight: 600; }
+
         /* ── Tabela resumo ── */
         .table-resumo th {
             background: #f8f9fa;
@@ -270,8 +309,11 @@
             <button id="btn-buscar" class="btn btn-sm btn-primary px-4 mt-auto">
                 <i class="bi bi-search me-1"></i>Buscar
             </button>
+            <button id="btn-csv" class="btn btn-sm btn-outline-success px-4 mt-auto" title="Exportar os termos usados no cálculo">
+                <i class="bi bi-download me-1"></i>Exportar CSV
+            </button>
             <span class="text-muted small mt-auto ms-2">
-                <i class="bi bi-info-circle me-1"></i>Exclui termos assinados após o mês seguinte ao selecionado.
+                <i class="bi bi-info-circle me-1"></i>O mês/ano define o corte para pagamentos já realizados. Veja o guia abaixo.
             </span>
         </div>
     </div>
@@ -357,6 +399,76 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Guia orientativo -->
+    <div class="guide-card">
+        <h5><i class="bi bi-book me-2"></i>Como funciona este relatório</h5>
+
+        <p><strong>Pergunta respondida:</strong> <em>"A partir de [mês/ano selecionado], qual é o total de dívidas comprometidas do FUMCAD?"</em></p>
+        <p>
+            O relatório consolida todas as parcelas FUMCAD (<code>parcela_tipo = Programada</code> ou <code>Projetada</code>) cujo
+            comprometimento financeiro ainda está em aberto — ou estava em aberto — a partir da data de referência selecionada.
+            A soma utilizada é sempre o <strong>valor previsto</strong> de cada parcela.
+        </p>
+
+        <p class="mb-2"><strong>Regras de elegibilidade por status:</strong></p>
+        <table class="table guide-table table-bordered table-sm mb-3">
+            <thead>
+                <tr>
+                    <th>Status Principal</th>
+                    <th>Status Secundário</th>
+                    <th>Entra no cálculo?</th>
+                    <th>Condição do mês/ano</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Encaminhado para Pagamento</td>
+                    <td><em>qualquer</em></td>
+                    <td><span class="badge-sim">✅ Sim</span></td>
+                    <td>Sem efeito — sempre incluído</td>
+                </tr>
+                <tr>
+                    <td>Não Pago</td>
+                    <td>NULL ou <code>-</code></td>
+                    <td><span class="badge-sim">✅ Sim</span></td>
+                    <td>Sem efeito — sempre incluído</td>
+                </tr>
+                <tr>
+                    <td>Não Pago</td>
+                    <td>Qualquer outro valor</td>
+                    <td><span class="badge-nao">❌ Não</span></td>
+                    <td>—</td>
+                </tr>
+                <tr>
+                    <td>Pago</td>
+                    <td>Integral ou Parcial</td>
+                    <td><span class="badge-cond">⚠️ Condicional</span></td>
+                    <td>Incluído se <code>data_pagamento ≥ 1º dia do mês selecionado</code></td>
+                </tr>
+                <tr>
+                    <td>Pago</td>
+                    <td>Glosa</td>
+                    <td><span class="badge-nao">❌ Não</span></td>
+                    <td>—</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p><strong>Por que incluir pagamentos já realizados?</strong><br>
+        Quando você consulta um mês passado (ex.: janeiro/2026), as parcelas que foram pagas
+        <em>depois</em> de janeiro ainda fazem parte do estoque de dívidas <em>daquele período</em>.
+        O filtro de mês/ano delimita quais pagamentos ainda "contam" como comprometimento ativo.
+        Ao avançar o mês, pagamentos já quitados antes desse ponto deixam de aparecer automaticamente.</p>
+
+        <p><strong>Disponível Calculado = A − TFM − TCV − DEA</strong><br>
+        Onde A é o saldo bancário atual (informado manualmente) e DEA é informado manualmente.
+        TFM e TCV são calculados automaticamente pelo banco de dados.</p>
+
+        <p class="mb-0"><strong>Exportar CSV:</strong> o botão <em>Exportar CSV</em> baixa todas as linhas
+        de <code>gestao_financeira.ultra_liquidacoes</code> que compõem o cálculo para o mês/ano selecionado,
+        com todas as colunas disponíveis, pronto para abrir no Excel.</p>
     </div>
 
 </div>
@@ -520,6 +632,13 @@ function permitirApenasNumeros(event) {
 
     // Botão Buscar
     document.getElementById('btn-buscar').addEventListener('click', fetchDisponibilidade);
+
+    // Botão Exportar CSV
+    document.getElementById('btn-csv').addEventListener('click', function () {
+        const mes = document.getElementById('sel-mes').value;
+        const ano = document.getElementById('inp-ano').value;
+        window.location.href = `/gestao_financeira/api/fumcad/exportar-csv?mes=${mes}&ano=${ano}`;
+    });
 
     // Inicializa seletor com mês/ano atual
     const hoje = new Date();

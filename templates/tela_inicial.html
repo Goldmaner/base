@@ -363,9 +363,6 @@
             </a>
             {% endif %}
             {% if is_admin or 'ferias' in user_acessos %}
-            <a href="{{ url_for('ferias.listar') }}" class="faf-btn">
-              <i class="bi bi-calendar-check"></i> Férias
-            </a>
             <a href="{{ url_for('ferias.calendario') }}" class="faf-btn">
               <i class="bi bi-calendar3"></i> Calendário Geral
             </a>
@@ -847,5 +844,101 @@
       }
     });
   </script>
+
+  {% set total_lembretes = (lembretes_hoje|length) + (lembretes_amanha|length) %}
+  {% if total_lembretes > 0 %}
+  <!-- Floating Lembretes Panel -->
+  <div id="lembretesFloat" style="position:fixed;bottom:22px;right:22px;z-index:1055;width:340px;">
+    <div class="text-end mb-1">
+      <button id="lembretesToggle" onclick="toggleLembretes()"
+              class="btn btn-primary btn-sm shadow-sm" style="border-radius:30px;padding:6px 14px;font-size:0.82rem;">
+        <i class="bi bi-bell-fill"></i>
+        <span class="badge bg-danger ms-1">{{ total_lembretes }}</span>
+        <span class="ms-1">Lembretes</span>
+      </button>
+    </div>
+    <div id="lembretesCard" class="card shadow border-0" style="border-top:3px solid #2563eb !important;">
+      <div class="card-header d-flex align-items-center justify-content-between py-2 px-3"
+           style="background:#1e3a5f;color:#fff;border-radius:0;">
+        <span style="font-size:0.88rem;font-weight:700;">
+          <i class="bi bi-bell-fill me-1"></i> Lembretes do dia
+        </span>
+        <button onclick="toggleLembretes()" class="btn-close btn-close-white p-0" style="font-size:0.65rem;"></button>
+      </div>
+      <div class="card-body p-0" style="max-height:310px;overflow-y:auto;font-size:0.82rem;">
+        {% if lembretes_hoje %}
+        <div class="px-3 pt-2 pb-1" style="font-size:0.75rem;font-weight:700;color:#2563eb;letter-spacing:.4px;">
+          <i class="bi bi-calendar-check me-1"></i> HOJE
+        </div>
+        {% for item in lembretes_hoje %}
+        <a href="{{ url_for('ferias.calendario') }}"
+           class="d-flex align-items-start gap-2 px-3 py-2 text-decoration-none text-dark border-bottom"
+           style="transition:background .15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
+          <i class="bi bi-{{ 'calendar-event text-primary' if item.tipo == 'evento' else 'person-check text-success' }} mt-1" style="font-size:0.9rem;flex-shrink:0;"></i>
+          <div style="min-width:0;">
+            <div class="fw-semibold text-truncate">{{ item.titulo }}</div>
+            {% if item.horario %}<small class="text-muted"><i class="bi bi-clock"></i> {{ item.horario.strftime('%H:%M') }}</small>{% endif %}
+            {% if item.usuario_nome %}<small class="text-muted d-block text-truncate">{{ item.usuario_nome }}</small>{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+        {% endif %}
+        {% if lembretes_amanha %}
+        <div class="px-3 pt-2 pb-1" style="font-size:0.75rem;font-weight:700;color:#64748b;letter-spacing:.4px;">
+          <i class="bi bi-calendar2-plus me-1"></i> AMANHÃ
+        </div>
+        {% for item in lembretes_amanha %}
+        <a href="{{ url_for('ferias.calendario') }}"
+           class="d-flex align-items-start gap-2 px-3 py-2 text-decoration-none text-dark border-bottom"
+           style="transition:background .15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
+          <i class="bi bi-{{ 'calendar-event text-primary' if item.tipo == 'evento' else 'person-check text-success' }} mt-1" style="font-size:0.9rem;flex-shrink:0;"></i>
+          <div style="min-width:0;">
+            <div class="fw-semibold text-truncate">{{ item.titulo }}</div>
+            {% if item.horario %}<small class="text-muted"><i class="bi bi-clock"></i> {{ item.horario.strftime('%H:%M') }}</small>{% endif %}
+            {% if item.usuario_nome %}<small class="text-muted d-block text-truncate">{{ item.usuario_nome }}</small>{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+        {% endif %}
+      </div>
+      <div class="card-footer text-center py-2 border-0" style="background:#f8fafc;">
+        <a href="{{ url_for('ferias.calendario') }}" class="text-decoration-none" style="font-size:0.78rem;color:#2563eb;">
+          <i class="bi bi-calendar3 me-1"></i>Ver calendário completo
+        </a>
+      </div>
+    </div>
+  </div>
+  <script>
+    const LEMBRETES_DISMISS_KEY = 'lembretes_dismissed';
+    function toggleLembretes() {
+      const card = document.getElementById('lembretesCard');
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (card.style.display === 'none') {
+        card.style.display = 'block';
+        localStorage.removeItem(LEMBRETES_DISMISS_KEY);
+      } else {
+        card.style.display = 'none';
+        localStorage.setItem(LEMBRETES_DISMISS_KEY, todayStr);
+      }
+    }
+    // Auto-abrir ao carregar apenas se não foi dispensado hoje
+    document.addEventListener('DOMContentLoaded', function() {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const dismissed = localStorage.getItem(LEMBRETES_DISMISS_KEY);
+      const card = document.getElementById('lembretesCard');
+      if (dismissed === todayStr) {
+        card.style.display = 'none';
+      } else {
+        card.style.display = 'block';
+        // Auto-ocultar após 6 segundos
+        setTimeout(function() {
+          card.style.display = 'none';
+          localStorage.setItem(LEMBRETES_DISMISS_KEY, todayStr);
+        }, 6000);
+      }
+    });
+  </script>
+  {% endif %}
+
 </body>
 </html>

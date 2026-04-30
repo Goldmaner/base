@@ -5246,8 +5246,18 @@
                 tdParcela.append(inputParcela);
                 tr.append(tdParcela);
                 
-                // Coluna de ações (botão excluir)
+                // Coluna de ações (botões sobe/desce + excluir)
                 const tdAcao = $('<td>').addClass('text-center');
+                const btnSubir = $('<button>')
+                    .addClass('btn btn-sm btn-outline-secondary me-1')
+                    .html('<i class="bi bi-chevron-up"></i>')
+                    .attr('title', 'Mês anterior')
+                    .on('click', function() { ajustarMesCronogramaLinha(tr, -1); });
+                const btnDescer = $('<button>')
+                    .addClass('btn btn-sm btn-outline-secondary me-1')
+                    .html('<i class="bi bi-chevron-down"></i>')
+                    .attr('title', 'Próximo mês')
+                    .on('click', function() { ajustarMesCronogramaLinha(tr, 1); });
                 const btnExcluir = $('<button>')
                     .addClass('btn btn-sm btn-danger')
                     .html('<i class="bi bi-trash"></i>')
@@ -5258,7 +5268,7 @@
                             recalcularTotaisCronogramaEdicao();
                         }
                     });
-                tdAcao.append(btnExcluir);
+                tdAcao.append(btnSubir).append(btnDescer).append(btnExcluir);
                 tr.append(tdAcao);
                 
                 tbody.append(tr);
@@ -5457,6 +5467,29 @@
     }
     
     // Adicionar mês no início do cronograma de edição
+    // Ajustar mês de uma linha do cronograma de edição (delta = -1 para voltar, +1 para avançar)
+    function ajustarMesCronogramaLinha(tr, delta) {
+        const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        const tdMes = tr.find('td').eq(1);
+        const mesNomeAtual = tdMes.text().trim();
+        const partes = mesNomeAtual.split('/');
+        if (partes.length < 2) return;
+        const mesIndex = meses.indexOf(partes[0].toLowerCase());
+        if (mesIndex < 0) return;
+        const ano = parseInt('20' + partes[1]);
+
+        let novoMesIndex = mesIndex + delta;
+        let novoAno = ano;
+        if (novoMesIndex < 0)  { novoMesIndex = 11; novoAno -= 1; }
+        if (novoMesIndex > 11) { novoMesIndex = 0;  novoAno += 1; }
+
+        const novoMesNome = `${meses[novoMesIndex]}/${String(novoAno).slice(-2)}`;
+        const novaData    = `${novoAno}-${String(novoMesIndex + 1).padStart(2, '0')}-01`;
+
+        tdMes.text(novoMesNome);
+        tr.attr('data-nome-mes', novaData);
+    }
+
     function adicionarMesInicioCronogramaEdicao() {
         const totalLinhas = $('#corpoTabelaCronogramaEdicao tr').length;
         
@@ -5508,8 +5541,18 @@
         tr.append($('<td>').addClass('cronograma-edicao-total-mes fw-bold text-end').html('R$ 0,00'));
         tr.append($('<td>').addClass('text-muted').text(''));
         
-        // Botão excluir
+        // Botões sobe/desce + excluir
         const tdAcao = $('<td>').addClass('text-center');
+        const btnSubir = $('<button>')
+            .addClass('btn btn-sm btn-outline-secondary me-1')
+            .html('<i class="bi bi-chevron-up"></i>')
+            .attr('title', 'Mês anterior')
+            .on('click', function() { ajustarMesCronogramaLinha(tr, -1); });
+        const btnDescer = $('<button>')
+            .addClass('btn btn-sm btn-outline-secondary me-1')
+            .html('<i class="bi bi-chevron-down"></i>')
+            .attr('title', 'Próximo mês')
+            .on('click', function() { ajustarMesCronogramaLinha(tr, 1); });
         const btnExcluir = $('<button>')
             .addClass('btn btn-sm btn-danger')
             .html('<i class="bi bi-trash"></i>')
@@ -5520,7 +5563,7 @@
                     recalcularTotaisCronogramaEdicao();
                 }
             });
-        tdAcao.append(btnExcluir);
+        tdAcao.append(btnSubir).append(btnDescer).append(btnExcluir);
         tr.append(tdAcao);
         
         $('#corpoTabelaCronogramaEdicao').prepend(tr);
@@ -5588,8 +5631,18 @@
         tr.append($('<td>').addClass('cronograma-edicao-total-mes fw-bold text-end').html('R$ 0,00'));
         tr.append($('<td>').addClass('text-muted').text(''));
         
-        // Botão excluir
+        // Botões sobe/desce + excluir
         const tdAcao = $('<td>').addClass('text-center');
+        const btnSubir = $('<button>')
+            .addClass('btn btn-sm btn-outline-secondary me-1')
+            .html('<i class="bi bi-chevron-up"></i>')
+            .attr('title', 'Mês anterior')
+            .on('click', function() { ajustarMesCronogramaLinha(tr, -1); });
+        const btnDescer = $('<button>')
+            .addClass('btn btn-sm btn-outline-secondary me-1')
+            .html('<i class="bi bi-chevron-down"></i>')
+            .attr('title', 'Próximo mês')
+            .on('click', function() { ajustarMesCronogramaLinha(tr, 1); });
         const btnExcluir = $('<button>')
             .addClass('btn btn-sm btn-danger')
             .html('<i class="bi bi-trash"></i>')
@@ -5600,7 +5653,7 @@
                     recalcularTotaisCronogramaEdicao();
                 }
             });
-        tdAcao.append(btnExcluir);
+        tdAcao.append(btnSubir).append(btnDescer).append(btnExcluir);
         tr.append(tdAcao);
         
         $('#corpoTabelaCronogramaEdicao').append(tr);
@@ -6508,13 +6561,16 @@
                             input.hasClass('edit-val-previsto') || input.hasClass('edit-val-subtraido') ||
                             input.hasClass('edit-val-encaminhado') || input.hasClass('edit-val-pago')) {
                             
-                            // Limpar e converter valor (aceita tanto . quanto , como decimal)
+                            // Limpar e converter valor (formato BR: pontos = milhar, vírgula = decimal)
                             let valorLimpo = trimmedValue.replace(/[^\d.,\-]/g, '');
-                            valorLimpo = valorLimpo.replace(',', '.');
+                            if (valorLimpo.includes(',')) {
+                                // Formato BR: remover pontos de milhar e substituir vírgula decimal por ponto
+                                valorLimpo = valorLimpo.replace(/\./g, '').replace(',', '.');
+                            }
                             const valorFloat = parseFloat(valorLimpo);
                             
                             if (!isNaN(valorFloat)) {
-                                input.val(formatarValorMonetario(valorFloat));
+                                input.val(valorFloat.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
                             }
                         }
                         // Se é data

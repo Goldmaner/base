@@ -2,7 +2,7 @@
 Módulo de gerenciamento de conexão com o banco de dados PostgreSQL LOCAL
 """
 
-from flask import g
+from flask import g, request as _flask_request
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool, PoolError
@@ -76,10 +76,19 @@ def get_cursor():
                 print(f"[SLOW QUERY {elapsed:.2f}s] {str(query)[:200]}")
                 try:
                     from decorators import registrar_erro
+                    # Capturar rota que originou a query (contexto de request)
+                    try:
+                        _endpoint = _flask_request.path
+                        _metodo   = _flask_request.method
+                    except RuntimeError:
+                        _endpoint = None
+                        _metodo   = None
                     registrar_erro(
                         tipo_erro='query_lenta',
                         duracao_ms=int(elapsed * 1000),
-                        query_preview=str(query)[:500],
+                        query_preview=str(query),  # query completa, sem truncamento
+                        endpoint=_endpoint,
+                        metodo=_metodo,
                         mensagem=f'Query lenta: {elapsed:.2f}s',
                     )
                 except Exception:

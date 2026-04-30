@@ -102,10 +102,11 @@ def listar():
         
         # Buscar d_usuarios da tabela de usuários
         cur.execute("""
-            SELECT DISTINCT d_usuario, email
-            FROM gestao_pessoas.usuarios
-            WHERE d_usuario IS NOT NULL AND d_usuario != ''
-            ORDER BY d_usuario
+            SELECT DISTINCT u.d_usuario, u.email, ui.usuario_nome
+            FROM gestao_pessoas.usuarios u
+            LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = u.email
+            WHERE u.d_usuario IS NOT NULL AND u.d_usuario != ''
+            ORDER BY u.d_usuario
         """)
         usuarios_disponiveis = cur.fetchall()
         
@@ -446,6 +447,63 @@ def calendario():
         except Exception as e_aniv:
             print(f'[ferias] Erro ao carregar aniversários: {e_aniv}')
 
+        # Buscar datas_importantes filtradas pela unidade do usuário logado
+        # Agente Público e admin visualizam todas as unidades
+        datas_importantes = []
+        try:
+            tipo_usuario_logado = session.get('tipo_usuario', '')
+            eh_admin_ou_publico = tipo_usuario_logado in ['Agente Público', 'admin']
+
+            if tipo_usuario_logado:
+                if eh_admin_ou_publico:
+                    cur.execute("""
+                        SELECT di.id, di.nome_data, di.data_inicio, di.data_fim,
+                               di.horario_inicio, di.horario_fim, di.observacoes,
+                               di.d_usuario, di.usuario_email, di.tipo_usuario,
+                               ui.usuario_nome
+                        FROM public.datas_importantes di
+                        LEFT JOIN gestao_pessoas.usuarios_infos ui
+                               ON ui.usuario_email = di.usuario_email
+                        WHERE (
+                            EXTRACT(YEAR FROM di.data_inicio) = %s
+                            OR (di.data_fim IS NOT NULL AND EXTRACT(YEAR FROM di.data_fim) = %s)
+                        )
+                        ORDER BY di.data_inicio
+                    """, (ano_filtro, ano_filtro))
+                else:
+                    cur.execute("""
+                        SELECT di.id, di.nome_data, di.data_inicio, di.data_fim,
+                               di.horario_inicio, di.horario_fim, di.observacoes,
+                               di.d_usuario, di.usuario_email, di.tipo_usuario,
+                               ui.usuario_nome
+                        FROM public.datas_importantes di
+                        LEFT JOIN gestao_pessoas.usuarios_infos ui
+                               ON ui.usuario_email = di.usuario_email
+                        WHERE di.tipo_usuario = %s
+                          AND (
+                              EXTRACT(YEAR FROM di.data_inicio) = %s
+                              OR (di.data_fim IS NOT NULL AND EXTRACT(YEAR FROM di.data_fim) = %s)
+                          )
+                        ORDER BY di.data_inicio
+                    """, (tipo_usuario_logado, ano_filtro, ano_filtro))
+
+                for r in cur.fetchall():
+                    datas_importantes.append({
+                        'id': r['id'],
+                        'nome_data': r['nome_data'],
+                        'data_inicio': r['data_inicio'].isoformat() if r['data_inicio'] else None,
+                        'data_fim': r['data_fim'].isoformat() if r['data_fim'] else None,
+                        'horario_inicio': r['horario_inicio'].strftime('%H:%M') if r['horario_inicio'] else None,
+                        'horario_fim': r['horario_fim'].strftime('%H:%M') if r['horario_fim'] else None,
+                        'observacoes': r['observacoes'],
+                        'd_usuario': r['d_usuario'],
+                        'usuario_email': r['usuario_email'],
+                        'tipo_usuario': r['tipo_usuario'],
+                        'usuario_nome': r['usuario_nome'],
+                    })
+        except Exception as e_di:
+            print(f'[ferias] Erro ao carregar datas_importantes: {e_di}')
+
         cur.close()
         
         # Converter para formato JSON para o calendário
@@ -466,7 +524,8 @@ def calendario():
             eventos=eventos,
             ano_atual=ano_filtro,
             anos_disponiveis=anos_disponiveis,
-            aniversarios=aniversarios
+            aniversarios=aniversarios,
+            datas_importantes=datas_importantes
         )
         
     except Exception as e:

@@ -7,6 +7,7 @@ Foco:
 4. Criação de relatórios operacionais da unidade;
 4. Demonstrativo - atualizar;
 5. Foco total em orçamento anual e análise de contas.
+6. Melhorar Biblioteca Informativa, decisões AJ (prescrição, omissão de prestação de contas e juros e mora). 
 
 # Plano de Continuação do Projeto FAF
 

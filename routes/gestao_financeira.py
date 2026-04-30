@@ -1209,6 +1209,11 @@ def api_fumcad_disponibilidade():
     """
     Retorna os valores indisponíveis do FUMCAD agrupados por tipo (TFM+TCL / TCV).
 
+    Lógica de elegibilidade (independente de vigencia_inicial):
+      - Encaminhado para Pagamento : todos, qualquer status secundário
+      - Não Pago                   : apenas sem status secundário (NULL ou '-')
+      - Pago (Integral/Parcial)    : apenas se data_pagamento >= 1º dia do mês/ano selecionado
+
     Query params:
         mes  (int 1-12, default = mês atual)
         ano  (int,      default = ano atual)
@@ -1227,37 +1232,36 @@ def api_fumcad_disponibilidade():
         cur.execute("""
             SELECT
                 CASE
-                    WHEN ul.numero_termo ILIKE 'TFM%%' OR ul.numero_termo ILIKE 'TCL%%' THEN 'TFM'
-                    WHEN ul.numero_termo ILIKE 'TCV%%' THEN 'TCV'
+                    WHEN numero_termo ILIKE 'TFM%%' OR numero_termo ILIKE 'TCL%%' THEN 'TFM'
+                    WHEN numero_termo ILIKE 'TCV%%'                                THEN 'TCV'
                 END AS tipo,
-                SUM(
-                    CASE
-                        WHEN ul.valor_pago > 0 THEN ul.valor_previsto - ul.valor_pago
-                        ELSE ul.valor_previsto
-                    END
-                ) AS valor_indisponivel
+                SUM(valor_previsto) AS valor_indisponivel
 
-            FROM gestao_financeira.ultra_liquidacoes ul
-            LEFT JOIN (
-                SELECT numero_termo, data_assinatura
-                FROM public.parcerias_sei
-                WHERE aditamento = '-' AND apostilamento = '-'
-            ) ps ON ps.numero_termo = ul.numero_termo
+            FROM gestao_financeira.ultra_liquidacoes
 
             WHERE
-                ul.numero_termo ILIKE '%%FUMCAD%%'
-                AND ul.parcela_tipo IN ('Programada', 'Projetada')
-                AND ul.parcela_status IN ('Encaminhado para Pagamento', 'Não Pago')
+                numero_termo ILIKE '%%FUMCAD%%'
+                AND parcela_tipo IN ('Programada', 'Projetada')
                 AND (
-                    ul.parcela_status_secundario IS NULL
-                    OR ul.parcela_status_secundario = ''
-                    OR ul.parcela_status_secundario = '-'
-                )
-                AND (
-                    ps.data_assinatura IS NULL
-                    OR ps.data_assinatura <= MAKE_DATE(%(ano)s, %(mes)s, 1)
-                                            + INTERVAL '2 months'
-                                            - INTERVAL '1 day'
+                    -- Encaminhado para Pagamento: todos, independente do status secundário
+                    parcela_status = 'Encaminhado para Pagamento'
+
+                    OR (
+                        -- Não Pago: apenas sem status secundário (NULL ou '-')
+                        parcela_status = 'Não Pago'
+                        AND (
+                            parcela_status_secundario IS NULL
+                            OR parcela_status_secundario = ''
+                            OR parcela_status_secundario = '-'
+                        )
+                    )
+
+                    OR (
+                        -- Pago Integral/Parcial: somente a partir do 1º dia do mês selecionado
+                        parcela_status = 'Pago'
+                        AND parcela_status_secundario IN ('Integral', 'Parcial')
+                        AND data_pagamento >= MAKE_DATE(%(ano)s, %(mes)s, 1)
+                    )
                 )
 
             GROUP BY tipo
@@ -1281,6 +1285,141 @@ def api_fumcad_disponibilidade():
 
     except Exception as e:
         print(f"Erro em api_fumcad_disponibilidade: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@gestao_financeira_bp.route('/api/fumcad/exportar-csv')
+@login_required
+@requires_access('gestao_financeira')
+def api_fumcad_exportar_csv():
+    """
+    Exporta em CSV todas as parcelas FUMCAD que compõem o cálculo de indisponibilidade.
+    Usa exatamente os mesmos filtros de api_fumcad_disponibilidade.
+
+    Query params:
+        mes  (int 1-12, default = mês atual)
+        ano  (int,      default = ano atual)
+    """
+    import csv
+    import io
+    from datetime import date
+
+    try:
+        hoje = date.today()
+        mes = request.args.get('mes', type=int) or hoje.month
+        ano = request.args.get('ano', type=int) or hoje.year
+
+        if mes < 1 or mes > 12:
+            return jsonify({'success': False, 'error': 'Parâmetro mes inválido (1-12)'}), 400
+
+        cur = get_cursor()
+
+        cur.execute("""
+            SELECT
+                id,
+                numero_termo,
+                vigencia_inicial,
+                vigencia_final,
+                parcela_tipo,
+                parcela_numero,
+                valor_elemento_53_23,
+                valor_elemento_53_24,
+                valor_previsto,
+                valor_subtraido,
+                valor_encaminhado,
+                valor_pago,
+                parcela_status,
+                parcela_status_secundario,
+                parcela_andamento,
+                data_pagamento,
+                observacoes,
+                created_por,
+                created_em,
+                atualizado_por,
+                atualizado_em
+
+            FROM gestao_financeira.ultra_liquidacoes
+
+            WHERE
+                numero_termo ILIKE '%%FUMCAD%%'
+                AND parcela_tipo IN ('Programada', 'Projetada')
+                AND (
+                    parcela_status = 'Encaminhado para Pagamento'
+
+                    OR (
+                        parcela_status = 'Não Pago'
+                        AND (
+                            parcela_status_secundario IS NULL
+                            OR parcela_status_secundario = ''
+                            OR parcela_status_secundario = '-'
+                        )
+                    )
+
+                    OR (
+                        parcela_status = 'Pago'
+                        AND parcela_status_secundario IN ('Integral', 'Parcial')
+                        AND data_pagamento >= MAKE_DATE(%(ano)s, %(mes)s, 1)
+                    )
+                )
+
+            ORDER BY numero_termo, vigencia_inicial
+        """, {'mes': mes, 'ano': ano})
+
+        rows = cur.fetchall()
+        cur.close()
+
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_NONNUMERIC)
+
+        # Cabeçalho
+        writer.writerow([
+            'id', 'numero_termo', 'vigencia_inicial', 'vigencia_final',
+            'parcela_tipo', 'parcela_numero',
+            'valor_elemento_53_23', 'valor_elemento_53_24',
+            'valor_previsto', 'valor_subtraido', 'valor_encaminhado', 'valor_pago',
+            'parcela_status', 'parcela_status_secundario', 'parcela_andamento',
+            'data_pagamento', 'observacoes',
+            'created_por', 'created_em', 'atualizado_por', 'atualizado_em'
+        ])
+
+        for row in rows:
+            writer.writerow([
+                row['id'],
+                row['numero_termo'],
+                row['vigencia_inicial'],
+                row['vigencia_final'],
+                row['parcela_tipo'],
+                row['parcela_numero'],
+                row['valor_elemento_53_23'],
+                row['valor_elemento_53_24'],
+                row['valor_previsto'],
+                row['valor_subtraido'],
+                row['valor_encaminhado'],
+                row['valor_pago'],
+                row['parcela_status'],
+                row['parcela_status_secundario'],
+                row['parcela_andamento'],
+                row['data_pagamento'],
+                row['observacoes'],
+                row['created_por'],
+                row['created_em'],
+                row['atualizado_por'],
+                row['atualizado_em'],
+            ])
+
+        nome_arquivo = f"fumcad_{str(mes).zfill(2)}_{ano}.csv"
+        output.seek(0)
+        from flask import Response
+        return Response(
+            '\ufeff' + output.getvalue(),   # BOM UTF-8 para Excel
+            mimetype='text/csv; charset=utf-8',
+            headers={'Content-Disposition': f'attachment; filename="{nome_arquivo}"'}
+        )
+
+    except Exception as e:
+        print(f"Erro em api_fumcad_exportar_csv: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500

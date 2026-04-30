@@ -101,8 +101,14 @@
       background: #1e293b; color: #e2e8f0;
       border-radius: 6px; padding: 10px 14px;
       font-size: .75rem; white-space: pre-wrap; word-break: break-all;
-      max-height: 200px; overflow-y: auto;
+      max-height: 400px; overflow-y: auto;
     }
+    .detalhe-expandir {
+      font-size: .7rem; color: #94a3b8; cursor: pointer;
+      border: none; background: none; padding: 2px 6px;
+      text-decoration: underline;
+    }
+    .detalhe-pre.expanded { max-height: none; }
 
     /* ── Paginação ── */
     .pagination .page-link { color: #dc2626; }
@@ -122,6 +128,12 @@
       <p>Monitoramento de erros HTTP, queries lentas e falhas em APIs externas</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('admin.exportar_erros', formato='json') }}" class="btn-admin outline">
+        <i class="bi bi-filetype-json"></i> Exportar JSON
+      </a>
+      <a href="{{ url_for('admin.exportar_erros', formato='md') }}" class="btn-admin outline">
+        <i class="bi bi-markdown"></i> Exportar .md
+      </a>
       <a href="{{ url_for('admin.painel_testes') }}" class="btn-admin outline">
         <i class="bi bi-check2-circle"></i> Testes de Regressão
       </a>
@@ -304,7 +316,13 @@
             <td colspan="10" class="p-0">
               <div class="p-3 bg-light border-top">
                 {% if e.query_preview %}
-                <p class="mb-1" style="font-size:.78rem;font-weight:600;color:#64748b;">Query:</p>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <p class="mb-0" style="font-size:.78rem;font-weight:600;color:#64748b;">
+                    Query completa
+                    <span class="badge bg-secondary ms-1" style="font-size:.65rem;">{{ e.query_preview | length }} chars</span>
+                  </p>
+                  <button class="detalhe-expandir" onclick="toggleExpand(this)">expandir tudo</button>
+                </div>
                 <pre class="detalhe-pre">{{ e.query_preview }}</pre>
                 {% endif %}
                 {% if e.detalhes %}
@@ -409,6 +427,15 @@
           mostrarToast(d.erro || 'Erro', false);
         }
       });
+  }
+
+  function toggleExpand(btn) {
+    const pre = btn.closest('div').querySelector('.detalhe-pre');
+    if (pre.classList.toggle('expanded')) {
+      btn.textContent = 'recolher';
+    } else {
+      btn.textContent = 'expandir tudo';
+    }
   }
 </script>
 </body>

@@ -294,10 +294,12 @@
                 <label for="criar_d_usuario" class="form-label">
                   <i class="bi bi-card-text"></i> Registro (D-Usuário) *
                 </label>
-                <select class="form-select" id="criar_d_usuario" name="d_usuario" required>
+                <select class="form-select" id="criar_d_usuario" name="d_usuario" required
+                        onchange="autoPreencherNome(this, 'criar_nome_completo')">
                   <option value="">-- Selecione --</option>
                   {% for usuario in usuarios_disponiveis %}
-                    <option value="{{ usuario.d_usuario }}" title="{{ usuario.email }}">
+                    <option value="{{ usuario.d_usuario }}" title="{{ usuario.email }}"
+                            data-nome="{{ usuario.usuario_nome or '' }}">
                       {{ usuario.d_usuario }} ({{ usuario.email }})
                     </option>
                   {% endfor %}
@@ -467,6 +469,14 @@
       document.getElementById('filtrosChevron').classList.add('bi-chevron-down');
     });
     
+    // Auto-preenchimento de Nome Completo ao selecionar d_usuario
+    function autoPreencherNome(selectEl, nomeInputId) {
+      const opt = selectEl.options[selectEl.selectedIndex];
+      const nome = opt.getAttribute('data-nome') || '';
+      const nomeInput = document.getElementById(nomeInputId);
+      if (nomeInput && nome) nomeInput.value = nome;
+    }
+
     // Função para editar férias
     function editarFerias(id, dUsuario, nome, inicioFerias, fimFerias, inicioAquis, fimAquis) {
       document.getElementById('editar_d_usuario').value = dUsuario;

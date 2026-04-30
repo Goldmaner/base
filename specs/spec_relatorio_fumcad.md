@@ -2,13 +2,18 @@
 **Arquivo:** `relatorio_fumcad.html`  
 **Contexto:** Gestão Orçamentária — Sistema de Gestão Financeira Municipal  
 **Stack:** Flask (Python) + HTML/CSS/JS puro  
-**Status:** ✅ Fechada — pronta para implementação
+**Status:** ✅ Atualizada — v2
 
 ---
 
 ## 1. Objetivo
 
 Exibir os valores **indisponíveis** do FUMCAD (Fundo Municipal dos Direitos da Criança e do Adolescente), permitindo calcular o saldo disponível real da conta bancária deduzindo compromissos financeiros pendentes, agrupados por tipo de instrumento: Termo de Fomento, Termo de Convênio e DEA.
+
+**Pergunta central que o relatório responde:**  
+> "A partir de [mês/ano selecionado], qual é o total de dívidas comprometidas do FUMCAD?"
+
+O seletor de mês/ano define o **ponto de corte para pagamentos já efetuados**: parcelas pagas a partir dessa data ainda são consideradas dívidas, pois o dinheiro já está comprometido no exercício vigente.
 
 ---
 
@@ -22,19 +27,19 @@ gestao_financeira.ultra_liquidacoes
 | Coluna                      | Tipo          | Uso                                                                  |
 |-----------------------------|---------------|----------------------------------------------------------------------|
 | `numero_termo`              | varchar       | Identifica o instrumento e se é FUMCAD                               |
-| `vigencia_inicial`          | date          | Início da vigência — usado como critério temporal                    |
+| `vigencia_inicial`          | date          | Início da vigência                                                   |
 | `vigencia_final`            | date          | Fim da vigência                                                      |
-| `valor_previsto`            | numeric(18,2) | Valor total previsto da parcela                                      |
-| `valor_pago`                | numeric(18,2) | Valor já pago (pode ser parcial)                                     |
+| `parcela_tipo`              | varchar       | Tipo da parcela: `Programada` / `Projetada`                         |
+| `valor_previsto`            | numeric(18,2) | Valor total previsto da parcela — **coluna de soma**                 |
+| `valor_pago`                | numeric(18,2) | Valor já pago (referência, não usado no SUM)                         |
 | `parcela_status`            | varchar       | Status principal: `Pago` / `Encaminhado para Pagamento` / `Não Pago` |
 | `parcela_status_secundario` | varchar       | Status secundário (valores conforme tabela categórica abaixo)        |
+| `data_pagamento`            | date          | Data em que o pagamento foi realizado — filtro para status `Pago`    |
 
 ### 2.2 Tabela categórica de status (referência — sem JOIN em runtime)
 ```
 categoricas.c_dac_status_pagamento
 ```
-
-Os valores de `parcela_status_secundario` em `ultra_liquidacoes` são inseridos via dropdown referenciando essa tabela. Estão desnormalizados na coluna principal — não é necessário JOIN.
 
 | status_principal           | status_secundario                   |
 |----------------------------|-------------------------------------|
@@ -56,95 +61,55 @@ Os valores de `parcela_status_secundario` em `ultra_liquidacoes` são inseridos 
 
 ### 3.1 Identificação de registros FUMCAD
 - `numero_termo ILIKE '%FUMCAD%'`
-- Prefixo `TFM` → **Termo de Fomento**
+- Prefixo `TFM` ou `TCL` → **Termo de Fomento / Colaboração**
 - Prefixo `TCV` → **Termo de Convênio**
 
-### 3.2 Critério temporal — filtro por mês selecionado
-O filtro usa o **mês e ano de `vigencia_inicial`**:
-
+### 3.2 Filtro de tipo de parcela
+Apenas parcelas dos tipos:
 ```
-EXTRACT(YEAR  FROM vigencia_inicial) = :ano_selecionado
-AND
-EXTRACT(MONTH FROM vigencia_inicial) = :mes_selecionado
+parcela_tipo IN ('Programada', 'Projetada')
 ```
-
-Somente parcelas cujo `vigencia_inicial` cai no mês/ano escolhido são incluídas.
 
 ### 3.3 Cálculo do valor indisponível por parcela
-
+A soma é sempre sobre `valor_previsto` — sem subtração:
 ```
-CASE
-  WHEN valor_pago > 0 THEN valor_previsto - valor_pago
-  ELSE valor_previsto
-END
+SUM(valor_previsto)
 ```
 
-Captura pagamentos parciais: o saldo remanescente (`previsto - pago`) ainda está comprometido.  
-Aplica-se igualmente a **TFM e TCV**.
+### 3.4 Elegibilidade de parcelas — critério de status
 
-### 3.4 Elegibilidade de parcelas
+| parcela_status             | parcela_status_secundario       | Entra no cálculo? | Condição adicional |
+|----------------------------|---------------------------------|-------------------|--------------------|
+| Encaminhado para Pagamento | qualquer                        | ✅ Sim             | — |
+| Não Pago                   | NULL ou `-`                     | ✅ Sim             | — |
+| Não Pago                   | Qualquer outro valor            | ❌ Não             | — |
+| Pago                       | Integral                        | ✅ Sim             | `data_pagamento >= 1º dia do mês selecionado` |
+| Pago                       | Parcial                         | ✅ Sim             | `data_pagamento >= 1º dia do mês selecionado` |
+| Pago                       | Glosa                           | ❌ Não             | — |
 
-| parcela_status             | parcela_status_secundario       | Entra no cálculo? |
-|----------------------------|---------------------------------|-------------------|
-| Pago                       | Integral                        | ❌ Não             |
-| Pago                       | Parcial                         | ✅ Sim (saldo = previsto − pago) |
-| Pago                       | Glosa                           | ✅ Sim (saldo = previsto − pago) |
-| Encaminhado para Pagamento | -                               | ✅ Sim             |
-| Não Pago                   | -                               | ✅ Sim             |
-| Não Pago                   | Antigos                         | ❌ Não             |
-| Não Pago                   | Falta Certidão                  | ✅ Sim *           |
-| Não Pago                   | Aguardando Alteração            | ✅ Sim *           |
-| Não Pago                   | Falta encarte de Prestações     | ✅ Sim *           |
-| Não Pago                   | Rescisão                        | ✅ Sim *           |
-| Não Pago                   | Glosa                           | ✅ Sim *           |
+**Lógica para `Pago`:** se o gestor seleciona "março/2026", todas as parcelas pagas a partir de 01/03/2026 são incluídas, pois o comprometimento financeiro já estava estabelecido nesse período.
 
-*Sujeitos à regra de exercício orçamentário (3.5).
+### 3.5 Semântica do seletor de mês/ano
 
-### 3.5 Regra de exercício orçamentário — aplica-se APENAS ao TFM
+O seletor **não filtra por vigência** — filtra apenas o ponto de corte para pagamentos já realizados:
 
-O TFM respeita o exercício orçamentário anual. O **TCV não é afetado** por esta regra.
-
-**Lógica da janela de transição** (calculada dinamicamente pelo ano corrente do servidor):
-
-```
-data_corte = 01/03/ano_atual   ← sempre 1º de março do ano corrente
-
-SE CURRENT_DATE < data_corte:
-    # Janela jan–fev: considera ano atual E ano anterior
-    TFM: vigencia_inicial >= 01/01/(ano_atual - 1)
-
-SE CURRENT_DATE >= data_corte:
-    # A partir de março: apenas o ano vigente
-    TFM: vigencia_inicial >= 01/01/ano_atual
-```
-
-Isso significa que registros de TFM do ano anterior são automaticamente descartados após 1º de março, sem nenhuma configuração manual.
+| Tipo de status             | Efeito do seletor de mês/ano                          |
+|----------------------------|-------------------------------------------------------|
+| Encaminhado para Pagamento | Sem efeito — sempre incluído                          |
+| Não Pago (null/-)          | Sem efeito — sempre incluído                          |
+| Pago (Integral/Parcial)    | Incluído se `data_pagamento >= MAKE_DATE(ano, mes, 1)` |
 
 ---
 
 ## 4. Query SQL
 
-> ⚠️ **Antes de executar em produção:** verificar existência de índices:
-> ```sql
-> SELECT indexname, indexdef
-> FROM pg_indexes
-> WHERE tablename = 'ultra_liquidacoes'
->   AND schemaname = 'gestao_financeira';
-> ```
-> Se não houver índices em `vigencia_inicial`, `numero_termo` ou `parcela_status`, criá-los antes de ir a produção.
-
 ```sql
 SELECT
     CASE
-        WHEN numero_termo ILIKE 'TFM%' THEN 'TFM'
-        WHEN numero_termo ILIKE 'TCV%' THEN 'TCV'
+        WHEN numero_termo ILIKE 'TFM%' OR numero_termo ILIKE 'TCL%' THEN 'TFM'
+        WHEN numero_termo ILIKE 'TCV%'                               THEN 'TCV'
     END AS tipo,
-    SUM(
-        CASE
-            WHEN valor_pago > 0 THEN valor_previsto - valor_pago
-            ELSE valor_previsto
-        END
-    ) AS valor_indisponivel
+    SUM(valor_previsto) AS valor_indisponivel
 
 FROM gestao_financeira.ultra_liquidacoes
 
@@ -152,37 +117,29 @@ WHERE
     -- Apenas registros FUMCAD
     numero_termo ILIKE '%FUMCAD%'
 
-    -- Filtro pelo mês/ano de início de vigência
-    AND EXTRACT(YEAR  FROM vigencia_inicial) = :ano_selecionado
-    AND EXTRACT(MONTH FROM vigencia_inicial) = :mes_selecionado
+    -- Tipos de parcela válidos
+    AND parcela_tipo IN ('Programada', 'Projetada')
 
-    -- Excluir Pago Integral (único "Pago" que sai)
-    AND NOT (parcela_status = 'Pago' AND parcela_status_secundario = 'Integral')
-
-    -- Excluir Não Pago Antigos
-    AND NOT (parcela_status = 'Não Pago' AND parcela_status_secundario = 'Antigos')
-
-    -- Regra de exercício orçamentário: aplica-se apenas ao TFM
+    -- Elegibilidade por status
     AND (
-        -- TCV: sem restrição de ano
-        numero_termo ILIKE 'TCV%'
+        -- Encaminhado para Pagamento: todos
+        parcela_status = 'Encaminhado para Pagamento'
 
         OR (
-            -- TFM: aplica janela de transição
-            numero_termo ILIKE 'TFM%'
+            -- Não Pago: apenas sem status secundário
+            parcela_status = 'Não Pago'
             AND (
-                -- Dentro da janela jan–fev: aceita ano atual e anterior
-                (
-                    CURRENT_DATE < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '2 months'
-                    AND EXTRACT(YEAR FROM vigencia_inicial) >= EXTRACT(YEAR FROM CURRENT_DATE) - 1
-                )
-                OR
-                -- A partir de março: apenas ano vigente
-                (
-                    CURRENT_DATE >= DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '2 months'
-                    AND EXTRACT(YEAR FROM vigencia_inicial) = EXTRACT(YEAR FROM CURRENT_DATE)
-                )
+                parcela_status_secundario IS NULL
+                OR parcela_status_secundario = ''
+                OR parcela_status_secundario = '-'
             )
+        )
+
+        OR (
+            -- Pago Integral/Parcial: a partir do 1º dia do mês selecionado
+            parcela_status = 'Pago'
+            AND parcela_status_secundario IN ('Integral', 'Parcial')
+            AND data_pagamento >= MAKE_DATE(:ano, :mes, 1)
         )
     )
 
