@@ -1209,7 +1209,9 @@ def api_fumcad_disponibilidade():
     """
     Retorna os valores indisponíveis do FUMCAD agrupados por tipo (TFM+TCL / TCV).
 
-    Lógica de elegibilidade (independente de vigencia_inicial):
+    Lógica de elegibilidade:
+      - Apenas termos assinados até o 1º dia do mês selecionado
+        (via parcerias_sei onde aditamento='-' e apostilamento='-')
       - Encaminhado para Pagamento : todos, qualquer status secundário
       - Não Pago                   : apenas sem status secundário (NULL ou '-')
       - Pago (Integral/Parcial)    : apenas se data_pagamento >= 1º dia do mês/ano selecionado
@@ -1232,35 +1234,46 @@ def api_fumcad_disponibilidade():
         cur.execute("""
             SELECT
                 CASE
-                    WHEN numero_termo ILIKE 'TFM%%' OR numero_termo ILIKE 'TCL%%' THEN 'TFM'
-                    WHEN numero_termo ILIKE 'TCV%%'                                THEN 'TCV'
+                    WHEN ul.numero_termo ILIKE 'TFM%%' OR ul.numero_termo ILIKE 'TCL%%' THEN 'TFM'
+                    WHEN ul.numero_termo ILIKE 'TCV%%'                                    THEN 'TCV'
                 END AS tipo,
-                SUM(valor_previsto) AS valor_indisponivel
+                SUM(ul.valor_previsto) AS valor_indisponivel
 
-            FROM gestao_financeira.ultra_liquidacoes
+            FROM gestao_financeira.ultra_liquidacoes ul
+            LEFT JOIN (
+                SELECT numero_termo, MIN(data_assinatura) AS data_assinatura
+                FROM public.parcerias_sei
+                WHERE aditamento = '-' AND apostilamento = '-'
+                GROUP BY numero_termo
+            ) ps ON ps.numero_termo = ul.numero_termo
 
             WHERE
-                numero_termo ILIKE '%%FUMCAD%%'
-                AND parcela_tipo IN ('Programada', 'Projetada')
+                ul.numero_termo ILIKE '%%FUMCAD%%'
+                AND ul.parcela_tipo IN ('Programada', 'Projetada')
+                -- Termo deve ter sido assinado até o 1º dia do mês selecionado
+                AND (
+                    ps.data_assinatura IS NULL
+                    OR ps.data_assinatura <= MAKE_DATE(%(ano)s, %(mes)s, 1)
+                )
                 AND (
                     -- Encaminhado para Pagamento: todos, independente do status secundário
-                    parcela_status = 'Encaminhado para Pagamento'
+                    ul.parcela_status = 'Encaminhado para Pagamento'
 
                     OR (
                         -- Não Pago: apenas sem status secundário (NULL ou '-')
-                        parcela_status = 'Não Pago'
+                        ul.parcela_status = 'Não Pago'
                         AND (
-                            parcela_status_secundario IS NULL
-                            OR parcela_status_secundario = ''
-                            OR parcela_status_secundario = '-'
+                            ul.parcela_status_secundario IS NULL
+                            OR ul.parcela_status_secundario = ''
+                            OR ul.parcela_status_secundario = '-'
                         )
                     )
 
                     OR (
                         -- Pago Integral/Parcial: somente a partir do 1º dia do mês selecionado
-                        parcela_status = 'Pago'
-                        AND parcela_status_secundario IN ('Integral', 'Parcial')
-                        AND data_pagamento >= MAKE_DATE(%(ano)s, %(mes)s, 1)
+                        ul.parcela_status = 'Pago'
+                        AND ul.parcela_status_secundario IN ('Integral', 'Parcial')
+                        AND ul.data_pagamento >= MAKE_DATE(%(ano)s, %(mes)s, 1)
                     )
                 )
 
@@ -1318,53 +1331,65 @@ def api_fumcad_exportar_csv():
 
         cur.execute("""
             SELECT
-                id,
-                numero_termo,
-                vigencia_inicial,
-                vigencia_final,
-                parcela_tipo,
-                parcela_numero,
-                valor_elemento_53_23,
-                valor_elemento_53_24,
-                valor_previsto,
-                valor_subtraido,
-                valor_encaminhado,
-                valor_pago,
-                parcela_status,
-                parcela_status_secundario,
-                parcela_andamento,
-                data_pagamento,
-                observacoes,
-                created_por,
-                created_em,
-                atualizado_por,
-                atualizado_em
+                ul.id,
+                ul.numero_termo,
+                ul.vigencia_inicial,
+                ul.vigencia_final,
+                ul.parcela_tipo,
+                ul.parcela_numero,
+                ul.valor_elemento_53_23,
+                ul.valor_elemento_53_24,
+                ul.valor_previsto,
+                ul.valor_subtraido,
+                ul.valor_encaminhado,
+                ul.valor_pago,
+                ul.parcela_status,
+                ul.parcela_status_secundario,
+                ul.parcela_andamento,
+                ul.data_pagamento,
+                ul.observacoes,
+                ul.created_por,
+                ul.created_em,
+                ul.atualizado_por,
+                ul.atualizado_em,
+                ps.data_assinatura AS data_assinatura_termo
 
-            FROM gestao_financeira.ultra_liquidacoes
+            FROM gestao_financeira.ultra_liquidacoes ul
+            LEFT JOIN (
+                SELECT numero_termo, MIN(data_assinatura) AS data_assinatura
+                FROM public.parcerias_sei
+                WHERE aditamento = '-' AND apostilamento = '-'
+                GROUP BY numero_termo
+            ) ps ON ps.numero_termo = ul.numero_termo
 
             WHERE
-                numero_termo ILIKE '%%FUMCAD%%'
-                AND parcela_tipo IN ('Programada', 'Projetada')
+                ul.numero_termo ILIKE '%%FUMCAD%%'
+                AND ul.parcela_tipo IN ('Programada', 'Projetada')
+                -- Termo deve ter sido assinado até o 1º dia do mês selecionado
                 AND (
-                    parcela_status = 'Encaminhado para Pagamento'
+                    ps.data_assinatura IS NULL
+                    OR ps.data_assinatura <= MAKE_DATE(%(ano)s, %(mes)s, 1)
+                )
+                AND (
+                    ul.parcela_status = 'Encaminhado para Pagamento'
 
                     OR (
-                        parcela_status = 'Não Pago'
+                        ul.parcela_status = 'Não Pago'
                         AND (
-                            parcela_status_secundario IS NULL
-                            OR parcela_status_secundario = ''
-                            OR parcela_status_secundario = '-'
+                            ul.parcela_status_secundario IS NULL
+                            OR ul.parcela_status_secundario = ''
+                            OR ul.parcela_status_secundario = '-'
                         )
                     )
 
                     OR (
-                        parcela_status = 'Pago'
-                        AND parcela_status_secundario IN ('Integral', 'Parcial')
-                        AND data_pagamento >= MAKE_DATE(%(ano)s, %(mes)s, 1)
+                        ul.parcela_status = 'Pago'
+                        AND ul.parcela_status_secundario IN ('Integral', 'Parcial')
+                        AND ul.data_pagamento >= MAKE_DATE(%(ano)s, %(mes)s, 1)
                     )
                 )
 
-            ORDER BY numero_termo, vigencia_inicial
+            ORDER BY ul.numero_termo, ul.vigencia_inicial
         """, {'mes': mes, 'ano': ano})
 
         rows = cur.fetchall()
@@ -1381,7 +1406,8 @@ def api_fumcad_exportar_csv():
             'valor_previsto', 'valor_subtraido', 'valor_encaminhado', 'valor_pago',
             'parcela_status', 'parcela_status_secundario', 'parcela_andamento',
             'data_pagamento', 'observacoes',
-            'created_por', 'created_em', 'atualizado_por', 'atualizado_em'
+            'created_por', 'created_em', 'atualizado_por', 'atualizado_em',
+            'data_assinatura_termo'
         ])
 
         for row in rows:
@@ -1407,6 +1433,7 @@ def api_fumcad_exportar_csv():
                 row['created_em'],
                 row['atualizado_por'],
                 row['atualizado_em'],
+                row['data_assinatura_termo'],
             ])
 
         nome_arquivo = f"fumcad_{str(mes).zfill(2)}_{ano}.csv"

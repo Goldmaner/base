@@ -59,7 +59,7 @@ def index():
             cur2.execute("""
                 SELECT 'pessoal' AS tipo, di.nome_data AS titulo, di.data_inicio,
                        di.horario_inicio AS horario, ui.usuario_nome
-                FROM public.datas_importantes di
+                FROM calendario.datas_importantes di
                 LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = di.usuario_email
                 WHERE di.data_inicio IN (%s, %s)
                 ORDER BY di.data_inicio, di.horario_inicio NULLS LAST
@@ -68,7 +68,7 @@ def index():
             cur2.execute("""
                 SELECT 'pessoal' AS tipo, di.nome_data AS titulo, di.data_inicio,
                        di.horario_inicio AS horario, ui.usuario_nome
-                FROM public.datas_importantes di
+                FROM calendario.datas_importantes di
                 LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = di.usuario_email
                 WHERE di.tipo_usuario = %s AND di.data_inicio IN (%s, %s)
                 ORDER BY di.data_inicio, di.horario_inicio NULLS LAST
@@ -80,7 +80,7 @@ def index():
             cur2.execute("""
                 SELECT 'evento' AS tipo, de.nome_atividade AS titulo, de.data_inicio,
                        NULL AS horario, ui.usuario_nome
-                FROM public.datas_eventos de
+                FROM calendario.datas_eventos de
                 LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = de.usuario_email
                 WHERE de.data_inicio IN (%s, %s)
                 ORDER BY de.data_inicio
@@ -89,7 +89,7 @@ def index():
             cur2.execute("""
                 SELECT 'evento' AS tipo, de.nome_atividade AS titulo, de.data_inicio,
                        NULL AS horario, ui.usuario_nome
-                FROM public.datas_eventos de
+                FROM calendario.datas_eventos de
                 LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = de.usuario_email
                 WHERE de.tipo_usuario = %s AND de.data_inicio IN (%s, %s)
                 ORDER BY de.data_inicio

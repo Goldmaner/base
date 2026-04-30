@@ -32,7 +32,7 @@ def listar():
         # Buscar anos disponíveis para o filtro
         cur.execute("""
             SELECT DISTINCT EXTRACT(YEAR FROM ferias_inicio) as ano
-            FROM gestao_pessoas.datas_ferias
+            FROM calendario.datas_ferias
             ORDER BY ano DESC
         """)
         anos_disponiveis = [int(row['ano']) for row in cur.fetchall()]
@@ -49,7 +49,7 @@ def listar():
                 df.aquisitivo_fim,
                 (df.ferias_fim - df.ferias_inicio + 1) as dias_ferias,
                 u.tipo_usuario
-            FROM gestao_pessoas.datas_ferias df
+            FROM calendario.datas_ferias df
             LEFT JOIN gestao_pessoas.usuarios u ON df.d_usuario = u.d_usuario
             WHERE 1=1
         """
@@ -95,7 +95,7 @@ def listar():
         # Buscar nomes únicos para o filtro
         cur.execute("""
             SELECT DISTINCT nome_completo
-            FROM gestao_pessoas.datas_ferias
+            FROM calendario.datas_ferias
             ORDER BY nome_completo
         """)
         nomes_disponiveis = [row['nome_completo'] for row in cur.fetchall()]
@@ -114,7 +114,7 @@ def listar():
         cur.execute("""
             SELECT DISTINCT u.tipo_usuario
             FROM gestao_pessoas.usuarios u
-            INNER JOIN gestao_pessoas.datas_ferias df ON u.d_usuario = df.d_usuario
+            INNER JOIN calendario.datas_ferias df ON u.d_usuario = df.d_usuario
             WHERE u.tipo_usuario IS NOT NULL AND u.tipo_usuario != ''
             ORDER BY u.tipo_usuario
         """)
@@ -175,7 +175,7 @@ def exportar_csv():
                 df.aquisitivo_fim,
                 (df.ferias_fim - df.ferias_inicio + 1) as dias_ferias,
                 u.tipo_usuario
-            FROM gestao_pessoas.datas_ferias df
+            FROM calendario.datas_ferias df
             LEFT JOIN gestao_pessoas.usuarios u ON df.d_usuario = u.d_usuario
             WHERE 1=1
         """
@@ -281,7 +281,7 @@ def criar():
         
         cur = get_cursor()
         cur.execute("""
-            INSERT INTO gestao_pessoas.datas_ferias 
+            INSERT INTO calendario.datas_ferias 
             (d_usuario, nome_completo, ferias_inicio, ferias_fim, aquisitivo_inicio, aquisitivo_fim)
             VALUES (%s, %s, %s, %s, %s, %s)
         """, (d_usuario, nome_completo, ferias_inicio, ferias_fim, aquisitivo_inicio, aquisitivo_fim))
@@ -323,7 +323,7 @@ def editar(id):
         
         cur = get_cursor()
         cur.execute("""
-            UPDATE gestao_pessoas.datas_ferias
+            UPDATE calendario.datas_ferias
             SET d_usuario = %s,
                 nome_completo = %s,
                 ferias_inicio = %s,
@@ -362,7 +362,7 @@ def deletar(id):
         cur = get_cursor()
         
         # Buscar dados antes de deletar para mensagem
-        cur.execute("SELECT nome_completo FROM gestao_pessoas.datas_ferias WHERE id = %s", (id,))
+        cur.execute("SELECT nome_completo FROM calendario.datas_ferias WHERE id = %s", (id,))
         ferias = cur.fetchone()
         
         if not ferias:
@@ -373,7 +373,7 @@ def deletar(id):
         nome = ferias['nome_completo']
         
         # Deletar
-        cur.execute("DELETE FROM gestao_pessoas.datas_ferias WHERE id = %s", (id,))
+        cur.execute("DELETE FROM calendario.datas_ferias WHERE id = %s", (id,))
         get_db().commit()
         cur.close()
         
@@ -410,7 +410,7 @@ def calendario():
                 ferias_inicio,
                 ferias_fim,
                 (ferias_fim - ferias_inicio + 1) as dias_ferias
-            FROM gestao_pessoas.datas_ferias
+            FROM calendario.datas_ferias
             WHERE EXTRACT(YEAR FROM ferias_inicio) = %s
                OR EXTRACT(YEAR FROM ferias_fim) = %s
             ORDER BY ferias_inicio
@@ -421,7 +421,7 @@ def calendario():
         # Buscar anos disponíveis
         cur.execute("""
             SELECT DISTINCT EXTRACT(YEAR FROM ferias_inicio) as ano
-            FROM gestao_pessoas.datas_ferias
+            FROM calendario.datas_ferias
             ORDER BY ano DESC
         """)
         anos_disponiveis = [int(row['ano']) for row in cur.fetchall()]
@@ -461,7 +461,7 @@ def calendario():
                                di.horario_inicio, di.horario_fim, di.observacoes,
                                di.d_usuario, di.usuario_email, di.tipo_usuario,
                                ui.usuario_nome
-                        FROM public.datas_importantes di
+                        FROM calendario.datas_importantes di
                         LEFT JOIN gestao_pessoas.usuarios_infos ui
                                ON ui.usuario_email = di.usuario_email
                         WHERE (
@@ -476,7 +476,7 @@ def calendario():
                                di.horario_inicio, di.horario_fim, di.observacoes,
                                di.d_usuario, di.usuario_email, di.tipo_usuario,
                                ui.usuario_nome
-                        FROM public.datas_importantes di
+                        FROM calendario.datas_importantes di
                         LEFT JOIN gestao_pessoas.usuarios_infos ui
                                ON ui.usuario_email = di.usuario_email
                         WHERE di.tipo_usuario = %s

@@ -3,11 +3,21 @@ Blueprint de Datas Importantes
 Gerencia abonos, folgas, consultas médicas e eventos por usuário.
 """
 
+import re
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from db import get_cursor, get_db
 from utils import login_required
 from decorators import requires_access
 from datetime import datetime
+
+
+def sanitizar_nome_doc(nome):
+    """Sanitiza nome para uso como nome de arquivo (chars inválidos removidos, espaços → _)."""
+    nome = nome.strip()
+    nome = re.sub(r'[\\/:*?"<>|]', '', nome)
+    nome = re.sub(r'\s+', '_', nome)
+    nome = re.sub(r'_+', '_', nome)
+    return nome.strip('_') or 'documento'
 
 datas_importantes_bp = Blueprint('datas_importantes', __name__, url_prefix='/datas-importantes')
 
@@ -69,7 +79,7 @@ def index():
                        di.horario_inicio, di.horario_fim, di.observacoes,
                        di.created_at, di.updated_at,
                        ui.usuario_nome, di.usuario_email
-                FROM public.datas_importantes di
+                FROM calendario.datas_importantes di
                 LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = di.usuario_email
                 WHERE di.nome_data <> 'Evento'
                 ORDER BY di.data_inicio ASC
@@ -80,7 +90,7 @@ def index():
                        horario_inicio, horario_fim, observacoes,
                        created_at, updated_at,
                        NULL AS usuario_nome, usuario_email
-                FROM public.datas_importantes
+                FROM calendario.datas_importantes
                 WHERE usuario_email = %s
                   AND nome_data <> 'Evento'
                 ORDER BY data_inicio ASC
@@ -95,7 +105,7 @@ def index():
                        de.valor_alimentacao, de.alinhamento_aev, de.observacoes,
                        de.cancelado, de.created_at, de.updated_at,
                        ui.usuario_nome, de.usuario_email
-                FROM public.datas_eventos de
+                FROM calendario.datas_eventos de
                 LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = de.usuario_email
                 ORDER BY de.data_inicio ASC NULLS LAST
             """)
@@ -106,7 +116,7 @@ def index():
                        valor_alimentacao, alinhamento_aev, observacoes,
                        cancelado, created_at, updated_at,
                        NULL AS usuario_nome, usuario_email
-                FROM public.datas_eventos
+                FROM calendario.datas_eventos
                 WHERE usuario_email = %s
                 ORDER BY data_inicio ASC NULLS LAST
             """, (email,))
@@ -115,13 +125,24 @@ def index():
         # Responsáveis indexados por evento_id
         cur.execute("""
             SELECT id, datas_evento_id, responsavel_atividade, responsavel_tipo
-            FROM public.datas_eventos_responsaveis
+            FROM calendario.datas_eventos_responsaveis
             ORDER BY id
         """)
         resp_rows = cur.fetchall()
         responsaveis_por_evento = {}
         for r in resp_rows:
             responsaveis_por_evento.setdefault(r['datas_evento_id'], []).append(r)
+
+        # Documentos indexados por evento_id
+        cur.execute("""
+            SELECT id, datas_evento_id, nome_doc, nome_doc_link
+            FROM calendario.datas_eventos_documentos
+            ORDER BY id
+        """)
+        doc_rows = cur.fetchall()
+        documentos_por_evento = {}
+        for d in doc_rows:
+            documentos_por_evento.setdefault(d['datas_evento_id'], []).append(d)
 
         # Lista de nomes para dropdown de responsáveis
         cur.execute("""
@@ -146,6 +167,18 @@ def index():
             """)
             usuarios_acesso_lista = cur.fetchall()
 
+        # Lista de usuários para campo "Registrar para" (visível ao ver_tudo)
+        usuarios_para_registro = []
+        if ver_tudo:
+            cur.execute("""
+                SELECT u.email, COALESCE(ui.usuario_nome, u.email) AS nome_exibicao
+                FROM gestao_pessoas.usuarios u
+                LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = u.email
+                WHERE u.tipo_usuario NOT IN ('admin')
+                ORDER BY nome_exibicao
+            """)
+            usuarios_para_registro = cur.fetchall()
+
         cur.close()
 
         # Flatten to list of name strings for JS template
@@ -157,8 +190,10 @@ def index():
             registros_pessoais=registros_pessoais,
             datas_eventos=datas_eventos,
             responsaveis_por_evento=responsaveis_por_evento,
+            documentos_por_evento=documentos_por_evento,
             usuarios_nomes=nomes_lista,
             usuarios_acesso_lista=usuarios_acesso_lista,
+            usuarios_para_registro=usuarios_para_registro,
             eh_gerente=eh_gerente,
             ver_tudo=ver_tudo,
         )
@@ -177,6 +212,7 @@ def index():
 def criar():
     """Cria um novo registro em datas_importantes."""
     d_usuario, email, tipo_usuario = _get_user_info()
+    ver_tudo = _pode_ver_tudo(email, tipo_usuario)
 
     nome_data      = request.form.get('nome_data', '').strip()
     data_inicio    = request.form.get('data_inicio', '').strip()
@@ -189,10 +225,29 @@ def criar():
         flash('Tipo e data de início são obrigatórios.', 'danger')
         return redirect(url_for('datas_importantes.index'))
 
+    # Se ver_tudo, permite registrar para outro usuário
+    target_email     = email
+    target_d_usuario = d_usuario
+    target_tipo      = tipo_usuario
+    if ver_tudo:
+        para_email = request.form.get('para_usuario_email', '').strip()
+        if para_email and para_email != email:
+            cur_lu = get_cursor()
+            cur_lu.execute(
+                "SELECT d_usuario, tipo_usuario FROM gestao_pessoas.usuarios WHERE email = %s",
+                (para_email,)
+            )
+            row_lu = cur_lu.fetchone()
+            cur_lu.close()
+            if row_lu:
+                target_email     = para_email
+                target_d_usuario = row_lu['d_usuario']
+                target_tipo      = row_lu['tipo_usuario']
+
     cur = get_cursor()
     try:
         cur.execute("""
-            INSERT INTO public.datas_importantes
+            INSERT INTO calendario.datas_importantes
                 (nome_data, data_inicio, data_fim,
                  horario_inicio, horario_fim, observacoes,
                  d_usuario, usuario_email, tipo_usuario,
@@ -201,7 +256,7 @@ def criar():
         """, (
             nome_data, data_inicio, data_fim,
             horario_inicio, horario_fim, observacoes,
-            d_usuario, email, tipo_usuario,
+            target_d_usuario, target_email, target_tipo,
             email
         ))
         get_db().commit()
@@ -222,8 +277,9 @@ def criar():
 @login_required
 @requires_access('ferias')
 def editar(id):
-    """Edita um registro que pertença ao usuário logado."""
-    _, email, _ = _get_user_info()
+    """Edita um registro: dono ou usuário com ver_tudo."""
+    d_usuario, email, tipo_usuario = _get_user_info()
+    ver_tudo = _pode_ver_tudo(email, tipo_usuario)
 
     nome_data      = request.form.get('nome_data', '').strip()
     data_inicio    = request.form.get('data_inicio', '').strip()
@@ -238,8 +294,17 @@ def editar(id):
 
     cur = get_cursor()
     try:
-        cur.execute("""
-            UPDATE public.datas_importantes
+        if ver_tudo:
+            where_clause = "WHERE id = %s"
+            params_update = (nome_data, data_inicio, data_fim, horario_inicio,
+                             horario_fim, observacoes, email, id)
+        else:
+            where_clause = "WHERE id = %s AND usuario_email = %s"
+            params_update = (nome_data, data_inicio, data_fim, horario_inicio,
+                             horario_fim, observacoes, email, id, email)
+
+        cur.execute(f"""
+            UPDATE calendario.datas_importantes
             SET nome_data      = %s,
                 data_inicio    = %s,
                 data_fim       = %s,
@@ -248,12 +313,8 @@ def editar(id):
                 observacoes    = %s,
                 updated_at     = NOW(),
                 updated_por    = %s
-            WHERE id = %s AND usuario_email = %s
-        """, (
-            nome_data, data_inicio, data_fim,
-            horario_inicio, horario_fim, observacoes,
-            email, id, email
-        ))
+            {where_clause}
+        """, params_update)
 
         if cur.rowcount == 0:
             flash('Registro não encontrado ou sem permissão para editar.', 'warning')
@@ -276,15 +337,19 @@ def editar(id):
 @login_required
 @requires_access('ferias')
 def deletar(id):
-    """Remove um registro que pertença ao usuário logado."""
-    _, email, _ = _get_user_info()
+    """Remove um registro: dono ou usuário com ver_tudo."""
+    d_usuario, email, tipo_usuario = _get_user_info()
+    ver_tudo = _pode_ver_tudo(email, tipo_usuario)
 
     cur = get_cursor()
     try:
-        cur.execute(
-            "SELECT nome_data FROM public.datas_importantes WHERE id = %s AND usuario_email = %s",
-            (id, email)
-        )
+        if ver_tudo:
+            cur.execute("SELECT nome_data FROM calendario.datas_importantes WHERE id = %s", (id,))
+        else:
+            cur.execute(
+                "SELECT nome_data FROM calendario.datas_importantes WHERE id = %s AND usuario_email = %s",
+                (id, email)
+            )
         registro = cur.fetchone()
 
         if not registro:
@@ -292,10 +357,13 @@ def deletar(id):
             cur.close()
             return redirect(url_for('datas_importantes.index'))
 
-        cur.execute(
-            "DELETE FROM public.datas_importantes WHERE id = %s AND usuario_email = %s",
-            (id, email)
-        )
+        if ver_tudo:
+            cur.execute("DELETE FROM calendario.datas_importantes WHERE id = %s", (id,))
+        else:
+            cur.execute(
+                "DELETE FROM calendario.datas_importantes WHERE id = %s AND usuario_email = %s",
+                (id, email)
+            )
         get_db().commit()
         flash(f'{registro["nome_data"]} excluído com sucesso!', 'success')
 
@@ -311,7 +379,7 @@ def deletar(id):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CRUD — public.datas_eventos (atividades/eventos institucionais)
+# CRUD — calendario.datas_eventos (atividades/eventos institucionais)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @datas_importantes_bp.route("/eventos/criar", methods=["POST"])
@@ -344,7 +412,7 @@ def criar_evento():
     cur = get_cursor()
     try:
         cur.execute("""
-            INSERT INTO public.datas_eventos
+            INSERT INTO calendario.datas_eventos
                 (nome_atividade, descritivo, data_inicio, datas_adicionais,
                  participacao, local, necessita_infraestrutura,
                  valor_alimentacao, alinhamento_aev, observacoes, cancelado,
@@ -367,11 +435,24 @@ def criar_evento():
             tipo_r = tipo_r.strip()
             if nome_r:
                 cur.execute("""
-                    INSERT INTO public.datas_eventos_responsaveis
+                    INSERT INTO calendario.datas_eventos_responsaveis
                         (datas_evento_id, nome_atividade, responsavel_atividade, responsavel_tipo,
                          created_at, created_por)
                     VALUES (%s, %s, %s, %s, NOW(), %s)
                 """, (evento_id, nome_atividade, nome_r, tipo_r or None, email))
+
+        # Inserir documentos
+        doc_nomes = request.form.getlist('doc_nome[]')
+        doc_links = request.form.getlist('doc_link[]')
+        for nome_d, link_d in zip(doc_nomes, doc_links):
+            nome_d = sanitizar_nome_doc(nome_d)
+            if nome_d:
+                cur.execute("""
+                    INSERT INTO calendario.datas_eventos_documentos
+                        (datas_evento_id, nome_atividade, nome_doc, nome_doc_link,
+                         created_at, created_por)
+                    VALUES (%s, %s, %s, %s, NOW(), %s)
+                """, (evento_id, nome_atividade, nome_d, link_d.strip() or None, email))
 
         get_db().commit()
         flash(f'Atividade "{nome_atividade}" registrada com sucesso!', 'success')
@@ -428,7 +509,7 @@ def editar_evento(id):
             params_update.append(email)
 
         cur.execute(f"""
-            UPDATE public.datas_eventos
+            UPDATE calendario.datas_eventos
             SET nome_atividade          = %s,
                 descritivo              = %s,
                 data_inicio             = %s,
@@ -449,17 +530,32 @@ def editar_evento(id):
             flash('Atividade não encontrada ou sem permissão para editar.', 'warning')
         else:
             # Substituir responsáveis
-            cur.execute("DELETE FROM public.datas_eventos_responsaveis WHERE datas_evento_id = %s", (id,))
+            cur.execute("DELETE FROM calendario.datas_eventos_responsaveis WHERE datas_evento_id = %s", (id,))
             for nome_r, tipo_r in zip(resp_nomes, resp_tipos):
                 nome_r = nome_r.strip()
                 tipo_r = tipo_r.strip()
                 if nome_r:
                     cur.execute("""
-                        INSERT INTO public.datas_eventos_responsaveis
+                        INSERT INTO calendario.datas_eventos_responsaveis
                             (datas_evento_id, nome_atividade, responsavel_atividade, responsavel_tipo,
                              created_at, created_por)
                         VALUES (%s, %s, %s, %s, NOW(), %s)
                     """, (id, nome_atividade, nome_r, tipo_r or None, email))
+
+            # Substituir documentos
+            cur.execute("DELETE FROM calendario.datas_eventos_documentos WHERE datas_evento_id = %s", (id,))
+            doc_nomes = request.form.getlist('doc_nome[]')
+            doc_links = request.form.getlist('doc_link[]')
+            for nome_d, link_d in zip(doc_nomes, doc_links):
+                nome_d = sanitizar_nome_doc(nome_d)
+                if nome_d:
+                    cur.execute("""
+                        INSERT INTO calendario.datas_eventos_documentos
+                            (datas_evento_id, nome_atividade, nome_doc, nome_doc_link,
+                             created_at, created_por)
+                        VALUES (%s, %s, %s, %s, NOW(), %s)
+                    """, (id, nome_atividade, nome_d, link_d.strip() or None, email))
+
             get_db().commit()
             flash('Atividade atualizada com sucesso!', 'success')
 
@@ -485,10 +581,10 @@ def deletar_evento(id):
     cur = get_cursor()
     try:
         if eh_gerente:
-            cur.execute("SELECT nome_atividade FROM public.datas_eventos WHERE id = %s", (id,))
+            cur.execute("SELECT nome_atividade FROM calendario.datas_eventos WHERE id = %s", (id,))
         else:
             cur.execute(
-                "SELECT nome_atividade FROM public.datas_eventos WHERE id = %s AND usuario_email = %s",
+                "SELECT nome_atividade FROM calendario.datas_eventos WHERE id = %s AND usuario_email = %s",
                 (id, email)
             )
         registro = cur.fetchone()
@@ -499,10 +595,10 @@ def deletar_evento(id):
             return redirect(url_for('datas_importantes.index'))
 
         if eh_gerente:
-            cur.execute("DELETE FROM public.datas_eventos WHERE id = %s", (id,))
+            cur.execute("DELETE FROM calendario.datas_eventos WHERE id = %s", (id,))
         else:
             cur.execute(
-                "DELETE FROM public.datas_eventos WHERE id = %s AND usuario_email = %s",
+                "DELETE FROM calendario.datas_eventos WHERE id = %s AND usuario_email = %s",
                 (id, email)
             )
         get_db().commit()
@@ -560,7 +656,7 @@ def toggle_acesso():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CRUD — public.datas_eventos_responsaveis
+# CRUD — calendario.datas_eventos_responsaveis
 # ─────────────────────────────────────────────────────────────────────────────
 
 @datas_importantes_bp.route("/responsaveis/deletar/<int:id>", methods=["POST"])
@@ -574,8 +670,8 @@ def deletar_responsavel(id):
         # Verificar ownership via evento
         cur.execute("""
             SELECT de.usuario_email, de.id AS evento_id
-            FROM public.datas_eventos_responsaveis der
-            JOIN public.datas_eventos de ON de.id = der.datas_evento_id
+            FROM calendario.datas_eventos_responsaveis der
+            JOIN calendario.datas_eventos de ON de.id = der.datas_evento_id
             WHERE der.id = %s
         """, (id,))
         row = cur.fetchone()
@@ -584,9 +680,41 @@ def deletar_responsavel(id):
         elif row['usuario_email'] != email and tipo_usuario not in ('Agente Público', 'admin'):
             flash('Sem permissão para remover este responsável.', 'danger')
         else:
-            cur.execute("DELETE FROM public.datas_eventos_responsaveis WHERE id = %s", (id,))
+            cur.execute("DELETE FROM calendario.datas_eventos_responsaveis WHERE id = %s", (id,))
             get_db().commit()
             flash('Responsável removido.', 'success')
+    except Exception as e:
+        get_db().rollback()
+        flash(f'Erro: {str(e)}', 'danger')
+    finally:
+        cur.close()
+    return redirect(url_for('datas_importantes.index'))
+
+
+@datas_importantes_bp.route("/eventos/documentos/deletar/<int:id>", methods=["POST"])
+@login_required
+@requires_access('ferias')
+def deletar_documento_evento(id):
+    """Remove um documento vinculado a um evento."""
+    _, email, tipo_usuario = _get_user_info()
+    eh_gerente = tipo_usuario in ('Agente Público', 'admin')
+    cur = get_cursor()
+    try:
+        cur.execute("""
+            SELECT ded.id, de.usuario_email
+            FROM calendario.datas_eventos_documentos ded
+            JOIN calendario.datas_eventos de ON de.id = ded.datas_evento_id
+            WHERE ded.id = %s
+        """, (id,))
+        row = cur.fetchone()
+        if not row:
+            flash('Documento não encontrado.', 'warning')
+        elif row['usuario_email'] != email and not eh_gerente:
+            flash('Sem permissão para remover este documento.', 'danger')
+        else:
+            cur.execute("DELETE FROM calendario.datas_eventos_documentos WHERE id = %s", (id,))
+            get_db().commit()
+            flash('Documento removido.', 'success')
     except Exception as e:
         get_db().rollback()
         flash(f'Erro: {str(e)}', 'danger')

@@ -462,6 +462,13 @@
         O filtro de mês/ano delimita quais pagamentos ainda "contam" como comprometimento ativo.
         Ao avançar o mês, pagamentos já quitados antes desse ponto deixam de aparecer automaticamente.</p>
 
+        <p><strong>Regra de existência do termo (data de assinatura):</strong><br>
+        Um termo FUMCAD só entra no cálculo se já existia no mês selecionado.
+        A data de assinatura é obtida de <code>public.parcerias_sei</code> (registro original,
+        sem aditação nem apostilamento). Se um termo foi assinado <em>após</em> o 1º dia do mês
+        selecionado, ele é automaticamente excluído — a dívida ainda não existia.
+        Termos sem registro de assinatura são mantidos no cálculo por precaução.</p>
+
         <p><strong>Disponível Calculado = A − TFM − TCV − DEA</strong><br>
         Onde A é o saldo bancário atual (informado manualmente) e DEA é informado manualmente.
         TFM e TCV são calculados automaticamente pelo banco de dados.</p>

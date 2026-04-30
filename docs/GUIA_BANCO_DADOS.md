@@ -16,6 +16,7 @@
 - [Schema `categoricas`](#-schema-categoricas--listas-suspensas-e-catálogos)
 - [Schema `celebracao`](#-schema-celebracao--celebração-de-parcerias)
 - [Schema `auditoria_memoria`](#-schema-auditoria_memoria)
+- [Schema `calendario`](#-schema-calendario--calendário-institucional)
 - [Relacionamentos Principais](#-relacionamentos-principais)
 - [Índices de Performance](#-índices-de-performance)
 - [Extensões e Convenções](#-extensões-e-convenções)
@@ -29,10 +30,11 @@
 | `public` | 15 | Core de parcerias, certidões, editais, despesas |
 | `analises_pc` | 14 | Conciliação bancária, checklists, inconsistências |
 | `gestao_financeira` | 8 | Ultra liquidações, cronogramas, empenhos SOF |
-| `gestao_pessoas` | 6 | Usuários, férias, logs de atividade e erros |
+| `gestao_pessoas` | 5 | Usuários, logs de atividade e erros |
 | `categoricas` | 32 | Listas suspensas e catálogos editáveis |
 | `celebracao` | 6 | Processo de celebração de novos termos |
 | `auditoria_memoria` | 1 | Auditoria de encaminhamentos de pagamento |
+| `calendario` | 5 | Férias, registros pessoais, eventos e documentos |
 
 **Chave primária universal**: `numero_termo` (text/varchar) identifica cada parceria em todas as tabelas relacionadas.
 
@@ -882,23 +884,9 @@ Informações pessoais dos usuários.
 | `usuario_nome` | text | Nome completo |
 | `usuario_aniversario` | date | Data de aniversário (usado no calendário) |
 | `usuario_vinculo` | text | Tipo de vínculo funcional |
+| `visualizar_todos_eventos` | boolean | Permite ver todos os eventos institucionais |
 | `criado_por` | text | |
 | `criado_em` | timestamp | |
-
----
-
-### `gestao_pessoas.datas_ferias`
-Períodos de férias dos servidores.
-
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| `id` | integer PK | |
-| `d_usuario` | varchar(20) | Código do usuário |
-| `nome_completo` | varchar(100) | |
-| `ferias_inicio` | date | Início das férias |
-| `ferias_fim` | date | Fim das férias |
-| `aquisitivo_inicio` | date | Início do período aquisitivo |
-| `aquisitivo_fim` | date | Fim do período aquisitivo |
 
 ---
 
@@ -1179,7 +1167,107 @@ Gestão de CENTS (Certidão de Entidade do Terceiro Setor).
 
 ---
 
-## 🟫 Schema `auditoria_memoria`
+## � Schema `calendario` — Calendário Institucional
+
+> Centraliza todas as tabelas de agenda, férias, registros pessoais e eventos. Migrado de `public` e `gestao_pessoas` em 30/04/2026.
+
+### `calendario.datas_ferias`
+Períodos de férias dos servidores.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------||
+| `id` | integer PK | |
+| `d_usuario` | varchar(20) | Código do usuário |
+| `nome_completo` | varchar(100) | |
+| `ferias_inicio` | date | Início das férias |
+| `ferias_fim` | date | Fim das férias |
+| `aquisitivo_inicio` | date | Início do período aquisitivo |
+| `aquisitivo_fim` | date | Fim do período aquisitivo |
+
+---
+
+### `calendario.datas_importantes`
+Registros pessoais de cada servidor (abonos, folgas, consultas médicas, etc.).
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------||
+| `id` | integer PK | |
+| `nome_data` | text | Tipo de registro (ex: Abono, Folga, Consulta) |
+| `data_inicio` | date | Data de início |
+| `data_fim` | date | Data de fim (opcional) |
+| `horario_inicio` | time | Horário de início |
+| `horario_fim` | time | Horário de fim |
+| `observacoes` | text | |
+| `d_usuario` | varchar(20) | Código do usuário |
+| `usuario_email` | text | E-mail do usuário |
+| `tipo_usuario` | text | Tipo do usuário no momento do registro |
+| `created_at` | timestamp | |
+| `created_por` | varchar(100) | |
+| `updated_at` | timestamp | |
+| `updated_por` | varchar(100) | |
+
+---
+
+### `calendario.datas_eventos` ⭐
+Atividades e eventos institucionais.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------||
+| `id` | integer PK | |
+| `nome_atividade` | text | Nome do evento/atividade |
+| `descritivo` | text | Descrição detalhada |
+| `data_inicio` | date | Data principal |
+| `datas_adicionais` | text | Datas extras (texto livre) |
+| `participacao` | varchar(50) | Organizador / Participante / Apoiador / Convidado |
+| `local` | text | Local do evento |
+| `necessita_infraestrutura` | boolean | Requer suporte de infraestrutura |
+| `valor_alimentacao` | numeric(12,2) | Valor de alimentação previsto |
+| `alinhamento_aev` | boolean | Alinhado com a Agenda Estratégica de Vida |
+| `observacoes` | text | |
+| `cancelado` | boolean DEFAULT FALSE | Se o evento foi cancelado |
+| `d_usuario` | varchar(20) | |
+| `usuario_email` | text | |
+| `tipo_usuario` | text | |
+| `created_at` | timestamp | |
+| `created_por` | varchar(100) | |
+| `updated_at` | timestamp | |
+| `updated_por` | varchar(100) | |
+
+---
+
+### `calendario.datas_eventos_responsaveis`
+Responsáveis vinculados a cada evento.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------||
+| `id` | integer PK | |
+| `datas_evento_id` | integer FK → `datas_eventos(id)` CASCADE | |
+| `nome_atividade` | text | Denormalização do nome do evento |
+| `responsavel_atividade` | text | Nome do responsável |
+| `responsavel_tipo` | text | Ponto Focal / Apresentador(a) / Participante |
+| `created_at` | timestamp | |
+| `created_por` | varchar(100) | |
+
+---
+
+### `calendario.datas_eventos_documentos`
+Documentos e links vinculados a cada evento.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------||
+| `id` | integer PK | |
+| `datas_evento_id` | integer FK → `datas_eventos(id)` CASCADE | |
+| `nome_atividade` | text | Referência denormalizada do nome do evento |
+| `nome_doc` | text NOT NULL | Nome do documento (sanitizado para uso como arquivo) |
+| `nome_doc_link` | text | Link externo (OneDrive, SharePoint, etc.) |
+| `created_at` | timestamp DEFAULT NOW() | |
+| `created_por` | varchar(100) | |
+| `updated_at` | timestamp | |
+| `updated_por` | varchar(100) | |
+
+---
+
+## �🟫 Schema `auditoria_memoria`
 
 ### `auditoria_memoria.auditoria_enc_pagamento`
 Snapshot de encaminhamentos de pagamento para auditoria.
@@ -1229,6 +1317,10 @@ gestao_financeira.ultra_liquidacoes.parcela_numero
 
 gestao_pessoas.usuarios.email
     └── gestao_pessoas.usuarios_infos.usuario_email (1:1)
+
+calendario.datas_eventos.id
+    ├── calendario.datas_eventos_responsaveis.datas_evento_id (1:N, CASCADE)
+    └── calendario.datas_eventos_documentos.datas_evento_id  (1:N, CASCADE)
 ```
 
 ---

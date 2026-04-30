@@ -181,13 +181,40 @@
         </div>
 
         <div class="content-card-body">
-
+          <!-- Avisos institucionais -->
+          <div class="alert mb-3 d-flex align-items-start gap-2"
+               style="background:#fef3c7;border-left:4px solid #d97706;border-radius:6px;padding:12px 16px">
+            <i class="bi bi-exclamation-triangle-fill text-warning mt-1" style="font-size:1.1rem;flex-shrink:0"></i>
+            <div>
+              <strong>Meios de Aferíção:</strong> todos os documentos comprobatórios relacionados aos eventos
+              realizados (listas de presença, fotos, relatórios etc.) deverão ser encartados no processo SEI
+              <strong class="text-danger">nº&nbsp;6074.2026/0000892-3</strong>.
+            </div>
+          </div>
+          <div class="mb-4" style="font-size:.875rem">
+            <i class="bi bi-box-arrow-up-right me-1 text-primary"></i>
+            Para visualizar a <strong>Seção de Eventos da Secretaria</strong> — que contém Reservas de
+            Auditório, Agendas e Eventos anteriores —
+            <a href="https://cloudprodamazhotmail.sharepoint.com/sites/RepositorioSMDHC/SitePages/Eventos(1).aspx"
+               target="_blank" rel="noopener" class="fw-semibold">clique aqui</a>.
+          </div>
           <!-- Formulário (colapsável) -->
           <div class="collapse mb-4" id="formPessoal">
             <div class="form-card">
               <h6><i class="bi bi-pencil-square me-1"></i>Novo Registro Pessoal</h6>
               <form method="POST" action="{{ url_for('datas_importantes.criar') }}">
                 <div class="row g-3">
+                  {% if ver_tudo %}
+                  <div class="col-md-4">
+                    <label class="form-label fw-semibold"><i class="bi bi-person-fill me-1"></i>Registrar para</label>
+                    <select name="para_usuario_email" class="form-select">
+                      <option value="">— meu próprio registro —</option>
+                      {% for u in usuarios_para_registro %}
+                      <option value="{{ u.email }}">{{ u.nome_exibicao }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  {% endif %}
                   <div class="col-md-3">
                     <label class="form-label fw-semibold">Tipo <span class="text-danger">*</span></label>
                     <select name="nome_data" class="form-select" required id="selectTipoPessoal">
@@ -242,12 +269,11 @@
               <thead>
                 <tr>
                   <th>Tipo</th>
-                  {% if eh_gerente %}<th>Servidor(a)</th>{% endif %}
+                  {% if ver_tudo %}<th>Servidor(a)</th>{% endif %}
                   <th>Data Início</th>
                   <th>Data Fim</th>
                   <th>Horário</th>
                   <th>Observações</th>
-                  <th>Registrado em</th>
                   <th class="text-center">Ações</th>
                 </tr>
               </thead>
@@ -263,6 +289,9 @@
                       {{ r.nome_data }}
                     </span>
                   </td>
+                  {% if ver_tudo %}
+                  <td class="text-muted small">{{ r.usuario_nome or r.usuario_email or '—' }}</td>
+                  {% endif %}
                   <td>{{ r.data_inicio.strftime('%d/%m/%Y') if r.data_inicio }}</td>
                   <td>{{ r.data_fim.strftime('%d/%m/%Y') if r.data_fim else '—' }}</td>
                   <td class="text-muted small">
@@ -272,19 +301,15 @@
                     {% else %}—{% endif %}
                   </td>
                   <td class="text-muted small">{{ r.observacoes or '—' }}</td>
-                  {% if eh_gerente %}
-                  <td class="text-muted small">{{ r.usuario_nome or r.usuario_email or '—' }}</td>
-                  {% endif %}
-                  <td class="text-muted small">{{ r.created_at.strftime('%d/%m/%Y') if r.created_at }}</td>
                   <td class="text-center">
-                    {% if not eh_gerente or r.usuario_email == session.get('email') %}
+                    {% if ver_tudo or r.usuario_email == session.get('email') %}
                     <button class="btn btn-sm btn-outline-primary me-1"
-                            onclick="abrirEdicao({{ r.id }}, '{{ r.nome_data }}',
-                              '{{ r.data_inicio.isoformat() if r.data_inicio }}',
-                              '{{ r.data_fim.isoformat() if r.data_fim else '' }}',
-                              '{{ r.horario_inicio.strftime('%H:%M') if r.horario_inicio else '' }}',
-                              '{{ r.horario_fim.strftime('%H:%M') if r.horario_fim else '' }}',
-                              {{ r.observacoes | tojson }})"
+                            onclick='abrirEdicao({{ r.id }}, {{ r.nome_data | tojson }},
+                              {{ (r.data_inicio.isoformat() if r.data_inicio else None) | tojson }},
+                              {{ (r.data_fim.isoformat() if r.data_fim else None) | tojson }},
+                              {{ (r.horario_inicio.strftime("%H:%M") if r.horario_inicio else None) | tojson }},
+                              {{ (r.horario_fim.strftime("%H:%M") if r.horario_fim else None) | tojson }},
+                              {{ r.observacoes | tojson }})'
                             title="Editar">
                       <i class="bi bi-pencil"></i>
                     </button>
@@ -331,7 +356,23 @@
         </div>
 
         <div class="content-card-body">
-
+          <!-- Avisos institucionais -->
+          <div class="alert mb-2 d-flex align-items-start gap-2"
+               style="background:#fef3c7;border-left:4px solid #d97706;border-radius:6px;padding:10px 14px">
+            <i class="bi bi-exclamation-triangle-fill text-warning mt-1" style="font-size:1.05rem;flex-shrink:0"></i>
+            <div style="font-size:.9rem">
+              <strong>Meios de Aferição:</strong> todos os documentos comprobatórios dos eventos realizados
+              (listas de presença, fotos, relatórios etc.) deverão ser encartados no processo SEI
+              <strong class="text-danger">nº&nbsp;6074.2026/0000892-3</strong>.
+            </div>
+          </div>
+          <div class="mb-3" style="font-size:.875rem">
+            <i class="bi bi-box-arrow-up-right me-1 text-primary"></i>
+            Para visualizar a <strong>Seção de Eventos da Secretaria</strong>
+            (Reservas de Auditório, Agendas e Eventos anteriores),
+            <a href="https://cloudprodamazhotmail.sharepoint.com/sites/RepositorioSMDHC/SitePages/Eventos(1).aspx"
+               target="_blank" rel="noopener" class="fw-semibold">clique aqui</a>.
+          </div>
           <!-- Formulário (colapsável) -->
           <div class="collapse mb-4" id="formEvento">
             <div class="form-card">
@@ -410,6 +451,19 @@
                       </button>
                     </label>
                     <div id="respContainerCriar"></div>
+                  </div>
+
+                  <!-- Documentos / Links -->
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">
+                      <i class="bi bi-paperclip me-1"></i>Documentos / Links
+                      <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                              onclick="adicionarDocRow('docContainerCriar')">
+                        <i class="bi bi-plus"></i> Adicionar
+                      </button>
+                    </label>
+                    <div class="text-muted small mb-1">Espaços no nome serão convertidos em <code>_</code></div>
+                    <div id="docContainerCriar"></div>
                   </div>
                 </div>
                 <div class="mt-3 d-flex gap-2">
@@ -517,12 +571,13 @@
                               {{ r.datas_adicionais | tojson }},
                               {{ r.participacao | tojson }},
                               {{ r.local | tojson }},
-                              {{ true if r.necessita_infraestrutura else false }},
+                              {{ r.necessita_infraestrutura | tojson }},
                               {{ r.valor_alimentacao | tojson }},
-                              {{ true if r.alinhamento_aev else false }},
+                              {{ r.alinhamento_aev | tojson }},
                               {{ r.observacoes | tojson }},
-                              {{ true if r.cancelado else false }},
-                              {{ responsaveis_por_evento.get(r.id, []) | tojson }}
+                              {{ r.cancelado | tojson }},
+                              {{ responsaveis_por_evento.get(r.id, []) | tojson }},
+                              {{ documentos_por_evento.get(r.id, []) | tojson }}
                             )'
                             title="Editar">
                       <i class="bi bi-pencil"></i>
@@ -753,6 +808,19 @@
               </label>
               <div id="respContainerEditar"></div>
             </div>
+
+            <!-- Documentos / Links -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-paperclip me-1"></i>Documentos / Links
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                        onclick="adicionarDocRow('docContainerEditar')">
+                  <i class="bi bi-plus"></i> Adicionar
+                </button>
+              </label>
+              <div class="text-muted small mb-1">Espaços no nome serão convertidos em <code>_</code></div>
+              <div id="docContainerEditar"></div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -810,9 +878,26 @@
     container.appendChild(row);
   }
 
+  // ─── Documentos: linha com nome + link ───────────────────────────────────
+  function adicionarDocRow(containerId, nome, link) {
+    const container = document.getElementById(containerId);
+    const row = document.createElement('div');
+    row.className = 'doc-row mb-2 d-flex gap-2 align-items-center';
+    row.innerHTML = `
+      <input type="text" name="doc_nome[]" class="form-control form-control-sm"
+             placeholder="Nome do documento" value="${(nome || '').replace(/"/g, '&quot;')}" style="max-width:220px">
+      <input type="url" name="doc_link[]" class="form-control form-control-sm"
+             placeholder="Link OneDrive (opcional)" value="${(link || '').replace(/"/g, '&quot;')}">
+      <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0"
+              onclick="this.parentElement.remove()">
+        <i class="bi bi-x"></i>
+      </button>`;
+    container.appendChild(row);
+  }
+
   // ─── Abre modal de edição de atividades ──────────────────────────────────
   function abrirEdicaoEvento(id, nome, descritivo, data, datasAdic, participacao,
-                              local, infra, valor, aev, obs, cancelado, responsaveis) {
+                              local, infra, valor, aev, obs, cancelado, responsaveis, documentos) {
     const form = document.getElementById('formEdicaoEvento');
     form.action = `/datas-importantes/eventos/editar/${id}`;
     document.getElementById('evEditNome').value            = nome || '';
@@ -835,6 +920,13 @@
           r.responsavel_atividade || '', r.responsavel_tipo || '');
       });
     }
+
+    const docContainer = document.getElementById('docContainerEditar');
+    docContainer.innerHTML = '';
+    if (documentos && documentos.length) {
+      documentos.forEach(d => adicionarDocRow('docContainerEditar', d.nome_doc || '', d.nome_doc_link || ''));
+    }
+
     new bootstrap.Modal(document.getElementById('modalEdicaoEvento')).show();
   }
 

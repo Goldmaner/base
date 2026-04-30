@@ -39,6 +39,10 @@ def listar():
     cur = get_cursor()
     
     # Base da query com filtros
+    # Exibe o maior total individual entre todos os aditivos de cada termo.
+    # Usar MAX(aditivo) seria errado quando o aditivo mais recente está incompleto;
+    # usar SUM de todos duplicaria o valor. O MAX de totais por aditivo captura
+    # o aditivo mais completo, independente do número de sequência.
     query_base = """
         SELECT 
             p.numero_termo,
@@ -46,9 +50,16 @@ def listar():
             p.meses,
             p.sei_celeb,
             p.total_previsto,
-            COALESCE(SUM(pd.valor), 0) as total_preenchido
+            COALESCE((
+                SELECT MAX(soma_aditivo)
+                FROM (
+                    SELECT COALESCE(SUM(pd2.valor), 0) AS soma_aditivo
+                    FROM Parcerias_Despesas pd2
+                    WHERE pd2.numero_termo = p.numero_termo
+                    GROUP BY COALESCE(pd2.aditivo, 0)
+                ) sub
+            ), 0) AS total_preenchido
         FROM Parcerias p
-        LEFT JOIN Parcerias_Despesas pd ON p.numero_termo = pd.numero_termo
         WHERE p.tipo_termo NOT IN ('Convênio de Cooperação', 'Convênio', 'Convênio - Passivo', 'Acordo de Cooperação')
     """
     
@@ -60,7 +71,7 @@ def listar():
         params.append(f"%{filtro_termo}%")
     
     query_base += """
-        GROUP BY p.numero_termo, p.tipo_termo, p.meses, p.sei_celeb, p.total_previsto
+        ORDER BY p.numero_termo
     """
     
     # PRIMEIRO: Calcular estatísticas sobre TODAS as parcerias (sem LIMIT)
@@ -129,7 +140,7 @@ def listar():
             parcerias = parcerias_filtradas
     else:
         # Sem filtro de status: usar query com limite normal
-        query_exibicao = query_base + " ORDER BY p.numero_termo"
+        query_exibicao = query_base
         
         # Adicionar LIMIT apenas para exibição se não for "todas"
         if limite_sql is not None:

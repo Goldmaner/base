@@ -101,45 +101,73 @@ O seletor **não filtra por vigência** — filtra apenas o ponto de corte para 
 
 ---
 
+### 3.6 Filtro de existência do termo — data de assinatura
+
+Um termo FUMCAD só pode ser dívida se já existia no período selecionado.
+
+**Fonte:** `public.parcerias_sei` onde `aditamento = '-'` E `apostilamento = '-'` (identifica a assinatura original do termo, sem aditações/apostilamentos).
+
+**Condição:** `MIN(data_assinatura) <= MAKE_DATE(ano, mes, 1)`
+
+- Se o termo foi assinado após o 1º dia do mês selecionado → **excluído** (não existia)
+- Se o termo não possui registro em `parcerias_sei` (`NULL`) → **incluído** (data desconhecida, assume-se existente)
+- O JOIN é feito via LEFT JOIN com subquery agrupada por `numero_termo` para evitar duplicatas
+
+**Exemplo:** gestor seleciona março/2026. Um TFM-FUMCAD foi assinado em 01/04/2026. `data_assinatura (01/04/2026) > MAKE_DATE(2026, 3, 1)` → excluído do cálculo.
+
+---
+
 ## 4. Query SQL
 
 ```sql
 SELECT
     CASE
-        WHEN numero_termo ILIKE 'TFM%' OR numero_termo ILIKE 'TCL%' THEN 'TFM'
-        WHEN numero_termo ILIKE 'TCV%'                               THEN 'TCV'
+        WHEN ul.numero_termo ILIKE 'TFM%' OR ul.numero_termo ILIKE 'TCL%' THEN 'TFM'
+        WHEN ul.numero_termo ILIKE 'TCV%'                                   THEN 'TCV'
     END AS tipo,
-    SUM(valor_previsto) AS valor_indisponivel
+    SUM(ul.valor_previsto) AS valor_indisponivel
 
-FROM gestao_financeira.ultra_liquidacoes
+FROM gestao_financeira.ultra_liquidacoes ul
+LEFT JOIN (
+    SELECT numero_termo, MIN(data_assinatura) AS data_assinatura
+    FROM public.parcerias_sei
+    WHERE aditamento = '-' AND apostilamento = '-'
+    GROUP BY numero_termo
+) ps ON ps.numero_termo = ul.numero_termo
 
 WHERE
     -- Apenas registros FUMCAD
-    numero_termo ILIKE '%FUMCAD%'
+    ul.numero_termo ILIKE '%FUMCAD%'
 
     -- Tipos de parcela válidos
-    AND parcela_tipo IN ('Programada', 'Projetada')
+    AND ul.parcela_tipo IN ('Programada', 'Projetada')
+
+    -- Termo deve existir no período selecionado
+    AND (
+        ps.data_assinatura IS NULL
+        OR ps.data_assinatura <= MAKE_DATE(:ano, :mes, 1)
+    )
 
     -- Elegibilidade por status
     AND (
         -- Encaminhado para Pagamento: todos
-        parcela_status = 'Encaminhado para Pagamento'
+        ul.parcela_status = 'Encaminhado para Pagamento'
 
         OR (
             -- Não Pago: apenas sem status secundário
-            parcela_status = 'Não Pago'
+            ul.parcela_status = 'Não Pago'
             AND (
-                parcela_status_secundario IS NULL
-                OR parcela_status_secundario = ''
-                OR parcela_status_secundario = '-'
+                ul.parcela_status_secundario IS NULL
+                OR ul.parcela_status_secundario = ''
+                OR ul.parcela_status_secundario = '-'
             )
         )
 
         OR (
             -- Pago Integral/Parcial: a partir do 1º dia do mês selecionado
-            parcela_status = 'Pago'
-            AND parcela_status_secundario IN ('Integral', 'Parcial')
-            AND data_pagamento >= MAKE_DATE(:ano, :mes, 1)
+            ul.parcela_status = 'Pago'
+            AND ul.parcela_status_secundario IN ('Integral', 'Parcial')
+            AND ul.data_pagamento >= MAKE_DATE(:ano, :mes, 1)
         )
     )
 
