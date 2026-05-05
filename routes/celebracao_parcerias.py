@@ -100,6 +100,9 @@ FILTROS = [
     ('filtro_numero_termo',   'numero_termo',           'text'),
     ('filtro_status_generico','status_generico',        'exact'),
     ('filtro_cnpj',           'cnpj',                   'text'),
+    ('filtro_assinatura_de',  'assinatura',             'date_from'),
+    ('filtro_assinatura_ate', 'assinatura',             'date_to'),
+    ('filtro_assinatura_ano', 'assinatura',             'year'),
 ]
 
 
@@ -129,6 +132,12 @@ def construir_where(filtros_vals, nome_analista_filtro=None):
         elif tipo == 'date_to':
             conditions.append(f"{coluna} <= %s")
             params.append(valor)
+        elif tipo == 'year':
+            try:
+                conditions.append(f"EXTRACT(YEAR FROM {coluna}) = %s")
+                params.append(int(valor))
+            except (ValueError, TypeError):
+                pass
 
     # Filtro por responsável do usuário logado — só aplica se o usuário
     # não escolheu explicitamente um responsável diferente no formulário
@@ -347,6 +356,15 @@ def index():
     """)
     editais_list = [r['edital_nome'] for r in cur.fetchall()]
 
+    # Anos de assinatura disponíveis
+    cur.execute("""
+        SELECT DISTINCT EXTRACT(YEAR FROM assinatura)::int AS ano
+        FROM celebracao.celebracao_parcerias
+        WHERE assinatura IS NOT NULL
+        ORDER BY ano DESC
+    """)
+    anos_assinatura_list = [r['ano'] for r in cur.fetchall()]
+
     # Nome PG: pessoas gestoras ativas
     cur.execute("""
         SELECT nome_pg FROM categoricas.c_geral_pessoa_gestora
@@ -406,6 +424,7 @@ def index():
         unidades_list=unidades_list,
         status_generico_list=status_generico_list,
         editais_list=editais_list,
+        anos_assinatura_list=anos_assinatura_list,
         nome_pg_list=nome_pg_list,
         lei_list=lei_list,
         regionalizacao_map=regionalizacao_map,
@@ -1217,3 +1236,204 @@ def api_emendas_por_sei():
         'multiplos': len(emendas) > 1,
         'vinculo': 'projeto' if usar_projeto else 'sei_celeb'
     })
+
+
+# ── Inserir Parceria (celebracao → public) ────────────────────────────────────
+
+@celebracao_parcerias_bp.route("/inserir-parceria/<int:id>", methods=["POST"])
+@login_required
+@requires_access('celebracao_parcerias')
+def inserir_parceria(id):
+    """
+    Transfere um registro celebrado do schema celebracao para:
+      - public.parcerias
+      - public.parcerias_infos_adicionais (se existir)
+      - public.parcerias_enderecos (todos os endereços vinculados)
+    Fase 2: sei_plano e sei_orcamento ficam em branco.
+    """
+    cur = get_cursor()
+    db  = get_db()
+    try:
+        # 1. Buscar o registro de celebração
+        cur.execute("""
+            SELECT * FROM celebracao.celebracao_parcerias WHERE id = %s
+        """, [id])
+        cp = cur.fetchone()
+
+        if not cp:
+            return jsonify({'success': False, 'erro': 'Registro não encontrado.'}), 404
+
+        # 2. Validações obrigatórias
+        if cp['status_generico'] != 'Celebrado':
+            return jsonify({'success': False,
+                            'erro': 'O registro deve ter status genérico "Celebrado".'}), 400
+
+        if not cp['assinatura']:
+            return jsonify({'success': False,
+                            'erro': 'O registro deve ter data de assinatura preenchida.'}), 400
+
+        numero_termo = (cp['numero_termo'] or '').strip()
+        sei_celeb    = (cp['sei_celeb']    or '').strip()
+
+        if not numero_termo:
+            return jsonify({'success': False,
+                            'erro': 'O número do termo não está preenchido.'}), 400
+
+        if not sei_celeb:
+            return jsonify({'success': False,
+                            'erro': 'O SEI de celebração não está preenchido.'}), 400
+
+        # 3. Verificar duplicidade em public.parcerias
+        cur.execute(
+            "SELECT 1 FROM public.parcerias WHERE numero_termo = %s OR sei_celeb = %s LIMIT 1",
+            [numero_termo, sei_celeb]
+        )
+        if cur.fetchone():
+            return jsonify({'success': False,
+                            'erro': 'Esta parceria já existe em public.parcerias '
+                                    '(mesmo número de termo ou SEI de celebração).'}), 409
+
+        # 4. Inserir em public.parcerias
+        cur.execute("""
+            INSERT INTO public.parcerias
+                (numero_termo, osc, cnpj, projeto, tipo_termo, portaria,
+                 inicio, final, meses, total_previsto, total_pago,
+                 conta, transicao, sei_celeb, sei_pc,
+                 endereco, sei_plano, sei_orcamento, contrapartida,
+                 edital_nome, data_criacao)
+            VALUES (%s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, NOW())
+        """, [
+            numero_termo,
+            cp['osc'],
+            cp['cnpj'],
+            cp['projeto'],
+            cp['tipo_termo'],
+            cp['lei'],              # lei → portaria
+            cp['inicio'],
+            cp['final'],
+            cp['meses'],
+            cp['total_previsto'],
+            0,                      # total_pago
+            cp['conta'],
+            0,                      # transicao
+            sei_celeb,
+            None,                   # sei_pc (preencher depois)
+            cp['endereco_sede'],    # endereco_sede → endereco
+            None,                   # sei_plano (fase 2)
+            None,                   # sei_orcamento (fase 2)
+            0,                      # contrapartida
+            cp['edital_nome'],
+        ])
+
+        # 5. Inserir em public.parcerias_infos_adicionais (se houver)
+        cur.execute("""
+            SELECT parceria_responsavel_legal, parceria_objeto,
+                   parceria_beneficiarios_diretos, parceria_beneficiarios_indiretos,
+                   parceria_justificativa_projeto, parceria_abrangencia_projeto
+            FROM celebracao.celebracao_parcerias_infos_adicionais
+            WHERE sei_celeb = %s
+            LIMIT 1
+        """, [sei_celeb])
+        ia = cur.fetchone()
+
+        if ia:
+            cur.execute("""
+                INSERT INTO public.parcerias_infos_adicionais
+                    (numero_termo, parceria_responsavel_legal, parceria_objeto,
+                     parceria_beneficiarios_diretos, parceria_beneficiarios_indiretos,
+                     parceria_justificativa_projeto, parceria_abrangencia_projeto,
+                     criado_em, atualizado_em)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+            """, [
+                numero_termo,
+                ia['parceria_responsavel_legal'],
+                ia['parceria_objeto'],
+                ia['parceria_beneficiarios_diretos'],
+                ia['parceria_beneficiarios_indiretos'],
+                ia['parceria_justificativa_projeto'],
+                ia['parceria_abrangencia_projeto'],
+            ])
+
+        # 6. Inserir em public.parcerias_enderecos (todos os endereços vinculados)
+        # Em celebracao, parceria_distrito é gravado pelo NOME do distrito.
+        # Em parcerias_enderecos, o JOIN usa codigo_distrital.
+        # Fazemos lookup para obter o código a partir do nome.
+        cur.execute("""
+            SELECT codigo_distrital, distrito
+            FROM categoricas.c_geral_regionalizacao
+        """)
+        _reg_rows = cur.fetchall()
+        _distrito_para_codigo = {r['distrito']: r['codigo_distrital'] for r in _reg_rows}
+
+        cur.execute("""
+            SELECT parceria_logradouro, parceria_complemento, parceria_numero,
+                   parceria_cep, parceria_distrito, observacao
+            FROM celebracao.celebracao_parcerias_enderecos
+            WHERE sei_celeb = %s
+            ORDER BY id
+        """, [sei_celeb])
+        enderecos = cur.fetchall()
+
+        for enc in enderecos:
+            # Resolver o código do distrito; se não encontrar, guarda o texto original
+            dist_nome = enc['parceria_distrito']
+            dist_codigo = _distrito_para_codigo.get(dist_nome, dist_nome)
+
+            cur.execute("""
+                INSERT INTO public.parcerias_enderecos
+                    (numero_termo, parceria_logradouro, parceria_complemento,
+                     parceria_numero, parceria_cep, parceria_distrito,
+                     observacao, criado_em, atualizado_em)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+            """, [
+                numero_termo,
+                enc['parceria_logradouro'],
+                enc['parceria_complemento'],
+                enc['parceria_numero'],
+                enc['parceria_cep'],
+                dist_codigo,
+                enc['observacao'],
+            ])
+
+        # 7. Inserir data de assinatura em public.parcerias_sei
+        #    Linha base: aditamento='-', apostilamento='-'
+        #    Aproveita o número do documento SEI do tipo 'Termo Base' (se houver)
+        if cp['assinatura']:
+            cur.execute("""
+                SELECT termo_sei_doc
+                FROM celebracao.celebracao_parcerias_sei
+                WHERE sei_celeb = %s AND termo_tipo_sei = 'Termo Base'
+                LIMIT 1
+            """, [sei_celeb])
+            _sei_base = cur.fetchone()
+            _termo_sei_doc = _sei_base['termo_sei_doc'] if _sei_base else None
+
+            cur.execute("""
+                INSERT INTO public.parcerias_sei
+                    (numero_termo, termo_sei_doc, data_assinatura, aditamento, apostilamento)
+                VALUES (%s, %s, %s, '-', '-')
+            """, [numero_termo, _termo_sei_doc, cp['assinatura']])
+
+        # 8. Inserir pessoa gestora em public.parcerias_pg
+        if cp['nome_pg']:
+            cur.execute("""
+                INSERT INTO public.parcerias_pg
+                    (numero_termo, nome_pg, data_de_criacao, usuario_id, dado_anterior, solicitacao)
+                VALUES (%s, %s, NOW(), %s, NULL, FALSE)
+            """, [numero_termo, cp['nome_pg'], session.get('user_id')])
+
+        db.commit()
+        print(f"[CELEBRAÇÃO] Parceria #{id} ({numero_termo}) inserida em public por {session.get('email')}")
+        return jsonify({
+            'success': True,
+            'mensagem': f'Parceria "{numero_termo}" inserida com sucesso!'
+        })
+
+    except Exception as e:
+        db.rollback()
+        print(f"[ERRO CELEBRAÇÃO] Erro ao inserir parceria #{id}: {e}")
+        return jsonify({'success': False, 'erro': str(e)}), 500

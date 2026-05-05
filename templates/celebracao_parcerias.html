@@ -217,6 +217,9 @@
             filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
             filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
             filtro_status_generico=filtro_status_generico,
+            filtro_assinatura_de=filtro_assinatura_de,
+            filtro_assinatura_ate=filtro_assinatura_ate,
+            filtro_assinatura_ano=filtro_assinatura_ano,
             mostrar_cnpj=mostrar_cnpj) }}"
            class="btn btn-light" title="Exportar CSV">
           <i class="bi bi-download me-1"></i> CSV
@@ -249,6 +252,9 @@
         {% if filtro_edital %}{% set _ = filtros_ativos.append('Edital') %}{% endif %}
         {% if filtro_numero_termo %}{% set _ = filtros_ativos.append('Nº Termo') %}{% endif %}
         {% if filtro_status_generico %}{% set _ = filtros_ativos.append('Status Genérico') %}{% endif %}
+        {% if filtro_assinatura_de %}{% set _ = filtros_ativos.append('Assinatura de') %}{% endif %}
+        {% if filtro_assinatura_ate %}{% set _ = filtros_ativos.append('Assinatura até') %}{% endif %}
+        {% if filtro_assinatura_ano %}{% set _ = filtros_ativos.append('Ano Assinatura') %}{% endif %}
         {% if filtros_ativos %}
           <span class="badge bg-primary ms-2">{{ filtros_ativos|length }} ativo(s)</span>
         {% endif %}
@@ -373,6 +379,27 @@
                        autocomplete="off">
               </div>
             </div>
+
+            <!-- Linha 3: Datas de Assinatura -->
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Assinatura de</label>
+              <input type="date" class="form-control form-control-sm"
+                     name="filtro_assinatura_de" value="{{ filtro_assinatura_de }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Assinatura até</label>
+              <input type="date" class="form-control form-control-sm"
+                     name="filtro_assinatura_ate" value="{{ filtro_assinatura_ate }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label form-label-sm">Ano de Assinatura</label>
+              <select class="form-select form-select-sm" name="filtro_assinatura_ano">
+                <option value="">Todos</option>
+                {% for ano in anos_assinatura_list %}
+                <option value="{{ ano }}" {% if filtro_assinatura_ano == ano|string %}selected{% endif %}>{{ ano }}</option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
           <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
             <button type="submit" class="btn btn-sm btn-primary">
@@ -439,6 +466,9 @@
                    filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
                    filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
                    filtro_status_generico=filtro_status_generico,
+                   filtro_assinatura_de=filtro_assinatura_de,
+                   filtro_assinatura_ate=filtro_assinatura_ate,
+                   filtro_assinatura_ano=filtro_assinatura_ano,
                    mostrar_cnpj=mostrar_cnpj) }}">
                   {{ label }} <i class="bi {{ icon }}"></i>
                 </a>
@@ -542,7 +572,9 @@
                   <i class="bi bi-person-lines-fill"></i>
                 </button>
                 {% if r.pode_inserir_parceria %}
-                <button class="btn btn-sm btn-success ms-1" title="Inserir parceria" disabled>
+                <button class="btn btn-sm btn-success ms-1"
+                  onclick="inserirParceria({{ r.id }}, '{{ (r.numero_termo or r.osc or '#' ~ r.id) | e }}')"
+                  title="Inserir parceria em public.parcerias">
                   <i class="bi bi-plus-circle"></i> Inserir parceria
                 </button>
                 {% endif %}
@@ -585,6 +617,9 @@
            filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
            filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
            filtro_status_generico=filtro_status_generico,
+           filtro_assinatura_de=filtro_assinatura_de,
+           filtro_assinatura_ate=filtro_assinatura_ate,
+           filtro_assinatura_ano=filtro_assinatura_ano,
            mostrar_cnpj=mostrar_cnpj) }}">
           <i class="bi bi-chevron-left"></i> Anterior
         </a>
@@ -602,6 +637,9 @@
              filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
              filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
              filtro_status_generico=filtro_status_generico,
+             filtro_assinatura_de=filtro_assinatura_de,
+             filtro_assinatura_ate=filtro_assinatura_ate,
+             filtro_assinatura_ano=filtro_assinatura_ano,
              mostrar_cnpj=mostrar_cnpj) }}">1</a>
         </li>
         {% if start_page > 2 %}
@@ -618,6 +656,9 @@
              filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
              filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
              filtro_status_generico=filtro_status_generico,
+             filtro_assinatura_de=filtro_assinatura_de,
+             filtro_assinatura_ate=filtro_assinatura_ate,
+             filtro_assinatura_ano=filtro_assinatura_ano,
              mostrar_cnpj=mostrar_cnpj) }}">{{ p }}</a>
         </li>
       {% endfor %}
@@ -634,6 +675,9 @@
              filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
              filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
              filtro_status_generico=filtro_status_generico,
+             filtro_assinatura_de=filtro_assinatura_de,
+             filtro_assinatura_ate=filtro_assinatura_ate,
+             filtro_assinatura_ano=filtro_assinatura_ano,
              mostrar_cnpj=mostrar_cnpj) }}">{{ total_pages }}</a>
         </li>
       {% endif %}
@@ -647,6 +691,9 @@
            filtro_projeto=filtro_projeto, filtro_unidade=filtro_unidade,
            filtro_edital=filtro_edital, filtro_numero_termo=filtro_numero_termo,
            filtro_status_generico=filtro_status_generico,
+           filtro_assinatura_de=filtro_assinatura_de,
+           filtro_assinatura_ate=filtro_assinatura_ate,
+           filtro_assinatura_ano=filtro_assinatura_ano,
            mostrar_cnpj=mostrar_cnpj) }}">
           Próximo <i class="bi bi-chevron-right"></i>
         </a>
@@ -2532,6 +2579,30 @@ async function salvarNovaParc() {
       btnSalvar.disabled = false;
       btnSalvar.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Criar Parceria';
       alert('Erro: ' + err);
+    });
+}
+
+// ── Inserir Parceria (celebracao → public) ──────────────────────────────
+function inserirParceria(id, label) {
+  if (!confirm(`Confirma a inserção da parceria em public.parcerias?\n\n"${label}"\n\nEsta ação transferirá os dados celebrados para o sistema de parcerias.`)) return;
+
+  const btn = document.querySelector(`button[onclick^="inserirParceria(${id},"]`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+
+  fetch(`/celebracao-parcerias/inserir-parceria/${id}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        alert('\u2713 ' + d.mensagem);
+        window.location.reload();
+      } else {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-plus-circle"></i> Inserir parceria'; }
+        alert('Erro: ' + (d.erro || 'Erro desconhecido'));
+      }
+    })
+    .catch(() => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-plus-circle"></i> Inserir parceria'; }
+      alert('Erro de comunicação com o servidor.');
     });
 }
 

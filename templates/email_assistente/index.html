@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Assistente - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #fef2f2; padding: 20px; }
+
+    .page-header {
+      background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%);
+      color: #fff;
+      padding: 22px 28px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 18px rgba(220,38,38,.28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+    .btn-adm {
+      background: linear-gradient(135deg, #7f1d1d, #dc2626);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600;
+      transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; cursor: pointer; font-size: .875rem;
+    }
+    .btn-adm:hover { opacity: .85; color: #fff; }
+    .btn-adm.outline {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.7);
+      color: #fff;
+    }
+    .btn-adm.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+    .btn-sec {
+      background: linear-gradient(135deg, #374151, #6b7280);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 6px;
+      cursor: pointer; font-size: .875rem; transition: opacity .15s;
+    }
+    .btn-sec:hover { opacity: .85; color: #fff; }
+
+    .filter-section {
+      background: #fff; padding: 20px; border-radius: 10px;
+      margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      border-left: 4px solid #dc2626;
+    }
+    .content-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden;
+    }
+    .content-card-header {
+      background: linear-gradient(135deg, #7f1d1d, #dc2626);
+      color: #fff; padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+
+    /* ── Cards de email ── */
+    .email-card {
+      border: 1px solid #fecaca; border-radius: 10px;
+      padding: 16px; margin-bottom: 12px;
+      background: #fff; transition: box-shadow .15s;
+      position: relative;
+    }
+    .email-card:hover { box-shadow: 0 4px 16px rgba(220,38,38,.12); }
+    .email-card .remetente { font-weight: 600; font-size: .9rem; color: #374151; }
+    .email-card .assunto   { font-size: 1rem; font-weight: 700; color: #111827; margin: 4px 0; }
+    .email-card .data-email { font-size: .78rem; color: #6b7280; }
+    .email-card .resumo-ia { background: #fef2f2; border-left: 3px solid #dc2626;
+      padding: 10px 14px; border-radius: 0 8px 8px 0; margin-top: 10px;
+      font-size: .88rem; color: #374151; line-height: 1.5; }
+    .email-card .acao-ia { font-size: .82rem; color: #6b7280; margin-top: 6px; }
+
+    .badge-alta   { background: #dc2626; color: #fff; }
+    .badge-normal { background: #f59e0b; color: #fff; }
+    .badge-baixa  { background: #6b7280; color: #fff; }
+
+    /* Spinner de loading */
+    .loading-overlay {
+      display: none; text-align: center; padding: 40px;
+    }
+    .spinner-custom {
+      width: 48px; height: 48px;
+      border: 4px solid #fecaca;
+      border-top-color: #dc2626;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Status icons */
+    .status-dot {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; margin-right: 6px;
+    }
+    .dot-ok { background: #16a34a; }
+    .dot-err { background: #dc2626; }
+    .dot-warn { background: #f59e0b; }
+  </style>
+</head>
+<body>
+
+<!-- ── Cabeçalho ── -->
+<div class="page-header">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h2><i class="bi bi-envelope-open-fill me-2"></i>Email Assistente</h2>
+      <p>Resumo automático dos seus emails Outlook com inteligência artificial (Gemini)</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn-adm outline" onclick="testarIA()">
+        <i class="bi bi-cpu"></i> Testar IA
+      </button>
+      <a href="{{ url_for('main.index') }}" class="btn-adm outline">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Status da IA ── -->
+<div id="alertIA" class="alert d-none mb-3" role="alert"></div>
+
+<!-- ── Configuração de credenciais ── -->
+<div class="filter-section mb-3">
+  <h6 class="mb-2">
+    <i class="bi bi-microsoft me-1" style="color:#dc2626;"></i>
+    Outlook local (COM Automation)
+  </h6>
+  <p class="text-muted small mb-2">
+    Conecta diretamente ao Outlook instalado nesta máquina — sem senha necessária, o MFA já foi feito ao abrir o Outlook.
+  </p>
+  <button class="btn-adm" onclick="testarCredenciais()">
+    <i class="bi bi-plug"></i> Testar Conexão com Outlook
+  </button>
+</div>
+
+<!-- ── Filtros de busca ── -->
+<div class="filter-section">
+  <h6 class="mb-3">
+    <i class="bi bi-funnel me-1" style="color:#dc2626;"></i>Buscar Emails
+  </h6>
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold">Período</label>
+      <select id="selectDias" class="form-select form-select-sm">
+        <option value="0">Hoje</option>
+        <option value="1">Últimas 24h</option>
+        <option value="3">Últimos 3 dias</option>
+        <option value="7">Últimos 7 dias</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold">Filtrar por texto</label>
+      <input type="text" id="filtroTexto" class="form-control form-control-sm"
+             placeholder="Assunto ou remetente..." oninput="filtrarEmails()">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold">Urgência</label>
+      <select id="filtroUrgencia" class="form-select form-select-sm" onchange="filtrarEmails()">
+        <option value="">Todas</option>
+        <option value="Alta">Alta</option>
+        <option value="Normal">Normal</option>
+        <option value="Baixa">Baixa</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <button class="btn-adm" onclick="buscarEmails()">
+        <i class="bi bi-search"></i> Buscar e Resumir
+      </button>
+      <button class="btn-sec ms-2" onclick="exportarRelatorio()" id="btnExportar" style="display:none;">
+        <i class="bi bi-file-earmark-text"></i> Exportar Relatório
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Resultados ── -->
+<div class="content-card mb-3">
+  <div class="content-card-header">
+    <h5><i class="bi bi-inbox me-2"></i>Emails <span id="totalLabel"></span></h5>
+    <span class="small opacity-75" id="statusResumo"></span>
+  </div>
+  <div class="p-3">
+    <div class="loading-overlay" id="loadingDiv">
+      <div class="spinner-custom mx-auto mb-3"></div>
+      <p class="text-muted">Conectando ao email e gerando resumos com IA...<br>
+        <small>Pode demorar alguns segundos dependendo da quantidade de emails</small>
+      </p>
+    </div>
+    <div id="listaEmails">
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-envelope" style="font-size:2.5rem; opacity:.3;"></i>
+        <p class="mt-2">Clique em "Buscar e Resumir" para carregar seus emails com resumos de IA.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Calendário ── -->
+<div class="content-card">
+  <div class="content-card-header">
+    <h5><i class="bi bi-calendar-event me-2"></i>Calendário <span id="totalCalLabel"></span></h5>
+    <div class="d-flex gap-2 align-items-center">
+      <select id="selectDiasCal" class="form-select form-select-sm" style="width:auto;background:#fff;color:#374151;">
+        <option value="1">Hoje + amanhã</option>
+        <option value="7" selected>Próximos 7 dias</option>
+        <option value="14">Próximas 2 semanas</option>
+        <option value="30">Próximo mês</option>
+      </select>
+      <button class="btn-adm outline" style="padding:4px 12px;font-size:.8rem;" onclick="buscarCalendario()">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+      </button>
+    </div>
+  </div>
+  <div class="p-3">
+    <div class="loading-overlay" id="loadingCal">
+      <div class="spinner-custom mx-auto mb-3"></div>
+      <p class="text-muted">Carregando calendário...</p>
+    </div>
+    <div id="listaCompromissos">
+      <div class="text-center text-muted py-4">
+        <i class="bi bi-calendar3" style="font-size:2.5rem; opacity:.3;"></i>
+        <p class="mt-2">Clique em "Atualizar" para carregar seus compromissos.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let _todosEmails = [];
+
+  // ── Testar conexão Outlook COM ────────────────────────────────────────────
+  async function testarCredenciais() {
+    const alertIA = document.getElementById('alertIA');
+    alertIA.className = 'alert alert-warning mb-3';
+    alertIA.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Testando conexão com Outlook...';
+    alertIA.classList.remove('d-none');
+    try {
+      const r = await fetch('/email-assistente/testar-credenciais', {method: 'POST'});
+      const d = await r.json();
+      if (d.ok) {
+        mostrarAlerta(alertIA, 'success', '✅ ' + d.mensagem);
+      } else {
+        let msg = d.mensagem || 'Falha desconhecida.';
+        if (msg.includes('dispatch') || msg.includes('COM') || msg.includes('RPC')) {
+          msg += '<br><small class="text-muted mt-1 d-block">💡 Verifique se o <strong>Outlook está aberto</strong> nesta máquina.</small>';
+        }
+        mostrarAlerta(alertIA, 'danger', '❌ ' + msg);
+      }
+    } catch(e) {
+      mostrarAlerta(alertIA, 'danger', '❌ Erro: ' + e.message);
+    }
+  }
+
+  // ── Testar API Gemini ─────────────────────────────────────────────────────
+  async function testarIA() {
+    const alertIA = document.getElementById('alertIA');
+    alertIA.className = 'alert alert-warning mb-3';
+    alertIA.innerHTML = '<i class="bi bi-cpu me-1"></i>Testando API Gemini...';
+    alertIA.classList.remove('d-none');
+    try {
+      const r = await fetch('/email-assistente/testar-ia');
+      const d = await r.json();
+      if (d.ok) {
+        mostrarAlerta(alertIA, 'success', '✅ Gemini OK — ' + d.mensagem);
+      } else {
+        mostrarAlerta(alertIA, 'danger', '❌ Gemini falhou: ' + d.mensagem);
+      }
+    } catch(e) {
+      mostrarAlerta(alertIA, 'danger', '❌ Erro: ' + e.message);
+    }
+  }
+
+  // ── Buscar e resumir emails ────────────────────────────────────────────────
+  async function buscarEmails() {
+    const dias = document.getElementById('selectDias').value;
+    const loading = document.getElementById('loadingDiv');
+    const lista = document.getElementById('listaEmails');
+
+    loading.style.display = 'block';
+    lista.innerHTML = '';
+
+    try {
+      const r = await fetch(`/email-assistente/emails-hoje?dias=${dias}`);
+      const d = await r.json();
+      loading.style.display = 'none';
+
+      if (d.error) {
+        lista.innerHTML = `<div class="alert alert-danger">${d.error}</div>`;
+        return;
+      }
+
+      _todosEmails = d.emails || [];
+      document.getElementById('totalLabel').textContent =
+        `(${d.total} encontrado${d.total !== 1 ? 's' : ''}, ${d.resumidos} resumido${d.resumidos !== 1 ? 's' : ''})`;
+      document.getElementById('statusResumo').textContent =
+        d.total > 0 ? `Gemini resumiu ${d.resumidos}/${d.total}` : '';
+      document.getElementById('btnExportar').style.display = d.total > 0 ? 'inline-flex' : 'none';
+
+      renderizarEmails(_todosEmails);
+    } catch(e) {
+      loading.style.display = 'none';
+      lista.innerHTML = `<div class="alert alert-danger">Erro de rede: ${e.message}</div>`;
+    }
+  }
+
+  // ── Renderizar lista ──────────────────────────────────────────────────────
+  function renderizarEmails(emails) {
+    const lista = document.getElementById('listaEmails');
+    if (!emails.length) {
+      lista.innerHTML = `<div class="text-center text-muted py-4">
+        <i class="bi bi-inbox" style="font-size:2rem;opacity:.4;"></i>
+        <p class="mt-2">Nenhum email encontrado no período.</p></div>`;
+      return;
+    }
+
+    lista.innerHTML = emails.map((em, i) => {
+      const ia = em.ia || {};
+      const urg = ia.urgencia || 'Normal';
+      const badgeClass = urg === 'Alta' ? 'badge-alta' : urg === 'Baixa' ? 'badge-baixa' : 'badge-normal';
+      const anexosTxt = em.anexos && em.anexos.length
+        ? `<span class="badge bg-secondary ms-2"><i class="bi bi-paperclip me-1"></i>${em.anexos.length} anexo${em.anexos.length > 1 ? 's' : ''}</span>`
+        : '';
+
+      return `<div class="email-card" data-assunto="${escHtml(em.assunto)}" data-remetente="${escHtml(em.remetente)}" data-urgencia="${urg}">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
+          <div>
+            <div class="remetente"><i class="bi bi-person-fill me-1 text-muted"></i>${escHtml(em.remetente)}</div>
+            <div class="assunto">${escHtml(em.assunto)}${anexosTxt}</div>
+            <div class="data-email"><i class="bi bi-clock me-1"></i>${escHtml(em.data)}</div>
+          </div>
+          <span class="badge ${badgeClass} px-2 py-1 align-self-start">${urg}</span>
+        </div>
+        ${ia.resumo ? `
+        <div class="resumo-ia">
+          <strong><i class="bi bi-stars me-1" style="color:#dc2626;"></i>Resumo IA:</strong>
+          ${escHtml(ia.resumo)}
+        </div>
+        ${ia.acao && ia.acao !== 'Nenhuma' ? `<div class="acao-ia"><i class="bi bi-check2-square me-1"></i><strong>Ação:</strong> ${escHtml(ia.acao)}</div>` : ''}
+        ` : ''}
+        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="toggleCorpo(${i})">
+          <i class="bi bi-envelope-open me-1"></i>Ver corpo completo
+        </button>
+        <div id="corpo-${i}" class="mt-2 p-2 bg-light rounded small d-none" style="white-space:pre-wrap; max-height:300px; overflow-y:auto;">${escHtml(em.corpo)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function toggleCorpo(i) {
+    const el = document.getElementById(`corpo-${i}`);
+    el.classList.toggle('d-none');
+  }
+
+  // ── Filtro em tempo real ──────────────────────────────────────────────────
+  function filtrarEmails() {
+    const texto = document.getElementById('filtroTexto').value.toLowerCase();
+    const urg = document.getElementById('filtroUrgencia').value;
+    const filtrados = _todosEmails.filter(em => {
+      const matchTexto = !texto ||
+        em.assunto.toLowerCase().includes(texto) ||
+        em.remetente.toLowerCase().includes(texto);
+      const matchUrg = !urg || (em.ia && em.ia.urgencia === urg);
+      return matchTexto && matchUrg;
+    });
+    renderizarEmails(filtrados);
+  }
+
+  // ── Exportar relatório de texto ───────────────────────────────────────────
+  function exportarRelatorio() {
+    if (!_todosEmails.length) return;
+    const linhas = [
+      `RELATÓRIO DE EMAILS — ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`,
+      `Total: ${_todosEmails.length} email(s)\n`,
+      '═'.repeat(70),
+    ];
+    _todosEmails.forEach((em, i) => {
+      const ia = em.ia || {};
+      linhas.push(`\n[${i+1}] ${em.assunto}`);
+      linhas.push(`    De: ${em.remetente}`);
+      linhas.push(`    Data: ${em.data}`);
+      linhas.push(`    Urgência: ${ia.urgencia || '-'}`);
+      linhas.push(`    Resumo IA: ${ia.resumo || '-'}`);
+      if (ia.acao && ia.acao !== 'Nenhuma') linhas.push(`    Ação: ${ia.acao}`);
+      linhas.push('─'.repeat(70));
+    });
+    const blob = new Blob([linhas.join('\n')], {type: 'text/plain;charset=utf-8'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `relatorio_emails_${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+  }
+
+  // ── Calendário ───────────────────────────────────────────────────────────
+  async function buscarCalendario() {
+    const dias = document.getElementById('selectDiasCal').value;
+    const loading = document.getElementById('loadingCal');
+    const lista = document.getElementById('listaCompromissos');
+    loading.style.display = 'block';
+    lista.innerHTML = '';
+    try {
+      const r = await fetch(`/email-assistente/calendario?dias=${dias}`);
+      const d = await r.json();
+      loading.style.display = 'none';
+      if (d.error) {
+        lista.innerHTML = `<div class="alert alert-danger">${d.error}</div>`;
+        return;
+      }
+      document.getElementById('totalCalLabel').textContent = `(${d.total} compromisso${d.total !== 1 ? 's' : ''})`;
+      if (!d.compromissos.length) {
+        lista.innerHTML = '<div class="text-center text-muted py-3">Nenhum compromisso no período.</div>';
+        return;
+      }
+      lista.innerHTML = d.compromissos.map(c => {
+        const online = c.online
+          ? `<a href="${escHtml(c.url_online)}" target="_blank" class="badge bg-primary text-decoration-none ms-1"><i class="bi bi-camera-video me-1"></i>Online</a>`
+          : '';
+        const local = c.local ? `<span class="badge bg-light text-dark border ms-1"><i class="bi bi-geo-alt me-1"></i>${escHtml(c.local)}</span>` : '';
+        const partic = c.participantes.length
+          ? `<div class="mt-1 small text-muted"><i class="bi bi-people me-1"></i>${escHtml(c.participantes.slice(0,5).join(', '))}${c.participantes.length > 5 ? ` +${c.participantes.length-5}` : ''}</div>`
+          : '';
+        const corpo = c.corpo
+          ? `<div class="mt-2 small text-muted" style="white-space:pre-wrap;">${escHtml(c.corpo.slice(0,300))}${c.corpo.length > 300 ? '…' : ''}</div>`
+          : '';
+        return `<div class="email-card" style="border-color:#dbeafe;">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
+            <div>
+              <div class="assunto"><i class="bi bi-calendar-check me-1" style="color:#2563eb;"></i>${escHtml(c.assunto)}</div>
+              <div class="data-email"><i class="bi bi-clock me-1"></i>${escHtml(c.inicio)} → ${escHtml(c.fim)}</div>
+              <div class="mt-1">${local}${online}</div>
+              ${partic}
+              ${corpo}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      loading.style.display = 'none';
+      lista.innerHTML = `<div class="alert alert-danger">Erro: ${e.message}</div>`;
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function mostrarAlerta(el, tipo, msg) {
+    el.className = `alert alert-${tipo} mb-2 py-2 small`;
+    el.innerHTML = msg;
+    el.classList.remove('d-none');
+    if (tipo === 'success') setTimeout(() => el.classList.add('d-none'), 5000);
+  }
+</script>
+</body>
+</html>

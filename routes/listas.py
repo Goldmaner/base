@@ -305,6 +305,88 @@ TABELAS_CONFIG = {
         'inline_edit': True,
         'inline_columns': ['substatus_status']
     },
+    'c_dgp_meta_tipos': {
+        'nome': 'DGP/Metas: Tipos de Meta',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['meta_tipo', 'tipo_classificacao', 'descricao', 'observacao'],
+        'colunas_obrigatorias': ['meta_tipo'],
+        'labels': {
+            'meta_tipo': 'Tipo de Meta',
+            'tipo_classificacao': 'Classificação',
+            'descricao': 'Descrição',
+            'observacao': 'Observação'
+        },
+        'colunas_filtro': ['meta_tipo', 'tipo_classificacao'],
+        'ordem': 'tipo_classificacao NULLS LAST, meta_tipo',
+        'tipos_campo': {
+            'meta_tipo': 'text',
+            'tipo_classificacao': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'observacao': 'textarea',
+            'rows_observacao': 2,
+        }
+    },
+    'c_dgp_indicadores': {
+        'nome': 'DGP/Metas: Indicadores',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['indicador', 'descricao', 'observacao'],
+        'colunas_obrigatorias': ['indicador'],
+        'labels': {
+            'indicador': 'Indicador',
+            'descricao': 'Descrição',
+            'observacao': 'Observação'
+        },
+        'colunas_filtro': ['indicador'],
+        'ordem': 'indicador',
+        'tipos_campo': {
+            'indicador': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'observacao': 'textarea',
+            'rows_observacao': 2,
+        }
+    },
+    'c_dgp_meios_afericao': {
+        'nome': 'DGP/Metas: Meios de Aferição',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['meios_afericao', 'descricao', 'observacao'],
+        'colunas_obrigatorias': ['meios_afericao'],
+        'labels': {
+            'meios_afericao': 'Meio de Aferição',
+            'descricao': 'Descrição',
+            'observacao': 'Observação'
+        },
+        'colunas_filtro': ['meios_afericao'],
+        'ordem': 'meios_afericao',
+        'tipos_campo': {
+            'meios_afericao': 'text',
+            'descricao': 'textarea',
+            'rows_descricao': 3,
+            'observacao': 'textarea',
+            'rows_observacao': 2,
+        }
+    },
+    'c_dgp_plano_definicoes': {
+        'nome': 'DGP/Metas: Definições do Glossário',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['meta_definicao', 'indicador_definicao', 'meios_definicoes'],
+        'labels': {
+            'meta_definicao': 'Definição de Meta',
+            'indicador_definicao': 'Definição de Indicador',
+            'meios_definicoes': 'Definição de Meios de Aferição'
+        },
+        'colunas_filtro': [],
+        'ordem': 'id',
+        'tipos_campo': {
+            'meta_definicao': 'textarea',
+            'rows_meta_definicao': 5,
+            'indicador_definicao': 'textarea',
+            'rows_indicador_definicao': 5,
+            'meios_definicoes': 'textarea',
+            'rows_meios_definicoes': 5,
+        }
+    },
     'c_alt_instrumento': {
         'nome': 'DGP/ALT: Instrumentos Jurídicos para Alterações de Contrato',
         'schema': 'categoricas',

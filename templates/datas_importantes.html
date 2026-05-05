@@ -175,22 +175,22 @@
 
         <div class="content-card-header">
           <h5><i class="bi bi-person-check me-2"></i>Meus Registros Pessoais</h5>
-          <button class="btn-parc" data-bs-toggle="collapse" data-bs-target="#formPessoal">
-            <i class="bi bi-plus-circle"></i> Novo Registro
-          </button>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn-parc outline" data-bs-toggle="modal" data-bs-target="#modalRelatorioAbono">
+              <i class="bi bi-bar-chart-line"></i> Meus Abonos
+            </button>
+            {% if ver_tudo %}
+            <button class="btn-parc outline" data-bs-toggle="modal" data-bs-target="#modalRelatorioAbonoTodos">
+              <i class="bi bi-people"></i> Relatório Geral
+            </button>
+            {% endif %}
+            <button class="btn-parc" data-bs-toggle="collapse" data-bs-target="#formPessoal">
+              <i class="bi bi-plus-circle"></i> Novo Registro
+            </button>
+          </div>
         </div>
 
         <div class="content-card-body">
-          <!-- Avisos institucionais -->
-          <div class="alert mb-3 d-flex align-items-start gap-2"
-               style="background:#fef3c7;border-left:4px solid #d97706;border-radius:6px;padding:12px 16px">
-            <i class="bi bi-exclamation-triangle-fill text-warning mt-1" style="font-size:1.1rem;flex-shrink:0"></i>
-            <div>
-              <strong>Meios de Aferíção:</strong> todos os documentos comprobatórios relacionados aos eventos
-              realizados (listas de presença, fotos, relatórios etc.) deverão ser encartados no processo SEI
-              <strong class="text-danger">nº&nbsp;6074.2026/0000892-3</strong>.
-            </div>
-          </div>
           <div class="mb-4" style="font-size:.875rem">
             <i class="bi bi-box-arrow-up-right me-1 text-primary"></i>
             Para visualizar a <strong>Seção de Eventos da Secretaria</strong> — que contém Reservas de
@@ -833,6 +833,127 @@
     </div>
   </div>
 </div>
+
+<!-- Modal Relatório de Abonos — usuário logado -->
+<div class="modal fade" id="modalRelatorioAbono" tabindex="-1">
+  <div class="modal-dialog modal-md">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-bar-chart-line me-2"></i>Meus Abonos — {{ ano_atual }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% set usados = meus_abonos_ano|length %}
+        {% set disponiveis = (6 - usados) if usados < 6 else 0 %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="fw-semibold">Abonos utilizados em {{ ano_atual }}</span>
+            <span class="fw-bold {% if usados >= 6 %}text-danger{% elif usados >= 4 %}text-warning{% else %}text-success{% endif %}">
+              {{ usados }} / 6
+            </span>
+          </div>
+          <div class="progress" style="height:10px">
+            <div class="progress-bar {% if usados >= 6 %}bg-danger{% elif usados >= 4 %}bg-warning{% else %}bg-success{% endif %}"
+                 style="width:{{ (usados / 6 * 100)|round|int }}%" role="progressbar"></div>
+          </div>
+          {% if disponiveis > 0 %}
+          <div class="text-muted small mt-1">{{ disponiveis }} abono(s) disponível(eis) no ano</div>
+          {% else %}
+          <div class="text-danger small mt-1 fw-semibold"><i class="bi bi-exclamation-circle me-1"></i>Limite anual atingido</div>
+          {% endif %}
+        </div>
+        {% if meus_abonos_ano %}
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr style="background:#f5f3ff">
+              <th width="30">#</th>
+              <th>Data</th>
+              <th>Observações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in meus_abonos_ano %}
+            <tr>
+              <td class="text-muted">{{ loop.index }}</td>
+              <td class="fw-semibold">{{ a.data_inicio.strftime('%d/%m/%Y') if a.data_inicio else '—' }}</td>
+              <td class="text-muted small">{{ a.observacoes or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-3">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:2rem"></i>
+          <p class="mt-2 mb-0">Nenhum abono registrado em {{ ano_atual }}.</p>
+        </div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if ver_tudo %}
+<!-- Modal Relatório Geral de Abonos — todos os servidores -->
+<div class="modal fade" id="modalRelatorioAbonoTodos" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-people me-2"></i>Relatório de Abonos — Todos os Servidores — {{ ano_atual }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">Limite: <strong>6 abonos por servidor por ano</strong>. Servidores inativos não são exibidos.</p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr style="background:linear-gradient(135deg,#312e81,#4f46e5);color:#fff">
+                <th>Servidor(a)</th>
+                <th class="text-center">Utilizados</th>
+                <th class="text-center">Disponíveis</th>
+                <th>Datas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for srv in relatorio_abonos_todos %}
+              {% set usados_srv = srv.abonos|length %}
+              {% set disp_srv = (6 - usados_srv) if usados_srv < 6 else 0 %}
+              <tr>
+                <td class="fw-semibold">{{ srv.nome }}</td>
+                <td class="text-center">
+                  <span class="badge {% if usados_srv >= 6 %}bg-danger{% elif usados_srv >= 4 %}bg-warning text-dark{% elif usados_srv > 0 %}bg-success{% else %}bg-light text-secondary border{% endif %}">
+                    {{ usados_srv }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <span class="badge {% if disp_srv == 0 %}bg-danger{% elif disp_srv <= 2 %}bg-warning text-dark{% else %}bg-light text-dark border{% endif %}">
+                    {{ disp_srv }}
+                  </span>
+                </td>
+                <td class="text-muted small">
+                  {% for a in srv.abonos %}
+                  <span class="me-2 text-nowrap">{{ a.data.strftime('%d/%m') if a.data else '—' }}{% if a.obs %} <em class="text-secondary">({{ a.obs }})</em>{% endif %}</span>
+                  {% endfor %}
+                  {% if not srv.abonos %}<span class="text-muted">—</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+              {% if not relatorio_abonos_todos %}
+              <tr><td colspan="4" class="text-center text-muted py-3">Nenhum registro encontrado.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <!-- Datalist para autocomplete de responsáveis -->
 <datalist id="datalist-nomes">

@@ -144,6 +144,31 @@
   </div>
 </div>
 
+<!-- ===== NAV TABS ===== -->
+<ul class="nav nav-tabs mb-0" id="painelTabs" role="tablist"
+    style="border-bottom:2px solid #dc2626; margin-bottom:0!important;">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-erros-btn" data-bs-toggle="tab"
+            data-bs-target="#pane-erros" type="button" role="tab"
+            style="border-color:#dc2626 #dc2626 #fff;">
+      <i class="bi bi-bug-fill me-1"></i>Erros do Sistema
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-relatos-btn" data-bs-toggle="tab"
+            data-bs-target="#pane-relatos" type="button" role="tab"
+            onclick="iniciarRelatos()">
+      <i class="bi bi-flag me-1"></i>Relatos de Usuários
+      <span id="badge-relatos" class="badge bg-warning text-dark ms-1" style="display:none;"></span>
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content pt-4" id="painelTabContent">
+
+<!-- ===== ABA ERROS DO SISTEMA ===== -->
+<div class="tab-pane fade show active" id="pane-erros" role="tabpanel">
+
 <!-- ===== STAT CARDS ===== -->
 <div class="stat-grid">
   <div class="stat-card">
@@ -374,6 +399,134 @@
     {% endif %}
   </div>
 </div>
+</div><!-- /pane-erros -->
+
+<!-- ===== ABA RELATOS DE USUÁRIOS ===== -->
+<div class="tab-pane fade" id="pane-relatos" role="tabpanel">
+
+  <!-- Stats relatos -->
+  <div class="stat-grid" id="relatos-stats-grid"></div>
+
+  <!-- Filtros relatos -->
+  <div class="filter-section">
+    <h6 class="mb-3"><i class="bi bi-funnel me-1" style="color:#dc2626;"></i>Filtros</h6>
+    <div class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.8rem;font-weight:600;">Status</label>
+        <select class="form-select form-select-sm" id="rel-filtro-status" style="min-width:140px;" onchange="carregarRelatos()">
+          <option value="">Todos</option>
+          <option value="Aberto">Aberto</option>
+          <option value="Em análise">Em análise</option>
+          <option value="Resolvido">Resolvido</option>
+          <option value="Descartado">Descartado</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.8rem;font-weight:600;">Tipo</label>
+        <select class="form-select form-select-sm" id="rel-filtro-tipo" style="min-width:130px;" onchange="carregarRelatos()">
+          <option value="">Todos</option>
+          <option>Erro</option>
+          <option>Sugestão</option>
+          <option>Melhoria</option>
+          <option>Dúvida</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.8rem;font-weight:600;">Módulo</label>
+        <select class="form-select form-select-sm" id="rel-filtro-modulo" style="min-width:170px;" onchange="carregarRelatos()">
+          <option value="">Todos</option>
+          <option>Parcerias</option>
+          <option>Certidões</option>
+          <option>Análises de PC</option>
+          <option>Conciliação Bancária</option>
+          <option>Gestão Financeira</option>
+          <option>Gestão Orçamentária</option>
+          <option>Editais</option>
+          <option>Celebração</option>
+          <option>CENTS</option>
+          <option>Manuais</option>
+          <option>Calendário e Férias</option>
+          <option>Listas</option>
+          <option>Pessoas / Usuários</option>
+          <option>Outro</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.8rem;font-weight:600;">Usuário</label>
+        <input type="text" class="form-control form-control-sm" id="rel-filtro-email"
+               placeholder="e-mail..." style="min-width:160px;"
+               onkeydown="if(event.key==='Enter') carregarRelatos()">
+      </div>
+      <div class="col-auto">
+        <button class="btn-admin" style="padding:6px 14px;" onclick="carregarRelatos()">
+          <i class="bi bi-search"></i> Filtrar
+        </button>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-outline-secondary btn-sm" onclick="limparFiltrosRelatos()">
+          <i class="bi bi-x-circle"></i> Limpar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela relatos -->
+  <div class="content-card">
+    <div class="content-card-header">
+      <h5><i class="bi bi-flag me-2"></i>Relatos de Usuários
+        <span id="rel-total-badge" class="badge bg-light text-dark ms-2" style="font-size:.75rem;"></span>
+      </h5>
+    </div>
+    <div class="content-card-body">
+      <div id="relatos-tabela-wrapper">
+        <div class="text-center py-5">
+          <div class="spinner-border text-danger" role="status"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /pane-relatos -->
+
+</div><!-- /tab-content -->
+
+<!-- Modal responder/atualizar relato -->
+<div class="modal fade" id="modalResponderRelato" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-chat-left-text me-2"></i>Ver / Responder Relato</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resp-relato-id">
+        <div id="resp-detalhes"></div>
+        <hr>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Novo Status</label>
+          <select class="form-select" id="resp-status">
+            <option value="Aberto">Aberto</option>
+            <option value="Em análise">Em análise</option>
+            <option value="Resolvido">Resolvido</option>
+            <option value="Descartado">Descartado</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Resposta para o usuário <small class="text-muted">(opcional)</small></label>
+          <textarea class="form-control" id="resp-resposta" rows="4"
+                    placeholder="Descreva a acão tomada ou o motivo do descarte..."></textarea>
+        </div>
+        <div id="resp-msg" class="alert d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="salvarRespostaRelato()">
+          <i class="bi bi-check-lg"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Toast de feedback -->
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
@@ -435,6 +588,197 @@
       btn.textContent = 'recolher';
     } else {
       btn.textContent = 'expandir tudo';
+    }
+  }
+
+  // ============================================================
+  // RELATOS DE USUÁRIOS
+  // ============================================================
+  let _relatosIniciados = false;
+
+  function iniciarRelatos() {
+    if (!_relatosIniciados) {
+      _relatosIniciados = true;
+      carregarRelatos();
+    }
+  }
+
+  function limparFiltrosRelatos() {
+    document.getElementById('rel-filtro-status').value = '';
+    document.getElementById('rel-filtro-tipo').value   = '';
+    document.getElementById('rel-filtro-modulo').value = '';
+    document.getElementById('rel-filtro-email').value  = '';
+    carregarRelatos();
+  }
+
+  async function carregarRelatos() {
+    const wrapper = document.getElementById('relatos-tabela-wrapper');
+    wrapper.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger" role="status"></div></div>';
+
+    const status = document.getElementById('rel-filtro-status').value;
+    const tipo   = document.getElementById('rel-filtro-tipo').value;
+    const modulo = document.getElementById('rel-filtro-modulo').value;
+    const email  = document.getElementById('rel-filtro-email').value;
+
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (tipo)   params.set('tipo',   tipo);
+    if (modulo) params.set('modulo', modulo);
+    if (email)  params.set('email',  email);
+
+    try {
+      const res  = await fetch(`/admin/relatos?${params.toString()}`);
+      const data = await res.json();
+
+      if (!res.ok) { wrapper.innerHTML = `<div class="alert alert-danger m-3">${data.erro}</div>`; return; }
+
+      // Stats cards
+      const s = data.stats || {};
+      document.getElementById('relatos-stats-grid').innerHTML = `
+        <div class="stat-card"><div class="stat-num">${s.abertos || 0}</div><div class="stat-label"><i class="bi bi-inbox me-1" style="color:#2563eb"></i>Abertos</div></div>
+        <div class="stat-card amarelo"><div class="stat-num">${s.em_analise || 0}</div><div class="stat-label"><i class="bi bi-hourglass me-1" style="color:#d97706"></i>Em análise</div></div>
+        <div class="stat-card verde"><div class="stat-num">${s.resolvidos || 0}</div><div class="stat-label"><i class="bi bi-check-circle me-1" style="color:#059669"></i>Resolvidos</div></div>
+        <div class="stat-card" style="border-top-color:#94a3b8;"><div class="stat-num">${s.descartados || 0}</div><div class="stat-label"><i class="bi bi-x-circle me-1" style="color:#94a3b8"></i>Descartados</div></div>
+        <div class="stat-card azul"><div class="stat-num">${s.semana || 0}</div><div class="stat-label"><i class="bi bi-calendar-week me-1" style="color:#2563eb"></i>Últimos 7 dias</div></div>
+      `;
+
+      // Badge no tab
+      const badgeTab = document.getElementById('badge-relatos');
+      if (s.abertos > 0) { badgeTab.textContent = s.abertos; badgeTab.style.display = ''; }
+      else { badgeTab.style.display = 'none'; }
+
+      document.getElementById('rel-total-badge').textContent = data.total;
+
+      if (!data.relatos || data.relatos.length === 0) {
+        wrapper.innerHTML = '<div class="text-center py-5"><i class="bi bi-check-circle-fill text-success" style="font-size:2.5rem;"></i><p class="mt-2 text-muted">Nenhum relato encontrado.</p></div>';
+        return;
+      }
+
+      const BADGE_STATUS = {
+        'Aberto':     '<span class="badge-tip" style="background:#2563eb;color:#fff;">Aberto</span>',
+        'Em análise': '<span class="badge-tip" style="background:#d97706;color:#fff;">Em análise</span>',
+        'Resolvido':  '<span class="badge-tip badge-ok">Resolvido</span>',
+        'Descartado': '<span class="badge-tip" style="background:#94a3b8;color:#fff;">Descartado</span>',
+      };
+      const BADGE_PRIO = {
+        'Urgente': '<span class="badge-tip badge-http">Urgente</span>',
+        'Normal':  '<span class="badge-tip" style="background:#e2e8f0;color:#1e293b;">Normal</span>',
+        'Baixa':   '<span class="badge-tip" style="background:#f1f5f9;color:#94a3b8;">Baixa</span>',
+      };
+      const BADGE_TIPO = {
+        'Erro':     '<span class="badge-tip badge-http">Erro</span>',
+        'Sugestão': '<span class="badge-tip badge-api">Sugestão</span>',
+        'Melhoria': '<span class="badge-tip" style="background:#059669;color:#fff;">Melhoria</span>',
+        'Dúvida':   '<span class="badge-tip badge-query">Dúvida</span>',
+      };
+
+      let html = `
+        <div class="table-responsive">
+        <table class="table table-hover mb-0" id="tabelaRelatos">
+          <thead>
+            <tr>
+              <th>#</th><th>Tipo</th><th>Módulo</th><th>Título</th>
+              <th>Prioridade</th><th>Status</th><th>Usuário</th><th>Data</th><th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+      data.relatos.forEach(r => {
+        const rowStyle = r.status === 'Resolvido' || r.status === 'Descartado' ? 'opacity:.55;' : '';
+        html += `
+          <tr id="rel-row-${r.id}" style="${rowStyle}">
+            <td class="text-muted">${r.id}</td>
+            <td>${BADGE_TIPO[r.tipo_relato] || r.tipo_relato}</td>
+            <td style="font-size:.78rem;">${r.modulo}</td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.titulo}">${r.titulo}</td>
+            <td>${BADGE_PRIO[r.prioridade_usuario] || r.prioridade_usuario}</td>
+            <td>${BADGE_STATUS[r.status] || r.status}</td>
+            <td style="font-size:.75rem;">${r.usuario_email || '—'}</td>
+            <td style="white-space:nowrap;font-size:.78rem;">${r.criado_em || '—'}</td>
+            <td>
+              <button class="btn-sm-admin" onclick='abrirResponderRelato(${JSON.stringify(r)})'>
+                <i class="bi bi-chat-left-text"></i> Ver/Resp.
+              </button>
+            </td>
+          </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      wrapper.innerHTML = html;
+
+    } catch(e) {
+      wrapper.innerHTML = `<div class="alert alert-danger m-3"><i class="bi bi-exclamation-triangle"></i> Erro ao carregar relatos: ${e.message}</div>`;
+    }
+  }
+
+  function abrirResponderRelato(r) {
+    document.getElementById('resp-relato-id').value = r.id;
+    document.getElementById('resp-status').value    = r.status;
+    document.getElementById('resp-resposta').value  = r.resposta_admin || '';
+
+    const BADGE_PRIO = {
+      'Urgente': '<span class="badge bg-danger">Urgente</span>',
+      'Normal':  '<span class="badge bg-light text-dark border">Normal</span>',
+      'Baixa':   '<span class="badge bg-light text-muted border">Baixa</span>',
+    };
+
+    const passos = r.passos_reproducao
+      ? `<div class="mt-2"><strong>Passos para reproduzir:</strong><pre class="detalhe-pre mt-1">${r.passos_reproducao}</pre></div>`
+      : '';
+    const resposta = r.resposta_admin
+      ? `<div class="mt-2 p-2 bg-light border-start border-success border-3 rounded"><small><strong>Resposta anterior:</strong> ${r.resposta_admin}</small></div>`
+      : '';
+
+    document.getElementById('resp-detalhes').innerHTML = `
+      <div class="mb-2">
+        <span class="fw-bold fs-6">${r.titulo}</span>
+        <div class="mt-1 d-flex flex-wrap gap-1">
+          <span class="badge bg-secondary">${r.tipo_relato}</span>
+          <span class="badge bg-light text-dark border">${r.modulo}</span>
+          ${BADGE_PRIO[r.prioridade_usuario] || ''}
+        </div>
+      </div>
+      <div class="mb-1"><strong>Usuário:</strong> ${r.usuario_email} <small class="text-muted">(${r.tipo_usuario || ''})</small></div>
+      <div class="mb-1"><strong>Data:</strong> ${r.criado_em}</div>
+      <div class="mt-2"><strong>Descrição:</strong><p class="mt-1 mb-0">${r.descricao}</p></div>
+      ${passos}
+      ${resposta}
+    `;
+
+    const msgEl = document.getElementById('resp-msg');
+    msgEl.className = 'alert d-none';
+    msgEl.textContent = '';
+
+    new bootstrap.Modal(document.getElementById('modalResponderRelato')).show();
+  }
+
+  async function salvarRespostaRelato() {
+    const id       = document.getElementById('resp-relato-id').value;
+    const status   = document.getElementById('resp-status').value;
+    const resposta = document.getElementById('resp-resposta').value.trim();
+    const msgEl    = document.getElementById('resp-msg');
+
+    try {
+      const res  = await fetch(`/admin/relatos/${id}/status`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status, resposta_admin: resposta}),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modalResponderRelato')).hide();
+        mostrarToast('Relato atualizado com sucesso!', true);
+        carregarRelatos();
+      } else {
+        msgEl.className = 'alert alert-danger';
+        msgEl.textContent = data.erro || 'Erro ao salvar.';
+        msgEl.classList.remove('d-none');
+      }
+    } catch(e) {
+      msgEl.className = 'alert alert-danger';
+      msgEl.textContent = 'Erro de conexão.';
+      msgEl.classList.remove('d-none');
     }
   }
 </script>

@@ -150,6 +150,9 @@
         <i class="bi bi-bug-fill"></i> Erros
       </a>
       {% endif %}
+      <button type="button" class="faf-header-btn" onclick="abrirModalRelatar()" title="Reportar erro ou sugestão">
+        <i class="bi bi-flag"></i> Reportar
+      </button>
       <button type="button" class="faf-header-btn" data-bs-toggle="modal" data-bs-target="#modalAlterarSenha">
         <i class="bi bi-key"></i> Alterar Senha
       </button>
@@ -384,7 +387,7 @@
           <i class="bi bi-gear-fill s-icon" style="font-size:1.05rem;"></i>
           <span>Opções de Administrador</span>
           <span class="s-spacer"></span>
-          <span class="s-count">1</span>
+          <span class="s-count">2</span>
           <i class="bi bi-chevron-down s-chev"></i>
         </button>
         <div id="collapseAdmin" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
@@ -392,6 +395,11 @@
             {% if is_admin or 'portarias' in user_acessos %}
             <a href="{{ url_for('main.gerenciar_portarias') }}" class="faf-btn">
               <i class="bi bi-file-earmark-text"></i> Gerenciar Portarias/Legislações
+            </a>
+            {% endif %}
+            {% if is_admin %}
+            <a href="{{ url_for('email_assistente.index') }}" class="faf-btn">
+              <i class="bi bi-envelope-open-fill"></i> Email Assistente (IA)
             </a>
             {% endif %}
           </div>
@@ -939,6 +947,467 @@
     });
   </script>
   {% endif %}
+
+  <!-- ===== MODAL RELATAR ===== -->
+  <div class="modal fade" id="modalRelatar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;">
+          <h5 class="modal-title"><i class="bi bi-flag me-2"></i>Reportar Erro / Sugestão</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+
+        <!-- Abas -->
+        <ul class="nav nav-tabs px-3 pt-2" id="relatarTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-novo-btn" data-bs-toggle="tab"
+                    data-bs-target="#tab-novo" type="button" role="tab">
+              <i class="bi bi-plus-circle me-1"></i>Novo Relato
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-meus-btn" data-bs-toggle="tab"
+                    data-bs-target="#tab-meus" type="button" role="tab"
+                    onclick="carregarMeusRelatos()">
+              <i class="bi bi-clock-history me-1"></i>Meus Relatos
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- ── ABA NOVO RELATO ── -->
+          <div class="tab-pane fade show active" id="tab-novo" role="tabpanel">
+            <div class="modal-body">
+              <form id="formRelatar" novalidate>
+                <div class="row g-3">
+                  <!-- Tipo -->
+                  <div class="col-sm-6">
+                    <label class="form-label fw-semibold">Tipo <span class="text-danger">*</span></label>
+                    <select class="form-select" id="rel-tipo" required onchange="togglePassos()">
+                      <option value="">Selecione...</option>
+                      <option value="Erro">&#x1F534; Erro</option>
+                      <option value="Sugestão">&#x1F4A1; Sugestão</option>
+                      <option value="Melhoria">&#x2B06;&#xFE0F; Melhoria</option>
+                      <option value="Dúvida">&#x2753; Dúvida</option>
+                    </select>
+                  </div>
+                  <!-- Módulo -->
+                  <div class="col-sm-6">
+                    <label class="form-label fw-semibold">Módulo <span class="text-danger">*</span></label>
+                    <select class="form-select" id="rel-modulo" required>
+                      <option value="">Selecione...</option>
+                      <option>Parcerias</option>
+                      <option>Certidões</option>
+                      <option>Análises de PC</option>
+                      <option>Conciliação Bancária</option>
+                      <option>Gestão Financeira</option>
+                      <option>Gestão Orçamentária</option>
+                      <option>Editais</option>
+                      <option>Celebração</option>
+                      <option>CENTS</option>
+                      <option>Manuais</option>
+                      <option>Calendário e Férias</option>
+                      <option>Listas</option>
+                      <option>Pessoas / Usuários</option>
+                      <option>Outro</option>
+                    </select>
+                  </div>
+                  <!-- Título -->
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Título <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="rel-titulo" maxlength="255"
+                           placeholder="Resumo em uma linha" required>
+                    <div class="form-text text-end"><span id="rel-titulo-count">0</span>/255</div>
+                  </div>
+                  <!-- Descrição -->
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Descrição <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="rel-descricao" rows="4"
+                              placeholder="Descreva o problema, a sugestão ou dúvida em detalhes" required></textarea>
+                  </div>
+                  <!-- Passos (somente Erro) -->
+                  <div class="col-12" id="rel-passos-group" style="display:none;">
+                    <label class="form-label fw-semibold">Passos para reproduzir</label>
+                    <textarea class="form-control" id="rel-passos" rows="3"
+                              placeholder="1. Acesse...
+2. Clique em...
+3. O erro ocorre quando..."></textarea>
+                  </div>
+                  <!-- Prioridade -->
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Prioridade percebida</label>
+                    <div class="d-flex gap-3">
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rel-prioridade" id="prio-urgente" value="Urgente">
+                        <label class="form-check-label text-danger fw-semibold" for="prio-urgente">
+                          <i class="bi bi-exclamation-triangle-fill"></i> Urgente
+                        </label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rel-prioridade" id="prio-normal" value="Normal" checked>
+                        <label class="form-check-label" for="prio-normal">Normal</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rel-prioridade" id="prio-baixa" value="Baixa">
+                        <label class="form-check-label text-muted" for="prio-baixa">Baixa</label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div id="rel-msg" class="alert d-none mt-3"></div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="button" class="btn btn-primary" id="rel-btn-enviar" onclick="enviarRelato()">
+                <i class="bi bi-send"></i> <span id="rel-btn-texto">Enviar Relato</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ── ABA MEUS RELATOS ── -->
+          <div class="tab-pane fade" id="tab-meus" role="tabpanel">
+            <div class="modal-body">
+              <div id="meus-relatos-lista">
+                <div class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de edição de relato -->
+  <div class="modal fade" id="modalEditarRelato" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Relato</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="edit-relato-id">
+          <form id="formEditarRelato" novalidate>
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold">Tipo <span class="text-danger">*</span></label>
+                <select class="form-select" id="edit-tipo" required onchange="togglePassosEdit()">
+                  <option value="Erro">&#x1F534; Erro</option>
+                  <option value="Sugestão">&#x1F4A1; Sugestão</option>
+                  <option value="Melhoria">&#x2B06;&#xFE0F; Melhoria</option>
+                  <option value="Dúvida">&#x2753; Dúvida</option>
+                </select>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold">Módulo <span class="text-danger">*</span></label>
+                <select class="form-select" id="edit-modulo" required>
+                  <option>Parcerias</option>
+                  <option>Certidões</option>
+                  <option>Análises de PC</option>
+                  <option>Conciliação Bancária</option>
+                  <option>Gestão Financeira</option>
+                  <option>Gestão Orçamentária</option>
+                  <option>Editais</option>
+                  <option>Celebração</option>
+                  <option>CENTS</option>
+                  <option>Manuais</option>
+                  <option>Calendário e Férias</option>
+                  <option>Listas</option>
+                  <option>Pessoas / Usuários</option>
+                  <option>Outro</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Título <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="edit-titulo" maxlength="255" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Descrição <span class="text-danger">*</span></label>
+                <textarea class="form-control" id="edit-descricao" rows="4" required></textarea>
+              </div>
+              <div class="col-12" id="edit-passos-group" style="display:none;">
+                <label class="form-label fw-semibold">Passos para reproduzir</label>
+                <textarea class="form-control" id="edit-passos" rows="3"></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Prioridade</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="edit-prioridade" id="edit-prio-urgente" value="Urgente">
+                    <label class="form-check-label text-danger fw-semibold" for="edit-prio-urgente">
+                      <i class="bi bi-exclamation-triangle-fill"></i> Urgente
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="edit-prioridade" id="edit-prio-normal" value="Normal">
+                    <label class="form-check-label" for="edit-prio-normal">Normal</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="edit-prioridade" id="edit-prio-baixa" value="Baixa">
+                    <label class="form-check-label text-muted" for="edit-prio-baixa">Baixa</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="edit-msg" class="alert d-none mt-3"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="salvarEdicaoRelato()">
+            <i class="bi bi-check-lg"></i> Salvar alterações
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Helpers ────────────────────────────────────────────────────────────
+    const BADGE_STATUS_RELATO = {
+      'Aberto':     '<span class="badge bg-primary">Aberto</span>',
+      'Em análise': '<span class="badge bg-warning text-dark">Em análise</span>',
+      'Resolvido':  '<span class="badge bg-success">Resolvido</span>',
+      'Descartado': '<span class="badge bg-secondary">Descartado</span>',
+    };
+    const BADGE_PRIO = {
+      'Urgente': '<span class="badge bg-danger">Urgente</span>',
+      'Normal':  '<span class="badge bg-light text-dark border">Normal</span>',
+      'Baixa':   '<span class="badge bg-light text-muted border">Baixa</span>',
+    };
+
+    function abrirModalRelatar() {
+      // Reset form
+      document.getElementById('formRelatar').reset();
+      const msg = document.getElementById('rel-msg');
+      msg.className = 'alert d-none';
+      msg.textContent = '';
+      document.getElementById('rel-passos-group').style.display = 'none';
+      document.getElementById('rel-btn-texto').textContent = 'Enviar Relato';
+      document.getElementById('rel-btn-enviar').disabled = false;
+      // Resetar para aba Novo Relato
+      const tabNovo = document.getElementById('tab-novo-btn');
+      bootstrap.Tab.getOrCreateInstance(tabNovo).show();
+      new bootstrap.Modal(document.getElementById('modalRelatar')).show();
+    }
+
+    function togglePassos() {
+      const tipo = document.getElementById('rel-tipo').value;
+      document.getElementById('rel-passos-group').style.display = tipo === 'Erro' ? '' : 'none';
+    }
+    function togglePassosEdit() {
+      const tipo = document.getElementById('edit-tipo').value;
+      document.getElementById('edit-passos-group').style.display = tipo === 'Erro' ? '' : 'none';
+    }
+
+    // contador de caracteres no título
+    document.addEventListener('DOMContentLoaded', function() {
+      const titulo = document.getElementById('rel-titulo');
+      if (titulo) {
+        titulo.addEventListener('input', function() {
+          document.getElementById('rel-titulo-count').textContent = this.value.length;
+        });
+      }
+    });
+
+    // ── Enviar novo relato ─────────────────────────────────────────────────
+    async function enviarRelato() {
+      const msg    = document.getElementById('rel-msg');
+      const btnTxt = document.getElementById('rel-btn-texto');
+      const btn    = document.getElementById('rel-btn-enviar');
+
+      const tipo_relato       = document.getElementById('rel-tipo').value;
+      const modulo            = document.getElementById('rel-modulo').value;
+      const titulo            = document.getElementById('rel-titulo').value.trim();
+      const descricao         = document.getElementById('rel-descricao').value.trim();
+      const passos_reproducao = document.getElementById('rel-passos').value.trim();
+      const prioridade_usuario = document.querySelector('input[name="rel-prioridade"]:checked')?.value || 'Normal';
+
+      if (!tipo_relato || !modulo || !titulo || !descricao) {
+        msg.className = 'alert alert-warning mt-3';
+        msg.textContent = 'Preencha todos os campos obrigatórios.';
+        msg.classList.remove('d-none');
+        return;
+      }
+
+      const payload = {
+        tipo_relato,
+        modulo,
+        titulo,
+        descricao,
+        passos_reproducao: tipo_relato === 'Erro' ? passos_reproducao : '',
+        prioridade_usuario,
+        url_pagina: window.location.href,
+        detalhes_tecnicos: {
+          user_agent: navigator.userAgent,
+          resolucao: `${screen.width}x${screen.height}`,
+          viewport: `${window.innerWidth}x${window.innerHeight}`,
+        },
+      };
+
+      btn.disabled = true;
+      btnTxt.textContent = 'Enviando...';
+      msg.className = 'alert d-none';
+
+      try {
+        const res  = await fetch('/api/relatos/novo', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          msg.className = 'alert alert-success mt-3';
+          msg.textContent = data.mensagem || 'Relato enviado com sucesso!';
+          msg.classList.remove('d-none');
+          document.getElementById('formRelatar').reset();
+          document.getElementById('rel-passos-group').style.display = 'none';
+          document.getElementById('rel-titulo-count').textContent = '0';
+          btn.disabled = false;
+          btnTxt.textContent = 'Enviar Relato';
+        } else {
+          msg.className = 'alert alert-danger mt-3';
+          msg.textContent = data.erro || 'Erro ao enviar relato.';
+          msg.classList.remove('d-none');
+          btn.disabled = false;
+          btnTxt.textContent = 'Enviar Relato';
+        }
+      } catch (e) {
+        msg.className = 'alert alert-danger mt-3';
+        msg.textContent = 'Erro de conexão. Tente novamente.';
+        msg.classList.remove('d-none');
+        btn.disabled = false;
+        btnTxt.textContent = 'Enviar Relato';
+      }
+    }
+
+    // ── Listar meus relatos ────────────────────────────────────────────────
+    let _meusRelatosCarregados = false;
+    async function carregarMeusRelatos() {
+      if (_meusRelatosCarregados) return;
+      const lista = document.getElementById('meus-relatos-lista');
+      try {
+        const res  = await fetch('/api/relatos/meus');
+        const data = await res.json();
+        _meusRelatosCarregados = true;
+
+        if (!data.relatos || data.relatos.length === 0) {
+          lista.innerHTML = '<div class="alert alert-light"><i class="bi bi-inbox"></i> Nenhum relato enviado ainda.</div>';
+          return;
+        }
+
+        let html = '<div class="list-group list-group-flush">';
+        data.relatos.forEach(r => {
+          const badge  = BADGE_STATUS_RELATO[r.status] || r.status;
+          const prio   = BADGE_PRIO[r.prioridade_usuario] || '';
+          const editar = r.status === 'Aberto'
+            ? `<button class="btn btn-sm btn-outline-primary ms-2" onclick="abrirEdicaoRelato(${JSON.stringify(r).replace(/"/g, '&quot;')})"><i class="bi bi-pencil"></i> Editar</button>`
+            : '';
+          const resposta = r.resposta_admin
+            ? `<div class="mt-2 p-2 bg-light rounded border-start border-success border-3"><small><strong><i class="bi bi-reply-fill text-success"></i> Resposta:</strong> ${r.resposta_admin}</small></div>`
+            : '';
+          html += `
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
+                <div>
+                  <span class="fw-semibold">${r.titulo}</span>
+                  <div class="mt-1 d-flex gap-1 flex-wrap">
+                    <span class="badge bg-info text-dark">${r.tipo_relato}</span>
+                    <span class="badge bg-light text-dark border">${r.modulo}</span>
+                    ${prio}
+                    ${badge}
+                  </div>
+                </div>
+                <div class="d-flex align-items-center">
+                  <small class="text-muted">${r.criado_em}</small>
+                  ${editar}
+                </div>
+              </div>
+              ${resposta}
+            </div>`;
+        });
+        html += '</div>';
+        lista.innerHTML = html;
+      } catch (e) {
+        lista.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Erro ao carregar relatos.</div>';
+      }
+    }
+
+    // ── Abrir modal de edição ────────────────────────────────────────────
+    function abrirEdicaoRelato(r) {
+      document.getElementById('edit-relato-id').value      = r.id;
+      document.getElementById('edit-titulo').value         = r.titulo;
+      document.getElementById('edit-descricao').value      = r.descricao;
+      document.getElementById('edit-passos').value         = r.passos_reproducao || '';
+      document.getElementById('edit-tipo').value           = r.tipo_relato;
+      document.getElementById('edit-modulo').value         = r.modulo;
+      document.querySelector(`input[name="edit-prioridade"][value="${r.prioridade_usuario}"]`).checked = true;
+      togglePassosEdit();
+      const editMsg = document.getElementById('edit-msg');
+      editMsg.className = 'alert d-none';
+      editMsg.textContent = '';
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarRelato')).show();
+    }
+
+    // ── Salvar edição ──────────────────────────────────────────────────────
+    async function salvarEdicaoRelato() {
+      const id       = document.getElementById('edit-relato-id').value;
+      const tipo_relato       = document.getElementById('edit-tipo').value;
+      const modulo            = document.getElementById('edit-modulo').value;
+      const titulo            = document.getElementById('edit-titulo').value.trim();
+      const descricao         = document.getElementById('edit-descricao').value.trim();
+      const passos_reproducao = document.getElementById('edit-passos').value.trim();
+      const prioridade_usuario = document.querySelector('input[name="edit-prioridade"]:checked')?.value || 'Normal';
+      const editMsg = document.getElementById('edit-msg');
+
+      if (!tipo_relato || !modulo || !titulo || !descricao) {
+        editMsg.className = 'alert alert-warning';
+        editMsg.textContent = 'Preencha todos os campos obrigatórios.';
+        editMsg.classList.remove('d-none');
+        return;
+      }
+
+      try {
+        const res  = await fetch(`/api/relatos/${id}/editar`, {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({tipo_relato, modulo, titulo, descricao, passos_reproducao, prioridade_usuario}),
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          bootstrap.Modal.getInstance(document.getElementById('modalEditarRelato')).hide();
+          _meusRelatosCarregados = false;  // força reload
+          // Voltar para aba meus relatos e recarregar
+          bootstrap.Tab.getOrCreateInstance(document.getElementById('tab-meus-btn')).show();
+          carregarMeusRelatos();
+        } else {
+          editMsg.className = 'alert alert-danger';
+          editMsg.textContent = data.erro || 'Erro ao salvar.';
+          editMsg.classList.remove('d-none');
+        }
+      } catch (e) {
+        editMsg.className = 'alert alert-danger';
+        editMsg.textContent = 'Erro de conexão.';
+        editMsg.classList.remove('d-none');
+      }
+    }
+
+    // Resetar estado da aba ao fechar o modal
+    document.addEventListener('DOMContentLoaded', function() {
+      const modalEl = document.getElementById('modalRelatar');
+      if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', function() {
+          _meusRelatosCarregados = false;
+        });
+      }
+    });
+  </script>
 
 </body>
 </html>

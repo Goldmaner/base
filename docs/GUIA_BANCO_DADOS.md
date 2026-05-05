@@ -15,6 +15,7 @@
 - [Schema `gestao_pessoas`](#-schema-gestao_pessoas--usuários-e-rh)
 - [Schema `categoricas`](#-schema-categoricas--listas-suspensas-e-catálogos)
 - [Schema `celebracao`](#-schema-celebracao--celebração-de-parcerias)
+- [Módulo Quadro de Metas](#-módulo-quadro-de-metas)
 - [Schema `auditoria_memoria`](#-schema-auditoria_memoria)
 - [Schema `calendario`](#-schema-calendario--calendário-institucional)
 - [Relacionamentos Principais](#-relacionamentos-principais)
@@ -31,8 +32,8 @@
 | `analises_pc` | 14 | Conciliação bancária, checklists, inconsistências |
 | `gestao_financeira` | 8 | Ultra liquidações, cronogramas, empenhos SOF |
 | `gestao_pessoas` | 5 | Usuários, logs de atividade e erros |
-| `categoricas` | 32 | Listas suspensas e catálogos editáveis |
-| `celebracao` | 6 | Processo de celebração de novos termos |
+| `categoricas` | 36 | Listas suspensas e catálogos editáveis |
+| `celebracao` | 7 | Processo de celebração de novos termos e Quadro de Metas |
 | `auditoria_memoria` | 1 | Auditoria de encaminhamentos de pagamento |
 | `calendario` | 5 | Férias, registros pessoais, eventos e documentos |
 
@@ -973,6 +974,10 @@ Log de erros HTTP, queries lentas e falhas em APIs externas.
 | `c_dgp_celebracao_status` | Status de celebração | `status_novo`, `status_antigo`, `status_generico` |
 | `c_dgp_celebracao_substatus` | Substatus de celebração | `substatus`, `responsabilidade_status`, `substatus_limite` |
 | `c_dgp_cents_status` | Status de CENTS | `cents_status`, `descricao`, `status_status` |
+| `c_dgp_meta_tipos` | ⭐ **Novo** Tipos de meta (Qualitativo, Impacto...) | `meta_tipo`, `tipo_classificacao` |
+| `c_dgp_indicadores` | ⭐ **Novo** Catálogo de indicadores | `indicador`, `descricao` |
+| `c_dgp_meios_afericao` | ⭐ **Novo** Meios de aferição | `meios_afericao`, `descricao` |
+| `c_dgp_plano_definicoes` | ⭐ **Novo** Glossário de ajuda ao preenchimento | `meta_definicao`, `indicador_definicao`, `meios_definicoes` |
 
 ### Catálogos DAC
 
@@ -1146,6 +1151,48 @@ Emendas parlamentares vinculadas a celebrações.
 
 ---
 
+### `celebracao.celebracao_metas` ⭐
+Quadro de Metas do Plano de Trabalho. Múltiplas metas por processo SEI (1:N).
+
+> **Criado em:** 05/05/2026  
+> **Referência:** Módulo Parcerias Metas (`/parcerias-metas`)  
+> **Script DDL:** `scripts/criar_tabelas_parcerias_metas.sql`
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | integer PK | |
+| `sei_numero` | varchar(30) NOT NULL | Referência lógica a processo SEI — 3 fontes possíveis |
+| `meta_titulo` | varchar(300) NOT NULL | Título conciso da meta |
+| `meta_descricao` | text | Descrição detalhada da meta |
+| `meta_objetivo` | text | Objetivo específico desta meta |
+| `meta_tipo_ids` | **integer[]** | Array de IDs de `categoricas.c_dgp_meta_tipos` — ver nota abaixo |
+| `indicadores_id` | integer | Ref. lógica a `categoricas.c_dgp_indicadores` |
+| `meta_obs_indicador` | text | Observações complementares sobre o indicador |
+| `meios_afericao_id` | integer | Ref. lógica a `categoricas.c_dgp_meios_afericao` |
+| `observacoes` | text | Observações gerais |
+| `ordem` | integer DEFAULT 0 | Ordem de exibição no quadro de metas |
+| `criado_por` | text | |
+| `criado_em` | timestamp DEFAULT NOW() | |
+| `atualizado_por` | text | |
+| `atualizado_em` | timestamp | |
+
+**Índices:**
+```sql
+CREATE INDEX idx_celebracao_metas_sei_numero ON celebracao.celebracao_metas (sei_numero);
+CREATE INDEX idx_celebracao_metas_tipo_ids  ON celebracao.celebracao_metas USING GIN (meta_tipo_ids);
+```
+
+**Fontes do campo `sei_numero`** (union query na API `/api/sei-numeros`):
+```sql
+SELECT sei_celeb AS sei_numero, 'Parceria'   FROM public.parcerias
+UNION
+SELECT sei_celeb,               'Celebração' FROM celebracao.celebracao_parcerias
+UNION
+SELECT edital_processo_sei,     'Edital'     FROM public.parcerias_edital
+```
+
+---
+
 ### `celebracao.gestao_cents`
 Gestão de CENTS (Certidão de Entidade do Terceiro Setor).
 
@@ -1284,6 +1331,87 @@ Snapshot de encaminhamentos de pagamento para auditoria.
 
 ---
 
+## 🎯 Módulo Quadro de Metas
+
+> **Criado em:** 05/05/2026 | **Blueprint:** `/parcerias-metas` | **Script DDL:** `scripts/criar_tabelas_parcerias_metas.sql`
+
+O módulo de Quadro de Metas armazena as metas do Plano de Trabalho vinculadas a um processo SEI. Utiliza 4 tabelas categóricas como catálogos e 1 tabela principal com relação 1:N por `sei_numero`.
+
+### Tabelas do módulo
+
+| Tabela | Schema | Função |
+|--------|--------|--------|
+| `celebracao.celebracao_metas` | celebracao | Tabela principal — 1:N por `sei_numero` |
+| `categoricas.c_dgp_meta_tipos` | categoricas | Catálogo de tipos (`tipo_classificacao` livre) |
+| `categoricas.c_dgp_indicadores` | categoricas | Catálogo de indicadores |
+| `categoricas.c_dgp_meios_afericao` | categoricas | Catálogo de meios de aferição |
+| `categoricas.c_dgp_plano_definicoes` | categoricas | Glossário de ajuda (1 linha ativa) |
+
+---
+
+### Padrão `INTEGER[]` — tipos de meta com múltipla seleção
+
+A coluna `meta_tipo_ids INTEGER[]` em `celebracao_metas` armazena um **array nativo do PostgreSQL** com os IDs selecionados de `c_dgp_meta_tipos`. Isso permite que uma meta tenha múltiplos tipos de múltiplas classificações sem colunas extras.
+
+**Como `c_dgp_meta_tipos` é estruturada:**
+
+| id | meta_tipo | tipo_classificacao |
+|----|-----------|-------------------|
+| 1 | Qualitativo | Tipo Q |
+| 2 | Quantitativo | Tipo Q |
+| 3 | Implantação | Tipo 2 |
+| 4 | Resultado | Tipo 2 |
+| 5 | Impacto | Tipo 2 |
+
+O campo `tipo_classificacao` é **TEXT livre** — a equipe pode criar novas classificações sem alteração de schema.
+
+**Exemplos de uso SQL:**
+
+```sql
+-- Inserir meta com tipos Qualitativo + Resultado + Impacto
+INSERT INTO celebracao.celebracao_metas (sei_numero, meta_titulo, meta_tipo_ids, ...)
+VALUES ('2025-0.123.456-0', 'Meta de atendimento', ARRAY[1, 4, 5]::INTEGER[], ...);
+
+-- Buscar metas que tenham o tipo "Resultado" (id=4)
+SELECT * FROM celebracao.celebracao_metas
+WHERE 4 = ANY(meta_tipo_ids);
+
+-- Buscar metas com todos os tipos de "Tipo 2"
+SELECT cm.*, array_agg(mt.meta_tipo) AS tipos
+FROM celebracao.celebracao_metas cm
+JOIN categoricas.c_dgp_meta_tipos mt ON mt.id = ANY(cm.meta_tipo_ids)
+WHERE mt.tipo_classificacao = 'Tipo 2'
+GROUP BY cm.id;
+
+-- Exibir labels dos tipos numa query de listagem
+SELECT cm.id, cm.meta_titulo,
+       (SELECT STRING_AGG(mt.meta_tipo || ' (' || COALESCE(mt.tipo_classificacao,'') || ')', ' | '
+                          ORDER BY mt.tipo_classificacao, mt.meta_tipo)
+        FROM categoricas.c_dgp_meta_tipos mt
+        WHERE mt.id = ANY(cm.meta_tipo_ids)) AS tipos_labels
+FROM celebracao.celebracao_metas cm;
+```
+
+**No frontend (JavaScript):** os tipos são carregados via `GET /parcerias-metas/api/meta-tipos`, que retorna um objeto agrupado por `tipo_classificacao`. Cada grupo é renderizado como um bloco de checkboxes independente.
+
+---
+
+### Query union: fontes do campo `sei_numero`
+
+```sql
+SELECT sei_celeb      AS sei_numero, 'Parceria'   AS fonte FROM public.parcerias
+  WHERE sei_celeb IS NOT NULL AND TRIM(sei_celeb) != ''
+UNION
+SELECT sei_celeb,                    'Celebração'          FROM celebracao.celebracao_parcerias
+  WHERE sei_celeb IS NOT NULL AND TRIM(sei_celeb) != ''
+UNION
+SELECT edital_processo_sei,          'Edital'              FROM public.parcerias_edital
+  WHERE edital_processo_sei IS NOT NULL AND TRIM(edital_processo_sei) != ''
+ORDER BY sei_numero;
+```
+
+---
+
 ## 🔗 Relacionamentos Principais
 
 ```
@@ -1311,6 +1439,18 @@ celebracao.celebracao_parcerias.sei_celeb
     ├── celebracao.celebracao_parcerias_enderecos.sei_celeb    (1:N)
     ├── celebracao.celebracao_parcerias_infos_adicionais.sei_celeb (1:1)
     └── celebracao.celebracao_parcerias_sei.sei_celeb          (1:N)
+
+-- Metas: sei_numero cruza 3 fontes (relação lógica, não FK declarada)
+celebracao.celebracao_metas.sei_numero
+    ← public.parcerias.sei_celeb             (Parceria)
+    ← celebracao.celebracao_parcerias.sei_celeb  (Celebração)
+    ← public.parcerias_edital.edital_processo_sei (Edital)
+celebracao.celebracao_metas.meta_tipo_ids[]
+    ← categoricas.c_dgp_meta_tipos.id       (N:N via array)
+celebracao.celebracao_metas.indicadores_id
+    ← categoricas.c_dgp_indicadores.id      (N:1)
+celebracao.celebracao_metas.meios_afericao_id
+    ← categoricas.c_dgp_meios_afericao.id   (N:1)
 
 gestao_financeira.ultra_liquidacoes.parcela_numero
     └── gestao_financeira.ultra_liquidacoes_cronograma.parcela_numero (1:N)
@@ -1347,6 +1487,10 @@ CREATE INDEX idx_conc_extrato_termo_indice ON analises_pc.conc_extrato(numero_te
 -- Back-empenhos SOF (gestao_financeira)
 -- Cobre: WHERE cod_cta_desp = '33503900' AND cod_nro_pcss_sof IS NOT NULL  (~3.1s → <500ms esperado)
 CREATE INDEX idx_back_empenhos_cta_desp ON gestao_financeira.back_empenhos(cod_cta_desp);
+
+-- Quadro de Metas (celebracao)
+CREATE INDEX idx_celebracao_metas_sei_numero ON celebracao.celebracao_metas (sei_numero);
+CREATE INDEX idx_celebracao_metas_tipo_ids   ON celebracao.celebracao_metas USING GIN (meta_tipo_ids);
 
 -- Log / Auditoria
 CREATE INDEX idx_log_recurso_tipo_id ON gestao_pessoas.log_atividades(recurso_tipo, recurso_id);

@@ -16,6 +16,9 @@ pillow==11.1.0
 # Excel
 openpyxl==3.1.5
 
+# Criptografia (senha email Outlook no Email Assistente)
+pywin32==308
+
 # HTTP / Web scraping
 requests==2.32.5
 beautifulsoup4==4.12.3

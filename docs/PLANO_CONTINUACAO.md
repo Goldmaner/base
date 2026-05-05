@@ -7,7 +7,7 @@ Foco:
 4. Criação de relatórios operacionais da unidade;
 4. Demonstrativo - atualizar;
 5. Foco total em orçamento anual e análise de contas.
-6. Melhorar Biblioteca Informativa, decisões AJ (prescrição, omissão de prestação de contas e juros e mora). 
+6. Melhorar Biblioteca Informativa, decisões AJ (prescrição, omissão de prestação de contas e juros e mora) (FEITO); 
 
 # Plano de Continuação do Projeto FAF
 
@@ -71,11 +71,11 @@ Foco:
 - Produção de relatórios para os dados existentes, com dashboards, etc (Difícil)
 - Atribuições bem definidas de todas as páginas (Médio)
 - Construção de relatório para preenchimento dos usuários, com indicadores (preenchimento, análise, revisão, emissão) (Difícil)
-- Página de Instrução para inclusão dos Manuais (Fácil)
+- Página de Instrução para inclusão dos Manuais (Fácil) ✅
 
 ### 14. Preenchimento de dados e sistema
 - Preenchimento de dados de diversas tables (Médio)
-- Testes automatizados e revisão do código (Difícil)
+- Testes automatizados e revisão do código (Difícil) ✅
 - Melhorar o frontend no geral (Fácil) ✅
 - Incluir informações de processos físicos;
 - Fazer tabela do backup.

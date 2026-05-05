@@ -184,6 +184,48 @@ def index():
         # Flatten to list of name strings for JS template
         nomes_lista = [r['usuario_nome'] for r in usuarios_nomes]
 
+        # Relatório de abonos
+        ano_atual = datetime.now().year
+        meus_abonos_ano = [
+            r for r in registros_pessoais
+            if r['nome_data'] == 'Abono'
+            and r['data_inicio'] is not None
+            and r['data_inicio'].year == ano_atual
+            and r['usuario_email'] == email
+        ]
+        relatorio_abonos_todos = []
+        if ver_tudo:
+            cur2 = get_cursor()
+            try:
+                cur2.execute("""
+                    SELECT u.email, COALESCE(ui.usuario_nome, u.email) AS usuario_nome
+                    FROM gestao_pessoas.usuarios u
+                    LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = u.email
+                    WHERE u.tipo_usuario NOT IN ('admin')
+                      AND COALESCE(ui.usuario_status, 'Ativo') = 'Ativo'
+                    ORDER BY usuario_nome
+                """)
+                todos_usuarios = {
+                    r['email']: {'nome': r['usuario_nome'], 'email': r['email'], 'abonos': []}
+                    for r in cur2.fetchall()
+                }
+                cur2.execute("""
+                    SELECT usuario_email, data_inicio, observacoes
+                    FROM calendario.datas_importantes
+                    WHERE nome_data = 'Abono'
+                      AND EXTRACT(YEAR FROM data_inicio) = %s
+                    ORDER BY usuario_email, data_inicio
+                """, (ano_atual,))
+                for row in cur2.fetchall():
+                    if row['usuario_email'] in todos_usuarios:
+                        todos_usuarios[row['usuario_email']]['abonos'].append({
+                            'data': row['data_inicio'],
+                            'obs': row['observacoes']
+                        })
+                relatorio_abonos_todos = list(todos_usuarios.values())
+            finally:
+                cur2.close()
+
         return render_template(
             'datas_importantes.html',
             tipos_evento=tipos_evento,
@@ -196,6 +238,9 @@ def index():
             usuarios_para_registro=usuarios_para_registro,
             eh_gerente=eh_gerente,
             ver_tudo=ver_tudo,
+            ano_atual=ano_atual,
+            meus_abonos_ano=meus_abonos_ano,
+            relatorio_abonos_todos=relatorio_abonos_todos,
         )
 
     except Exception as e:

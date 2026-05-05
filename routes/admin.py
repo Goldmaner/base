@@ -449,3 +449,156 @@ def exportar_testes(formato):
             mimetype='text/markdown; charset=utf-8',
             headers={'Content-Disposition': f'attachment; filename=testes_{data_str}.md'}
         )
+
+
+# =============================================================================
+# RELATOS DE USUÁRIOS
+# =============================================================================
+
+@admin_bp.route('/relatos', methods=['GET'])
+@login_required
+def listar_relatos():
+    """API JSON para o painel admin — retorna relatos com filtros e paginação."""
+    if not _apenas_admin():
+        return jsonify({'erro': 'Acesso negado'}), 403
+
+    cur = get_cursor()
+
+    # ── Filtros ────────────────────────────────────────────────────────────
+    status_filtro = request.args.get('status', '').strip()
+    tipo_filtro   = request.args.get('tipo',   '').strip()
+    modulo_filtro = request.args.get('modulo', '').strip()
+    email_filtro  = request.args.get('email',  '').strip()
+    pagina        = max(1, int(request.args.get('pagina', 1)))
+    por_pagina    = 50
+    offset        = (pagina - 1) * por_pagina
+
+    where_parts = ['1=1']
+    params      = []
+
+    if status_filtro:
+        where_parts.append('status = %s')
+        params.append(status_filtro)
+    if tipo_filtro:
+        where_parts.append('tipo_relato = %s')
+        params.append(tipo_filtro)
+    if modulo_filtro:
+        where_parts.append('modulo = %s')
+        params.append(modulo_filtro)
+    if email_filtro:
+        where_parts.append('usuario_email ILIKE %s')
+        params.append(f'%{email_filtro}%')
+
+    where_clause = ' AND '.join(where_parts)
+
+    cur.execute(f"""
+        SELECT id, tipo_relato, modulo, titulo, descricao, passos_reproducao,
+               prioridade_usuario, status, resposta_admin,
+               usuario_email, usuario_nome, tipo_usuario,
+               criado_em, atualizado_em, resolvido_por, resolvido_em
+        FROM gestao_pessoas.relatos_usuarios
+        WHERE {where_clause}
+        ORDER BY
+            CASE status WHEN 'Urgente' THEN 0 ELSE 1 END,
+            CASE prioridade_usuario WHEN 'Urgente' THEN 0 WHEN 'Normal' THEN 1 ELSE 2 END,
+            criado_em DESC
+        LIMIT %s OFFSET %s
+    """, params + [por_pagina, offset])
+    relatos = cur.fetchall()
+
+    cur.execute(
+        f"SELECT COUNT(*) AS total FROM gestao_pessoas.relatos_usuarios WHERE {where_clause}",
+        params
+    )
+    total = cur.fetchone()['total']
+
+    # ── Stats gerais ───────────────────────────────────────────────────────
+    cur.execute("""
+        SELECT
+            COUNT(*) FILTER (WHERE status = 'Aberto')       AS abertos,
+            COUNT(*) FILTER (WHERE status = 'Em análise')   AS em_analise,
+            COUNT(*) FILTER (WHERE status = 'Resolvido')    AS resolvidos,
+            COUNT(*) FILTER (WHERE status = 'Descartado')   AS descartados,
+            COUNT(*) FILTER (WHERE criado_em >= NOW() - INTERVAL '7 days') AS semana
+        FROM gestao_pessoas.relatos_usuarios
+    """)
+    stats = dict(cur.fetchone())
+
+    resultado = []
+    for r in relatos:
+        resultado.append({
+            'id':                r['id'],
+            'tipo_relato':       r['tipo_relato'],
+            'modulo':            r['modulo'],
+            'titulo':            r['titulo'],
+            'descricao':         r['descricao'],
+            'passos_reproducao': r['passos_reproducao'],
+            'prioridade_usuario': r['prioridade_usuario'],
+            'status':            r['status'],
+            'resposta_admin':    r['resposta_admin'],
+            'usuario_email':     r['usuario_email'],
+            'usuario_nome':      r['usuario_nome'],
+            'tipo_usuario':      r['tipo_usuario'],
+            'criado_em':         r['criado_em'].strftime('%d/%m/%Y %H:%M') if r['criado_em'] else None,
+            'atualizado_em':     r['atualizado_em'].strftime('%d/%m/%Y %H:%M') if r['atualizado_em'] else None,
+            'resolvido_por':     r['resolvido_por'],
+            'resolvido_em':      r['resolvido_em'].strftime('%d/%m/%Y %H:%M') if r['resolvido_em'] else None,
+        })
+
+    return jsonify({
+        'relatos':       resultado,
+        'total':         total,
+        'stats':         stats,
+        'pagina':        pagina,
+        'total_paginas': max(1, -(-total // por_pagina)),
+    })
+
+
+@admin_bp.route('/relatos/<int:relato_id>/status', methods=['PATCH'])
+@login_required
+def atualizar_status_relato(relato_id):
+    """Atualiza status e resposta de um relato (somente admin)."""
+    if not _apenas_admin():
+        return jsonify({'success': False, 'erro': 'Acesso negado'}), 403
+
+    data      = request.get_json(silent=True) or {}
+    status    = (data.get('status')        or '').strip()
+    resposta  = (data.get('resposta_admin') or '').strip()
+
+    STATUS_VALIDOS = {'Aberto', 'Em análise', 'Resolvido', 'Descartado'}
+    if status not in STATUS_VALIDOS:
+        return jsonify({'success': False, 'erro': 'Status inválido.'}), 400
+
+    db  = get_db()
+    cur = get_cursor()
+
+    cur.execute(
+        "SELECT id FROM gestao_pessoas.relatos_usuarios WHERE id = %s",
+        (relato_id,)
+    )
+    if not cur.fetchone():
+        return jsonify({'success': False, 'erro': 'Relato não encontrado.'}), 404
+
+    admin_email = session.get('email')
+
+    if status == 'Resolvido':
+        cur.execute("""
+            UPDATE gestao_pessoas.relatos_usuarios
+            SET status        = %s,
+                resposta_admin = %s,
+                atualizado_em  = NOW(),
+                resolvido_por  = %s,
+                resolvido_em   = NOW()
+            WHERE id = %s
+        """, (status, resposta or None, admin_email, relato_id))
+    else:
+        cur.execute("""
+            UPDATE gestao_pessoas.relatos_usuarios
+            SET status        = %s,
+                resposta_admin = %s,
+                atualizado_em  = NOW()
+            WHERE id = %s
+        """, (status, resposta or None, relato_id))
+
+    db.commit()
+    return jsonify({'success': True})

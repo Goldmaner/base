@@ -40,12 +40,15 @@ from routes.editais import editais_bp
 from routes.certidoes import certidoes_bp
 from routes.cents import cents_bp
 from routes.celebracao_parcerias import celebracao_parcerias_bp
+from routes.parcerias_metas import parcerias_metas_bp
 from routes.sei_orcamentario import sei_orcamentario_bp
 from routes.sof_api import sof_api_bp
 from routes.gestao_pessoas import gestao_pessoas_bp
 from routes.manuais import manuais_bp
 from routes.admin import admin_bp
 from routes.datas_importantes import datas_importantes_bp
+from routes.email_assistente import email_assistente_bp
+from routes.relatos import relatos_bp
 
 
 # ============================================================================
@@ -284,12 +287,15 @@ def create_app():
     app.register_blueprint(certidoes_bp)
     app.register_blueprint(cents_bp)
     app.register_blueprint(celebracao_parcerias_bp)
+    app.register_blueprint(parcerias_metas_bp)
     app.register_blueprint(sei_orcamentario_bp)
     app.register_blueprint(sof_api_bp)
     app.register_blueprint(gestao_pessoas_bp)
     app.register_blueprint(manuais_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(datas_importantes_bp)
+    app.register_blueprint(email_assistente_bp)
+    app.register_blueprint(relatos_bp)
     
     # ========================================================================
     # HOOKS GLOBAIS PARA LOGGING AUTOMÁTICO
