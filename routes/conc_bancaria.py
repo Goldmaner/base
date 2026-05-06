@@ -164,6 +164,7 @@ def api_salvar_extrato():
         
         # UPSERT: UPDATE se existe, INSERT se não existe
         ids_processados = []
+        ids_inseridos = []  # Apenas os IDs de novas linhas (INSERT)
         for linha in linhas:
             # Validar campos obrigatórios
             if not linha.get('indice'):
@@ -240,6 +241,7 @@ def api_salvar_extrato():
                 ))
                 novo_id = cur.fetchone()['id']
                 ids_processados.append(novo_id)
+                ids_inseridos.append(novo_id)  # Rastrear apenas INSERTs
         
         # ============================================================
         # AUTOMAÇÃO: Destinatário Identificado/Não Identificado
@@ -283,20 +285,23 @@ def api_salvar_extrato():
                 print(f"[AUTOMAÇÃO] Portaria 140 com transição, corte: jan/24")
             
             # Aplicar automação apenas se houver data de corte definida
-            if data_corte:
+            if data_corte and ids_processados:
                 print(f"[AUTOMAÇÃO] Aplicando regra para competências >= {data_corte}")
                 print(f"[AUTOMAÇÃO] Regras: Apenas células VAZIAS + Competência >= corte + Créditos E Débitos")
                 
-                linhas_atualizadas = 0
+                # OTIMIZAÇÃO: Buscar todos os dados de uma vez (evita N+1 queries)
+                cur.execute("""
+                    SELECT id, competencia, origem_destino, cat_transacao, credito, debito
+                    FROM analises_pc.conc_extrato
+                    WHERE id = ANY(%s)
+                """, (ids_processados,))
+                linhas_map = {row['id']: row for row in cur.fetchall()}
                 
-                # Processar cada linha salva
+                # Coletar pares (id, nova_categoria) para batch UPDATE
+                atualizacoes = []  # lista de (nova_categoria, linha_id)
+                
                 for linha_id in ids_processados:
-                    cur.execute("""
-                        SELECT id, competencia, origem_destino, cat_transacao, credito, debito
-                        FROM analises_pc.conc_extrato
-                        WHERE id = %s
-                    """, (linha_id,))
-                    linha_data = cur.fetchone()
+                    linha_data = linhas_map.get(linha_id)
                     
                     if not linha_data:
                         continue
@@ -304,8 +309,6 @@ def api_salvar_extrato():
                     competencia = linha_data['competencia']
                     cat_transacao_atual = (linha_data['cat_transacao'] or '').strip()
                     origem_destino = (linha_data['origem_destino'] or '').strip()
-                    credito = linha_data['credito'] or 0
-                    debito = linha_data['debito'] or 0
                     
                     # REGRA 1: Se competência não está preenchida, pular
                     if not competencia:
@@ -319,31 +322,25 @@ def api_salvar_extrato():
                     if cat_transacao_atual:
                         continue
                     
-                    # REGRA 4: Aplicar apenas a DÉBITOS e CRÉDITOS (qualquer tipo de transação)
-                    # (Removida a restrição de apenas débitos)
-                    
                     # Determinar nova categoria baseada em Origem/Destino
-                    nova_categoria = None
-                    
                     if origem_destino:
-                        # Origem/Destino preenchido → Destinatário Identificado
                         nova_categoria = 'Destinatário Identificado'
                     else:
-                        # Origem/Destino vazio → Destinatário não Identificado
                         nova_categoria = 'Destinatário não Identificado'
                     
-                    # Atualizar categoria e marcar como "Avaliado"
-                    if nova_categoria:
-                        cur.execute("""
-                            UPDATE analises_pc.conc_extrato
-                            SET cat_transacao = %s,
-                                cat_avaliacao = 'Avaliado'
-                            WHERE id = %s
-                        """, (nova_categoria, linha_id))
-                        linhas_atualizadas += 1
+                    atualizacoes.append((nova_categoria, linha_id))
                 
-                if linhas_atualizadas > 0:
-                    print(f"[AUTOMAÇÃO] ✅ {linhas_atualizadas} linhas categorizadas automaticamente")
+                # OTIMIZAÇÃO: Batch UPDATE único em vez de N queries individuais
+                if atualizacoes:
+                    from psycopg2.extras import execute_values
+                    execute_values(cur, """
+                        UPDATE analises_pc.conc_extrato AS e
+                        SET cat_transacao = v.nova_categoria,
+                            cat_avaliacao = 'Avaliado'
+                        FROM (VALUES %s) AS v(nova_categoria, id)
+                        WHERE e.id = v.id::integer
+                    """, atualizacoes)
+                    print(f"[AUTOMAÇÃO] ✅ {len(atualizacoes)} linhas categorizadas automaticamente")
         
         db.commit()
         
@@ -352,7 +349,8 @@ def api_salvar_extrato():
         
         return jsonify({
             'mensagem': f'{len(ids_processados)} linhas salvas com sucesso',
-            'ids': ids_processados
+            'ids': ids_processados,
+            'ids_inseridos': ids_inseridos  # IDs apenas das novas linhas (INSERT)
         }), 200
         
     except Exception as e:
@@ -936,11 +934,38 @@ def api_salvar_documentos_analise():
         
         ids_processados = []
         
-        for doc in documentos:
-            conc_extrato_id = doc.get('conc_extrato_id')
-            
-            if not conc_extrato_id:
-                continue
+        # Filtrar documentos válidos
+        docs_validos = [doc for doc in documentos if doc.get('conc_extrato_id')]
+        if not docs_validos:
+            db.commit()
+            return jsonify({'mensagem': '0 documentos salvos', 'ids': []}), 200
+        
+        conc_ids = [doc['conc_extrato_id'] for doc in docs_validos]
+        
+        # ============================================================
+        # OTIMIZAÇÃO: Buscar dados do extrato + aplicabilidade em UMA query
+        # Em vez de N SELECT individuais dentro do loop
+        # ============================================================
+        cur.execute("""
+            SELECT 
+                e.id, e.data, e.credito, e.debito, e.discriminacao, e.cat_transacao,
+                e.competencia, e.origem_destino, e.cat_avaliacao,
+                ca.aplicacao
+            FROM analises_pc.conc_extrato e
+            LEFT JOIN categoricas.c_dac_despesas_analise ca ON e.cat_transacao = ca.categoria_extra
+            WHERE e.id = ANY(%s)
+        """, (conc_ids,))
+        extrato_map = {row['id']: row for row in cur.fetchall()}
+        
+        # OTIMIZAÇÃO: Verificar registros existentes em UMA query
+        cur.execute("""
+            SELECT id, conc_extrato_id FROM analises_pc.conc_analise
+            WHERE conc_extrato_id = ANY(%s) AND numero_termo = %s
+        """, (conc_ids, numero_termo))
+        existentes_map = {row['conc_extrato_id']: row['id'] for row in cur.fetchall()}
+        
+        for doc in docs_validos:
+            conc_extrato_id = doc['conc_extrato_id']
             
             # Valores possíveis: textos descritivos ou vazios
             # Coluna 14 (Guia): "Guia apresentada", "Não apresentada"
@@ -959,18 +984,8 @@ def api_salvar_documentos_analise():
             # MAS SOMENTE se a categoria for aplicável
             # ============================================================
             
-            # Buscar dados da linha do extrato + aplicabilidade da categoria
-            cur.execute("""
-                SELECT 
-                    e.data, e.credito, e.debito, e.discriminacao, e.cat_transacao, 
-                    e.competencia, e.origem_destino, e.cat_avaliacao,
-                    ca.aplicacao
-                FROM analises_pc.conc_extrato e
-                LEFT JOIN categoricas.c_dac_despesas_analise ca ON e.cat_transacao = ca.categoria_extra
-                WHERE e.id = %s
-            """, (conc_extrato_id,))
-            
-            linha_extrato = cur.fetchone()
+            # Usar dict lookup (O(1)) em vez de query individual
+            linha_extrato = extrato_map.get(conc_extrato_id)
             
             if linha_extrato:
                 # Verificar se categoria é não aplicável (aplicacao = true significa NÃO aplicável)
@@ -1008,15 +1023,10 @@ def api_salvar_documentos_analise():
                         if not avaliacao_fora_municipio or avaliacao_fora_municipio.strip() == '':
                             avaliacao_fora_municipio = 'São Paulo'
             
-            # Verificar se já existe registro
-            cur.execute("""
-                SELECT id FROM analises_pc.conc_analise
-                WHERE conc_extrato_id = %s AND numero_termo = %s
-            """, (conc_extrato_id, numero_termo))
+            # Usar dict lookup (O(1)) em vez de query individual
+            id_existente = existentes_map.get(conc_extrato_id)
             
-            existe = cur.fetchone()
-            
-            if existe:
+            if id_existente:
                 # UPDATE
                 cur.execute("""
                     UPDATE analises_pc.conc_analise SET
@@ -1055,6 +1065,8 @@ def api_salvar_documentos_analise():
                 ))
                 novo_id = cur.fetchone()['id']
                 ids_processados.append(novo_id)
+                # Adicionar ao mapa para evitar INSERTs duplicados no mesmo payload
+                existentes_map[conc_extrato_id] = novo_id
         
         db.commit()
         

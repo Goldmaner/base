@@ -273,12 +273,12 @@ def dados_relatorio():
             taxas_nao_devolvidas_dp = taxas_bancarias - devolucao_taxas
             print(f"[DEBUG RELATORIO DP] Taxas não Devolvidas: {taxas_nao_devolvidas_dp}")
             
-            # 5. Valores já devolvidos (cat_transacao='Restituição de Verba')
+            # 5. Valores já devolvidos (cat_transacao='Restituição de Verba' ou 'Devolução de Taxas Bancárias')
             cursor.execute("""
                 SELECT COALESCE(SUM(ABS(discriminacao)), 0) as total_restituicao
                 FROM analises_pc.conc_extrato
                 WHERE numero_termo = %s 
-                    AND LOWER(cat_transacao) = 'restituição de verba'
+                    AND LOWER(cat_transacao) IN ('restituição de verba', 'devolução de taxas bancárias')
                     AND discriminacao IS NOT NULL
             """, (numero_termo,))
             
@@ -612,12 +612,12 @@ def dados_relatorio():
             print(f"[DEBUG MISTO] 8. Saldos não Utilizados (DAC) RECALCULADO: {saldos_nao_utilizados_dac}")
             print(f"[DEBUG MISTO]    = Valor Total Projeto ({valor_total_projeto_dac:.2f}) - Valor Executado Aprovado ({valor_executado_aprovado_dac:.2f}) - Despesas Glosa ({despesas_glosa_dac:.2f})")
             
-            # 12. Valores já Devolvidos (cat_transacao='Restituição de Verba')
+            # 12. Valores já Devolvidos (cat_transacao='Restituição de Verba' ou 'Devolução de Taxas Bancárias')
             cursor.execute("""
                 SELECT COALESCE(SUM(ABS(discriminacao)), 0) as total_restituicao
                 FROM analises_pc.conc_extrato
                 WHERE numero_termo = %s 
-                    AND LOWER(cat_transacao) = 'restituição de verba'
+                    AND LOWER(cat_transacao) IN ('restituição de verba', 'devolução de taxas bancárias')
                     AND discriminacao IS NOT NULL
             """, (numero_termo,))
             

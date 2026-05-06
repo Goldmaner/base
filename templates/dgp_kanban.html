@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Kanban DGP - FAF</title>
+  <title>DGP - Aditamentos e Alterações - FAF</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -101,8 +101,46 @@
     .btn-add-card { font-size:.78rem; color:#6c757d; background:none; border:1px dashed #dee2e6;
                     width:100%; text-align:left; border-radius:6px; padding:5px 10px; }
     .btn-add-card:hover { background:#f8f9fa; color:#0d6efd; border-color:#0d6efd; }
+    /* Ocultos count below bucket */
+    .btn-ocultos-status {
+      display:block; width:100%; text-align:left; background:none; border:none;
+      font-size:.74rem; color:#6c757d; padding:3px 4px; border-radius:5px;
+      cursor:pointer; line-height:1.4;
+    }
+    .btn-ocultos-status:hover { background:#f0f0f0; color:#0d6efd; }
     /* Instrumento mini-badge */
     .inst-badge { font-size:.65rem; padding:1px 6px; border-radius:3px; }
+    /* Ocultar todos btn */
+    .btn-ocultar-todos {
+      opacity:0; background:none; border:none; padding:2px 5px; border-radius:4px;
+      font-size:.72rem; cursor:pointer; line-height:1;
+      transition:opacity .15s; color:inherit;
+    }
+    .kanban-column-header:hover .btn-ocultar-todos { opacity:.6; }
+    .btn-ocultar-todos:hover { opacity:1!important; background:rgba(0,0,0,.12); }
+    /* Fix card type badges — allow wrapping and break long names */
+    .kanban-card .badge { white-space:normal; word-break:break-word; line-height:1.3; }
+    /* Marcadores selected pills in modal */
+    .marcador-pill-selected {
+      display:inline-flex; align-items:center; border-radius:20px;
+      padding:2px 9px; font-size:.78rem; font-weight:600;
+      cursor:pointer; user-select:none; line-height:1.4;
+      border:1px solid rgba(0,0,0,.08);
+    }
+    .marcador-item {
+      cursor:pointer; border-radius:6px; padding:5px 10px;
+      display:flex; align-items:center;
+      transition:background .1s;
+    }
+    .marcador-item:hover { background:#f0f4ff; }
+    .marcador-item.selected .marcador-nome { font-weight:600; }
+    .marcador-dot { width:14px; height:14px; border-radius:3px; flex-shrink:0; }
+    .color-swatch {
+      width:28px; height:28px; border-radius:5px; cursor:pointer;
+      border:2px solid transparent; transition:border-color .1s, transform .1s;
+    }
+    .color-swatch:hover { border-color:#555; transform:scale(1.15); }
+    .color-swatch.active { border-color:#000!important; box-shadow:0 0 0 1px #000; }
   </style>
 </head>
 <body>
@@ -112,7 +150,7 @@
   <div class="header-section mb-3">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div>
-        <h4 class="mb-0"><i class="bi bi-kanban"></i> Kanban DGP — Alterações</h4>
+        <h4 class="mb-0"><i class="bi bi-kanban"></i> DGP - Aditamentos e Alterações</h4>
         <small class="opacity-75">Gestão visual de alterações em termos de parceria</small>
       </div>
       <div class="d-flex gap-2 flex-wrap">
@@ -129,8 +167,8 @@
           <i class="bi bi-eye-slash"></i> Ocultos
           <span class="badge bg-dark ms-1">{{ ocultos|length }}</span>
         </button>
-        <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="btn btn-light btn-sm">
-          <i class="bi bi-table"></i> Visão Tabela (clássica)
+        <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm">
+          <i class="bi bi-house"></i> Início
         </a>
         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCadastroAlteracao">
           <i class="bi bi-plus-circle"></i> Nova Alteração
@@ -192,8 +230,14 @@
     {% set ordem = status.alt_ordem %}
     <div class="kanban-column" id="column-{{ loop.index }}" data-status="{{ status.alt_status }}">
       <div class="kanban-column-header col-h-{{ ordem }}">
-        <span title="{{ status.alt_status }}">{{ status.alt_status }}</span>
-        <span class="badge rounded-pill bg-white text-dark" id="badge-{{ loop.index }}">{{ cards_by_status[status.alt_status]|length }}</span>
+        <span title="{{ status.alt_status_label }}" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">{{ status.alt_status_label }}</span>
+        <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
+          <span class="badge rounded-pill bg-white text-dark" id="badge-{{ loop.index }}">{{ cards_by_status[status.alt_status]|length }}</span>
+          <button type="button" class="btn-ocultar-todos" title="Ocultar todos os cards desta coluna"
+                  onclick="ocultarTodosNoColuna(this)" data-col-idx="{{ loop.index }}">
+            <i class="bi bi-eye-slash-fill"></i>
+          </button>
+        </div>
       </div>
       <div class="kanban-column-body sortable-container"
            id="col-body-{{ loop.index }}"
@@ -244,27 +288,23 @@
           </div>
           <strong class="d-block" style="font-size:.85rem;">{{ card.numero_termo }}</strong>
           {% if card.osc %}
-            <small class="text-muted d-block" style="font-size:.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ card.osc }}">{{ card.osc[:35] }}{% if card.osc|length > 35 %}…{% endif %}</small>
-          {% endif %}
-          <!-- Tipos -->
-          {% if card.tipos_alteracao %}
-            <div class="mt-1">
-              {% for tipo in card.tipos_alteracao.split(', ') %}
-                <span class="badge bg-success me-1" style="font-size:.65rem;">{{ tipo }}</span>
-              {% endfor %}
-            </div>
+            <small class="text-muted d-block" style="font-size:.7rem; word-break:break-word; white-space:normal; line-height:1.3;" title="{{ card.osc }}">{{ card.osc }}</small>
           {% endif %}
           <!-- Footer info -->
-          <div class="d-flex justify-content-between align-items-center mt-2" style="font-size:.72rem; color:#6c757d;">
-            <span title="{{ card.responsavel }}">
+          <div class="d-flex justify-content-between align-items-start mt-2" style="font-size:.72rem; color:#6c757d; gap:4px;">
+            <span style="word-break:break-word; flex:1; min-width:0;">
               <i class="bi bi-person-fill"></i>
               {% if card.responsavel %}
-                {{ card.responsavel.split(';')[0].strip()[:18] }}{% if card.responsavel.split(';')|length > 1 %} +{{ card.responsavel.split(';')|length - 1 }}{% endif %}
+                {% for r in card.responsavel.split(';') %}{{ r.strip() }}{% if not loop.last %}, {% endif %}{% endfor %}
               {% else %}—{% endif %}
             </span>
-            {% if card.alt_data_inicio %}
-              <span><i class="bi bi-calendar3"></i> {{ card.alt_data_inicio.strftime('%d/%m/%y') }}</span>
-            {% endif %}
+            <span class="flex-shrink-0 text-end">
+              {% if card.alt_data_conclusao %}
+                <span title="Data de conclusão"><i class="bi bi-flag-fill" style="color:#198754;"></i> {{ card.alt_data_conclusao.strftime('%d/%m/%y') }}</span>
+              {% elif card.alt_data_inicio %}
+                <span><i class="bi bi-calendar3"></i> {{ card.alt_data_inicio.strftime('%d/%m/%y') }}</span>
+              {% endif %}
+            </span>
           </div>
           <!-- Priority + Marcadores -->
           <div class="mt-1">
@@ -286,6 +326,14 @@
         <button class="btn-add-card" onclick="novoCardStatus('{{ status.alt_status }}')">
           <i class="bi bi-plus"></i> Adicionar tarefa
         </button>
+        {% set n_ocultos = ocultos_by_status.get(status.alt_status, 0) %}
+        {% if n_ocultos > 0 %}
+        <button class="btn-ocultos-status mt-1" onclick="reexibirStatusOcultos('{{ status.alt_status|e }}')"
+                title="Clique para reexibir todos desta coluna">
+          <i class="bi bi-eye-slash" style="font-size:.75rem;"></i>
+          {{ n_ocultos }} oculto{{ 's' if n_ocultos > 1 else '' }}
+        </button>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -338,7 +386,7 @@
                     {% endfor %}
                   {% endif %}
                 </td>
-                <td><span class="badge bg-secondary">{{ card.alt_status }}</span></td>
+                <td><span class="badge bg-secondary">{{ status_label_map.get(card.alt_status, card.alt_status) }}</span></td>
                 <td>
                   {% if card.alt_prioridade %}
                     <span class="prio-badge prio-{{ card.alt_prioridade|replace(' ','') }}">{{ card.alt_prioridade }}</span>
@@ -551,10 +599,24 @@
                   <input type="date" class="form-control" id="alt_data_conclusao" name="alt_data_conclusao">
                 </div>
                 <div class="col-md-3">
-                  <label for="alt_marcadores" class="form-label">Marcadores</label>
-                  <input type="text" class="form-control" id="alt_marcadores" name="alt_marcadores"
-                         placeholder="Ex: Tipo A, Dotação X" title="Separe múltiplos marcadores por vírgula">
-                  <small class="text-muted">Separe por vírgula</small>
+                  <label class="form-label"><i class="bi bi-tags"></i> Rótulos</label>
+                  <div id="marcadores-selecionados" class="d-flex flex-wrap gap-1 mb-1" style="min-height:26px;"></div>
+                  <div class="dropdown">
+                    <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                            data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                            aria-expanded="false">
+                      <i class="bi bi-tag"></i> Adicionar rótulo
+                    </button>
+                    <div class="dropdown-menu p-0 shadow" style="width:min(460px,92vw); max-width:92vw;">
+                      <div class="p-2 border-bottom">
+                        <input type="text" class="form-control form-control-sm" id="buscaMarcador"
+                               placeholder="Pesquisar rótulo…"
+                               oninput="renderizarMarcadoresDisponiveis(this.value)">
+                      </div>
+                      <div id="listaMarcadores" style="max-height:420px; overflow-y:auto;"></div>
+                    </div>
+                  </div>
+                  <input type="hidden" id="alt_marcadores" name="alt_marcadores">
                 </div>
               </div>
             </div>
@@ -599,6 +661,7 @@ const instrumentos   = {{ instrumentos|tojson if instrumentos else '[]' }};
 const analistasAtivos   = {{ analistas_ativos|tojson if analistas_ativos else '[]' }};
 const analistasInativos = {{ analistas_inativos|tojson if analistas_inativos else '[]' }};
 const statusList = {{ status_list|tojson if status_list else '[]' }};
+const ocultosPorStatus = {{ ocultos_by_status|tojson if ocultos_by_status else '{}' }};
 
 // tipo → campo dinâmico config
 const tiposCampos = {};
@@ -788,7 +851,8 @@ function mostrarCamposNumeracao(instrumento) {
   }
 }
 
-$('#formAlteracao').submit(function() {
+$('#formAlteracao').submit(function(e) {
+  e.preventDefault();
   const inst = $('#instrumento_alteracao').val();
   let num = 0;
   if (['Termo de Aditamento','Termo de Apostilamento'].includes(inst)) {
@@ -799,6 +863,36 @@ $('#formAlteracao').submit(function() {
     num = apo * 100 + adit;
   }
   $('#alt_numero').val(num);
+
+  const $btn = $('button[type="submit"][form="formAlteracao"]');
+  const origText = $btn.html();
+  $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Salvando…');
+
+  $.ajax({
+    url: $('#formAlteracao').attr('action'),
+    method: 'POST',
+    data: new FormData(document.getElementById('formAlteracao')),
+    processData: false,
+    contentType: false,
+    headers: {'X-Requested-With': 'XMLHttpRequest'},
+    success: function(resp) {
+      if (resp && resp.success) {
+        var modalEl = document.getElementById('modalCadastroAlteracao');
+        var modalInst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        modalInst.hide();
+        location.reload();
+      } else {
+        alert(resp && resp.message ? resp.message : 'Erro ao salvar alteração.');
+        $btn.prop('disabled', false).html(origText);
+      }
+    },
+    error: function(xhr) {
+      let msg = 'Erro ao salvar alteração.';
+      try { const r = JSON.parse(xhr.responseText); if (r.message) msg = r.message; } catch(ex) {}
+      alert(msg);
+      $btn.prop('disabled', false).html(origText);
+    }
+  });
 });
 
 function buscarProximoNumero() {
@@ -909,7 +1003,12 @@ function editarAlteracao(numeroTermo, instrumento, altNumero) {
       $('#alt_prioridade').val(data.prioridade || '');
       $('#alt_data_inicio').val(data.data_inicio || '');
       $('#alt_data_conclusao').val(data.data_conclusao || '');
-      $('#alt_marcadores').val(data.marcadores || '');
+      setMarcadoresSelecionados(data.marcadores || '');
+      // Auto-adicionar marcadores sugeridos pelo numero_termo e tipos
+      setTimeout(function() {
+        const tiposAlt = (data.tipos || []);
+        aplicarMarcadoresAuto(numeroTermo, tiposAlt);
+      }, 50);
       // Rebuild tipos
       $('#tipos-alteracao-container').empty();
       contadorTipos = 0;
@@ -985,12 +1084,422 @@ function ocultarCard(numero, instrumento, altNumero, oculto) {
     contentType: 'application/json',
     data: JSON.stringify({ numero_termo: numero, instrumento: instrumento, alt_numero: parseInt(altNumero), oculto: oculto }),
     success: function(r) {
-      if (r.success) location.reload();
-      else alert('Erro: ' + (r.error || ''));
+      if (!r.success) { alert('Erro: ' + (r.error || '')); return; }
+      if (oculto) {
+        // Remover card do board sem recarregar a página
+        const card = document.querySelector(
+          '.kanban-card[data-numero="' + CSS.escape(numero) + '"][data-instrumento="' + CSS.escape(instrumento) + '"][data-alt-numero="' + altNumero + '"]'
+        );
+        if (card) {
+          const col = card.closest('.kanban-column');
+          card.style.transition = 'opacity .2s';
+          card.style.opacity = '0';
+          setTimeout(function() {
+            card.remove();
+            atualizarBadgesContagem();
+            if (col) _atualizarContadorOcultos(col, 1);
+          }, 200);
+        }
+      } else {
+        // Reexibir requer HTML do servidor
+        location.reload();
+      }
     },
     error: function() { alert('Erro ao ocultar card.'); }
   });
 }
+
+// Incrementa/decrementa o contador "X oculto(s)" no rodapé da coluna
+function _atualizarContadorOcultos(col, delta) {
+  let btn = col.querySelector('.btn-ocultos-status');
+  if (!btn && delta > 0) {
+    const footer = col.querySelector('.kanban-column-footer');
+    if (!footer) return;
+    const status = col.dataset.status;
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-ocultos-status mt-1';
+    btn.title = 'Clique para reexibir todos desta coluna';
+    btn.setAttribute('onclick', 'reexibirStatusOcultos(\'' + escJs(status) + '\')');
+    btn.innerHTML = '<i class="bi bi-eye-slash" style="font-size:.75rem;"></i> 1 oculto';
+    footer.appendChild(btn);
+    return;
+  }
+  if (!btn) return;
+  const match = btn.textContent.match(/(\d+)/);
+  let count = match ? parseInt(match[1]) : 0;
+  count = Math.max(0, count + delta);
+  if (count === 0) {
+    btn.remove();
+  } else {
+    btn.innerHTML = '<i class="bi bi-eye-slash" style="font-size:.75rem;"></i> ' + count + ' oculto' + (count !== 1 ? 's' : '');
+  }
+}
+
+// ====================================================
+// OCULTAR TODOS OS CARDS DE UMA COLUNA (uma única requisição em lote)
+// ====================================================
+function ocultarTodosNoColuna(btn) {
+  const colIdx = btn.dataset.colIdx;
+  const body = document.getElementById('col-body-' + colIdx);
+  const cards = body.querySelectorAll('.kanban-card');
+  if (cards.length === 0) return;
+  if (!confirm('Ocultar os ' + cards.length + ' card(s) desta coluna?')) return;
+  btn.disabled = true;
+  const lista = [];
+  cards.forEach(function(card) {
+    lista.push({
+      numero_termo: card.dataset.numero,
+      instrumento:  card.dataset.instrumento,
+      alt_numero:   parseInt(card.dataset.altNumero) || 0
+    });
+  });
+  $.ajax({
+    url: '/parcerias/alteracao/ocultar_lote',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify({ cards: lista, oculto: true }),
+    success: function() {
+      // Remover cards do DOM sem recarregar
+      const col = btn.closest('.kanban-column');
+      cards.forEach(function(card) { card.remove(); });
+      atualizarBadgesContagem();
+      if (col) _atualizarContadorOcultos(col, lista.length);
+      btn.disabled = false;
+    },
+    error: function() { btn.disabled = false; alert('Erro ao ocultar cards.'); }
+  });
+}
+
+// ====================================================
+// REEXIBIR TODOS OS CARDS OCULTOS DE UMA COLUNA
+// ====================================================
+function reexibirStatusOcultos(status) {
+  // Coletar da lista de ocultos renderizada no painel
+  const lista = [];
+  document.querySelectorAll('#painel-ocultos .kanban-card[data-status="' + status + '"]').forEach(function(card) {
+    lista.push({
+      numero_termo: card.dataset.numero,
+      instrumento:  card.dataset.instrumento,
+      alt_numero:   parseInt(card.dataset.altNumero) || 0
+    });
+  });
+  if (!lista.length) {
+    // fallback: usa dados do servidor — recarrega mostrando painel
+    toggleOcultos();
+    return;
+  }
+  $.ajax({
+    url: '/parcerias/alteracao/ocultar_lote',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify({ cards: lista, oculto: false }),
+    success: function() { location.reload(); },
+    error: function() { alert('Erro ao reexibir cards.'); }
+  });
+}
+
+// ====================================================
+// MARCADORES PICKER (Planner-style)
+// ====================================================
+const PALETA_CORES = {
+  // ── Vermelhos ──────────────────────────────────────────────────
+  'Vermelho pastel':      { bg: '#fee2e2', text: '#dc2626' },
+  'Vermelho claro':       { bg: '#fca5a5', text: '#7f1d1d' },
+  'Vermelho':             { bg: '#f87171', text: '#450a0a' },
+  'Vermelho forte':       { bg: '#ef4444', text: '#fff' },
+  'Vermelho escuro':      { bg: '#dc2626', text: '#fff' },
+  'Carmim':               { bg: '#991b1b', text: '#fef2f2' },
+  // ── Laranjas ─────────────────────────────────────────────────
+  'Laranja pastel':       { bg: '#ffedd5', text: '#c2410c' },
+  'Laranja claro':        { bg: '#fed7aa', text: '#9a3412' },
+  'Laranja':              { bg: '#fdba74', text: '#7c2d12' },
+  'Laranja forte':        { bg: '#fb923c', text: '#431407' },
+  'Laranja vivo':         { bg: '#f97316', text: '#fff' },
+  'Âmbar':               { bg: '#f59e0b', text: '#fff' },
+  // ── Amarelos ─────────────────────────────────────────────────
+  'Amarelo pastel':       { bg: '#fef9c3', text: '#854d0e' },
+  'Amarelo claro':        { bg: '#fef08a', text: '#713f12' },
+  'Amarelo':              { bg: '#fde047', text: '#422006' },
+  'Dourado':              { bg: '#eab308', text: '#fff' },
+  'Lima pastel':          { bg: '#ecfccb', text: '#365314' },
+  'Lima':                 { bg: '#bef264', text: '#1a2e05' },
+  // ── Verdes ───────────────────────────────────────────────────
+  'Verde pastel':         { bg: '#dcfce7', text: '#166534' },
+  'Verde claro':          { bg: '#bbf7d0', text: '#14532d' },
+  'Verde':                { bg: '#86efac', text: '#052e16' },
+  'Verde forte':          { bg: '#4ade80', text: '#052e16' },
+  'Verde vivo':           { bg: '#22c55e', text: '#fff' },
+  'Verde escuro':         { bg: '#16a34a', text: '#fff' },
+  // ── Esmeralda / Teal ─────────────────────────────────────────
+  'Esmeralda pastel':     { bg: '#d1fae5', text: '#065f46' },
+  'Esmeralda':            { bg: '#6ee7b7', text: '#022c22' },
+  'Esmeralda escura':     { bg: '#10b981', text: '#fff' },
+  'Teal pastel':          { bg: '#ccfbf1', text: '#115e59' },
+  'Teal':                 { bg: '#5eead4', text: '#042f2e' },
+  'Teal escuro':          { bg: '#0d9488', text: '#fff' },
+  // ── Cianos / Azul-céu ──────────────────────────────────────────
+  'Ciano pastel':         { bg: '#cffafe', text: '#164e63' },
+  'Ciano':                { bg: '#a5f3fc', text: '#083344' },
+  'Ciano forte':          { bg: '#06b6d4', text: '#fff' },
+  'Azul-céu pastel':      { bg: '#e0f2fe', text: '#0c4a6e' },
+  'Azul-céu':             { bg: '#bae6fd', text: '#082f49' },
+  'Azul-céu forte':       { bg: '#0ea5e9', text: '#fff' },
+  // ── Azuis ────────────────────────────────────────────────────
+  'Azul pastel':          { bg: '#dbeafe', text: '#1d4ed8' },
+  'Azul claro':           { bg: '#bfdbfe', text: '#1e3a8a' },
+  'Azul':                 { bg: '#93c5fd', text: '#1e3a8a' },
+  'Azul forte':           { bg: '#60a5fa', text: '#1e3a8a' },
+  'Azul vivo':            { bg: '#3b82f6', text: '#fff' },
+  'Azul escuro':          { bg: '#1d4ed8', text: '#eff6ff' },
+  // ── Índigo ──────────────────────────────────────────────────
+  'Índigo pastel':        { bg: '#e0e7ff', text: '#3730a3' },
+  'Índigo claro':         { bg: '#c7d2fe', text: '#312e81' },
+  'Índigo':               { bg: '#a5b4fc', text: '#312e81' },
+  'Índigo forte':         { bg: '#818cf8', text: '#1e1b4b' },
+  'Índigo escuro':        { bg: '#4338ca', text: '#eef2ff' },
+  'Marinho':              { bg: '#3730a3', text: '#e0e7ff' },
+  // ── Roxos ────────────────────────────────────────────────────
+  'Roxo pastel':          { bg: '#ede9fe', text: '#6d28d9' },
+  'Roxo claro':           { bg: '#ddd6fe', text: '#4c1d95' },
+  'Roxo':                 { bg: '#c4b5fd', text: '#3b0764' },
+  'Roxo forte':           { bg: '#a78bfa', text: '#2e1065' },
+  'Roxo vivo':            { bg: '#7c3aed', text: '#fff' },
+  'Violeta':              { bg: '#6d28d9', text: '#f5f3ff' },
+  // ── Rosas / Magenta ──────────────────────────────────────────
+  'Rosa pastel':          { bg: '#fce7f3', text: '#9d174d' },
+  'Rosa claro':           { bg: '#fbcfe8', text: '#831843' },
+  'Rosa':                 { bg: '#f9a8d4', text: '#500724' },
+  'Rosa forte':           { bg: '#f472b6', text: '#500724' },
+  'Magenta':              { bg: '#ec4899', text: '#fff' },
+  'Magenta escuro':       { bg: '#be185d', text: '#fdf2f8' },
+  // ── Marrons / Terrosos ───────────────────────────────────────
+  'Areia':                { bg: '#fef3c7', text: '#78350f' },
+  'Caqui':                { bg: '#fde68a', text: '#78350f' },
+  'Marrom claro':         { bg: '#d97706', text: '#fff' },
+  'Marrom':               { bg: '#b45309', text: '#fef3c7' },
+  'Marrom escuro':        { bg: '#92400e', text: '#fffbeb' },
+  'Castanho':             { bg: '#78350f', text: '#fff7ed' },
+  // ── Cinzas / Neutros ─────────────────────────────────────────
+  'Branco suave':         { bg: '#f8fafc', text: '#475569' },
+  'Cinza claro':          { bg: '#f1f5f9', text: '#475569' },
+  'Cinza':                { bg: '#e2e8f0', text: '#334155' },
+  'Cinza médio':           { bg: '#cbd5e1', text: '#1e293b' },
+  'Cinza escuro':         { bg: '#64748b', text: '#fff' },
+  'Chumbo':               { bg: '#475569', text: '#f8fafc' },
+  'Preto':                { bg: '#1e293b', text: '#f8fafc' },
+};
+
+let marcadoresDisponiveis = [];
+let marcadoresCores = {};    // nome -> { bg, text }
+let marcadoresSelecionados = new Set();
+let _siglaTipoContratoMap = {};  // sigla -> nome (ex: {'TFM': 'Fomento'})
+
+function getMarcadorCor(nome) {
+  return marcadoresCores[nome] || PALETA_CORES['Cinza'];
+}
+
+// ====================================================
+// AUTO-SUGESTÃO DE MARCADORES
+// ====================================================
+// Sugere marcadores baseado no numero_termo (sigla/coordenação) e tipos selecionados
+function sugerirMarcadoresAuto(numeroTermo, tiposAlt) {
+  const sugeridos = new Set();
+  const partes = (numeroTermo || '').split('/');
+
+  // 1. Tipo de contrato pela sigla (1º segmento do numero_termo)
+  if (partes.length > 0) {
+    const sigla = partes[0].trim().toUpperCase();
+    const tipoNome = _siglaTipoContratoMap[sigla];
+    if (tipoNome && marcadoresDisponiveis.some(m => m.nome === tipoNome)) {
+      sugeridos.add(tipoNome);
+    }
+  }
+
+  // 2. Coordenação / Dotação pelo último segmento do numero_termo
+  if (partes.length > 1) {
+    const ultimo = partes[partes.length - 1].trim().toUpperCase();
+    marcadoresDisponiveis.forEach(function(m) {
+      if (m.fonte !== 'dotacao') return;
+      const nome = (m.nome || '').trim().toUpperCase();
+      if (nome === ultimo || nome.startsWith(ultimo) || ultimo.startsWith(nome)) {
+        sugeridos.add(m.nome);
+      }
+    });
+  }
+
+  // 3. Tipos de alteração selecionados no formulário
+  const tipos = typeof tiposAlt === 'string'
+    ? tiposAlt.split(',').map(s => s.trim()).filter(Boolean)
+    : (tiposAlt || []);
+  tipos.forEach(function(tipo) {
+    if (marcadoresDisponiveis.some(m => m.fonte === 'alt_tipo' && m.nome === tipo)) {
+      sugeridos.add(tipo);
+    }
+  });
+
+  return sugeridos;
+}
+
+// Aplica sugestões ao picker sem remover seleções manuais existentes
+function aplicarMarcadoresAuto(numeroTermo, tiposAlt) {
+  if (!marcadoresDisponiveis.length) return;  // ainda carregando
+  const sugs = sugerirMarcadoresAuto(numeroTermo, tiposAlt);
+  let adicionou = false;
+  sugs.forEach(function(nome) {
+    if (!marcadoresSelecionados.has(nome)) {
+      marcadoresSelecionados.add(nome);
+      adicionou = true;
+    }
+  });
+  if (adicionou) {
+    atualizarPillsMarcadores();
+    const b = document.getElementById('buscaMarcador');
+    renderizarMarcadoresDisponiveis(b ? b.value : '');
+  }
+}
+
+function renderizarMarcadoresDisponiveis(busca) {
+  const container = document.getElementById('listaMarcadores');
+  if (!container) return;
+  if (!marcadoresDisponiveis.length) {
+    container.innerHTML = '<div class="text-muted small p-3 text-center"><i class="bi bi-hourglass-split"></i> Carregando…</div>';
+    return;
+  }
+  const lower = (busca || '').toLowerCase();
+  const fonteLabels = {
+    'tipo_contrato': 'Tipo de Contrato',
+    'dotacao':       'Coordenação / Dotação',
+    'alt_tipo':      'Tipo de Alteração'
+  };
+  const grupos = {};
+  marcadoresDisponiveis.forEach(function(m) {
+    if (lower && !m.nome.toLowerCase().includes(lower)) return;
+    if (!grupos[m.fonte]) grupos[m.fonte] = [];
+    grupos[m.fonte].push(m);
+  });
+
+  let html = '';
+  if (!Object.keys(grupos).length) {
+    html = '<div class="text-muted small p-3 text-center">Nenhum rótulo encontrado</div>';
+  } else {
+    ['tipo_contrato', 'dotacao', 'alt_tipo'].forEach(function(fonte) {
+      if (!grupos[fonte]) return;
+      html += '<div class="px-2 pt-2 pb-0" style="font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#6c757d;">'
+            + escHtml(fonteLabels[fonte] || fonte) + '</div>';
+      grupos[fonte].forEach(function(m) {
+        const cor  = getMarcadorCor(m.nome);
+        const sel  = marcadoresSelecionados.has(m.nome);
+        const slug = slugMarcador(m.nome);
+        html += '<div class="marcador-item' + (sel ? ' selected' : '') + '" '
+              + 'data-nome="' + escAttr(m.nome) + '" '
+              + 'onclick="toggleMarcador(\'' + escJs(m.nome) + '\')" '
+              + 'style="cursor:pointer;">'
+              + '<div class="marcador-dot me-2" style="background:' + cor.bg + '; border:1px solid rgba(0,0,0,.1);"></div>'
+              + '<span class="marcador-nome flex-grow-1" style="font-size:.83rem;">' + escHtml(m.nome) + '</span>'
+              + (sel ? '<i class="bi bi-check2 text-primary me-2" style="font-size:.85rem;"></i>'
+                     : '<span style="width:20px;" class="me-2"></span>')
+              + '<button type="button" class="btn p-0 text-muted border-0" style="font-size:.68rem; line-height:1; background:none;" '
+              + 'onclick="abrirCorPicker(\'' + escJs(m.nome) + '\',\'' + m.fonte + '\', event)" title="Alterar cor">'
+              + '<i class="bi bi-pencil-fill"></i></button>'
+              + '</div>'
+              + '<div id="cor-picker-' + slug + '" style="display:none; padding:6px 10px 10px 10px; background:#f8f9fa; border-top:1px solid #e9ecef;">'
+              + '<div style="font-size:.68rem; font-weight:600; color:#6c757d; margin-bottom:5px;">Escolher cor:</div>'
+              + '<div style="display:grid; grid-template-columns:repeat(6,1fr); gap:4px;">';
+        Object.entries(PALETA_CORES).forEach(function(entry) {
+          const cNome = entry[0], c = entry[1];
+          const ativo = marcadoresCores[m.nome] && marcadoresCores[m.nome].bg === c.bg;
+          html += '<div class="color-swatch' + (ativo ? ' active' : '') + '" '
+                + 'style="background:' + c.bg + '; border-color:' + (ativo ? '#333' : 'transparent') + ';" '
+                + 'title="' + cNome + '" '
+                + 'onclick="salvarCorMarcador(\'' + escJs(m.nome) + '\',\'' + cNome + '\',\'' + m.fonte + '\',event)"></div>';
+        });
+        html += '</div></div>';
+      });
+    });
+  }
+  container.innerHTML = html;
+}
+
+function toggleMarcador(nome) {
+  if (marcadoresSelecionados.has(nome)) {
+    marcadoresSelecionados.delete(nome);
+  } else {
+    marcadoresSelecionados.add(nome);
+  }
+  atualizarPillsMarcadores();
+  const b = document.getElementById('buscaMarcador');
+  renderizarMarcadoresDisponiveis(b ? b.value : '');
+}
+
+function atualizarPillsMarcadores() {
+  const container = document.getElementById('marcadores-selecionados');
+  if (!container) return;
+  let html = '';
+  marcadoresSelecionados.forEach(function(nome) {
+    const cor = getMarcadorCor(nome);
+    html += '<span class="marcador-pill-selected" '
+          + 'style="background:' + cor.bg + '; color:' + cor.text + ';" '
+          + 'onclick="toggleMarcador(\'' + escJs(nome) + '\')" title="Clique para remover">'
+          + escHtml(nome.length > 22 ? nome.slice(0,22) + '\u2026' : nome)
+          + ' <i class="bi bi-x"></i></span>';
+  });
+  container.innerHTML = html;
+  const inp = document.getElementById('alt_marcadores');
+  if (inp) inp.value = Array.from(marcadoresSelecionados).join(',');
+}
+
+function setMarcadoresSelecionados(valor) {
+  marcadoresSelecionados.clear();
+  if (valor) {
+    valor.split(',').map(function(s) { return s.trim(); }).filter(Boolean).forEach(function(s) {
+      marcadoresSelecionados.add(s);
+    });
+  }
+  atualizarPillsMarcadores();
+  const b = document.getElementById('buscaMarcador');
+  renderizarMarcadoresDisponiveis(b ? b.value : '');
+}
+
+function abrirCorPicker(nome, fonte, event) {
+  event.stopPropagation();
+  const slug = slugMarcador(nome);
+  const el = document.getElementById('cor-picker-' + slug);
+  if (!el) return;
+  const wasHidden = el.style.display === 'none';
+  document.querySelectorAll('[id^="cor-picker-"]').forEach(function(p) { p.style.display = 'none'; });
+  if (wasHidden) el.style.display = 'block';
+}
+
+function salvarCorMarcador(nome, corNome, fonte, event) {
+  event.stopPropagation();
+  const cor = PALETA_CORES[corNome] || PALETA_CORES['Cinza'];
+  marcadoresCores[nome] = cor;
+  $.ajax({
+    url: '/parcerias/api/marcadores/cor',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify({ nome: nome, cor: corNome, fonte: fonte })
+  });
+  const slug = slugMarcador(nome);
+  const el = document.getElementById('cor-picker-' + slug);
+  if (el) el.style.display = 'none';
+  const b = document.getElementById('buscaMarcador');
+  renderizarMarcadoresDisponiveis(b ? b.value : '');
+  atualizarPillsMarcadores();
+  // Update board card pills
+  document.querySelectorAll('.marcador-pill').forEach(function(pill) {
+    if (pill.dataset.nome === nome) {
+      pill.style.background = cor.bg;
+      pill.style.color = cor.text;
+    }
+  });
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function escJs(s)   { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function slugMarcador(s) { return s.replace(/[^a-zA-Z0-9]/g,'_'); }
 
 // ====================================================
 // SORTABLEJS - DRAG & DROP
@@ -1104,17 +1613,53 @@ function limparFiltros() {
 }
 
 // ====================================================
-// MARCADORES: load colors on page ready and apply
+// INIT: load colors, bind modal events
 // ====================================================
 $(document).ready(function() {
+  // Load marcadores globally
   $.get('/parcerias/api/marcadores', function(data) {
-    const coresMap = {};
-    const paleta = { 'Vermelho':'#fee2e2','Laranja':'#ffedd5','Amarelo':'#fef9c3','Verde':'#dcfce7','Azul':'#dbeafe','Roxo':'#ede9fe','Rosa':'#fce7f3','Cinza':'#e9ecef' };
-    data.forEach(m => { coresMap[m.nome] = paleta[m.cor] || paleta['Cinza']; });
+    marcadoresDisponiveis = data;
+    marcadoresCores = {};
+    _siglaTipoContratoMap = {};
+    data.forEach(function(m) {
+      marcadoresCores[m.nome] = PALETA_CORES[m.cor] || PALETA_CORES['Cinza'];
+      if (m.fonte === 'tipo_contrato' && m.sigla) {
+        _siglaTipoContratoMap[m.sigla.toUpperCase()] = m.nome;
+      }
+    });
+    // Apply colors to board cards
     document.querySelectorAll('.marcador-pill').forEach(function(pill) {
       const nome = pill.dataset.nome;
-      if (nome && coresMap[nome]) pill.style.background = coresMap[nome];
+      const cor = marcadoresCores[nome];
+      if (cor) { pill.style.background = cor.bg; pill.style.color = cor.text; }
     });
+  });
+
+  // Auto-marcadores: quando numero_termo mudar via Select2
+  $(document).on('select2:select', '#numero_termo', function() {
+    const val = $(this).val() || '';
+    const tiposAlt = Array.from(document.querySelectorAll('.tipo-select')).map(s => s.value).filter(Boolean);
+    aplicarMarcadoresAuto(val, tiposAlt);
+  });
+
+  // Auto-marcadores: quando um Tipo de Alteração for selecionado
+  $(document).on('change', '.tipo-select', function() {
+    const numeroTermo = $('#numero_termo').val() || '';
+    const tiposAlt = Array.from(document.querySelectorAll('.tipo-select')).map(s => s.value).filter(Boolean);
+    aplicarMarcadoresAuto(numeroTermo, tiposAlt);
+  });
+
+  // When modal opens, render the picker (data may already be loaded)
+  $('#modalCadastroAlteracao').on('show.bs.modal', function() {
+    renderizarMarcadoresDisponiveis('');
+  });
+
+  // When modal closes, reset picker for next open
+  $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
+    marcadoresSelecionados.clear();
+    atualizarPillsMarcadores();
+    const b = document.getElementById('buscaMarcador');
+    if (b) b.value = '';
   });
 });
 </script>

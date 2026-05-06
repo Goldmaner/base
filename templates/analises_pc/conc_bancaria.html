@@ -659,6 +659,7 @@
                 <button class="btn btn-primary w-100 btn-save-top" onclick="salvarConciliacao()" id="btnSalvar" style="display: none;">
                     <i class="bi bi-save me-2"></i>Salvar
                 </button>
+                <div id="badgeEstadoSave" style="display:none; font-size:0.65rem; text-align:center; margin-top:2px; white-space:nowrap;"></div>
             </div>
             <div class="col-md-1">
                 <button class="btn btn-outline-secondary w-100" onclick="irParaUltimaLinha()" title="Ir para a última linha">
@@ -1100,6 +1101,7 @@
     let linhas = [];
     let notasFiscais = {}; // Objeto indexado por conc_extrato_id
     let documentosAnalise = {}; // Objeto indexado por conc_extrato_id
+    let documentosAnaliseDirty = new Set(); // IDs de documentosAnalise modificados (dirty tracking)
     let categoriasAplicabilidade = {}; // Dicionário { categoria: aplicacao (true/false) }
     let categoriasRubricas = {}; // Dicionário { categoria: rubrica }
     let secaoNotasFiscaisAtiva = false;
@@ -1468,22 +1470,11 @@
         console.log(`[INSERÇÃO] ${quantidade} linha(s) inserida(s) no índice ${index}`);
     }
     
-    function salvarNoCache() {
+    async function salvarNoCache() {
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) return;
         
         const cacheKey = `autosave_conc_${numeroTermo}`;
-        
-        // DEBUG: Estado antes de salvar no cache
-        console.group('💾 DEBUG CACHE - Salvamento');
-        console.log('🔑 Cache Key:', cacheKey);
-        console.log('📊 Dados a salvar:', {
-            totalLinhas: linhas.length,
-            totalNotasFiscais: Object.keys(notasFiscais).length,
-            totalDocumentos: Object.keys(documentosAnalise).length,
-            filtrosAtivos: detectarFiltrosAtivos(),
-            timestamp: new Date().toISOString()
-        });
         
         const dataToSave = {
             timestamp: Date.now(),
@@ -1493,12 +1484,13 @@
         };
         
         try {
-            localStorage.setItem(cacheKey, JSON.stringify(dataToSave));
-            
-            const cacheSize = JSON.stringify(dataToSave).length;
-            console.log('✅ Cache salvo com sucesso');
-            console.log('📦 Tamanho do cache:', (cacheSize / 1024).toFixed(2) + ' KB');
-            console.groupEnd();
+            // Usar IndexedDB (sem limite de 5MB do localStorage)
+            if (typeof idbKeyval !== 'undefined') {
+                await idbKeyval.set(cacheKey, dataToSave);
+            } else {
+                // Fallback para localStorage se idb-keyval não carregar
+                localStorage.setItem(cacheKey, JSON.stringify(dataToSave));
+            }
             
             // Mostrar indicador visual
             const status = document.getElementById('autosaveStatus');
@@ -1509,23 +1501,31 @@
                     status.style.display = 'none';
                 }, 2000);
             }
+            atualizarBadgeEstado('cache');
         } catch (error) {
             console.error('❌ Erro ao salvar cache:', error);
-            console.log('💥 Possível causa: localStorage cheio ou bloqueado');
-            console.groupEnd();
         }
     }
     
-    function limparCache() {
+    async function limparCache() {
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) return;
         
         const cacheKey = `autosave_conc_${numeroTermo}`;
-        localStorage.removeItem(cacheKey);
+        try {
+            if (typeof idbKeyval !== 'undefined') {
+                await idbKeyval.del(cacheKey);
+            } else {
+                localStorage.removeItem(cacheKey);
+            }
+        } catch (error) {
+            console.warn('Erro ao limpar cache:', error);
+        }
         console.log('Cache limpo');
     }
     
     function agendarAutosave() {
+        atualizarBadgeEstado('pendente');
         // Cancelar timer anterior
         if (autosaveTimer) {
             clearTimeout(autosaveTimer);
@@ -1664,6 +1664,36 @@
     // ATALHO DE TECLADO: CTRL+B PARA SALVAR
     // ============================================================
     document.addEventListener('keydown', function(event) {
+        // Ctrl+Z ou Cmd+Z (Mac) — Desfazer (apenas quando foco está dentro da tabela)
+        if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+            const table = document.getElementById('tabelaConciliacao');
+            if (table && table.contains(document.activeElement)) {
+                event.preventDefault();
+                desfazerAlteracao();
+                return;
+            }
+        }
+        
+        // Ctrl+Shift+↓ — Ir para a próxima linha com alterações pendentes
+        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'ArrowDown') {
+            event.preventDefault();
+            irParaProximaLinhaSuja();
+            return;
+        }
+        
+        // Ctrl+D — Preencher abaixo (colunas repetíveis)
+        if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key === 'd') {
+            const target = document.activeElement;
+            if (target && target.classList.contains('cell-input')) {
+                const td = target.closest('td');
+                if (td && td.closest('#tabelaConciliacao')) {
+                    event.preventDefault();
+                    preencherAbaixo(target);
+                    return;
+                }
+            }
+        }
+        
         // Ctrl+B ou Cmd+B (Mac)
         if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
             event.preventDefault(); // Evitar comportamento padrão do navegador
@@ -1675,12 +1705,12 @@
             }
             
             // Feedback visual imediato
-            showToast('💾 Salvando conciliação... (Ctrl+B)', 'info', 2000);
+            showToast('💾 Salvando tudo... (Ctrl+B)', 'info', 2000);
             
-            // Executar salvamento
-            salvarConciliacao();
+            // Executar salvamento COMPLETO (ignora dirty tracking)
+            salvarTudo();
             
-            console.log('[HOTKEY] Salvamento disparado via Ctrl+B');
+            console.log('[HOTKEY] Salvamento completo disparado via Ctrl+B');
         }
     });
 
@@ -1695,7 +1725,10 @@
         console.log('%cMonitor visual:', 'color: #3498db; font-weight: bold;');
         console.log('%c  Clique no botão ⚡ no canto superior direito', 'color: #95a5a6;');
         console.log('%c\n⌨️  ATALHOS DE TECLADO:', 'color: #9b59b6; font-size: 13px; font-weight: bold;');
-        console.log('%c  Ctrl+B         %c- Salvar conciliação rapidamente', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
+        console.log('%c  Ctrl+B         %c- Salvar tudo (force sync)', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
+        console.log('%c  Ctrl+Z         %c- Desfazer (dentro da tabela)', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
+        console.log('%c  Ctrl+D         %c- Preencher coluna abaixo (células vazias)', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
+        console.log('%c  Ctrl+Shift+↓  %c- Ir para próxima linha alterada', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
         console.log('');
         
         carregarTermos();
@@ -1916,12 +1949,24 @@
             // Verificar se há autosave no cache para este termo
             const timerCache = performanceMetrics.start('carregarExtrato - Verificar cache');
             const cacheKey = `autosave_conc_${numeroTermo}`;
-            const autosaveData = localStorage.getItem(cacheKey);
+            
+            // Usar IndexedDB (idb-keyval) com fallback para localStorage
+            let autosaveData = null;
+            try {
+                if (typeof idbKeyval !== 'undefined') {
+                    autosaveData = await idbKeyval.get(cacheKey);
+                } else {
+                    const raw = localStorage.getItem(cacheKey);
+                    autosaveData = raw ? JSON.parse(raw) : null;
+                }
+            } catch (e) {
+                console.warn('Erro ao ler cache:', e);
+            }
+            
             let usarAutosave = false;
             
             if (autosaveData) {
-                const cachedData = JSON.parse(autosaveData);
-                const { timestamp, linhas: linhasCache, notasFiscais: nfCache, documentosAnalise: docCache } = cachedData;
+                const { timestamp, linhas: linhasCache, notasFiscais: nfCache, documentosAnalise: docCache } = autosaveData;
                 const minutosPassados = (Date.now() - timestamp) / 1000 / 60;
                 
                 // DEBUG: Recuperação de cache
@@ -1950,7 +1995,7 @@
                         console.log('✅ Cache aplicado com sucesso');
                     } else {
                         // Limpar cache se usuário recusar
-                        localStorage.removeItem(cacheKey);
+                        limparCache();
                         console.log('🗑️ Cache rejeitado e removido');
                     }
                 }
@@ -1971,7 +2016,8 @@
                         origem_destino: item.origem_destino,
                         cat_avaliacao: item.cat_avaliacao,
                         avaliacao_analista: item.avaliacao_analista,
-                        mesclado_com: item.mesclado_com || []
+                        mesclado_com: item.mesclado_com || [],
+                        _dirty: false  // dirty tracking: false ao carregar do banco
                     }));
                     proximoIndice = Math.max(...linhas.map(l => l.indice || 0)) + 1;
                 } else {
@@ -2497,12 +2543,25 @@
     }
     
     function parseCompetencia(competenciaStr) {
-        // Aceita formatos: MM/AAAA ou DD/MM/AAAA
+        // Aceita formatos: MM/AAAA, DD/MM/AAAA, MMM/AAAA (ex: ago/2026), MM/AA, etc.
         if (!competenciaStr) return null;
         
-        const partes = competenciaStr.trim().split('/');
+        const str = competenciaStr.trim();
+        const partes = str.split('/');
+        
+        // Mapa de nomes de mês (português)
+        const mesesNomes = { jan:1, fev:2, mar:3, abr:4, mai:5, jun:6, jul:7, ago:8, set:9, out:10, nov:11, dez:12 };
         
         if (partes.length === 2) {
+            // Verificar se o primeiro segmento é nome de mês (ex: ago/2026)
+            const mesNome = partes[0].toLowerCase().substring(0, 3);
+            if (mesesNomes[mesNome]) {
+                const mes = mesesNomes[mesNome];
+                let ano = parseInt(partes[1]);
+                if (ano >= 0 && ano <= 99) ano = 2000 + ano;
+                if (ano > 1900) return `${ano}-${mes.toString().padStart(2, '0')}-01`;
+            }
+            
             // Formato: MM/AAAA ou MM/AA
             const mes = parseInt(partes[0]);
             let ano = parseInt(partes[1]);
@@ -2564,7 +2623,7 @@
         if (!competenciaParsed) {
             linhas[index].competencia = null;
             linhas[index].competencia_valida = false;
-            linhas[index].competencia_erro = 'Formato inválido. Use MM/AAAA ou "Sem competência"';
+            linhas[index].competencia_erro = 'Formato inválido. Use MM/AAAA, ago/2026, 01/08/2026 ou "Sem competência"';
             renderizarTabela(); // Só renderiza quando há erro para mostrar mensagem
             return;
         }
@@ -2880,13 +2939,42 @@
         // OTIMIZAÇÃO 1: Usar DocumentFragment para construir DOM antes de inserir
         const fragment = document.createDocumentFragment();
         
-        // OTIMIZAÇÃO 2: Cachear grupos de composição usando WeakMap global
-        // Calcular apenas para linhas que não estão no cache
-        linhas.forEach((linha, idx) => {
-            if (!gruposComposicaoCache.has(linha)) {
-                gruposComposicaoCache.set(linha, identificarGrupoComposicao(idx));
+        // OTIMIZAÇÃO 2: Precomputar grupos de composição em O(n) — varredura única para frente
+        // (substitui WeakMap com O(n²) worst-case)
+        const gruposComposicao = new Array(linhas.length);
+        {
+            let gi = 0;
+            while (gi < linhas.length) {
+                const lgi = linhas[gi];
+                const valorRef = lgi.credito || lgi.debito;
+                const comp = lgi.discriminacao || 0;
+                if (!valorRef || Math.abs(comp - valorRef) < 0.01) {
+                    gruposComposicao[gi] = { ehGrupo: false };
+                    gi++;
+                    continue;
+                }
+                const dataGi = lgi.data;
+                const tipoGi = lgi.credito ? 'credito' : 'debito';
+                let fim = gi;
+                while (fim + 1 < linhas.length) {
+                    const next = linhas[fim + 1];
+                    const vNext = tipoGi === 'credito' ? next.credito : next.debito;
+                    const cNext = next.discriminacao || 0;
+                    if (next.data === dataGi && Math.abs((vNext || 0) - valorRef) < 0.01 && Math.abs(cNext - valorRef) >= 0.01) {
+                        fim++;
+                    } else { break; }
+                }
+                if (fim === gi) {
+                    gruposComposicao[gi] = { ehGrupo: false };
+                    gi++;
+                } else {
+                    for (let gj = gi; gj <= fim; gj++) {
+                        gruposComposicao[gj] = { ehGrupo: true, ehPrimeira: gj === gi, inicioGrupo: gi, fimGrupo: fim, tipo: tipoGi };
+                    }
+                    gi = fim + 1;
+                }
             }
-        });
+        }
 
         // Filtrar linhas por mês se estiver no modo páginas
         let linhasFiltradas = linhas;
@@ -2941,8 +3029,8 @@
                 }
             }
             
-            // OTIMIZAÇÃO: Usar grupo de composição do cache WeakMap
-            const grupoInfo = gruposComposicaoCache.get(linha);
+            // OTIMIZAÇÃO: Usar grupo de composição precomputado (O(n) total)
+            const grupoInfo = gruposComposicao[index];
             
             // OTIMIZAÇÃO CRÍTICA: Construir HTML com array.join() ao invés de innerHTML +=
             // Elimina reparse O(n²) -> O(n)
@@ -3386,13 +3474,18 @@
                 
                 if (linhasPaste.length === 0) return;
                 
-                // Salvar estado antes de modificar
+                // Salvar estado antes de modificar (UMA vez, para desfazer tudo com Ctrl+Z)
                 salvarEstadoNoHistorico();
                 
-                // Garantir linhas suficientes
+                // Garantir linhas suficientes (push direto, sem renderizar a cada linha)
                 const linhasNecessarias = linhaIndex + linhasPaste.length;
                 while (linhas.length < linhasNecessarias) {
-                    adicionarLinha();
+                    linhas.push({
+                        id: null, indice: proximoIndice++,
+                        data: '', credito: null, debito: null, discriminacao: null,
+                        cat_transacao: null, competencia: null, origem_destino: null,
+                        cat_avaliacao: null, avaliacao_analista: null, mesclado_com: [], _dirty: false
+                    });
                 }
                 
                 // Distribuir dados de NF
@@ -3438,9 +3531,6 @@
             const colunaInicial = colunaMap[tdIndex];
             if (!colunaInicial) return;
             
-            // Salvar estado antes de modificar
-            salvarEstadoNoHistorico();
-            
             // Parse dos dados (Excel copia com \t para colunas e \n para linhas)
             const linhasPaste = pastedData
                 .split('\n')
@@ -3450,10 +3540,18 @@
             // Se não há linhas válidas, retornar
             if (linhasPaste.length === 0) return;
             
-            // Garantir que temos linhas suficientes
+            // Salvar estado antes de modificar (UMA vez, para desfazer tudo com Ctrl+Z)
+            salvarEstadoNoHistorico();
+            
+            // Garantir que temos linhas suficientes (push direto, sem renderizar a cada linha)
             const linhasNecessarias = linhaIndex + linhasPaste.length;
             while (linhas.length < linhasNecessarias) {
-                adicionarLinha();
+                linhas.push({
+                    id: null, indice: proximoIndice++,
+                    data: '', credito: null, debito: null, discriminacao: null,
+                    cat_transacao: null, competencia: null, origem_destino: null,
+                    cat_avaliacao: null, avaliacao_analista: null, mesclado_com: [], _dirty: false
+                });
             }
             
             // Distribuir dados
@@ -3563,6 +3661,7 @@
 
     function atualizarCampo(index, campo, valor) {
         linhas[index][campo] = valor;
+        linhas[index]._dirty = true;  // dirty tracking
         
         // Rastrear deleção manual de competência
         if (campo === 'competencia') {
@@ -3735,6 +3834,7 @@
         
         // Atualizar campo com valor do dropdown (texto direto)
         documentosAnalise[linha.id][campo] = valorDropdown || '';
+        documentosAnaliseDirty.add(linha.id);  // dirty tracking para documentos
         
         // DEBUG: Log específico para Comprovante
         if (campo === 'avaliacao_comprovante') {
@@ -4015,6 +4115,7 @@
         const valorNumerico = parseMoeda(valor);
         const linhaAnterior = linhas[index][campo];
         linhas[index][campo] = valorNumerico;
+        linhas[index]._dirty = true;  // dirty tracking
         
         // Auto-preencher composição apenas na PRIMEIRA vez que crédito/débito for preenchido
         // (se composição ainda está vazia ou não foi editada manualmente)
@@ -5342,11 +5443,11 @@
         }
     }
 
-    async function salvarConciliacao() {
+    async function salvarConciliacao(modoCompleto = false) {
         // ============================================================
         // DEBUG: Estado inicial do salvamento
         // ============================================================
-        console.group('🔍 DEBUG SALVAMENTO - Início');
+        console.group(modoCompleto ? '🔄 DEBUG SALVAMENTO COMPLETO' : '🔍 DEBUG SALVAMENTO (dirty only)');
         
         const numeroTermo = document.getElementById('numeroTermo').value;
         const bancoExtrato = document.getElementById('bancoExtrato').value;
@@ -5384,9 +5485,27 @@
         }
 
         // Filtrar linhas com pelo menos um campo preenchido
-        const linhasParaSalvar = linhas.filter(linha => {
+        let linhasFonte = linhas.filter(linha => {
             return linha.data || linha.credito || linha.debito || linha.discriminacao;
-        }).map(linha => {
+        });
+        
+        // DIRTY TRACKING: salvar apenas linhas alteradas (novas linhas sem id sempre incluídas)
+        if (!modoCompleto) {
+            linhasFonte = linhasFonte.filter(l => l._dirty || !l.id);
+        }
+        
+        // Verificar se há algo para salvar (dirty save apenas)
+        if (!modoCompleto) {
+            const temDocsDirty = documentosAnaliseDirty.size > 0;
+            const temLinhasDirty = linhasFonte.length > 0;
+            if (!temLinhasDirty && !temDocsDirty) {
+                showToast('Nada para salvar — sem alterações desde o último save.', 'info', 3000);
+                console.groupEnd();
+                return;
+            }
+        }
+
+        const linhasParaSalvar = linhasFonte.map(linha => {
             // Auto-preencher competência se estiver vazia mas tiver data
             // EXCETO se o usuário deletou manualmente
             let competencia = linha.competencia;
@@ -5446,7 +5565,7 @@
             };
         });
 
-        if (linhasParaSalvar.length === 0) {
+        if (linhasParaSalvar.length === 0 && modoCompleto) {
             if (!confirm('Não há dados para salvar. Deseja salvar mesmo assim (limpar todos os dados existentes)?')) {
                 return;
             }
@@ -5463,7 +5582,10 @@
                 body: JSON.stringify({
                     numero_termo: numeroTermo,
                     linhas: linhasParaSalvar,
-                    modo_completo: limiteAtual === 'todas'  // Só deleta se carregou todas
+                    // modo_completo: true permite deletar linhas ausentes do payload
+                    // Dirty save: sempre false (payload parcial, não deletar nada)
+                    // Full save (modoCompleto): só deleta se carregou todas as linhas
+                    modo_completo: modoCompleto && limiteAtual === 'todas'
                 })
             });
 
@@ -5524,88 +5646,63 @@
                 }
             }
             
-            // Salvar documentos de análise se seção estiver ativa
-            if (secaoDocumentosAtiva) {
-                // DEBUG: Payload de documentos
-                console.group('📋 DEBUG DOCUMENTOS - Payload');
-                console.log('🔍 Iteração sobre:', 'Array linhas (NÃO DOM)');
-                console.log('Total de linhas no array:', linhas.length);
-                console.log('Total de documentos em memória:', Object.keys(documentosAnalise).length);
-                
-                // Incluir TODAS as linhas salvas (com ID), não apenas as editadas
-                const documentosParaSalvar = linhas
-                    .filter(linha => linha.id) // Apenas linhas já salvas no banco
-                    .map(linha => {
-                        const categoria = linha.cat_transacao || '';
-                        const rubrica = categoriasRubricas[categoria] || '';
-                        const naoAplicavelGeral = categoriasAplicabilidade[categoria] === true;
-                        
-                        // Regras específicas por rubrica
-                        const naoAplicavelForaMunicipio = naoAplicavelGeral || 
-                                                          rubrica === 'Pessoal' || 
-                                                          rubrica === 'Administrativas';
-                        
-                        const naoAplicavelContratos = naoAplicavelGeral || 
-                                                      ['Pessoal', 'Materiais', 'Implantação', 'Imobilizado'].includes(rubrica);
-                        
-                        // Buscar documento existente no objeto indexado
-                        const doc = documentosAnalise[linha.id] || {};
-                        
-                        // SISTEMA DE DROPDOWNS: Enviar valores de texto diretamente
-                        // Se campo não aplicável → enviar string vazia (será ignorado no backend)
-                        // Se campo aplicável → enviar valor selecionado ou vazio se não selecionado
-                        
-                        return {
-                            conc_extrato_id: linha.id,
-                            avaliacao_guia: naoAplicavelGeral ? '' : (doc.avaliacao_guia || ''),
-                            avaliacao_comprovante: naoAplicavelGeral ? '' : (doc.avaliacao_comprovante || ''),
-                            avaliacao_contratos: naoAplicavelContratos ? '' : (doc.avaliacao_contratos || ''),
-                            avaliacao_fora_municipio: naoAplicavelForaMunicipio ? '' : (doc.avaliacao_fora_municipio || '')
-                        };
-                    });
-                
-                console.log('Total de documentos a salvar:', documentosParaSalvar.length);
-                
-                // DEBUG: Análise específica da coluna Comprovante
-                const comprovantesPreenchidos = documentosParaSalvar.filter(d => d.avaliacao_comprovante && d.avaliacao_comprovante.trim() !== '');
-                console.log(`%c📊 Análise Comprovante: ${comprovantesPreenchidos.length} de ${documentosParaSalvar.length} linhas têm valor`, 'color: #4ecdc4; font-weight: bold');
-                if (comprovantesPreenchidos.length > 0) {
-                    console.log('IDs com Comprovante preenchido:', comprovantesPreenchidos.map(d => `ID=${d.conc_extrato_id}: "${d.avaliacao_comprovante}"`));
-                }
-                
-                console.table(documentosParaSalvar.map(doc => ({
-                    ID: doc.conc_extrato_id,
-                    Guia: doc.avaliacao_guia || 'vazio',
-                    Comprovante: doc.avaliacao_comprovante || 'vazio',
-                    Contratos: doc.avaliacao_contratos || 'vazio',
-                    ForaMunicipio: doc.avaliacao_fora_municipio || 'vazio'
-                })));
-                console.groupEnd();
-                
-                if (documentosParaSalvar.length > 0) {
-                    const docResponse = await fetch('/conc_bancaria/api/documentos-analise', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            numero_termo: numeroTermo,
-                            documentos: documentosParaSalvar
-                        })
-                    });
+            // ============================================================
+            // Salvar documentos de análise
+            // Dirty save: apenas IDs em documentosAnaliseDirty (sem gate de seção)
+            // Full save (modoCompleto): todas as linhas com ID
+            // Nota: secaoDocumentosAtiva controla EXIBIÇÃO, não persistência
+            // ============================================================
+            const linhasParaDocs = modoCompleto
+                ? linhas.filter(l => l.id)
+                : linhas.filter(l => l.id && documentosAnaliseDirty.has(l.id));
+            
+            if (linhasParaDocs.length > 0) {
+                const documentosParaSalvar = linhasParaDocs.map(linha => {
+                    const categoria = linha.cat_transacao || '';
+                    const rubrica = categoriasRubricas[categoria] || '';
+                    const naoAplicavelGeral = categoriasAplicabilidade[categoria] === true;
                     
-                    if (!docResponse.ok) {
-                        console.warn('Aviso: Não foi possível salvar documentos de análise');
-                    }
+                    const naoAplicavelForaMunicipio = naoAplicavelGeral || 
+                                                      rubrica === 'Pessoal' || 
+                                                      rubrica === 'Administrativas';
+                    
+                    const naoAplicavelContratos = naoAplicavelGeral || 
+                                                  ['Pessoal', 'Materiais', 'Implantação', 'Imobilizado'].includes(rubrica);
+                    
+                    const doc = documentosAnalise[linha.id] || {};
+                    
+                    return {
+                        conc_extrato_id: linha.id,
+                        avaliacao_guia: naoAplicavelGeral ? '' : (doc.avaliacao_guia || ''),
+                        avaliacao_comprovante: naoAplicavelGeral ? '' : (doc.avaliacao_comprovante || ''),
+                        avaliacao_contratos: naoAplicavelContratos ? '' : (doc.avaliacao_contratos || ''),
+                        avaliacao_fora_municipio: naoAplicavelForaMunicipio ? '' : (doc.avaliacao_fora_municipio || '')
+                    };
+                });
+                
+                console.log(`[DOC SAVE] ${documentosParaSalvar.length} docs (modo: ${modoCompleto ? 'completo' : 'dirty'})`);
+                
+                const docResponse = await fetch('/conc_bancaria/api/documentos-analise', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        documentos: documentosParaSalvar
+                    })
+                });
+                
+                if (!docResponse.ok) {
+                    console.warn('Aviso: Não foi possível salvar documentos de análise');
                 }
             }
             
             // Limpar cache após salvar com sucesso
-            console.log('✅ Salvamento concluído com sucesso');
-            console.log('🗑️ Limpando cache...');
             limparCache();
-            console.groupEnd(); // Fim do DEBUG SALVAMENTO;
+            console.log('✅ Salvamento concluído com sucesso');
+            console.groupEnd();
             
-            // Atualizar IDs das linhas que foram inseridas (novas linhas sem ID)
-            // O backend retorna os IDs das linhas inseridas
+            // Atualizar IDs das linhas inseridas (novas linhas sem ID)
+            // Backend retorna ids_inseridos: apenas IDs de INSERTs (não UPDATEs)
             if (resultado.ids_inseridos && resultado.ids_inseridos.length > 0) {
                 let indexId = 0;
                 linhas.forEach(linha => {
@@ -5616,8 +5713,11 @@
                 });
             }
             
-            // Recarregar apenas dados auxiliares (Notas Fiscais e Documentos) se necessário
-            // NÃO recarregar extrato completo - os dados em memória já estão corretos
+            // Limpar dirty flags após save bem-sucedido
+            linhas.forEach(l => l._dirty = false);
+            documentosAnaliseDirty.clear();
+            
+            // Recarregar dados auxiliares se necessário
             if (secaoNotasFiscaisAtiva) {
                 await carregarNotasFiscais();
             }
@@ -5627,6 +5727,7 @@
             
             // Re-renderizar tabela para atualizar IDs e estado visual
             renderizarTabela();
+            atualizarBadgeEstado('salvo');
 
         } catch (error) {
             console.error('❌ Erro ao salvar:', error);
@@ -5643,12 +5744,127 @@
         }
     }
 
+    // ============================================================
+    // BADGE DE ESTADO: Salvo / Em cache / Alterações pendentes
+    // ============================================================
+    function atualizarBadgeEstado(estado) {
+        const badge = document.getElementById('badgeEstadoSave');
+        if (!badge) return;
+        badge.style.display = 'block';
+        if (estado === 'salvo') {
+            badge.textContent = '✅ Salvo no servidor';
+            badge.style.color = '#198754';
+        } else if (estado === 'cache') {
+            badge.textContent = '💾 Em cache local';
+            badge.style.color = '#6c757d';
+        } else if (estado === 'pendente') {
+            badge.textContent = '● Alterações pendentes';
+            badge.style.color = '#dc3545';
+        }
+    }
+
     // Função para ir à última linha da tabela
     function irParaUltimaLinha() {
         const tbody = document.getElementById('tbodyConciliacao');
         if (tbody && tbody.lastElementChild) {
             tbody.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
+    }
+
+    // ============================================================
+    // SALVAR TUDO: força sincronização completa (botão de pânico)
+    // Ignora dirty tracking — envia todas as linhas.
+    // Chamado pelo atalho Ctrl+B.
+    // ============================================================
+    async function salvarTudo() {
+        showToast('🔄 Salvamento completo iniciado (Ctrl+B)...', 'info', 2000);
+        return salvarConciliacao(true);
+    }
+
+    // ============================================================
+    // IR PARA PRÓXIMA LINHA SUJA (Ctrl+Shift+↓)
+    // ============================================================
+    function irParaProximaLinhaSuja() {
+        const ativoTr = document.activeElement?.closest('tr[data-index]');
+        const indexAtual = ativoTr ? parseInt(ativoTr.dataset.index) : -1;
+        
+        // Buscar próxima linha suja após a posição atual
+        let proxima = -1;
+        for (let i = indexAtual + 1; i < linhas.length; i++) {
+            if (linhas[i]._dirty) { proxima = i; break; }
+        }
+        // Se não encontrou, voltar ao início (wrap)
+        if (proxima === -1) {
+            for (let i = 0; i <= indexAtual; i++) {
+                if (linhas[i]._dirty) { proxima = i; break; }
+            }
+        }
+        if (proxima === -1) {
+            showToast('Nenhuma linha com alterações pendentes', 'info', 2000);
+            return;
+        }
+        const tr = document.querySelector(`tr[data-index="${proxima}"]`);
+        if (tr) {
+            tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const input = tr.querySelector('.cell-input');
+            if (input) input.focus();
+        }
+        showToast(`Linha ${linhas[proxima].indice || proxima + 1} (alterada)`, 'info', 1500);
+    }
+
+    // ============================================================
+    // PREENCHER ABAIXO (Ctrl+D)
+    // Copia o valor da célula atual para todas as células vazias abaixo
+    // Funciona nas colunas: Categoria, Competência, Origem/Destino,
+    //                       Avaliação, Observações
+    // ============================================================
+    function preencherAbaixo(inputElement) {
+        const tr = inputElement.closest('tr[data-index]');
+        if (!tr) return;
+        const index = parseInt(tr.dataset.index);
+        const td = inputElement.closest('td');
+        const tdIndex = Array.from(tr.children).indexOf(td);
+        
+        // Apenas colunas repetíveis
+        const colunaMap = {
+            5: 'cat_transacao',
+            6: 'competencia',
+            7: 'origem_destino',
+            8: 'cat_avaliacao',
+            9: 'avaliacao_analista'
+        };
+        const campo = colunaMap[tdIndex];
+        if (!campo) {
+            showToast('Preencher abaixo não disponível nesta coluna', 'info', 2000);
+            return;
+        }
+        
+        const valorAtual = linhas[index][campo];
+        if (!valorAtual || (typeof valorAtual === 'string' && valorAtual.trim() === '')) {
+            showToast('Célula atual está vazia — nada para preencher', 'warning', 2000);
+            return;
+        }
+        
+        salvarEstadoNoHistorico();
+        let count = 0;
+        for (let i = index + 1; i < linhas.length; i++) {
+            const v = linhas[i][campo];
+            if (!v || (typeof v === 'string' && v.trim() === '')) {
+                linhas[i][campo] = valorAtual;
+                linhas[i]._dirty = true;
+                count++;
+            }
+        }
+        if (count === 0) {
+            showToast('Todas as células abaixo já estão preenchidas', 'info', 2000);
+            return;
+        }
+        renderizarTabela();
+        agendarAutosave();
+        const exibicao = campo === 'competencia'
+            ? formatarCompetenciaParaExibicao(valorAtual)
+            : (typeof valorAtual === 'string' ? valorAtual : String(valorAtual));
+        showToast(`✓ ${count} célula(s) preenchida(s) com "${exibicao}"`, 'success', 3000);
     }
     
     // FUNÇÃO: Atualizar guias automaticamente
@@ -5885,6 +6101,8 @@
 <!-- Indicador de Autosave Fixo -->
 <small id="autosaveStatus">💾 Salvo em cache</small>
 
+<!-- idb-keyval: IndexedDB key-value store (~900 bytes) - substitui localStorage para autosave -->
+<script src="https://unpkg.com/idb-keyval@6/dist/umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

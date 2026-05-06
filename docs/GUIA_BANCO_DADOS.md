@@ -152,7 +152,7 @@ Registro de todas as alterações DGP (25+ tipos).
 | `instrumento_alteracao` | varchar(80) | Tipo de instrumento (Aditamento, Apostilamento...) |
 | `alt_numero` | integer | Número sequencial da alteração |
 | `alt_tipo` | varchar(100) | Tipo específico da alteração |
-| `alt_status` | varchar(30) | Status atual |
+| `alt_status` | text | Status atual |
 | `alt_info` | text | Novo valor |
 | `alt_old_info` | text | Valor anterior |
 | `alt_responsavel` | varchar(80) | Responsável pela alteração |

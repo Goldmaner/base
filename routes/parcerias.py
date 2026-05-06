@@ -7,6 +7,7 @@ from db import get_cursor, get_db, execute_query
 from utils import login_required
 from decorators import requires_access
 import csv
+import time as _time
 from io import StringIO, BytesIO
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
@@ -18,6 +19,10 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 parcerias_bp = Blueprint('parcerias', __name__, url_prefix='/parcerias')
+
+# Cache simples para api_marcadores (evita 3 queries por usuário por carregamento)
+_MARCADORES_CACHE = {'data': None, 'ts': 0}
+_MARCADORES_CACHE_TTL = 300  # 5 minutos
 
 
 @parcerias_bp.route("/", methods=["GET"])
@@ -3230,210 +3235,9 @@ def deletar_rescisao(id):
 @requires_access('dgp_alteracoes')
 def dgp_alteracoes():
     """
-    Página de gerenciamento de alterações em termos de parceria
+    Redirecionamento para o Kanban DGP (página legada arquivada)
     """
-    cur = get_cursor()
-    
-    try:
-        # Buscar tipos de alteração com seus instrumentos e configurações de campo
-        cur.execute("""
-            SELECT 
-                alt_tipo, 
-                alt_instrumento,
-                alt_campo_tipo,
-                alt_campo_placeholder,
-                alt_campo_maxlength,
-                alt_campo_min
-            FROM categoricas.c_alt_tipo 
-            ORDER BY alt_tipo
-        """)
-        tipos_alteracao = cur.fetchall()
-        
-        # Buscar instrumentos disponíveis
-        cur.execute("""
-            SELECT DISTINCT instrumento_alteracao 
-            FROM categoricas.c_alt_instrumento 
-            ORDER BY instrumento_alteracao
-        """)
-        instrumentos = [row['instrumento_alteracao'] for row in cur.fetchall()]
-        
-        # Buscar analistas DGP da tabela categoricas.c_dgp_analistas separados por status
-        analistas_ativos = []
-        analistas_inativos = []
-        try:
-            cur.execute("""
-                SELECT nome_analista, status
-                FROM categoricas.c_dgp_analistas
-                WHERE nome_analista IS NOT NULL
-                ORDER BY nome_analista
-            """)
-            for row in cur.fetchall():
-                analista_obj = {'nome': row['nome_analista'], 'status': row['status']}
-                if row['status']:  # True = Ativo
-                    analistas_ativos.append(analista_obj)
-                else:  # False = Inativo
-                    analistas_inativos.append(analista_obj)
-        except Exception as e:
-            print(f"[WARN] Erro ao buscar analistas DGP: {str(e)}")
-            # Fallback para lista estática se tabela não existir
-            analistas_ativos = [{'nome': 'Administrador', 'status': True}, {'nome': 'Sistema', 'status': True}]
-            analistas_inativos = []
-        
-        # Buscar alterações cadastradas com filtros
-        filtro_termo = request.args.get('filtro_termo', '').strip()
-        filtro_instrumento = request.args.get('filtro_instrumento', '').strip()
-        filtro_tipos = request.args.getlist('filtro_tipos[]')
-        filtro_responsavel = request.args.get('filtro_responsavel', '').strip()
-        filtro_status = request.args.get('filtro_status', '').strip()
-        filtro_osc = request.args.get('filtro_osc', '').strip()
-        filtro_processo = request.args.get('filtro_processo', '').strip()
-        
-        # Construir query base com subconsulta para pegar SEI documento e data de assinatura
-        query_base = """
-            SELECT 
-                t.numero_termo,
-                t.instrumento_alteracao,
-                t.alt_numero,
-                string_agg(DISTINCT t.alt_tipo, ', ' ORDER BY t.alt_tipo) as tipos_alteracao,
-                MAX(t.alt_responsavel) as responsavel,
-                MAX(t.alt_status) as alt_status,
-                (
-                    SELECT s.termo_sei_doc 
-                    FROM public.parcerias_sei s
-                    WHERE s.numero_termo = t.numero_termo
-                    AND (
-                        (t.instrumento_alteracao = 'Termo de Aditamento' AND s.aditamento = CAST(t.alt_numero AS VARCHAR))
-                        OR (t.instrumento_alteracao = 'Termo de Apostilamento' AND s.apostilamento = CAST(t.alt_numero AS VARCHAR))
-                        OR (t.instrumento_alteracao = 'Termo de Apostilamento do Aditamento' 
-                            AND s.apostilamento = CAST(FLOOR(t.alt_numero / 100) AS VARCHAR)
-                            AND s.aditamento = CAST(MOD(t.alt_numero, 100) AS VARCHAR))
-                        OR (t.instrumento_alteracao NOT IN ('Termo de Aditamento', 'Termo de Apostilamento', 'Termo de Apostilamento do Aditamento')
-                            AND s.termo_tipo_sei = t.instrumento_alteracao)
-                    )
-                    LIMIT 1
-                ) as termo_sei_doc,
-                (
-                    SELECT s.data_assinatura 
-                    FROM public.parcerias_sei s
-                    WHERE s.numero_termo = t.numero_termo
-                    AND (
-                        (t.instrumento_alteracao = 'Termo de Aditamento' AND s.aditamento = CAST(t.alt_numero AS VARCHAR))
-                        OR (t.instrumento_alteracao = 'Termo de Apostilamento' AND s.apostilamento = CAST(t.alt_numero AS VARCHAR))
-                        OR (t.instrumento_alteracao = 'Termo de Apostilamento do Aditamento' 
-                            AND s.apostilamento = CAST(FLOOR(t.alt_numero / 100) AS VARCHAR)
-                            AND s.aditamento = CAST(MOD(t.alt_numero, 100) AS VARCHAR))
-                        OR (t.instrumento_alteracao NOT IN ('Termo de Aditamento', 'Termo de Apostilamento', 'Termo de Apostilamento do Aditamento')
-                            AND s.termo_tipo_sei = t.instrumento_alteracao)
-                    )
-                    LIMIT 1
-                ) as data_assinatura
-            FROM public.termos_alteracoes t
-            LEFT JOIN public.parcerias p ON t.numero_termo = p.numero_termo
-            WHERE 1=1
-        """
-        
-        params = []
-        
-        # Aplicar filtros
-        if filtro_termo:
-            query_base += " AND t.numero_termo ILIKE %s"
-            params.append(f"%{filtro_termo}%")
-        
-        if filtro_instrumento:
-            query_base += " AND t.instrumento_alteracao = %s"
-            params.append(filtro_instrumento)
-        
-        if filtro_tipos:
-            placeholders = ','.join(['%s'] * len(filtro_tipos))
-            query_base += f" AND t.alt_tipo IN ({placeholders})"
-            params.extend(filtro_tipos)
-        
-        if filtro_responsavel:
-            query_base += " AND t.alt_responsavel LIKE %s"
-            params.append(f"%{filtro_responsavel}%")
-        
-        if filtro_status:
-            query_base += " AND t.alt_status = %s"
-            params.append(filtro_status)
-        
-        if filtro_osc:
-            query_base += " AND p.osc ILIKE %s"
-            params.append(f"%{filtro_osc}%")
-        
-        if filtro_processo:
-            query_base += " AND (p.sei_celeb ILIKE %s OR p.sei_pc ILIKE %s)"
-            params.extend([f"%{filtro_processo}%", f"%{filtro_processo}%"])
-        
-        query_base += """
-            GROUP BY t.numero_termo, t.instrumento_alteracao, t.alt_numero
-        """
-        
-        # Paginação
-        page = request.args.get('page', 1, type=int)
-        per_page = 100
-        offset = (page - 1) * per_page
-        
-        # Contar total de registros (query separada sem subconsultas complexas)
-        count_query = f"""
-            SELECT COUNT(*) as total
-            FROM ({query_base}) as subquery
-        """
-        cur.execute(count_query, params)
-        count_result = cur.fetchone()
-        total_count = count_result['total'] if count_result else 0
-        total_pages = (total_count + per_page - 1) // per_page
-        
-        # Adicionar ORDER BY e LIMIT/OFFSET para query principal
-        query_base += """
-            ORDER BY 
-                CASE WHEN MAX(alt_status) = 'Concluído' THEN 1 ELSE 0 END,
-                data_assinatura DESC NULLS LAST, 
-                numero_termo, 
-                alt_numero
-        """
-        query_base += f" LIMIT {per_page} OFFSET {offset}"
-        
-        cur.execute(query_base, params)
-        alteracoes = cur.fetchall()
-        
-        # Buscar lista de status categorizados para o dropdown do modal
-        try:
-            cur.execute("""
-                SELECT alt_status, alt_ordem
-                FROM categoricas.c_alt_status_alteracao
-                ORDER BY alt_ordem
-            """)
-            status_list = cur.fetchall()
-        except Exception:
-            status_list = []
-
-        cur.close()
-        
-        return render_template(
-            'dgp_alteracoes.html',
-            tipos_alteracao=tipos_alteracao,
-            instrumentos=instrumentos,
-            alteracoes=alteracoes,
-            analistas_dgp=analistas_ativos + analistas_inativos,  # Para compatibilidade com filtros
-            analistas_ativos=analistas_ativos,
-            analistas_inativos=analistas_inativos,
-            page=page,
-            total_pages=total_pages,
-            total_count=total_count,
-            filtro_osc=filtro_osc,
-            filtro_processo=filtro_processo,
-            status_list=status_list,
-        )
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"[ERRO] Erro ao carregar página de alterações: {str(e)}")
-        flash(f'Erro ao carregar dados: {str(e)}', 'danger')
-        cur.close()
-        return redirect(url_for('parcerias.listar'))
-
-
+    return redirect(url_for('parcerias.dgp_kanban'))
 @parcerias_bp.route("/dgp_alteracoes/exportar_csv", methods=["GET"])
 @login_required
 @requires_access('dgp_alteracoes')
@@ -4528,8 +4332,10 @@ def salvar_alteracao():
         
         # Validar campos obrigatórios
         if not numero_termo or not instrumento_alteracao or not alt_status or not alt_responsavel:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(success=False, message='Todos os campos obrigatórios devem ser preenchidos!')
             flash('Todos os campos obrigatórios devem ser preenchidos!', 'danger')
-            return redirect(url_for('parcerias.dgp_alteracoes'))
+            return redirect(url_for('parcerias.dgp_kanban'))
         
         # Tipos de alteração e informações (arrays)
         tipos_alteracao = request.form.getlist('alt_tipo[]')
@@ -4538,8 +4344,10 @@ def salvar_alteracao():
         alt_info_fins = request.form.getlist('alt_info_fim[]')
         
         if not tipos_alteracao or not any(tipos_alteracao):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(success=False, message='Selecione pelo menos um tipo de alteração!')
             flash('Selecione pelo menos um tipo de alteração!', 'danger')
-            return redirect(url_for('parcerias.dgp_alteracoes'))
+            return redirect(url_for('parcerias.dgp_kanban'))
         
         # Ler SEI e data de assinatura antes do loop (somente relevantes se status=Concluído)
         alt_sei_documento = request.form.get('alt_sei_documento', '').strip() or None
@@ -4559,7 +4367,9 @@ def salvar_alteracao():
         duplicata = cur.fetchone()
         if duplicata and duplicata['total'] > 0:
             flash(f'Já existe uma alteração cadastrada para {instrumento_alteracao} nº {alt_numero} do termo {numero_termo}. Por favor, edite o registro existente.', 'warning')
-            return redirect(url_for('parcerias.dgp_alteracoes'))
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(success=False, message=f'Já existe uma alteração para este instrumento/número.')
+            return redirect(url_for('parcerias.dgp_kanban'))
         
         # Processar cada tipo de alteração
         registros_inseridos = 0
@@ -4639,15 +4449,19 @@ def salvar_alteracao():
         cur.close()
         
         flash(f'{registros_inseridos} alteração(ões) cadastrada(s) com sucesso para o termo {numero_termo}!', 'success')
-        return redirect(url_for('parcerias.dgp_alteracoes'))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(success=True, message=f'{registros_inseridos} alteração(ões) cadastrada(s) com sucesso!')
+        return redirect(url_for('parcerias.dgp_kanban'))
         
     except Exception as e:
         print(f"[ERRO] Erro ao salvar alteração: {str(e)}")
         import traceback
         traceback.print_exc()
         get_db().rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(success=False, message=f'Erro ao salvar alteração: {str(e)}')
         flash(f'Erro ao salvar alteração: {str(e)}', 'danger')
-        return redirect(url_for('parcerias.dgp_alteracoes'))
+        return redirect(url_for('parcerias.dgp_kanban'))
 
 
 def _salvar_sei_parcerias(cur, numero_termo, instrumento_alteracao, alt_numero, sei_documento, data_assinatura):
@@ -5184,8 +4998,10 @@ def atualizar_alteracao():
         
         # Validar campos obrigatórios
         if not numero_termo or not instrumento_alteracao or not alt_status or not alt_responsavel:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(success=False, message='Todos os campos obrigatórios devem ser preenchidos!')
             flash('Todos os campos obrigatórios devem ser preenchidos!', 'danger')
-            return redirect(url_for('parcerias.dgp_alteracoes'))
+            return redirect(url_for('parcerias.dgp_kanban'))
         
         # Tipos de alteração e informações (arrays)
         tipos_alteracao = request.form.getlist('alt_tipo[]')
@@ -5200,8 +5016,10 @@ def atualizar_alteracao():
         alt_info_fins = request.form.getlist('alt_info_fim[]')
         
         if not tipos_alteracao or not any(tipos_alteracao):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(success=False, message='Selecione pelo menos um tipo de alteração!')
             flash('Selecione pelo menos um tipo de alteração!', 'danger')
-            return redirect(url_for('parcerias.dgp_alteracoes'))
+            return redirect(url_for('parcerias.dgp_kanban'))
         
         # LÃ“GICA DE REVERSÃƒO: Buscar tipos que foram removidos e restaurar alt_old_info
         cur.execute("""
@@ -5313,13 +5131,17 @@ def atualizar_alteracao():
         cur.close()
         
         flash(f'Alteração atualizada com sucesso! {registros_inseridos} tipo(s) de alteração.', 'success')
-        return redirect(url_for('parcerias.dgp_alteracoes'))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(success=True, message=f'Alteração atualizada com sucesso!')
+        return redirect(url_for('parcerias.dgp_kanban'))
         
     except Exception as e:
         print(f"[ERRO] Erro ao atualizar alteração: {str(e)}")
         get_db().rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(success=False, message=f'Erro ao atualizar alteração: {str(e)}')
         flash(f'Erro ao atualizar alteração: {str(e)}', 'danger')
-        return redirect(url_for('parcerias.dgp_alteracoes'))
+        return redirect(url_for('parcerias.dgp_kanban'))
 
 
 @parcerias_bp.route("/alteracao/deletar", methods=["POST"])
@@ -5370,7 +5192,7 @@ def dgp_kanban():
     cur = get_cursor()
     try:
         cur.execute("""
-            SELECT alt_status, alt_ordem
+            SELECT alt_status, COALESCE(alt_status_descricao, alt_status) AS alt_status_label, alt_ordem
             FROM categoricas.c_alt_status_alteracao
             ORDER BY alt_ordem
         """)
@@ -5433,11 +5255,14 @@ def dgp_kanban():
 
         # Agrupar por status
         cards_by_status = {s['alt_status']: [] for s in status_list}
+        ocultos_by_status = {s['alt_status']: 0 for s in status_list}
         ocultos = []
         for alt in todas_alteracoes:
             status_key = alt['alt_status']
             if alt['alt_oculto']:
                 ocultos.append(dict(alt))
+                if status_key in ocultos_by_status:
+                    ocultos_by_status[status_key] += 1
             elif status_key in cards_by_status:
                 cards_by_status[status_key].append(dict(alt))
             else:
@@ -5446,11 +5271,14 @@ def dgp_kanban():
                     cards_by_status[status_list[0]['alt_status']].append(dict(alt))
 
         cur.close()
+        status_label_map = {s['alt_status']: s['alt_status_label'] for s in status_list}
         return render_template(
             'dgp_kanban.html',
             status_list=status_list,
+            status_label_map=status_label_map,
             cards_by_status=cards_by_status,
             ocultos=ocultos,
+            ocultos_by_status=ocultos_by_status,
             tipos_alteracao=tipos_alteracao,
             instrumentos=instrumentos,
             analistas_ativos=analistas_ativos,
@@ -5471,11 +5299,15 @@ def api_mover_card():
     dados = request.get_json(force=True)
     numero_termo = (dados.get('numero_termo') or '').strip()
     instrumento = (dados.get('instrumento') or '').strip()
-    alt_numero = int(dados.get('alt_numero', 0))
     novo_status = (dados.get('novo_status') or '').strip()
 
-    if not all([numero_termo, instrumento, alt_numero, novo_status]):
+    if not (numero_termo and instrumento and novo_status):
         return jsonify({'success': False, 'error': 'Parâmetros inválidos'}), 400
+
+    try:
+        alt_numero = int(dados.get('alt_numero') or 0)
+    except (TypeError, ValueError):
+        alt_numero = 0
 
     cur = get_cursor()
     try:
@@ -5484,6 +5316,7 @@ def api_mover_card():
             SELECT 1 FROM categoricas.c_alt_status_alteracao WHERE alt_status = %s
         """, (novo_status,))
         if not cur.fetchone():
+            cur.close()
             return jsonify({'success': False, 'error': 'Status inválido'}), 400
 
         if novo_status == 'Concluído':
@@ -5506,13 +5339,21 @@ def api_mover_card():
             """, (numero_termo, instrumento, alt_numero))
             for row in cur.fetchall():
                 if row['alt_info']:
-                    _atualizar_tabela_original(cur, numero_termo, row['alt_tipo'],
-                                               row['alt_info'], row['alt_numero'], instrumento)
+                    try:
+                        _atualizar_tabela_original(cur, numero_termo, row['alt_tipo'],
+                                                   row['alt_info'], row['alt_numero'], instrumento)
+                    except Exception as e_inner:
+                        import traceback
+                        print(f"[WARN] api_mover_card: _atualizar_tabela_original falhou para "
+                              f"'{row['alt_tipo']}' — {e_inner}")
+                        traceback.print_exc()
+                        # Não abortar o move por falha na sincronização
 
         get_db().commit()
         cur.close()
         return jsonify({'success': True})
     except Exception as e:
+        import traceback; traceback.print_exc()
         get_db().rollback()
         cur.close()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -5529,7 +5370,7 @@ def api_ocultar_card():
     alt_numero = int(dados.get('alt_numero', 0))
     oculto = bool(dados.get('oculto', True))
 
-    if not all([numero_termo, instrumento, alt_numero]):
+    if not (numero_termo and instrumento):
         return jsonify({'success': False, 'error': 'Parâmetros inválidos'}), 400
 
     cur = get_cursor()
@@ -5548,28 +5389,90 @@ def api_ocultar_card():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@parcerias_bp.route("/alteracao/ocultar_lote", methods=["POST"])
+@login_required
+@requires_access('dgp_alteracoes')
+def api_ocultar_lote():
+    """Ocultar ou reexibir vários cards de uma vez (operação em lote)."""
+    dados = request.get_json(force=True)
+    cards = dados.get('cards', [])  # lista de {numero_termo, instrumento, alt_numero}
+    oculto = bool(dados.get('oculto', True))
+
+    if not cards:
+        return jsonify({'success': False, 'error': 'Lista vazia'}), 400
+
+    # Montar pares para UPDATE … WHERE (a,b,c) IN (VALUES …)
+    values = []
+    params = []
+    for c in cards:
+        numero_termo = (c.get('numero_termo') or '').strip()
+        instrumento  = (c.get('instrumento') or '').strip()
+        alt_numero   = int(c.get('alt_numero', 0))
+        if not (numero_termo and instrumento):
+            continue
+        values.append('(%s, %s, %s)')
+        params.extend([numero_termo, instrumento, alt_numero])
+
+    if not values:
+        return jsonify({'success': False, 'error': 'Nenhum card válido'}), 400
+
+    params.insert(0, oculto)  # primeiro parâmetro é o valor de alt_oculto
+    sql = """
+        UPDATE public.termos_alteracoes
+        SET alt_oculto = %s
+        WHERE (numero_termo, instrumento_alteracao, alt_numero)
+              IN ({})
+    """.format(', '.join(values))
+
+    cur = get_cursor()
+    try:
+        cur.execute(sql, params)
+        get_db().commit()
+        cur.close()
+        return jsonify({'success': True, 'atualizados': cur.rowcount})
+    except Exception as e:
+        get_db().rollback()
+        cur.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @parcerias_bp.route("/api/marcadores", methods=["GET"])
 @login_required
 def api_marcadores():
-    """Retorna lista de marcadores disponíveis com suas cores."""
+    """Retorna lista de marcadores disponíveis com suas cores (com cache de 5 min)."""
+    now = _time.time()
+    if _MARCADORES_CACHE['data'] is not None and (now - _MARCADORES_CACHE['ts']) < _MARCADORES_CACHE_TTL:
+        return jsonify(_MARCADORES_CACHE['data'])
+
     cur = get_cursor()
     try:
-        # Agregar as 3 fontes de marcadores
+        # Buscar tipo_contrato com sigla (para auto-sugestão client-side)
         cur.execute("""
-            SELECT informacao AS nome, 'tipo_contrato' AS fonte
+            SELECT informacao AS nome, 'tipo_contrato' AS fonte, sigla
             FROM categoricas.c_geral_tipo_contrato
             WHERE informacao IS NOT NULL AND informacao != ''
-            UNION
+        """)
+        tipos_contrato = cur.fetchall()
+
+        # Buscar dotações
+        cur.execute("""
             SELECT DISTINCT coordenacao AS nome, 'dotacao' AS fonte
             FROM categoricas.c_geral_dotacoes
             WHERE coordenacao IS NOT NULL AND coordenacao != ''
-            UNION
+            ORDER BY nome
+        """)
+        dotacoes = cur.fetchall()
+
+        # Buscar alt_tipos
+        cur.execute("""
             SELECT DISTINCT alt_tipo AS nome, 'alt_tipo' AS fonte
             FROM categoricas.c_alt_tipo
             WHERE alt_tipo IS NOT NULL
-            ORDER BY fonte, nome
+            ORDER BY nome
         """)
-        marcadores_raw = cur.fetchall()
+        alt_tipos = cur.fetchall()
+
+        marcadores_raw = list(tipos_contrato) + list(dotacoes) + list(alt_tipos)
 
         # Buscar cores salvas
         cur.execute("SELECT marcador_nome, marcador_cor, marcador_fonte FROM categoricas.c_kanban_marcadores_cores")
@@ -5577,13 +5480,19 @@ def api_marcadores():
 
         marcadores = []
         for m in marcadores_raw:
-            marcadores.append({
+            entry = {
                 'nome': m['nome'],
                 'fonte': m['fonte'],
                 'cor': cores_map.get(m['nome'], 'Cinza'),
-            })
+            }
+            # Incluir sigla para tipo_contrato (para auto-sugestão no frontend)
+            if m['fonte'] == 'tipo_contrato' and m.get('sigla'):
+                entry['sigla'] = m['sigla']
+            marcadores.append(entry)
 
         cur.close()
+        _MARCADORES_CACHE['data'] = marcadores
+        _MARCADORES_CACHE['ts'] = now
         return jsonify(marcadores)
     except Exception as e:
         cur.close()
@@ -5614,6 +5523,7 @@ def api_salvar_cor_marcador():
         """, (nome, cor, fonte))
         get_db().commit()
         cur.close()
+        _MARCADORES_CACHE['ts'] = 0  # Invalida cache ao salvar nova cor
         return jsonify({'success': True})
     except Exception as e:
         get_db().rollback()

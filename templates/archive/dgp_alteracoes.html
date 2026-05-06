@@ -1,0 +1,1564 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Alterações DGP - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <!-- Select2 para dropdown com busca -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      padding: 20px; 
+    }
+    .header-section { 
+      background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+      color: white;
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .form-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table-section { 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table th { 
+      background-color: #0d6efd; 
+      color: white; 
+      white-space: nowrap; 
+    }
+    .btn-action { 
+      padding: 5px 15px; 
+      font-size: 0.85rem;
+    }
+    .select2-container { 
+      width: 100% !important; 
+    }
+    .alert-info-custom {
+      background-color: #e7f3ff;
+      border-left: 4px solid #0d6efd;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .tipo-alteracao-secao {
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 15px;
+      background-color: #f8f9fa;
+    }
+    .tipo-alteracao-secao.active {
+      border-color: #0d6efd;
+      background-color: #e7f3ff;
+    }
+    .btn-remover-tipo {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Cabeçalho -->
+    <div class="header-section">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="bi bi-arrow-repeat"></i> Alterações DGP</h2>
+          <p class="mb-0">Cadastro e gerenciamento de alterações em termos de parceria</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('parcerias.dgp_kanban') }}" class="btn btn-info">
+            <i class="bi bi-kanban"></i> Visualização Quadro (Kanban)
+          </a>
+          <a href="{{ url_for('parcerias.dgp_alteracoes_futuro') }}" class="btn btn-warning">
+            <i class="bi bi-calendar-event"></i> Futuros Aditamentos
+          </a>
+          <a href="{{ url_for('parcerias.dgp_alteracoes_temp_sei') }}" class="btn btn-info">
+            <i class="bi bi-file-earmark-text"></i> Relatório de alterações e SEIS
+          </a>
+          <a href="{{ url_for('parcerias.termos_rescindidos') }}" class="btn btn-danger">
+            <i class="bi bi-x-circle"></i> Cadastrar Termos Rescindidos
+          </a>
+          <a href="{{ url_for('main.index') }}" class="btn btn-light">
+            <i class="bi bi-arrow-left"></i> Voltar
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensagens Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Botão para Abrir Modal de Cadastro -->
+    <div class="mb-4 text-end">
+      <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#modalCadastroAlteracao">
+        <i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração
+      </button>
+    </div>
+
+    <!-- Modal de Cadastro de Alteração -->
+    <div class="modal fade" id="modalCadastroAlteracao" tabindex="-1" aria-labelledby="modalCadastroLabel" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="modalCadastroLabel">
+              <i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert-info-custom">
+              <i class="bi bi-info-circle-fill"></i> 
+              <strong>Importante:</strong> Você pode cadastrar múltiplos tipos de alteração para um mesmo termo. 
+              Cada tipo será salvo como um registro separado.
+            </div>
+
+            <form method="POST" action="{{ url_for('parcerias.salvar_alteracao') }}" id="formAlteracao">
+        
+        <!-- SEÇÃO 1: Dados Gerais -->
+        <div class="mb-4">
+          <h5 class="border-bottom pb-2 mb-3">
+            <i class="bi bi-file-text"></i> Dados Gerais da Alteração
+          </h5>
+
+          <div class="row g-3">
+            <!-- Número do Termo -->
+            <div class="col-md-4">
+              <label for="numero_termo" class="form-label">
+                <i class="bi bi-file-earmark-text"></i> Número do Termo *
+              </label>
+              <select class="form-select" id="numero_termo" name="numero_termo" required>
+                <option value="">Digite para buscar...</option>
+              </select>
+              <small class="text-muted">Selecione o termo que receberá a alteração</small>
+            </div>
+
+            <!-- Instrumento Jurídico (preenchido automaticamente) -->
+            <div class="col-md-4">
+              <label for="instrumento_alteracao" class="form-label">
+                <i class="bi bi-file-earmark-medical"></i> Instrumento Jurídico *
+              </label>
+              <select class="form-select" id="instrumento_alteracao" name="instrumento_alteracao" required>
+                <option value="">-- Selecione --</option>
+                {% for instrumento in instrumentos %}
+                <option value="{{ instrumento }}">{{ instrumento }}</option>
+                {% endfor %}
+              </select>
+              <small class="text-muted">Preenchido automaticamente, mas pode ser alterado manualmente</small>
+            </div>
+
+            <!-- Status da Alteração -->
+            <div class="col-md-4">
+              <label for="alt_status" class="form-label">
+                <i class="bi bi-flag"></i> Status *
+              </label>
+              <select class="form-select" id="alt_status" name="alt_status" required>
+                <option value="">-- Selecione --</option>
+                {% if status_list %}
+                  {% for s in status_list %}
+                  <option value="{{ s.alt_status }}">{{ s.alt_status }}</option>
+                  {% endfor %}
+                {% else %}
+                <option value="Pendente - DGP/ADIT">Pendente - DGP/ADIT</option>
+                <option value="Em análise - DGP/ADIT">Em análise - DGP/ADIT</option>
+                <option value="Concluído">Concluído</option>
+                {% endif %}
+              </select>
+              <small class="text-muted">Status atual da alteração</small>
+            </div>
+          </div>
+          
+          <!-- Número SEI do Documento (aparece somente quando Status = Concluído) -->
+          <div class="row g-3 mt-2" id="campo-sei-documento-container" style="display: none;">
+            <div class="col-md-6">
+              <label for="alt_sei_documento" class="form-label">
+                <i class="bi bi-file-earmark-check"></i> Número SEI do Documento *
+              </label>
+              <input type="text" class="form-control" id="alt_sei_documento" name="alt_sei_documento" 
+                     placeholder="Ex: 123456789">
+              <small class="text-muted">Número SEI do documento da alteração concluída</small>
+            </div>
+            <div class="col-md-6">
+              <label for="alt_data_assinatura" class="form-label">
+                <i class="bi bi-calendar-check"></i> Data de Assinatura *
+              </label>
+              <input type="date" class="form-control" id="alt_data_assinatura" name="alt_data_assinatura" 
+                     max="9999-12-31">
+              <small class="text-muted">Data de assinatura da alteração concluída</small>
+            </div>
+          </div>
+
+          <div class="row g-3 mt-2">
+            <!-- Responsável pela Alteração -->
+            <div class="col-md-12">
+              <label for="alt_responsavel" class="form-label">
+                <i class="bi bi-person-badge"></i> Responsáveis pela Alteração *
+              </label>
+              <select class="form-select" id="alt_responsavel" name="alt_responsavel[]" multiple required size="5">
+                {% for analista in analistas_dgp %}
+                  {% if analista.status %}
+                  <option value="{{ analista.nome }}">{{ analista.nome }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="mostrar_inativos" onchange="toggleAnalistasInativos()">
+                <label class="form-check-label" for="mostrar_inativos">
+                  Mostrar analistas inativos
+                </label>
+              </div>
+              <small class="text-muted">Selecione uma ou mais pessoas responsáveis (Ctrl+Clique para múltipla seleção)</small>
+            </div>
+          </div>
+
+          <!-- Numeração da Alteração -->
+          <div class="row g-3 mt-2" id="numeracao-container" style="display: none;">
+            <div class="col-md-12">
+              <label class="form-label">
+                <i class="bi bi-hash"></i> Numeração da Alteração *
+              </label>
+            </div>
+
+            <!-- Campo para Aditamento/Apostilamento simples -->
+            <div class="col-md-6" id="numero-simples-container" style="display: none;">
+              <input type="number" class="form-control" id="alt_numero_simples" 
+                     min="1" max="99" placeholder="Digite um número de 1 a 99">
+              <small class="text-muted">Número do Termo de Aditamento ou Apostilamento (1 a 99)</small>
+            </div>
+
+            <!-- Campos para Apostilamento do Aditamento -->
+            <div class="col-md-3" id="numero-apostilamento-container" style="display: none;">
+              <label for="alt_numero_apostilamento" class="form-label">Nº Apostilamento</label>
+              <input type="number" class="form-control" id="alt_numero_apostilamento" 
+                     min="1" max="9" placeholder="1-9">
+              <small class="text-muted">Número do Apostilamento</small>
+            </div>
+
+            <div class="col-md-3" id="numero-aditamento-container" style="display: none;">
+              <label for="alt_numero_aditamento" class="form-label">Nº Aditamento</label>
+              <input type="number" class="form-control" id="alt_numero_aditamento" 
+                     min="1" max="99" placeholder="1-99">
+              <small class="text-muted">Número do Aditamento</small>
+            </div>
+
+            <!-- Campo hidden para enviar o número final -->
+            <input type="hidden" id="alt_numero" name="alt_numero" value="0">
+          </div>
+        </div>
+
+        <!-- SEÇÃO 2.5: Planejamento (Kanban) -->
+        <div class="mb-4">
+          <h5 class="border-bottom pb-2 mb-3">
+            <i class="bi bi-calendar-week"></i> Planejamento
+          </h5>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label for="alt_prioridade" class="form-label">Prioridade</label>
+              <select class="form-select" id="alt_prioridade" name="alt_prioridade">
+                <option value="">— Nenhuma —</option>
+                <option value="Urgente">🔴 Urgente</option>
+                <option value="Importante">🟠 Importante</option>
+                <option value="Média">🔵 Média</option>
+                <option value="Baixa">⚫ Baixa</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="alt_data_inicio" class="form-label">Data de Início</label>
+              <input type="date" class="form-control" id="alt_data_inicio" name="alt_data_inicio">
+            </div>
+            <div class="col-md-3">
+              <label for="alt_data_conclusao" class="form-label">Data de Conclusão</label>
+              <input type="date" class="form-control" id="alt_data_conclusao" name="alt_data_conclusao">
+            </div>
+            <div class="col-md-3">
+              <label for="alt_marcadores" class="form-label">Marcadores</label>
+              <input type="text" class="form-control" id="alt_marcadores" name="alt_marcadores"
+                     placeholder="Ex: Tipo A, Dotação X" title="Separe múltiplos marcadores por vírgula">
+              <small class="text-muted">Separe por vírgula</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 2: Tipos de Alteração (Dinâmica) -->
+        <div class="mb-4">
+          <h5 class="border-bottom pb-2 mb-3">
+            <i class="bi bi-list-check"></i> Tipos de Alteração
+          </h5>
+
+          <div id="tipos-alteracao-container">
+            <!-- Primeira seção de tipo (gerada via JavaScript) -->
+          </div>
+
+              <button type="button" class="btn btn-outline-primary" id="btn-adicionar-tipo">
+                <i class="bi bi-plus-circle"></i> Adicionar Mais um Tipo de Alteração
+              </button>
+            </div>
+
+        <!-- SEÇÃO 3: Observações -->
+        <div class="mb-4">
+          <h5 class="border-bottom pb-2 mb-3">
+            <i class="bi bi-chat-left-text"></i> Observações
+          </h5>
+
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label for="alt_observacao" class="form-label">
+                <i class="bi bi-journal-text"></i> Observações Adicionais
+              </label>
+              <textarea class="form-control" id="alt_observacao" name="alt_observacao" 
+                        rows="3" placeholder="Digite observações sobre esta alteração..."></textarea>
+              <small class="text-muted">Campo opcional para informações complementares</small>
+            </div>
+          </div>
+        </div>
+
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <button type="submit" form="formAlteracao" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Salvar Alteração(ões)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Modal de Confirmação de Exclusão -->
+    <div class="modal fade" id="modalExcluir" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title">
+              <i class="bi bi-exclamation-triangle-fill"></i> Confirmar Exclusão
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Tem certeza que deseja excluir TODAS as alterações cadastradas para:</p>
+            <div class="alert alert-warning">
+              <strong>Termo:</strong> <span id="termoExcluir"></span><br>
+              <strong>Instrumento:</strong> <span id="instrumentoExcluir"></span><br>
+              <strong>Numeração:</strong> <span id="numeroExcluir"></span>
+            </div>
+            <p class="text-muted small">Esta ação não pode ser desfeita e excluirá todos os tipos de alteração vinculados.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="bi bi-x-circle"></i> Cancelar
+            </button>
+            <form id="formExcluir" method="POST" style="display: inline;">
+              <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash"></i> Confirmar Exclusão
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seção de Filtros -->
+    <div class="form-section mb-3">
+      <h5 class="mb-3">
+        <button class="btn btn-link text-decoration-none p-0 d-flex align-items-center" type="button" 
+                data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" 
+                aria-expanded="false" aria-controls="filtrosCollapse">
+          <i class="bi bi-funnel me-2"></i> Filtros
+          <i class="bi bi-chevron-down ms-2" id="filtrosChevron"></i>
+        </button>
+      </h5>
+      <div class="collapse" id="filtrosCollapse">
+        <form method="GET" action="{{ url_for('parcerias.dgp_alteracoes') }}" id="formFiltros">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label for="filtro_termo" class="form-label">Número do Termo</label>
+            <input type="text" class="form-control" id="filtro_termo" name="filtro_termo" 
+                   value="{{ request.args.get('filtro_termo', '') }}" placeholder="Digite o termo...">
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_instrumento" class="form-label">Instrumento</label>
+            <select class="form-select" id="filtro_instrumento" name="filtro_instrumento">
+              <option value="">-- Todos --</option>
+              <option value="Termo de Aditamento" {{ 'selected' if request.args.get('filtro_instrumento') == 'Termo de Aditamento' }}>Termo de Aditamento</option>
+              <option value="Termo de Apostilamento" {{ 'selected' if request.args.get('filtro_instrumento') == 'Termo de Apostilamento' }}>Termo de Apostilamento</option>
+              <option value="Termo de Apostilamento do Aditamento" {{ 'selected' if request.args.get('filtro_instrumento') == 'Termo de Apostilamento do Aditamento' }}>Termo de Apostilamento do Aditamento</option>
+              <option value="Informação DGP" {{ 'selected' if request.args.get('filtro_instrumento') == 'Informação DGP' }}>Informação DGP</option>
+              <option value="Despacho Autorizatório" {{ 'selected' if request.args.get('filtro_instrumento') == 'Despacho Autorizatório' }}>Despacho Autorizatório</option>
+              <option value="Informação da Pessoa Gestora" {{ 'selected' if request.args.get('filtro_instrumento') == 'Informação da Pessoa Gestora' }}>Informação da Pessoa Gestora</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_tipos" class="form-label">Tipos de Alteração</label>
+            <select class="form-select" id="filtro_tipos" name="filtro_tipos[]" multiple size="3">
+              {% for tipo in tipos_alteracao %}
+                <option value="{{ tipo.alt_tipo }}" 
+                  {{ 'selected' if tipo.alt_tipo in request.args.getlist('filtro_tipos[]') }}>
+                  {{ tipo.alt_tipo }}
+                </option>
+              {% endfor %}
+            </select>
+            <small class="text-muted">Ctrl+Clique para múltipla seleção</small>
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_responsavel" class="form-label">Responsável</label>
+            <select class="form-select" id="filtro_responsavel" name="filtro_responsavel">
+              <option value="">-- Todos --</option>
+              {% for analista in analistas_dgp %}
+                <option value="{{ analista.nome if analista is mapping else analista }}" 
+                  {{ 'selected' if request.args.get('filtro_responsavel') == (analista.nome if analista is mapping else analista) }}>
+                  {{ analista.nome if analista is mapping else analista }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_status" class="form-label">Status</label>
+          <select class="form-select" id="filtro_status" name="filtro_status">
+              <option value="">-- Todos --</option>
+              {% if status_list %}
+                {% for s in status_list %}
+                <option value="{{ s.alt_status }}" {{ 'selected' if request.args.get('filtro_status') == s.alt_status }}>{{ s.alt_status }}</option>
+                {% endfor %}
+              {% else %}
+              <option value="Pendente - DGP/ADIT" {{ 'selected' if request.args.get('filtro_status') == 'Pendente - DGP/ADIT' }}>Pendente - DGP/ADIT</option>
+              <option value="Concluído" {{ 'selected' if request.args.get('filtro_status') == 'Concluído' }}>Concluído</option>
+              {% endif %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_osc" class="form-label">OSC</label>
+            <input type="text" class="form-control" id="filtro_osc" name="filtro_osc"
+                   value="{{ request.args.get('filtro_osc', '') }}" placeholder="Nome da OSC...">
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_processo" class="form-label">Processo SEI</label>
+            <input type="text" class="form-control" id="filtro_processo" name="filtro_processo"
+                   value="{{ request.args.get('filtro_processo', '') }}" placeholder="Número do processo...">
+          </div>
+        </div>
+        <div class="row mt-3">
+          <div class="col-md-12 text-end">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-search"></i> Aplicar Filtros
+            </button>
+            <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="btn btn-secondary">
+              <i class="bi bi-x-circle"></i> Limpar Filtros
+            </a>
+          </div>
+        </div>
+      </form>
+      </div>
+    </div>
+
+    <!-- Tabela de Alterações Cadastradas -->
+    <div class="table-section">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">
+          <i class="bi bi-table"></i> Alterações Cadastradas
+          <span class="badge bg-primary">{{ total_count if total_count else 0 }}</span>
+        </h4>
+        <div class="d-flex align-items-center gap-3">
+          <a href="{{ url_for('parcerias.dgp_alteracoes_exportar_csv') }}?{{ request.query_string.decode('utf-8') }}" 
+             class="btn btn-success">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+          </a>
+          {% if total_pages > 1 %}
+          <div class="text-muted">
+            Página {{ page }} de {{ total_pages }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if alteracoes %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped">
+            <thead>
+              <tr>
+                <th style="width: 12%;">Número do Termo</th>
+                <th style="width: 14%;">Instrumento</th>
+                <th style="width: 5%;">Numeração</th>
+                <th style="width: 18%;">Tipos de Alteração</th>
+                <th style="width: 8%;">Status</th>
+                <th style="width: 8%;">Data Assinatura</th>
+                <th style="width: 8%;">Nº SEI Doc</th>
+                <th style="width: 15%;">Responsáveis</th>
+                <th style="width: 12%;" class="text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for alteracao in alteracoes %}
+                <tr>
+                  <td><strong>{{ alteracao.numero_termo }}</strong></td>
+                  <td>{{ alteracao.instrumento_alteracao }}</td>
+                  <td class="text-center">
+                    {% if alteracao.alt_numero == 0 %}
+                      <span class="badge bg-secondary">N/A</span>
+                    {% elif alteracao.alt_numero >= 100 %}
+                      <span class="badge bg-info">
+                        {{ (alteracao.alt_numero // 100) }}/{{ (alteracao.alt_numero % 100) }}
+                      </span>
+                    {% else %}
+                      <span class="badge bg-primary">{{ alteracao.alt_numero }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if alteracao.tipos_alteracao %}
+                      {% set tipos = alteracao.tipos_alteracao.split(', ') %}
+                      {% for tipo in tipos %}
+                        <span class="badge bg-success me-1">{{ tipo }}</span>
+                      {% endfor %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if alteracao.alt_status == 'Concluído' %}
+                      <span class="badge bg-success">{{ alteracao.alt_status }}</span>
+                    {% elif alteracao.alt_status == 'Em andamento' %}
+                      <span class="badge bg-primary">{{ alteracao.alt_status }}</span>
+                    {% elif alteracao.alt_status == 'Iniciado' %}
+                      <span class="badge bg-info">{{ alteracao.alt_status }}</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ alteracao.alt_status or 'N/A' }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if alteracao.data_assinatura %}
+                      <small><strong>{{ alteracao.data_assinatura.strftime('%d/%m/%Y') }}</strong></small>
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if alteracao.termo_sei_doc %}
+                      <span class="badge bg-dark">{{ alteracao.termo_sei_doc }}</span>
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if alteracao.responsavel %}
+                      {% set responsaveis = alteracao.responsavel.split(';') %}
+                      {% for resp in responsaveis %}
+                        <span class="badge bg-info me-1">{{ resp.strip() }}</span>
+                      {% endfor %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <button class="btn btn-sm btn-warning btn-action" 
+                            onclick="editarAlteracao('{{ alteracao.numero_termo }}', '{{ alteracao.instrumento_alteracao }}', {{ alteracao.alt_numero }})"
+                            title="Editar alteração">
+                      <i class="bi bi-pencil"></i> Editar
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-action" 
+                            onclick="confirmarExclusao('{{ alteracao.numero_termo }}', '{{ alteracao.instrumento_alteracao }}', {{ alteracao.alt_numero }})"
+                            title="Excluir alteração">
+                      <i class="bi bi-trash"></i> Excluir
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Paginação -->
+        {% if total_pages > 1 %}
+        {% set args_without_page = request.args.copy() %}
+        {% set _ = args_without_page.pop('page', None) %}
+        <nav aria-label="Navegação de páginas" class="mt-4">
+          <ul class="pagination justify-content-center">
+            <!-- Botão Primeira Página -->
+            <li class="page-item {{ 'disabled' if page == 1 else '' }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=1, **args_without_page) }}">
+                <i class="bi bi-chevron-double-left"></i>
+              </a>
+            </li>
+            
+            <!-- Botão Anterior -->
+            <li class="page-item {{ 'disabled' if page == 1 else '' }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=page-1, **args_without_page) }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+            
+            <!-- Números de Página -->
+            {% set start_page = [1, page - 2]|max %}
+            {% set end_page = [total_pages, page + 2]|min %}
+            
+            {% if start_page > 1 %}
+              <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+            
+            {% for p in range(start_page, end_page + 1) %}
+              <li class="page-item {{ 'active' if p == page else '' }}">
+                <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=p, **args_without_page) }}">{{ p }}</a>
+              </li>
+            {% endfor %}
+            
+            {% if end_page < total_pages %}
+              <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+            
+            <!-- Botão Próximo -->
+            <li class="page-item {{ 'disabled' if page == total_pages else '' }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=page+1, **args_without_page) }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+            
+            <!-- Botão Última Página -->
+            <li class="page-item {{ 'disabled' if page == total_pages else '' }}">
+              <a class="page-link" href="{{ url_for('parcerias.dgp_alteracoes', page=total_pages, **args_without_page) }}">
+                <i class="bi bi-chevron-double-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> Nenhuma alteração cadastrada ainda.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script>
+    // Animar ícone de colapso dos filtros
+    document.getElementById('filtrosCollapse').addEventListener('show.bs.collapse', function() {
+      document.getElementById('filtrosChevron').classList.remove('bi-chevron-down');
+      document.getElementById('filtrosChevron').classList.add('bi-chevron-up');
+    });
+    document.getElementById('filtrosCollapse').addEventListener('hide.bs.collapse', function() {
+      document.getElementById('filtrosChevron').classList.remove('bi-chevron-up');
+      document.getElementById('filtrosChevron').classList.add('bi-chevron-down');
+    });
+    
+    // Dados dos tipos de alteração vindos do backend
+    const tiposAlteracao = {{ tipos_alteracao|tojson if tipos_alteracao else '[]'|safe }};
+    const instrumentos = {{ instrumentos|tojson if instrumentos else '[]'|safe }};
+    const analistasAtivos = {{ analistas_ativos|tojson if analistas_ativos else '[]'|safe }};
+    const analistasInativos = {{ analistas_inativos|tojson if analistas_inativos else '[]'|safe }};
+    
+    // Mapeamento de tipos para campos dinâmicos (construído a partir dos dados do banco)
+    const tiposCampos = {};
+    tiposAlteracao.forEach(tipo => {
+      if (tipo.alt_campo_tipo) {
+        tiposCampos[tipo.alt_tipo] = {
+          tipo: tipo.alt_campo_tipo,
+          placeholder: tipo.alt_campo_placeholder || '',
+          maxlength: tipo.alt_campo_maxlength || null,
+          min: tipo.alt_campo_min || null
+        };
+      }
+    });
+    
+    let contadorTipos = 0;
+    let tiposSelecionados = new Set();
+    
+    // Função para toggle de analistas inativos
+    function toggleAnalistasInativos() {
+      const checkbox = $('#mostrar_inativos');
+      const select = $('#alt_responsavel');
+      const valoresSelecionados = select.val() || [];
+      
+      select.empty();
+      
+      // Sempre adicionar ativos
+      analistasAtivos.forEach(analista => {
+        select.append(`<option value="${analista.nome}">${analista.nome}</option>`);
+      });
+      
+      // Adicionar inativos se checkbox marcado
+      if (checkbox.is(':checked')) {
+        analistasInativos.forEach(analista => {
+          select.append(`<option value="${analista.nome}" class="text-muted" style="font-style: italic;">${analista.nome} (Inativo)</option>`);
+        });
+      }
+      
+      // Restaurar seleção
+      select.val(valoresSelecionados);
+    }
+    
+    // Função para buscar próximo número de alteração
+    function buscarProximoNumero() {
+      const numeroTermo = $('#numero_termo').val();
+      const instrumento = $('#instrumento_alteracao').val();
+      
+      if (!numeroTermo || !instrumento) return;
+      
+      // Apenas buscar para Aditamento ou Apostilamento
+      if (instrumento !== 'Termo de Aditamento' && instrumento !== 'Termo de Apostilamento') {
+        return;
+      }
+      
+      $.ajax({
+        url: '/parcerias/alteracao/proximo_numero',
+        method: 'GET',
+        data: {
+          numero_termo: numeroTermo,
+          instrumento: instrumento
+        },
+        success: function(response) {
+          if (response.success) {
+            const proximoNumero = response.proximo_numero;
+            
+            if (instrumento === 'Termo de Aditamento' || instrumento === 'Termo de Apostilamento') {
+              $('#alt_numero_simples').val(proximoNumero);
+              console.log(`[DEBUG] Próximo número sugerido: ${proximoNumero}`);
+            }
+          }
+        },
+        error: function(xhr) {
+          console.error('Erro ao buscar próximo número:', xhr.responseJSON?.error);
+        }
+      });
+    }
+
+    $(document).ready(function() {
+      // Nada aqui - seção será adicionada quando modal abrir
+      
+      // Interceptar submit do formulário para processar endereços
+      $('#formAlteracao').on('submit', function(e) {
+        // Processar campos de endereços antes de enviar
+        $('.endereco-tipo-localizacao').each(function() {
+          const index = $(this).data('index');
+          const jsonField = $(`#enderecos_json_${index}`);
+          
+          if (jsonField.length && jsonField.val()) {
+            // O valor JSON já está no campo hidden correto como alt_info[]
+            console.log(`[DEBUG SUBMIT] Endereços para índice ${index}:`, jsonField.val());
+          }
+        });
+        
+        // Permitir submit normal
+        return true;
+      });
+    });
+
+    // Inicializar Select2 quando o modal for aberto
+    $('#modalCadastroAlteracao').on('shown.bs.modal', function() {
+      // Adicionar primeira seção se container estiver vazio
+      if ($('#tipos-alteracao-container').children().length === 0) {
+        adicionarSecaoTipo();
+      }
+      // Inicializar Select2 para número do termo dentro do modal
+      $('#numero_termo').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Digite para buscar o termo...',
+        allowClear: true,
+        minimumInputLength: 2,
+        dropdownParent: $('#modalCadastroAlteracao'), // IMPORTANTE: Para funcionar dentro do modal
+        ajax: {
+          url: '{{ url_for("parcerias.api_termos_parcerias") }}',
+          dataType: 'json',
+          delay: 250,
+          data: function(params) {
+            return { q: params.term };
+          },
+          processResults: function(data) {
+            return { results: data };
+          },
+          cache: true
+        },
+        language: {
+          inputTooShort: function() {
+            return "Digite pelo menos 2 caracteres para buscar";
+          },
+          noResults: function() {
+            return "Nenhum termo encontrado";
+          },
+          searching: function() {
+            return "Buscando...";
+          }
+        }
+      });
+      
+      // Listener para buscar próximo número quando termo for selecionado
+      $('#numero_termo').on('select2:select', function() {
+        buscarProximoNumero();
+      });
+    });
+    
+    // Listener para mostrar/ocultar campos SEI e Data Assinatura quando status mudar
+    $(document).on('change', '#alt_status', function() {
+      const status = $(this).val();
+      const campoSeiContainer = $('#campo-sei-documento-container');
+      const campoSei = $('#alt_sei_documento');
+      const campoDataAssinatura = $('#alt_data_assinatura');
+      
+      if (status === 'Concluído') {
+        campoSeiContainer.show();
+        campoSei.prop('required', true);
+        campoDataAssinatura.prop('required', true);
+      } else {
+        campoSeiContainer.hide();
+        campoSei.prop('required', false).val('');
+        campoDataAssinatura.prop('required', false).val('');
+      }
+    });
+
+    // Limpar Select2 quando o modal for fechado
+    $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
+      if ($('#numero_termo').hasClass('select2-hidden-accessible')) {
+        $('#numero_termo').select2('destroy');
+      }
+      $('#formAlteracao')[0].reset();
+      $('#formAlteracao').attr('action', '{{ url_for("parcerias.salvar_alteracao") }}');
+      $('#modalCadastroLabel').html('<i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração');
+      // Resetar tipos de alteração
+      $('#tipos-alteracao-container').empty();
+      contadorTipos = 0;
+      tiposSelecionados.clear();
+      // Ocultar campos de numeração
+      $('#numeracao-container').hide();
+    });
+
+    // Função para adicionar uma nova seção de tipo de alteração
+    function adicionarSecaoTipo() {
+      contadorTipos++;
+      
+      // Contar quantas seções visíveis existem para mostrar número correto
+      const secoesVisiveis = $('.tipo-alteracao-secao').length + 1;
+      const id = `tipo_${contadorTipos}`;
+
+      const html = `
+        <div class="tipo-alteracao-secao position-relative" id="${id}" data-index="${contadorTipos}">
+          ${secoesVisiveis > 1 ? `
+            <button type="button" class="btn btn-sm btn-danger btn-remover-tipo" onclick="removerSecaoTipo('${id}')">
+              <i class="bi bi-x"></i>
+            </button>
+          ` : ''}
+          
+          <h6 class="mb-3">
+            <i class="bi bi-tag"></i> Tipo de Alteração #${secoesVisiveis}
+          </h6>
+
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label for="alt_tipo_${contadorTipos}" class="form-label">
+                Selecione o Tipo de Alteração *
+              </label>
+              <select class="form-select tipo-select" id="alt_tipo_${contadorTipos}" 
+                      name="alt_tipo[]" required onchange="atualizarInstrumento(); atualizarCampoDinamico(${contadorTipos})">
+                <option value="">-- Selecione --</option>
+                ${tiposAlteracao.map(tipo => `
+                  <option value="${tipo.alt_tipo}" data-instrumento="${tipo.alt_instrumento}">
+                    ${tipo.alt_tipo}
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+
+            <!-- Campo dinâmico para alt_info -->
+            <div class="col-md-12" id="campo_info_${contadorTipos}" style="display: none;">
+              <!-- Será preenchido dinamicamente -->
+            </div>
+          </div>
+        </div>
+      `;
+
+      $('#tipos-alteracao-container').append(html);
+      
+      // Renumerar todos os títulos após adicionar
+      renumerarTiposAlteracao();
+    }
+
+    // Botão adicionar mais tipo
+    $('#btn-adicionar-tipo').click(function() {
+      adicionarSecaoTipo();
+    });
+
+    // Função para remover seção de tipo
+    function removerSecaoTipo(id) {
+      const select = $(`#${id} select`);
+      const valor = select.val();
+      if (valor) {
+        tiposSelecionados.delete(valor);
+      }
+      $(`#${id}`).remove();
+      atualizarInstrumento();
+      
+      // Renumerar todos os títulos após remover
+      renumerarTiposAlteracao();
+    }
+    
+    // Função para renumerar os títulos das seções
+    function renumerarTiposAlteracao() {
+      $('.tipo-alteracao-secao').each(function(index) {
+        $(this).find('h6').html(`<i class="bi bi-tag"></i> Tipo de Alteração #${index + 1}`);
+        
+        // Mostrar/ocultar botão de remover (primeira seção não pode ser removida)
+        if (index === 0) {
+          $(this).find('.btn-remover-tipo').hide();
+        } else {
+          $(this).find('.btn-remover-tipo').show();
+        }
+      });
+    }
+
+    // Atualizar instrumento baseado no primeiro tipo selecionado
+    function atualizarInstrumento() {
+      const primeiroTipo = $('.tipo-select').first();
+      const selectedOption = primeiroTipo.find('option:selected');
+      const instrumento = selectedOption.data('instrumento') || '';
+      
+      if (instrumento) {
+        $('#instrumento_alteracao').val(instrumento);
+        mostrarCamposNumeracao(instrumento);
+      }
+    }
+
+    // Listener para mudanças manuais no instrumento
+    $(document).on('change', '#instrumento_alteracao', function() {
+      mostrarCamposNumeracao($(this).val());
+      buscarProximoNumero(); // Buscar número quando instrumento mudar
+    });
+
+    // Mostrar campos de numeração apropriados
+    function mostrarCamposNumeracao(instrumento) {
+      const container = $('#numeracao-container');
+      const simplesContainer = $('#numero-simples-container');
+      const apostilamentoContainer = $('#numero-apostilamento-container');
+      const aditamentoContainer = $('#numero-aditamento-container');
+
+      // Salvar valores atuais antes de esconder
+      const valorSimples = $('#alt_numero_simples').val();
+      const valorApostilamento = $('#alt_numero_apostilamento').val();
+      const valorAditamento = $('#alt_numero_aditamento').val();
+
+      // Resetar visibilidade (mas NÃO os valores)
+      simplesContainer.hide();
+      apostilamentoContainer.hide();
+      aditamentoContainer.hide();
+      $('#alt_numero_simples').prop('required', false);
+      $('#alt_numero_apostilamento').prop('required', false);
+      $('#alt_numero_aditamento').prop('required', false);
+      
+      if (!instrumento || 
+          instrumento === 'Informação DGP' || 
+          instrumento === 'Despacho Autorizatório' || 
+          instrumento === 'Informação da Pessoa Gestora') {
+        // Não numerável - campo some e valor fica 0
+        container.hide();
+        $('#alt_numero').val('0');
+      } else if (instrumento === 'Termo de Aditamento' || instrumento === 'Termo de Apostilamento') {
+        // Numeração simples (1 a 99) - Restaurar valor se existir
+        container.show();
+        simplesContainer.show();
+        if (valorSimples) $('#alt_numero_simples').val(valorSimples);
+        $('#alt_numero_simples').prop('required', true);
+      } else if (instrumento === 'Termo de Apostilamento do Aditamento') {
+        // Numeração composta - Restaurar valores se existirem
+        container.show();
+        apostilamentoContainer.show();
+        aditamentoContainer.show();
+        if (valorApostilamento) $('#alt_numero_apostilamento').val(valorApostilamento);
+        if (valorAditamento) $('#alt_numero_aditamento').val(valorAditamento);
+        $('#alt_numero_apostilamento').prop('required', true);
+        $('#alt_numero_aditamento').prop('required', true);
+      } else {
+        container.hide();
+        $('#alt_numero').val('0');
+      }
+    }
+
+    // Calcular número final antes de submeter
+    $('#formAlteracao').submit(function(e) {
+      const instrumento = $('#instrumento_alteracao').val();
+      let numeroFinal = 0;
+
+      if (instrumento === 'Termo de Aditamento' || instrumento === 'Termo de Apostilamento') {
+        numeroFinal = parseInt($('#alt_numero_simples').val()) || 0;
+      } else if (instrumento === 'Termo de Apostilamento do Aditamento') {
+        const apostilamento = parseInt($('#alt_numero_apostilamento').val()) || 0;
+        const aditamento = parseInt($('#alt_numero_aditamento').val()) || 0;
+        // Formato: apostilamento * 100 + aditamento (ex: 1 e 1 = 101, 2 e 2 = 202)
+        numeroFinal = (apostilamento * 100) + aditamento;
+      }
+
+      $('#alt_numero').val(numeroFinal);
+    });
+
+    // Função para atualizar campo dinâmico baseado no tipo de alteração
+    function atualizarCampoDinamico(index) {
+      const tipoSelect = $(`#alt_tipo_${index}`);
+      const tipoSelecionado = tipoSelect.val();
+      const campoContainer = $(`#campo_info_${index}`);
+      
+      if (!tipoSelecionado || !tiposCampos[tipoSelecionado]) {
+        campoContainer.hide();
+        return;
+      }
+      
+      const config = tiposCampos[tipoSelecionado];
+      
+      let campoHTML = '';
+      
+      campoHTML += `<label class="form-label"><i class="bi bi-pencil-square"></i> Nova Informação *</label>`;
+      
+      switch(config.tipo) {
+        case 'text':
+          campoHTML += `<input type="text" class="form-control" name="alt_info[]" 
+                        placeholder="${config.placeholder}" 
+                        ${config.maxlength ? `maxlength="${config.maxlength}"` : ''} required>`;
+          break;
+          
+        case 'textarea':
+          campoHTML += `<textarea class="form-control" name="alt_info[]" rows="3" 
+                        placeholder="${config.placeholder}" required></textarea>`;
+          break;
+          
+        case 'number':
+          campoHTML += `<input type="number" class="form-control" name="alt_info[]" 
+                        placeholder="${config.placeholder}" min="${config.min || 0}" required>`;
+          break;
+          
+        case 'money':
+          campoHTML += `<input type="text" class="form-control money-input" name="alt_info[]" 
+                        placeholder="${config.placeholder}" required>`;
+          break;
+          
+        case 'date':
+          campoHTML += `<input type="date" class="form-control" name="alt_info[]" required>`;
+          break;
+          
+        case 'date_range':
+          campoHTML += `
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label small">Data de Início</label>
+                <input type="date" class="form-control" name="alt_info_inicio[]" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small">Data de Término</label>
+                <input type="date" class="form-control" name="alt_info_fim[]" required>
+              </div>
+            </div>`;
+          break;
+          
+        case 'select_osc':
+          campoHTML += `<select class="form-select" name="alt_info[]" required>
+                          <option value="">-- Selecione a OSC --</option>
+                          <!-- Será populado via AJAX -->
+                        </select>`;
+          // Carregar OSCs via AJAX
+          setTimeout(() => {
+            $.get('/parcerias/api/lista_oscs', function(data) {
+              const select = $(`#campo_info_${index} select[name="alt_info[]"]`);
+              data.forEach(osc => {
+                select.append(`<option value="${osc}">${osc}</option>`);
+              });
+            });
+          }, 100);
+          break;
+          
+        case 'select_pg':
+          campoHTML += `<select class="form-select" name="alt_info[]" required>
+                          <option value="">-- Selecione a Pessoa Gestora --</option>
+                          <!-- Será populado via AJAX -->
+                        </select>`;
+          // Carregar PGs via AJAX
+          setTimeout(() => {
+            $.get('/parcerias/api/lista_pgs', function(data) {
+              const select = $(`#campo_info_${index} select[name="alt_info[]"]`);
+              data.forEach(pg => {
+                select.append(`<option value="${pg}">${pg}</option>`);
+              });
+            });
+          }, 100);
+          break;
+        
+        case 'enderecos':
+          // Interface especial para editar múltiplos endereços
+          campoHTML += `
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle"></i> Os endereços atuais serão carregados para edição. 
+              Você pode modificar, remover ou adicionar novos endereços.
+            </div>
+            <div class="endereco-tipo-localizacao" data-index="${index}">
+              <div id="enderecosContainer_${index}" class="mb-2">
+                <div class="text-center">
+                  <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                  </div>
+                  <small class="text-muted d-block">Carregando endereços...</small>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarEnderecoAlteracao(${index})">
+                <i class="bi bi-plus-circle"></i> Adicionar Novo Endereço
+              </button>
+              <input type="hidden" name="alt_info[]" id="enderecos_json_${index}" value="">
+            </div>`;
+          
+          // Carregar endereços existentes via AJAX
+          setTimeout(() => {
+            const numeroTermo = $('#numero_termo').val();
+            if (numeroTermo) {
+              carregarEnderecosAlteracao(index, numeroTermo);
+            } else {
+              $(`#enderecosContainer_${index}`).html(`
+                <div class="alert alert-warning">
+                  <i class="bi bi-exclamation-triangle"></i> 
+                  Selecione um termo primeiro para carregar os endereços.
+                </div>`);
+            }
+          }, 100);
+          break;
+      }
+      
+      campoHTML += `<small class="text-muted">Preencha a nova informação para este tipo de alteração</small>`;
+      
+      console.log(`[DEBUG atualizarCampoDinamico] HTML gerado (${campoHTML.length} caracteres)`);
+      campoContainer.html(campoHTML).show();
+      console.log(`[DEBUG atualizarCampoDinamico] Campo mostrado e HTML inserido`);
+      
+      // Aplicar máscara de dinheiro se necessário
+      if (config.tipo === 'money') {
+        $(`#campo_info_${index} .money-input`).on('input', function() {
+          let value = this.value.replace(/\D/g, '');
+          value = (parseInt(value) / 100).toFixed(2);
+          this.value = 'R$ ' + value.replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+        });
+      }
+      
+      console.log(`[DEBUG atualizarCampoDinamico] Finalizado para índice ${index}`);
+    }
+
+    // ========== FUNÇÕES PARA ENDEREÇOS (LOCALIZAÇÃO DO PROJETO) ==========
+    
+    let enderecosData = {}; // Armazena endereços por índice
+    let contadorEnderecosAlt = {}; // Contador por índice de alteração
+    
+    function carregarEnderecosAlteracao(index, numeroTermo) {
+      $.ajax({
+        url: `/parcerias/api/enderecos/${numeroTermo}`,
+        method: 'GET',
+        success: function(response) {
+          if (response.success) {
+            enderecosData[index] = response.enderecos;
+            contadorEnderecosAlt[index] = response.enderecos.length;
+            renderizarEnderecosAlteracao(index);
+          } else {
+            $(`#enderecosContainer_${index}`).html(`
+              <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i> Nenhum endereço encontrado para este termo.
+              </div>`);
+            enderecosData[index] = [];
+            contadorEnderecosAlt[index] = 0;
+          }
+        },
+        error: function() {
+          $(`#enderecosContainer_${index}`).html(`
+            <div class="alert alert-danger">
+              <i class="bi bi-x-circle"></i> Erro ao carregar endereços.
+            </div>`);
+          enderecosData[index] = [];
+          contadorEnderecosAlt[index] = 0;
+        }
+      });
+    }
+    
+    function renderizarEnderecosAlteracao(index) {
+      const container = $(`#enderecosContainer_${index}`);
+      container.empty();
+      
+      if (!enderecosData[index] || enderecosData[index].length === 0) {
+        container.html(`
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Nenhum endereço cadastrado. Clique em "Adicionar Novo Endereço" para criar.
+          </div>`);
+        atualizarJsonEnderecos(index);
+        return;
+      }
+      
+      enderecosData[index].forEach((endereco, idx) => {
+        const enderecoHTML = `
+          <div class="card mb-2" data-endereco-idx="${idx}">
+            <div class="card-body">
+              <div class="d-flex justify-content-between mb-2">
+                <h6 class="mb-0">Endereço #${idx + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerEnderecoAlteracao(${index}, ${idx})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+              
+              <div class="row g-2 mb-2">
+                <div class="col-md-8">
+                  <label class="form-label small">Logradouro</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_logradouro || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_logradouro', this.value)">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Número</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_numero || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_numero', this.value)">
+                </div>
+              </div>
+              
+              <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                  <label class="form-label small">Complemento</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_complemento || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_complemento', this.value)">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">CEP</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_cep || ''}"
+                         placeholder="00000-000"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_cep', this.value)">
+                </div>
+              </div>
+              
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label small">Distrito</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.parceria_distrito || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'parceria_distrito', this.value)">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Observação</label>
+                  <input type="text" class="form-control form-control-sm" 
+                         value="${endereco.observacao || ''}"
+                         onchange="atualizarEnderecoAlteracao(${index}, ${idx}, 'observacao', this.value)">
+                </div>
+              </div>
+            </div>
+          </div>`;
+        
+        container.append(enderecoHTML);
+      });
+      
+      atualizarJsonEnderecos(index);
+    }
+    
+    function adicionarEnderecoAlteracao(index) {
+      if (!enderecosData[index]) {
+        enderecosData[index] = [];
+      }
+      if (!contadorEnderecosAlt[index]) {
+        contadorEnderecosAlt[index] = 0;
+      }
+      
+      // Adicionar novo endereço vazio (sem ID = será INSERT)
+      enderecosData[index].push({
+        parceria_logradouro: '',
+        parceria_numero: '',
+        parceria_complemento: '',
+        parceria_cep: '',
+        parceria_distrito: '',
+        observacao: ''
+      });
+      
+      renderizarEnderecosAlteracao(index);
+    }
+    
+    function removerEnderecoAlteracao(index, enderecoIdx) {
+      if (confirm('Deseja remover este endereço?')) {
+        enderecosData[index].splice(enderecoIdx, 1);
+        renderizarEnderecosAlteracao(index);
+      }
+    }
+    
+    function atualizarEnderecoAlteracao(index, enderecoIdx, campo, valor) {
+      if (enderecosData[index] && enderecosData[index][enderecoIdx]) {
+        enderecosData[index][enderecoIdx][campo] = valor;
+        atualizarJsonEnderecos(index);
+      }
+    }
+    
+    function atualizarJsonEnderecos(index) {
+      // Serializar endereços como JSON no campo hidden
+      const json = JSON.stringify(enderecosData[index] || []);
+      $(`#enderecos_json_${index}`).val(json);
+      console.log(`[DEBUG] Endereços atualizados para índice ${index}:`, json);
+    }
+
+    // Função para editar alteração
+    function editarAlteracao(numeroTermo, instrumento, altNumero) {
+      // Carregar dados via AJAX
+      $.ajax({
+        url: '/parcerias/alteracao/editar',
+        method: 'GET',
+        data: {
+          numero_termo: numeroTermo,
+          instrumento: instrumento,
+          alt_numero: altNumero
+        },
+        success: function(data) {
+          // Preencher o formulário com os dados
+          // Primeiro destruir o Select2 se existir
+          if ($('#numero_termo').hasClass('select2-hidden-accessible')) {
+            $('#numero_termo').select2('destroy');
+          }
+          
+          // Preencher campo de termo (adicionar opção se não existir)
+          $('#numero_termo').empty().append($('<option>', {
+            value: numeroTermo,
+            text: numeroTermo,
+            selected: true
+          }));
+          
+          // Re-inicializar Select2 após preencher
+          $('#numero_termo').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Digite para buscar o termo...',
+            allowClear: true,
+            minimumInputLength: 2,
+            dropdownParent: $('#modalCadastroAlteracao'),
+            ajax: {
+              url: '{{ url_for("parcerias.api_termos_parcerias") }}',
+              dataType: 'json',
+              delay: 250,
+              data: function(params) {
+                return { q: params.term };
+              },
+              processResults: function(data) {
+                return { results: data };
+              },
+              cache: true
+            },
+            language: {
+              inputTooShort: function() {
+                return "Digite pelo menos 2 caracteres para buscar";
+              },
+              noResults: function() {
+                return "Nenhum termo encontrado";
+              },
+              searching: function() {
+                return "Buscando...";
+              }
+            }
+          });
+          
+          // Preencher instrumento
+          $('#instrumento_alteracao').val(instrumento);
+          
+          // Preencher numeração
+          if (altNumero >= 100) {
+            // Apostilamento do Aditamento
+            const apostilamento = Math.floor(altNumero / 100);
+            const aditamento = altNumero % 100;
+            $('#alt_numero_apostilamento').val(apostilamento);
+            $('#alt_numero_aditamento').val(aditamento);
+          } else if (altNumero > 0) {
+            $('#alt_numero_simples').val(altNumero);
+          }
+          $('#alt_numero').val(altNumero);
+          
+          mostrarCamposNumeracao(instrumento);
+          
+          // Preencher status, responsavel e observacao
+          $('#alt_status').val(data.status || 'Iniciado');
+          
+          // Mostrar/ocultar campos SEI documento e Data Assinatura baseado no status
+          if (data.status === 'Concluído') {
+            $('#campo-sei-documento-container').show();
+            $('#alt_sei_documento').prop('required', true);
+            $('#alt_data_assinatura').prop('required', true);
+            // Carregar SEI documento e data assinatura se existirem
+            if (data.sei_documento) {
+              $('#alt_sei_documento').val(data.sei_documento);
+            }
+            if (data.data_assinatura) {
+              $('#alt_data_assinatura').val(data.data_assinatura);
+            }
+          } else {
+            $('#campo-sei-documento-container').hide();
+            $('#alt_sei_documento').prop('required', false).val('');
+            $('#alt_data_assinatura').prop('required', false).val('');
+          }
+          
+          // Preencher múltiplos responsáveis (separados por ;)
+          if (data.responsavel) {
+            const responsaveis = data.responsavel.split(';').map(r => r.trim());
+            $('#alt_responsavel').val(responsaveis);
+          }
+          
+          $('#alt_observacao').val(data.observacao || '');
+          
+          // Campos kanban (novos)
+          $('#alt_prioridade').val(data.prioridade || '');
+          $('#alt_data_inicio').val(data.data_inicio || '');
+          $('#alt_data_conclusao').val(data.data_conclusao || '');
+          $('#alt_marcadores').val(data.marcadores || '');
+          
+          // Limpar tipos anteriores e adicionar os tipos do banco
+          $('#tipos-alteracao-container').empty();
+          contadorTipos = 0;
+          tiposSelecionados.clear();
+          
+          // Verificar se há tipos e infos
+          console.log('[DEBUG EDITAR] ========== INÍCIO CARREGAMENTO ==========');
+          console.log('[DEBUG EDITAR] Tipos recebidos:', data.tipos);
+          console.log('[DEBUG EDITAR] Quantidade de tipos:', data.tipos ? data.tipos.length : 0);
+          console.log('[DEBUG EDITAR] Infos recebidas:', data.infos);
+          console.log('[DEBUG EDITAR] Quantidade de infos:', data.infos ? data.infos.length : 0);
+          
+          // Adicionar seções para cada tipo
+          if (data.tipos && data.tipos.length > 0) {
+            // Criar todas as seções primeiro
+            for (let idx = 0; idx < data.tipos.length; idx++) {
+              adicionarSecaoTipo();
+              console.log(`[DEBUG EDITAR] Seção ${idx + 1} criada com ID: tipo_${contadorTipos}`);
+            }
+            
+            // Aguardar um pouco para garantir que o DOM foi atualizado
+            setTimeout(() => {
+              data.tipos.forEach((tipo, idx) => {
+                const sectionIndex = idx + 1; // Seções começam em 1
+                const selectElement = $(`#alt_tipo_${sectionIndex}`);
+                
+                if (selectElement.length > 0) {
+                  // Preencher select do tipo
+                  selectElement.val(tipo);
+                  tiposSelecionados.add(tipo);
+                  
+                  // Atualizar campo dinâmico
+                  atualizarCampoDinamico(sectionIndex);
+                  
+                  // Aguardar o campo dinâmico ser criado e então preencher
+                  setTimeout(() => {
+                    const info = data.infos[idx] || '';
+                    console.log(`[DEBUG EDITAR] Preenchendo info na seção ${sectionIndex}: "${info}"`);
+                    
+                    const campoInfo = $(`#campo_info_${sectionIndex}`);
+                    console.log(`[DEBUG EDITAR] Campo info encontrado: ${campoInfo.length > 0 ? 'SIM' : 'NÃO'}`);
+                    console.log(`[DEBUG EDITAR] Campo info visível: ${campoInfo.is(':visible') ? 'SIM' : 'NÃO'}`);
+                    
+                    // Se for date_range, separar os valores
+                    if (tipo === 'Adequação de vigência' && info.includes('|')) {
+                      const datas = info.split('|');
+                      const inputInicio = $(`#campo_info_${sectionIndex} input[name="alt_info_inicio[]"]`);
+                      const inputFim = $(`#campo_info_${sectionIndex} input[name="alt_info_fim[]"]`);
+                      
+                      console.log(`[DEBUG EDITAR] Input início encontrado: ${inputInicio.length}`);
+                      console.log(`[DEBUG EDITAR] Input fim encontrado: ${inputFim.length}`);
+                      
+                      if (inputInicio.length) inputInicio.val(datas[0]);
+                      if (inputFim.length) inputFim.val(datas[1]);
+                      
+                      console.log(`[DEBUG EDITAR] Valores preenchidos: ${datas[0]} / ${datas[1]}`);
+                    } else {
+                      // Para outros tipos - testar todos os seletores
+                      const inputText = $(`#campo_info_${sectionIndex} input[name="alt_info[]"]`);
+                      const textarea = $(`#campo_info_${sectionIndex} textarea[name="alt_info[]"]`);
+                      const select = $(`#campo_info_${sectionIndex} select[name="alt_info[]"]`);
+                      
+                      console.log(`[DEBUG EDITAR] Input text encontrado: ${inputText.length}`);
+                      console.log(`[DEBUG EDITAR] Textarea encontrado: ${textarea.length}`);
+                      console.log(`[DEBUG EDITAR] Select encontrado: ${select.length}`);
+                      
+                      if (inputText.length) {
+                        inputText.val(info);
+                        console.log(`[DEBUG EDITAR] Preenchido input text com: "${info}"`);
+                      }
+                      if (textarea.length) {
+                        textarea.val(info);
+                        console.log(`[DEBUG EDITAR] Preenchido textarea com: "${info}"`);
+                      }
+                      if (select.length) {
+                        select.val(info);
+                        console.log(`[DEBUG EDITAR] Preenchido select com: "${info}"`);
+                      }
+                    }
+                  }, 500); // Delay para campo dinâmico ser criado
+                } else {
+                  console.error(`[DEBUG EDITAR] ERRO: Select #alt_tipo_${sectionIndex} não encontrado!`);
+                }
+              });
+              
+              console.log('[DEBUG EDITAR] ========== FIM CARREGAMENTO ==========');
+              
+              // Mostrar alerta para o usuário
+              const msg = `Carregados ${data.tipos.length} tipo(s) de alteração. Verifique o console (F12) para detalhes.`;
+              console.log(`[DEBUG EDITAR] ${msg}`);
+              
+              // Atualizar instrumento baseado no primeiro tipo
+              setTimeout(() => {
+                atualizarInstrumento();
+              }, 1000);
+              
+            }, 200); // Delay inicial para garantir que todas as seções foram criadas
+            
+          } else {
+            // Se não há tipos, adicionar uma seção vazia
+            console.log('[DEBUG EDITAR] Nenhum tipo encontrado, adicionando seção vazia');
+            adicionarSecaoTipo();
+          }
+          
+          // Alterar título e ação do modal
+          $('#modalCadastroAlteracaoLabel').text('Editar Alteração');
+          $('#formAlteracao').attr('action', 
+            `/parcerias/alteracao/atualizar?numero_termo=${numeroTermo}&instrumento=${instrumento}&alt_numero=${altNumero}`
+          );
+          
+          // Abrir modal
+          $('#modalCadastroAlteracao').modal('show');
+        },
+        error: function(xhr) {
+          alert('Erro ao carregar alteração: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+        }
+      });
+    }
+
+    // Função para confirmar exclusão
+    function confirmarExclusao(numeroTermo, instrumento, altNumero) {
+      $('#termoExcluir').text(numeroTermo);
+      $('#instrumentoExcluir').text(instrumento);
+      
+      let numeroTexto = 'N/A';
+      if (altNumero >= 100) {
+        const apostilamento = Math.floor(altNumero / 100);
+        const aditamento = altNumero % 100;
+        numeroTexto = `${apostilamento}/${aditamento}`;
+      } else if (altNumero > 0) {
+        numeroTexto = altNumero;
+      }
+      $('#numeroExcluir').text(numeroTexto);
+      
+      $('#formExcluir').attr('action', `/parcerias/alteracao/deletar?numero_termo=${encodeURIComponent(numeroTermo)}&instrumento=${encodeURIComponent(instrumento)}&alt_numero=${altNumero}`);
+      
+      var modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+      modal.show();
+    }
+  </script>
+</body>
+</html>
