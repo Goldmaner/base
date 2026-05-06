@@ -11,11 +11,22 @@ os.environ['PORT'] = '5000'
 from app import app
 
 if __name__ == '__main__':
-    print("=" * 60)
-    print("🚀 SERVIDOR DE PRODUÇÃO")
-    print("=" * 60)
-    print("Porta: 5000")
-    print("URL: http://127.0.0.1:5000")
-    print("Hot Reload: DESATIVADO (reinicie manualmente para atualizar)")
-    print("=" * 60)
-    app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)
+    try:
+        from waitress import serve
+
+        print("=" * 60)
+        print("🚀 SERVIDOR DE PRODUÇÃO (Waitress)")
+        print("=" * 60)
+        print("Porta: 5000")
+        print("Threads: 8 (Windows-safe, 8 requisições simultâneas)")
+        print("URL: http://127.0.0.1:5000")
+        print("=" * 60)
+
+        serve(app, host='0.0.0.0', port=5000, threads=8)
+
+    except ImportError:
+        print("=" * 60)
+        print("⚠️  Waitress não encontrado — usando Flask threaded")
+        print("Execute: pip install waitress")
+        print("=" * 60)
+        app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False, threaded=True)

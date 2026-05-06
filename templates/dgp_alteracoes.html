@@ -81,6 +81,9 @@
           <p class="mb-0">Cadastro e gerenciamento de alterações em termos de parceria</p>
         </div>
         <div class="d-flex gap-2">
+          <a href="{{ url_for('parcerias.dgp_kanban') }}" class="btn btn-info">
+            <i class="bi bi-kanban"></i> Visualização Quadro (Kanban)
+          </a>
           <a href="{{ url_for('parcerias.dgp_alteracoes_futuro') }}" class="btn btn-warning">
             <i class="bi bi-calendar-event"></i> Futuros Aditamentos
           </a>
@@ -174,10 +177,15 @@
               </label>
               <select class="form-select" id="alt_status" name="alt_status" required>
                 <option value="">-- Selecione --</option>
-                <option value="Em análise prévia">Em análise prévia</option>
-                <option value="Iniciado">Iniciado</option>
-                <option value="Em andamento">Em andamento</option>
+                {% if status_list %}
+                  {% for s in status_list %}
+                  <option value="{{ s.alt_status }}">{{ s.alt_status }}</option>
+                  {% endfor %}
+                {% else %}
+                <option value="Pendente - DGP/ADIT">Pendente - DGP/ADIT</option>
+                <option value="Em análise - DGP/ADIT">Em análise - DGP/ADIT</option>
                 <option value="Concluído">Concluído</option>
+                {% endif %}
               </select>
               <small class="text-muted">Status atual da alteração</small>
             </div>
@@ -258,6 +266,39 @@
 
             <!-- Campo hidden para enviar o número final -->
             <input type="hidden" id="alt_numero" name="alt_numero" value="0">
+          </div>
+        </div>
+
+        <!-- SEÇÃO 2.5: Planejamento (Kanban) -->
+        <div class="mb-4">
+          <h5 class="border-bottom pb-2 mb-3">
+            <i class="bi bi-calendar-week"></i> Planejamento
+          </h5>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label for="alt_prioridade" class="form-label">Prioridade</label>
+              <select class="form-select" id="alt_prioridade" name="alt_prioridade">
+                <option value="">— Nenhuma —</option>
+                <option value="Urgente">🔴 Urgente</option>
+                <option value="Importante">🟠 Importante</option>
+                <option value="Média">🔵 Média</option>
+                <option value="Baixa">⚫ Baixa</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="alt_data_inicio" class="form-label">Data de Início</label>
+              <input type="date" class="form-control" id="alt_data_inicio" name="alt_data_inicio">
+            </div>
+            <div class="col-md-3">
+              <label for="alt_data_conclusao" class="form-label">Data de Conclusão</label>
+              <input type="date" class="form-control" id="alt_data_conclusao" name="alt_data_conclusao">
+            </div>
+            <div class="col-md-3">
+              <label for="alt_marcadores" class="form-label">Marcadores</label>
+              <input type="text" class="form-control" id="alt_marcadores" name="alt_marcadores"
+                     placeholder="Ex: Tipo A, Dotação X" title="Separe múltiplos marcadores por vírgula">
+              <small class="text-muted">Separe por vírgula</small>
+            </div>
           </div>
         </div>
 
@@ -397,13 +438,27 @@
           </div>
           <div class="col-md-3">
             <label for="filtro_status" class="form-label">Status</label>
-            <select class="form-select" id="filtro_status" name="filtro_status">
+          <select class="form-select" id="filtro_status" name="filtro_status">
               <option value="">-- Todos --</option>
-              <option value="Em análise prévia" {{ 'selected' if request.args.get('filtro_status') == 'Em análise prévia' }}>Em análise prévia</option>
-              <option value="Iniciado" {{ 'selected' if request.args.get('filtro_status') == 'Iniciado' }}>Iniciado</option>
-              <option value="Em andamento" {{ 'selected' if request.args.get('filtro_status') == 'Em andamento' }}>Em andamento</option>
+              {% if status_list %}
+                {% for s in status_list %}
+                <option value="{{ s.alt_status }}" {{ 'selected' if request.args.get('filtro_status') == s.alt_status }}>{{ s.alt_status }}</option>
+                {% endfor %}
+              {% else %}
+              <option value="Pendente - DGP/ADIT" {{ 'selected' if request.args.get('filtro_status') == 'Pendente - DGP/ADIT' }}>Pendente - DGP/ADIT</option>
               <option value="Concluído" {{ 'selected' if request.args.get('filtro_status') == 'Concluído' }}>Concluído</option>
+              {% endif %}
             </select>
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_osc" class="form-label">OSC</label>
+            <input type="text" class="form-control" id="filtro_osc" name="filtro_osc"
+                   value="{{ request.args.get('filtro_osc', '') }}" placeholder="Nome da OSC...">
+          </div>
+          <div class="col-md-3">
+            <label for="filtro_processo" class="form-label">Processo SEI</label>
+            <input type="text" class="form-control" id="filtro_processo" name="filtro_processo"
+                   value="{{ request.args.get('filtro_processo', '') }}" placeholder="Número do processo...">
           </div>
         </div>
         <div class="row mt-3">
@@ -1358,6 +1413,12 @@
           }
           
           $('#alt_observacao').val(data.observacao || '');
+          
+          // Campos kanban (novos)
+          $('#alt_prioridade').val(data.prioridade || '');
+          $('#alt_data_inicio').val(data.data_inicio || '');
+          $('#alt_data_conclusao').val(data.data_conclusao || '');
+          $('#alt_marcadores').val(data.marcadores || '');
           
           // Limpar tipos anteriores e adicionar os tipos do banco
           $('#tipos-alteracao-container').empty();

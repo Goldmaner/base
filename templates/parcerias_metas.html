@@ -88,6 +88,16 @@
     .sei-input-wrapper { position: relative; }
     .sei-input-wrapper i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #7c3aed; pointer-events: none; }
     .sei-input-wrapper input { padding-left: 32px; border-color: #d8b4fe; }
+
+    /* ── Não Identificado checkbox ── */
+    .ni-check-wrapper { margin-bottom: 6px; }
+    .ni-check-wrapper .form-check-label { color: #6b7280; font-size: .8rem; }
+    .ni-check-wrapper .form-check-input:checked { background-color: #7c3aed; border-color: #7c3aed; }
+    .ni-disabled { opacity: .45; pointer-events: none; }
+
+    /* ── Indicador row com obs ── */
+    .indicador-row { background: #faf8ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+    .indicador-row textarea { font-size: .8rem; }
   </style>
 </head>
 <body>
@@ -99,6 +109,9 @@
       <p>Plano de Trabalho — metas vinculadas a processos SEI</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('parcerias_metas.dicionario') }}" class="btn-parc outline">
+        <i class="bi bi-book"></i> Dicionário
+      </a>
       <a href="{{ url_for('main.index') }}" class="btn-parc outline">
         <i class="bi bi-arrow-left"></i> Voltar
       </a>
@@ -133,12 +146,20 @@
       {% endif %}
     </div>
     <div class="col-auto ms-auto">
-      <a href="{{ url_for('parcerias_metas.exportar_csv', filtro_sei=filtro_sei) }}" class="btn-parc" style="background:linear-gradient(135deg,#065f46,#059669);">
-        <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
-      </a>
-      <button type="button" class="btn-parc ms-1" onclick="abrirModalCriar()">
-        <i class="bi bi-plus-circle"></i> Nova Meta
-      </button>
+      <div class="d-flex flex-column align-items-end gap-2">
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('parcerias_metas.exportar_csv', filtro_sei=filtro_sei) }}" class="btn-parc" style="background:linear-gradient(135deg,#065f46,#059669);">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+          </a>
+          <button type="button" class="btn-parc ms-1" onclick="abrirModalCriar()">
+            <i class="bi bi-plus-circle"></i> Nova Meta
+          </button>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="checkOrdem" onchange="toggleOrdemColuna(this.checked)">
+          <label class="form-check-label small text-muted" for="checkOrdem">Mostrar coluna Ordem</label>
+        </div>
+      </div>
     </div>
   </form>
 </div>
@@ -156,6 +177,8 @@
         <tr>
           <th>#</th>
           <th>SEI</th>
+          <th>Nº Termo</th>
+          <th>OSC</th>
           <th>Título</th>
           <th>Objetivo</th>
           <th>Tipos</th>
@@ -163,7 +186,7 @@
           <th>Obs. Indicador</th>
           <th>Meios de Aferição</th>
           <th>Obs.</th>
-          <th>Ord.</th>
+          <th class="col-ord d-none">Ord.</th>
           <th>Ações</th>
         </tr>
       </thead>
@@ -172,6 +195,8 @@
         <tr>
           <td class="text-muted">{{ m.id }}</td>
           <td><span class="fw-semibold" style="color:#5b21b6;">{{ m.sei_numero }}</span></td>
+          <td style="white-space:nowrap;">{{ m.numero_termo }}</td>
+          <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ m.osc }}">{{ m.osc }}</td>
           <td style="max-width:200px;">
             <div class="fw-semibold" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ m.meta_titulo }}">{{ m.meta_titulo }}</div>
             {% if m.meta_descricao %}
@@ -213,7 +238,7 @@
             <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:120px;" title="{{ m.observacoes }}">{{ m.observacoes }}</span>
             {% else %}<span class="text-muted">—</span>{% endif %}
           </td>
-          <td class="text-center text-muted">{{ m.ordem }}</td>
+          <td class="col-ord d-none text-center text-muted">{{ m.ordem }}</td>
           <td>
             <div class="d-flex gap-1">
               <button class="btn btn-sm btn-outline-primary" title="Editar"
@@ -229,7 +254,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="11" class="text-center text-muted py-4">
+          <td colspan="13" class="text-center text-muted py-4">
             <i class="bi bi-inbox me-2"></i>Nenhuma meta encontrada.
             {% if filtro_sei %}Use outro filtro de SEI ou <a href="{{ url_for('parcerias_metas.index') }}">limpe o filtro</a>.{% endif %}
           </td>
@@ -259,7 +284,7 @@
         <div class="row g-3">
 
           <!-- SEI -->
-          <div class="col-md-5">
+          <div class="col-md-6">
             <label class="form-label fw-semibold">Número SEI <span class="text-danger">*</span></label>
             <div class="sei-input-wrapper">
               <i class="bi bi-search"></i>
@@ -270,15 +295,23 @@
             <small class="text-muted">Fontes: Parceria, Celebração, Edital</small>
           </div>
 
-          <!-- Ordem -->
-          <div class="col-md-2">
+          <!-- Ordem (só visível na edição) -->
+          <div class="col-md-2 d-none" id="ordemWrapper">
             <label class="form-label fw-semibold">Ordem</label>
             <input type="number" id="metaOrdem" class="form-control" value="0" min="0">
+            <small class="text-muted">Auto na criação</small>
           </div>
 
           <!-- Título -->
           <div class="col-12">
             <label class="form-label fw-semibold">Título da Meta <span class="text-danger">*</span></label>
+            <div class="ni-check-wrapper">
+              <div class="form-check">
+                <input class="form-check-input ni-check" type="checkbox" id="niTitulo"
+                       onchange="toggleNIField('metaTitulo', this)">
+                <label class="form-check-label" for="niTitulo">Não possui ou não identificado</label>
+              </div>
+            </div>
             <input type="text" id="metaTitulo" class="form-control" placeholder="Título conciso da meta">
           </div>
 
@@ -288,12 +321,26 @@
               Descrição
               <i class="bi bi-question-circle help-icon ms-1" title="" id="helpMeta" data-bs-toggle="tooltip"></i>
             </label>
+            <div class="ni-check-wrapper">
+              <div class="form-check">
+                <input class="form-check-input ni-check" type="checkbox" id="niDescricao"
+                       onchange="toggleNIField('metaDescricao', this)">
+                <label class="form-check-label" for="niDescricao">Não possui ou não identificado</label>
+              </div>
+            </div>
             <textarea id="metaDescricao" class="form-control" rows="3" placeholder="Descreva a meta detalhadamente..."></textarea>
           </div>
 
           <!-- Objetivo -->
           <div class="col-12">
             <label class="form-label fw-semibold">Objetivo</label>
+            <div class="ni-check-wrapper">
+              <div class="form-check">
+                <input class="form-check-input ni-check" type="checkbox" id="niObjetivo"
+                       onchange="toggleNIField('metaObjetivo', this)">
+                <label class="form-check-label" for="niObjetivo">Não possui ou não identificado</label>
+              </div>
+            </div>
             <textarea id="metaObjetivo" class="form-control" rows="2" placeholder="Objetivo específico desta meta..."></textarea>
           </div>
 
@@ -303,47 +350,68 @@
               Tipos de Meta
               <span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:.72rem;">Seleção múltipla</span>
             </label>
+            <div class="ni-check-wrapper">
+              <div class="form-check">
+                <input class="form-check-input ni-check" type="checkbox" id="niTipos"
+                       onchange="toggleNIContainer('tiposContainer', this)">
+                <label class="form-check-label" for="niTipos">Não identificado</label>
+              </div>
+            </div>
             <div id="tiposContainer" class="row g-2">
               <div class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>Carregando tipos...</div>
             </div>
           </div>
 
-          <!-- Indicador -->
-          <div class="col-md-5">
+          <!-- Indicadores (multi) -->
+          <div class="col-12">
             <label class="form-label fw-semibold">
-              Indicador
+              Indicadores
               <i class="bi bi-question-circle help-icon ms-1" title="" id="helpIndicador" data-bs-toggle="tooltip"></i>
             </label>
-            <select id="metaIndicador" class="form-select">
-              <option value="">— Selecione —</option>
-              {% for ind in indicadores %}
-              <option value="{{ ind.id }}">{{ ind.indicador }}</option>
-              {% endfor %}
-            </select>
+            <div class="ni-check-wrapper">
+              <div class="form-check">
+                <input class="form-check-input ni-check" type="checkbox" id="niIndicadores"
+                       onchange="toggleNIContainer('indicadoresContainer', this, 'btnAddIndicador')">
+                <label class="form-check-label" for="niIndicadores">Não identificado</label>
+              </div>
+            </div>
+            <div id="indicadoresContainer"></div>
+            <button type="button" id="btnAddIndicador" class="btn btn-sm btn-outline-secondary mt-1"
+                    onclick="adicionarLinhaIndicador()">
+              <i class="bi bi-plus-circle me-1"></i>Adicionar indicador
+            </button>
+            <datalist id="datalistIndicadores"></datalist>
+            <small class="text-muted d-block mt-1">
+              <i class="bi bi-magic me-1" style="color:#7c3aed;"></i>Novos indicadores são salvos automaticamente
+            </small>
           </div>
 
-          <!-- Obs. Indicador -->
-          <div class="col-md-7">
-            <label class="form-label fw-semibold">Observações sobre o Indicador</label>
-            <textarea id="metaObsIndicador" class="form-control" rows="2" placeholder="Observações complementares sobre como medir este indicador..."></textarea>
-          </div>
-
-          <!-- Meios de Aferição -->
-          <div class="col-md-5">
+          <!-- Meios de Aferição (multi) -->
+          <div class="col-12">
             <label class="form-label fw-semibold">
               Meios de Aferição
               <i class="bi bi-question-circle help-icon ms-1" title="" id="helpMeios" data-bs-toggle="tooltip"></i>
             </label>
-            <select id="metaMeiosAfericao" class="form-select">
-              <option value="">— Selecione —</option>
-              {% for ma in meios_afericao %}
-              <option value="{{ ma.id }}">{{ ma.meios_afericao }}</option>
-              {% endfor %}
-            </select>
+            <div class="ni-check-wrapper">
+              <div class="form-check">
+                <input class="form-check-input ni-check" type="checkbox" id="niMeios"
+                       onchange="toggleNIContainer('meiosContainer', this, 'btnAddMeio')">
+                <label class="form-check-label" for="niMeios">Não identificado</label>
+              </div>
+            </div>
+            <div id="meiosContainer"></div>
+            <button type="button" id="btnAddMeio" class="btn btn-sm btn-outline-secondary mt-1"
+                    onclick="adicionarLinhaMeio()">
+              <i class="bi bi-plus-circle me-1"></i>Adicionar meio de aferição
+            </button>
+            <datalist id="datalistMeios"></datalist>
+            <small class="text-muted d-block mt-1">
+              <i class="bi bi-magic me-1" style="color:#7c3aed;"></i>Novos meios são salvos automaticamente
+            </small>
           </div>
 
-          <!-- Observações -->
-          <div class="col-md-7">
+          <!-- Observações gerais -->
+          <div class="col-12">
             <label class="form-label fw-semibold">Observações gerais</label>
             <textarea id="metaObservacoes" class="form-control" rows="2" placeholder="Outras observações..."></textarea>
           </div>
@@ -429,11 +497,32 @@ async function carregarSeiDatalist() {
     ['seiDatalist', 'seiDatalistModal'].forEach(id => {
       const dl = document.getElementById(id);
       if (!dl) return;
-      dl.innerHTML = data.map(d =>
-        `<option value="${d.sei_numero}">${d.sei_numero} (${d.fonte})</option>`
-      ).join('');
+      dl.innerHTML = data.map(d => {
+        // Parcerias firmadas: só o número SEI, sem rótulo de fonte
+        // Celebração/Edital: número + identificação da fonte
+        const label = d.fonte === 'Parceria'
+          ? d.sei_numero
+          : `${d.sei_numero} (${d.fonte})`;
+        return `<option value="${d.sei_numero}">${label}</option>`;
+      }).join('');
     });
   } catch(e) { console.warn('Erro ao carregar SEIs', e); }
+}
+
+async function carregarDatalists() {
+  try {
+    const [resInd, resMeio] = await Promise.all([
+      fetch('{{ url_for("parcerias_metas.api_indicadores") }}'),
+      fetch('{{ url_for("parcerias_metas.api_meios") }}'),
+    ]);
+    const inds  = await resInd.json();
+    const meios = await resMeio.json();
+
+    const dlInd  = document.getElementById('datalistIndicadores');
+    const dlMeio = document.getElementById('datalistMeios');
+    if (dlInd)  dlInd.innerHTML  = inds.map(i  => `<option value="${i.indicador}"></option>`).join('');
+    if (dlMeio) dlMeio.innerHTML = meios.map(m => `<option value="${m.meios_afericao}"></option>`).join('');
+  } catch(e) { console.warn('Erro ao carregar datalists', e); }
 }
 
 async function carregarMetaTipos() {
@@ -446,11 +535,13 @@ async function carregarMetaTipos() {
 async function carregarDefinicoes() {
   try {
     const res = await fetch('{{ url_for("parcerias_metas.api_definicoes") }}');
-    definicoes = await res.json();
-    // Atualizar tooltips
-    setTooltip('helpMeta',       definicoes.meta_definicao);
-    setTooltip('helpIndicador',  definicoes.indicador_definicao);
-    setTooltip('helpMeios',      definicoes.meios_definicoes);
+    const lista = await res.json();
+    // lista = [{conceito, definicao, observacoes}, ...]
+    const por_conceito = {};
+    lista.forEach(d => { por_conceito[d.conceito.toLowerCase()] = d.definicao; });
+    setTooltip('helpMeta',       por_conceito['meta']);
+    setTooltip('helpIndicador',  por_conceito['indicador']);
+    setTooltip('helpMeios',      por_conceito['meios de aferição']);
   } catch(e) { console.warn('Erro ao carregar definições', e); }
 }
 
@@ -489,20 +580,101 @@ function renderizarTipos(selecionadosIds = []) {
   container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
 }
 
+// ── Helpers: linhas multi-input ──────────────────────────────────────────────
+// ── Helpers NI (Não Identificado) ───────────────────────────────────────────
+function toggleNIField(fieldId, checkbox) {
+  const field = document.getElementById(fieldId);
+  if (!field) return;
+  field.disabled = checkbox.checked;
+  field.classList.toggle('ni-disabled', checkbox.checked);
+}
+
+function toggleNIContainer(containerId, checkbox, addBtnId) {
+  const container = document.getElementById(containerId);
+  if (container) container.classList.toggle('ni-disabled', checkbox.checked);
+  if (addBtnId) {
+    const btn = document.getElementById(addBtnId);
+    if (btn) btn.disabled = checkbox.checked;
+  }
+}
+
+// ── Helpers: linhas indicadores (com obs individual) ─────────────────────────
+function adicionarLinhaIndicador(valor = '', obs = '') {
+  const container = document.getElementById('indicadoresContainer');
+  const div = document.createElement('div');
+  div.className = 'indicador-row';
+  div.innerHTML = `
+    <div class="d-flex gap-1 align-items-center">
+      <input type="text" list="datalistIndicadores"
+             class="form-control form-control-sm multi-item-ind"
+             placeholder="Selecione ou digite um indicador..." autocomplete="off">
+      <button type="button" class="btn btn-sm btn-outline-danger px-2 flex-shrink-0"
+              onclick="this.closest('.indicador-row').remove()" title="Remover">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+    <textarea class="form-control form-control-sm ind-obs mt-1" rows="1"
+              placeholder="Observação sobre este indicador (opcional)..."
+              style="resize:vertical;"></textarea>`;
+  container.appendChild(div);
+  if (valor) div.querySelector('.multi-item-ind').value = valor;
+  if (obs)   div.querySelector('.ind-obs').value = obs;
+}
+
+function adicionarLinhaMeio(valor = '') {
+  const container = document.getElementById('meiosContainer');
+  const div = document.createElement('div');
+  div.className = 'd-flex gap-1 mb-1';
+  div.innerHTML = `
+    <input type="text" list="datalistMeios" class="form-control form-control-sm multi-item"
+           placeholder="Selecione ou digite um meio..." autocomplete="off">
+    <button type="button" class="btn btn-sm btn-outline-danger px-2 flex-shrink-0"
+            onclick="this.closest('div').remove()" title="Remover">
+      <i class="bi bi-x"></i>
+    </button>`;
+  container.appendChild(div);
+  if (valor) div.querySelector('.multi-item').value = valor;
+}
+
+function coletarIndicadores() {
+  return [...document.querySelectorAll('#indicadoresContainer .indicador-row')]
+    .map(row => ({
+      texto: (row.querySelector('.multi-item-ind')?.value || '').trim(),
+      obs:   (row.querySelector('.ind-obs')?.value        || '').trim(),
+    }))
+    .filter(item => item.texto !== '');
+}
+
+function coletarMultiInput(containerId) {
+  return [...document.querySelectorAll(`#${containerId} .multi-item`)]
+    .map(el => el.value.trim()).filter(v => v !== '');
+}
+
+function limparContainer(id) {
+  document.getElementById(id).innerHTML = '';
+}
+
 // ── Abrir modal criar ─────────────────────────────────────────────────────────
 function abrirModalCriar() {
   document.getElementById('modalMetaTitulo').innerHTML =
     '<i class="bi bi-clipboard2-plus me-2"></i>Nova Meta';
   document.getElementById('metaId').value      = '';
   document.getElementById('metaSei').value     = '{{ filtro_sei }}';
-  document.getElementById('metaOrdem').value   = '0';
   document.getElementById('metaTitulo').value  = '';
   document.getElementById('metaDescricao').value = '';
   document.getElementById('metaObjetivo').value  = '';
-  document.getElementById('metaObsIndicador').value = '';
-  document.getElementById('metaObservacoes').value  = '';
-  document.getElementById('metaIndicador').value    = '';
-  document.getElementById('metaMeiosAfericao').value = '';
+  document.getElementById('metaObservacoes').value = '';
+  // Ordem oculta na criação (auto no backend)
+  document.getElementById('ordemWrapper').classList.add('d-none');
+  // Resetar checkboxes NI
+  ['niTitulo','niDescricao','niObjetivo','niTipos','niIndicadores','niMeios'].forEach(id => {
+    const cb = document.getElementById(id);
+    if (cb) { cb.checked = false; cb.dispatchEvent(new Event('change')); }
+  });
+  limparContainer('indicadoresContainer');
+  limparContainer('meiosContainer');
+  adicionarLinhaIndicador();
+  adicionarLinhaMeio();
   renderizarTipos([]);
   inicializarTooltipsModal();
   modalMeta.show();
@@ -512,16 +684,59 @@ function abrirModalCriar() {
 function abrirModalEditar(m) {
   document.getElementById('modalMetaTitulo').innerHTML =
     '<i class="bi bi-pencil me-2"></i>Editar Meta';
-  document.getElementById('metaId').value      = m.id;
-  document.getElementById('metaSei').value     = m.sei_numero || '';
-  document.getElementById('metaOrdem').value   = m.ordem ?? 0;
-  document.getElementById('metaTitulo').value  = m.meta_titulo || '';
-  document.getElementById('metaDescricao').value = m.meta_descricao || '';
-  document.getElementById('metaObjetivo').value  = m.meta_objetivo  || '';
-  document.getElementById('metaObsIndicador').value = m.meta_obs_indicador || '';
-  document.getElementById('metaObservacoes').value  = m.observacoes || '';
-  document.getElementById('metaIndicador').value    = m.indicadores_id || '';
-  document.getElementById('metaMeiosAfericao').value = m.meios_afericao_id || '';
+  document.getElementById('metaId').value    = m.id;
+  document.getElementById('metaSei').value   = m.sei_numero || '';
+  document.getElementById('metaOrdem').value = m.ordem ?? 0;
+  // Ordem visível na edição
+  document.getElementById('ordemWrapper').classList.remove('d-none');
+
+  // Título
+  const niTit = document.getElementById('niTitulo');
+  niTit.checked = (m.meta_titulo || '') === 'Não identificado';
+  toggleNIField('metaTitulo', niTit);
+  document.getElementById('metaTitulo').value = niTit.checked ? '' : (m.meta_titulo || '');
+
+  // Descrição
+  const niDesc = document.getElementById('niDescricao');
+  niDesc.checked = (m.meta_descricao || '') === 'Não identificado';
+  toggleNIField('metaDescricao', niDesc);
+  document.getElementById('metaDescricao').value = niDesc.checked ? '' : (m.meta_descricao || '');
+
+  // Objetivo
+  const niObj = document.getElementById('niObjetivo');
+  niObj.checked = (m.meta_objetivo || '') === 'Não identificado';
+  toggleNIField('metaObjetivo', niObj);
+  document.getElementById('metaObjetivo').value = niObj.checked ? '' : (m.meta_objetivo || '');
+
+  // Tipos NI
+  const niTipos = document.getElementById('niTipos');
+  niTipos.checked = !!m.tipos_ni;
+  toggleNIContainer('tiposContainer', niTipos);
+
+  // Indicadores
+  const niInd = document.getElementById('niIndicadores');
+  niInd.checked = !!m.indicadores_ni;
+  toggleNIContainer('indicadoresContainer', niInd, 'btnAddIndicador');
+  limparContainer('indicadoresContainer');
+  const inds = m.indicadores_textos || [];
+  const obsArr = m.obs_indicadores || [];
+  if (inds.length > 0) {
+    inds.forEach((v, i) => adicionarLinhaIndicador(v, obsArr[i] || ''));
+  } else {
+    adicionarLinhaIndicador();
+  }
+
+  // Meios
+  const niMeios = document.getElementById('niMeios');
+  niMeios.checked = !!m.meios_ni;
+  toggleNIContainer('meiosContainer', niMeios, 'btnAddMeio');
+  limparContainer('meiosContainer');
+  const meios = m.meios_textos || [];
+  if (meios.length > 0) { meios.forEach(v => adicionarLinhaMeio(v)); }
+  else { adicionarLinhaMeio(); }
+
+  document.getElementById('metaObservacoes').value = m.observacoes || '';
+
   const ids = (m.meta_tipo_ids || []).map(Number);
   renderizarTipos(ids);
   inicializarTooltipsModal();
@@ -541,24 +756,39 @@ function coletarTipoIds() {
 
 // ── Salvar (criar ou editar) ──────────────────────────────────────────────────
 async function salvarMeta() {
-  const id    = document.getElementById('metaId').value;
-  const sei   = document.getElementById('metaSei').value.trim();
-  const titulo = document.getElementById('metaTitulo').value.trim();
-  if (!sei || !titulo) {
+  const id  = document.getElementById('metaId').value;
+  const sei = document.getElementById('metaSei').value.trim();
+
+  const niTitulo = document.getElementById('niTitulo').checked;
+  const titulo_raw = document.getElementById('metaTitulo').value.trim();
+  const meta_titulo = niTitulo ? 'Não identificado' : titulo_raw;
+
+  if (!sei || !meta_titulo) {
     mostrarToast('SEI e Título são obrigatórios.', 'danger'); return;
   }
 
+  const niDesc  = document.getElementById('niDescricao').checked;
+  const niObj   = document.getElementById('niObjetivo').checked;
+  const niTipos = document.getElementById('niTipos').checked;
+  const niInd   = document.getElementById('niIndicadores').checked;
+  const niMeios = document.getElementById('niMeios').checked;
+
+  const indsColetados = niInd ? [] : coletarIndicadores();
+
   const payload = {
-    sei_numero:          sei,
-    meta_titulo:         titulo,
-    meta_descricao:      document.getElementById('metaDescricao').value || null,
-    meta_objetivo:       document.getElementById('metaObjetivo').value  || null,
-    meta_tipo_ids:       coletarTipoIds(),
-    indicadores_id:      document.getElementById('metaIndicador').value      || null,
-    meta_obs_indicador:  document.getElementById('metaObsIndicador').value   || null,
-    meios_afericao_id:   document.getElementById('metaMeiosAfericao').value  || null,
-    observacoes:         document.getElementById('metaObservacoes').value    || null,
-    ordem:               parseInt(document.getElementById('metaOrdem').value) || 0,
+    sei_numero:         sei,
+    meta_titulo:        meta_titulo,
+    meta_descricao:     niDesc  ? 'Não identificado' : (document.getElementById('metaDescricao').value || null),
+    meta_objetivo:      niObj   ? 'Não identificado' : (document.getElementById('metaObjetivo').value  || null),
+    meta_tipo_ids:      coletarTipoIds(),
+    tipos_ni:           niTipos,
+    indicadores_textos: indsColetados.map(i => i.texto),
+    obs_indicadores:    indsColetados.map(i => i.obs),
+    indicadores_ni:     niInd,
+    meios_textos:       niMeios ? [] : coletarMultiInput('meiosContainer'),
+    meios_ni:           niMeios,
+    observacoes:        document.getElementById('metaObservacoes').value || null,
+    ordem:              parseInt(document.getElementById('metaOrdem').value) || 0,
   };
 
   const url    = id ? `/parcerias-metas/editar/${id}` : '/parcerias-metas/criar';
@@ -574,10 +804,18 @@ async function salvarMeta() {
     if (!res.ok) throw new Error(json.erro || 'Erro ao salvar');
     mostrarToast('Meta salva com sucesso!');
     modalMeta.hide();
+    carregarDatalists();
     setTimeout(() => location.reload(), 900);
   } catch(e) {
     mostrarToast(e.message, 'danger');
   }
+}
+
+// ── Toggle coluna Ordem ───────────────────────────────────────────────────────
+function toggleOrdemColuna(mostrar) {
+  document.querySelectorAll('.col-ord').forEach(el => {
+    el.classList.toggle('d-none', !mostrar);
+  });
 }
 
 // ── Excluir ───────────────────────────────────────────────────────────────────
@@ -608,7 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
   input.addEventListener('change', () => localStorage.setItem('parcerias_metas_sei', input.value));
 
   // Carregar dados assíncronos
-  Promise.all([carregarSeiDatalist(), carregarMetaTipos(), carregarDefinicoes()]);
+  Promise.all([carregarSeiDatalist(), carregarMetaTipos(), carregarDefinicoes(), carregarDatalists()]);
 });
 </script>
 </body>

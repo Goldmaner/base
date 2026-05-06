@@ -6,6 +6,7 @@ from threading import Thread
 import json
 import traceback as _traceback
 from flask import session, redirect, url_for, flash, request, current_app
+from config import ACESSOS_BASICOS
 
 
 # =============================================================================
@@ -130,6 +131,10 @@ def requires_access(modulo):
             
             # Agente Público tem acesso total
             if session.get('tipo_usuario') == 'Agente Público':
+                return f(*args, **kwargs)
+
+            # Módulos do pack básico são liberados para todo usuário autenticado
+            if modulo in ACESSOS_BASICOS:
                 return f(*args, **kwargs)
             
             # Verificar se o usuário tem acesso ao módulo

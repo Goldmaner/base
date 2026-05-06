@@ -1,0 +1,1122 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kanban DGP - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+  <style>
+    body { background:#f0f2f5; }
+    .header-section {
+      background: linear-gradient(135deg,#0d6efd 0%,#0b5ed7 100%);
+      color:#fff; padding:20px 30px; border-radius:8px; margin-bottom:16px;
+      box-shadow:0 4px 6px rgba(0,0,0,.1);
+    }
+    /* ====== KANBAN BOARD ====== */
+    .kanban-board {
+      display:flex; gap:12px; overflow-x:auto; padding-bottom:16px;
+      min-height:calc(100vh - 220px); align-items:flex-start;
+    }
+    .kanban-column {
+      flex:0 0 270px; min-width:270px; background:#fff;
+      border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.08);
+      display:flex; flex-direction:column; max-height:calc(100vh - 220px);
+    }
+    .kanban-column-header {
+      padding:12px 14px 10px; border-radius:10px 10px 0 0;
+      font-weight:600; font-size:.82rem; display:flex;
+      justify-content:space-between; align-items:center;
+      border-bottom:2px solid rgba(0,0,0,.08);
+    }
+    .kanban-column-body {
+      flex:1; overflow-y:auto; padding:8px; min-height:60px;
+    }
+    .kanban-column-footer {
+      padding:8px 10px; border-top:1px solid #e9ecef;
+    }
+    /* Column header palette (by data-order attribute) */
+    .col-h-1, .col-h-2 { background:#dbeafe; color:#1e40af; }
+    .col-h-3, .col-h-4 { background:#fef3c7; color:#92400e; }
+    .col-h-5          { background:#ede9fe; color:#5b21b6; }
+    .col-h-6          { background:#d1fae5; color:#065f46; }
+    .col-h-7, .col-h-8 { background:#e0f2fe; color:#0c4a6e; }
+    .col-h-9, .col-h-13 { background:#fed7aa; color:#92400e; }
+    .col-h-10, .col-h-11 { background:#fce7f3; color:#9d174d; }
+    .col-h-12          { background:#ccfbf1; color:#0f766e; }
+    .col-h-14          { background:#dcfce7; color:#14532d; }
+    /* Cards */
+    .kanban-card {
+      background:#fff; border:1px solid #e9ecef; border-radius:8px;
+      margin-bottom:8px; padding:10px 12px; cursor:grab;
+      box-shadow:0 1px 3px rgba(0,0,0,.06); position:relative;
+      border-left:4px solid #dee2e6;
+      transition:box-shadow .15s;
+    }
+    .kanban-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.12); }
+    .kanban-card.sortable-ghost { opacity:.4; }
+    .kanban-card.sortable-drag  { box-shadow:0 8px 24px rgba(0,0,0,.2); }
+    .kanban-card[data-prioridade="Urgente"]   { border-left-color:#dc3545; }
+    .kanban-card[data-prioridade="Importante"]{ border-left-color:#fd7e14; }
+    .kanban-card[data-prioridade="Média"]     { border-left-color:#0d6efd; }
+    .kanban-card[data-prioridade="Baixa"]     { border-left-color:#6c757d; }
+    .card-actions { position:absolute; top:7px; right:7px; display:none; gap:3px; }
+    .kanban-card:hover .card-actions { display:flex; }
+    .card-actions .btn { padding:2px 6px; font-size:.72rem; }
+    /* Marcadores pills */
+    .marcador-pill {
+      display:inline-block; border-radius:20px; padding:1px 8px;
+      font-size:.68rem; font-weight:600; margin:2px 2px 0 0;
+      background:#e9ecef; color:#495057;
+    }
+    /* Priority badge */
+    .prio-badge { font-size:.68rem; padding:2px 7px; border-radius:20px; }
+    .prio-Urgente    { background:#fee2e2; color:#dc3545; }
+    .prio-Importante { background:#fff3cd; color:#d97706; }
+    .prio-Media      { background:#dbeafe; color:#1d4ed8; }
+    .prio-Baixa      { background:#f1f3f5; color:#6c757d; }
+    /* Filter bar */
+    .filter-bar { background:#fff; padding:12px 16px; border-radius:8px;
+                  margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .filter-bar .form-control, .filter-bar .form-select { font-size:.85rem; }
+    /* TABLE VIEW */
+    #table-view .table th { background:#0d6efd; color:#fff; white-space:nowrap; }
+    /* Hidden panel */
+    #painel-ocultos { background:#fff; border-radius:8px; padding:16px;
+                      box-shadow:0 1px 4px rgba(0,0,0,.06); margin-top:16px; }
+    /* Modal */
+    .select2-container { width:100%!important; }
+    .tipo-alteracao-secao {
+      border:2px solid #e9ecef; border-radius:8px; padding:16px;
+      margin-bottom:12px; background:#f8f9fa; position:relative;
+    }
+    .tipo-alteracao-secao.active { border-color:#0d6efd; background:#e7f3ff; }
+    .btn-remover-tipo { position:absolute; top:10px; right:10px; }
+    .alert-info-custom {
+      background:#e7f3ff; border-left:4px solid #0d6efd; padding:12px; margin-bottom:14px;
+    }
+    /* Add card btn */
+    .btn-add-card { font-size:.78rem; color:#6c757d; background:none; border:1px dashed #dee2e6;
+                    width:100%; text-align:left; border-radius:6px; padding:5px 10px; }
+    .btn-add-card:hover { background:#f8f9fa; color:#0d6efd; border-color:#0d6efd; }
+    /* Instrumento mini-badge */
+    .inst-badge { font-size:.65rem; padding:1px 6px; border-radius:3px; }
+  </style>
+</head>
+<body>
+<div class="container-fluid px-3 py-3">
+
+  <!-- HEADER -->
+  <div class="header-section mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h4 class="mb-0"><i class="bi bi-kanban"></i> Kanban DGP — Alterações</h4>
+        <small class="opacity-75">Gestão visual de alterações em termos de parceria</small>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <!-- Toggle view -->
+        <div class="btn-group" role="group">
+          <button id="btnBoard" class="btn btn-light btn-sm active" onclick="setView('board')">
+            <i class="bi bi-kanban"></i> Quadro
+          </button>
+          <button id="btnTable" class="btn btn-light btn-sm" onclick="setView('table')">
+            <i class="bi bi-table"></i> Tabela
+          </button>
+        </div>
+        <button class="btn btn-warning btn-sm" id="btnOcultos" onclick="toggleOcultos()" title="Cards ocultos">
+          <i class="bi bi-eye-slash"></i> Ocultos
+          <span class="badge bg-dark ms-1">{{ ocultos|length }}</span>
+        </button>
+        <a href="{{ url_for('parcerias.dgp_alteracoes') }}" class="btn btn-light btn-sm">
+          <i class="bi bi-table"></i> Visão Tabela (clássica)
+        </a>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCadastroAlteracao">
+          <i class="bi bi-plus-circle"></i> Nova Alteração
+        </button>
+        <a href="{{ url_for('main.index') }}" class="btn btn-outline-light btn-sm">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLASH MESSAGES -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar d-flex gap-2 flex-wrap align-items-end">
+    <div>
+      <label class="form-label mb-1" style="font-size:.78rem;">Busca</label>
+      <input type="text" class="form-control form-control-sm" id="filtroTexto" placeholder="Termo, OSC, tipo…" style="width:200px" oninput="aplicarFiltros()">
+    </div>
+    <div>
+      <label class="form-label mb-1" style="font-size:.78rem;">Responsável</label>
+      <select class="form-select form-select-sm" id="filtroResponsavel" onchange="aplicarFiltros()" style="width:160px">
+        <option value="">— Todos —</option>
+        {% for a in analistas_ativos + analistas_inativos %}
+          <option value="{{ a.nome }}">{{ a.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label mb-1" style="font-size:.78rem;">Prioridade</label>
+      <select class="form-select form-select-sm" id="filtroPrioridade" onchange="aplicarFiltros()" style="width:140px">
+        <option value="">— Todas —</option>
+        <option>Urgente</option>
+        <option>Importante</option>
+        <option>Média</option>
+        <option>Baixa</option>
+      </select>
+    </div>
+    <div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="limparFiltros()">
+        <i class="bi bi-x-circle"></i> Limpar
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== BOARD VIEW ===== -->
+  <div id="board-view" class="kanban-board">
+    {% for status in status_list %}
+    {% set ordem = status.alt_ordem %}
+    <div class="kanban-column" id="column-{{ loop.index }}" data-status="{{ status.alt_status }}">
+      <div class="kanban-column-header col-h-{{ ordem }}">
+        <span title="{{ status.alt_status }}">{{ status.alt_status }}</span>
+        <span class="badge rounded-pill bg-white text-dark" id="badge-{{ loop.index }}">{{ cards_by_status[status.alt_status]|length }}</span>
+      </div>
+      <div class="kanban-column-body sortable-container"
+           id="col-body-{{ loop.index }}"
+           data-status="{{ status.alt_status }}"
+           data-col-idx="{{ loop.index }}">
+        {% for card in cards_by_status[status.alt_status] %}
+        {% set inst_short = {
+          'Termo de Aditamento': 'TA',
+          'Termo de Apostilamento': 'APO',
+          'Termo de Apostilamento do Aditamento': 'APO/TA',
+          'Informação DGP': 'INFO',
+          'Despacho Autorizatório': 'DESP',
+          'Informação da Pessoa Gestora': 'INFO PG'
+        } %}
+        <div class="kanban-card"
+             data-numero="{{ card.numero_termo }}"
+             data-instrumento="{{ card.instrumento_alteracao }}"
+             data-alt-numero="{{ card.alt_numero }}"
+             data-sei="{{ card.termo_sei_doc or '' }}"
+             data-responsavel="{{ card.responsavel or '' }}"
+             data-prioridade="{{ card.alt_prioridade or '' }}"
+             data-marcadores="{{ card.alt_marcadores or '' }}"
+             data-osc="{{ card.osc or '' }}"
+             data-tipos="{{ card.tipos_alteracao or '' }}"
+             data-status="{{ card.alt_status }}">
+          <!-- Actions -->
+          <div class="card-actions">
+            <button class="btn btn-outline-warning btn-sm" onclick='editarAlteracao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})' title="Editar">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick='ocultarCard("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }}, true)' title="Ocultar">
+              <i class="bi bi-eye-slash"></i>
+            </button>
+            <button class="btn btn-outline-danger btn-sm" onclick='confirmarExclusao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})' title="Excluir">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+          <!-- Instrument badge + numero -->
+          <div class="d-flex align-items-center gap-1 mb-1">
+            <span class="badge bg-secondary inst-badge">{{ inst_short.get(card.instrumento_alteracao, card.instrumento_alteracao[:4]) }}</span>
+            {% if card.alt_numero > 0 %}
+              {% if card.alt_numero >= 100 %}
+                <span class="badge bg-info inst-badge">{{ card.alt_numero // 100 }}/{{ card.alt_numero % 100 }}</span>
+              {% else %}
+                <span class="badge bg-primary inst-badge">nº {{ card.alt_numero }}</span>
+              {% endif %}
+            {% endif %}
+          </div>
+          <strong class="d-block" style="font-size:.85rem;">{{ card.numero_termo }}</strong>
+          {% if card.osc %}
+            <small class="text-muted d-block" style="font-size:.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ card.osc }}">{{ card.osc[:35] }}{% if card.osc|length > 35 %}…{% endif %}</small>
+          {% endif %}
+          <!-- Tipos -->
+          {% if card.tipos_alteracao %}
+            <div class="mt-1">
+              {% for tipo in card.tipos_alteracao.split(', ') %}
+                <span class="badge bg-success me-1" style="font-size:.65rem;">{{ tipo }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <!-- Footer info -->
+          <div class="d-flex justify-content-between align-items-center mt-2" style="font-size:.72rem; color:#6c757d;">
+            <span title="{{ card.responsavel }}">
+              <i class="bi bi-person-fill"></i>
+              {% if card.responsavel %}
+                {{ card.responsavel.split(';')[0].strip()[:18] }}{% if card.responsavel.split(';')|length > 1 %} +{{ card.responsavel.split(';')|length - 1 }}{% endif %}
+              {% else %}—{% endif %}
+            </span>
+            {% if card.alt_data_inicio %}
+              <span><i class="bi bi-calendar3"></i> {{ card.alt_data_inicio.strftime('%d/%m/%y') }}</span>
+            {% endif %}
+          </div>
+          <!-- Priority + Marcadores -->
+          <div class="mt-1">
+            {% if card.alt_prioridade %}
+              <span class="prio-badge prio-{{ card.alt_prioridade|replace(' ','') }}">{{ card.alt_prioridade }}</span>
+            {% endif %}
+            {% if card.alt_marcadores %}
+              {% for m in card.alt_marcadores.split(',') %}
+                {% if m.strip() %}
+                  <span class="marcador-pill" data-nome="{{ m.strip() }}">{{ m.strip()[:20] }}</span>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="kanban-column-footer">
+        <button class="btn-add-card" onclick="novoCardStatus('{{ status.alt_status }}')">
+          <i class="bi bi-plus"></i> Adicionar tarefa
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ===== TABLE VIEW (hidden by default) ===== -->
+  <div id="table-view" style="display:none;">
+    <div style="background:#fff; border-radius:8px; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,.1);">
+      <div class="table-responsive">
+        <table class="table table-hover table-striped table-sm" id="tabela-kanban">
+          <thead>
+            <tr>
+              <th>Termo</th>
+              <th>Instrumento</th>
+              <th>Nº</th>
+              <th>Tipos</th>
+              <th>Status</th>
+              <th>Prioridade</th>
+              <th>Responsável</th>
+              <th>Início</th>
+              <th>Conclusão</th>
+              <th>Marcadores</th>
+              <th class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for status in status_list %}
+              {% for card in cards_by_status[status.alt_status] %}
+              <tr class="table-row-filterable"
+                  data-numero="{{ card.numero_termo }}"
+                  data-instrumento="{{ card.instrumento_alteracao }}"
+                  data-alt-numero="{{ card.alt_numero }}"
+                  data-responsavel="{{ card.responsavel or '' }}"
+                  data-prioridade="{{ card.alt_prioridade or '' }}"
+                  data-marcadores="{{ card.alt_marcadores or '' }}"
+                  data-osc="{{ card.osc or '' }}"
+                  data-tipos="{{ card.tipos_alteracao or '' }}"
+                  data-status="{{ card.alt_status }}">
+                <td><strong>{{ card.numero_termo }}</strong></td>
+                <td>{{ card.instrumento_alteracao }}</td>
+                <td class="text-center">
+                  {% if card.alt_numero == 0 %}<span class="badge bg-secondary">N/A</span>
+                  {% elif card.alt_numero >= 100 %}<span class="badge bg-info">{{ card.alt_numero // 100 }}/{{ card.alt_numero % 100 }}</span>
+                  {% else %}<span class="badge bg-primary">{{ card.alt_numero }}</span>{% endif %}
+                </td>
+                <td>
+                  {% if card.tipos_alteracao %}
+                    {% for tipo in card.tipos_alteracao.split(', ') %}
+                      <span class="badge bg-success me-1" style="font-size:.65rem;">{{ tipo }}</span>
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td><span class="badge bg-secondary">{{ card.alt_status }}</span></td>
+                <td>
+                  {% if card.alt_prioridade %}
+                    <span class="prio-badge prio-{{ card.alt_prioridade|replace(' ','') }}">{{ card.alt_prioridade }}</span>
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if card.responsavel %}
+                    {% for r in card.responsavel.split(';') %}
+                      <span class="badge bg-info me-1" style="font-size:.65rem;">{{ r.strip() }}</span>
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td>{% if card.alt_data_inicio %}{{ card.alt_data_inicio.strftime('%d/%m/%Y') }}{% else %}—{% endif %}</td>
+                <td>{% if card.alt_data_conclusao %}{{ card.alt_data_conclusao.strftime('%d/%m/%Y') }}{% else %}—{% endif %}</td>
+                <td>
+                  {% if card.alt_marcadores %}
+                    {% for m in card.alt_marcadores.split(',') %}
+                      {% if m.strip() %}<span class="marcador-pill">{{ m.strip() }}</span>{% endif %}
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  <button class="btn btn-sm btn-warning" onclick='editarAlteracao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})'>
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-sm btn-secondary" onclick='ocultarCard("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }}, true)'>
+                    <i class="bi bi-eye-slash"></i>
+                  </button>
+                  <button class="btn btn-sm btn-danger" onclick='confirmarExclusao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})'>
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HIDDEN CARDS PANEL ===== -->
+  <div id="painel-ocultos" style="display:none;">
+    <h6 class="mb-3"><i class="bi bi-eye-slash text-secondary"></i> Cards Ocultos ({{ ocultos|length }})</h6>
+    {% if ocultos %}
+    <div class="table-responsive">
+      <table class="table table-sm table-hover">
+        <thead><tr><th>Termo</th><th>Instrumento</th><th>Nº</th><th>Tipos</th><th>Status</th><th>Responsável</th><th></th></tr></thead>
+        <tbody>
+          {% for card in ocultos %}
+          <tr>
+            <td><strong>{{ card.numero_termo }}</strong></td>
+            <td>{{ card.instrumento_alteracao }}</td>
+            <td>{{ card.alt_numero }}</td>
+            <td>{{ card.tipos_alteracao }}</td>
+            <td><span class="badge bg-secondary">{{ card.alt_status }}</span></td>
+            <td>{{ card.responsavel }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary" onclick='ocultarCard("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }}, false)'>
+                <i class="bi bi-eye"></i> Reexibir
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-muted">Nenhum card oculto.</p>
+    {% endif %}
+  </div>
+
+  <!-- ===== MODAL EXCLUSÃO ===== -->
+  <div class="modal fade" id="modalExcluir" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Confirmar Exclusão</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Excluir TODAS as alterações para:</p>
+          <div class="alert alert-warning">
+            <strong>Termo:</strong> <span id="termoExcluir"></span><br>
+            <strong>Instrumento:</strong> <span id="instrumentoExcluir"></span><br>
+            <strong>Numeração:</strong> <span id="numeroExcluir"></span>
+          </div>
+          <p class="text-muted small">Esta ação não pode ser desfeita.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <form id="formExcluir" method="POST" style="display:inline;">
+            <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Confirmar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL CADASTRO / EDIÇÃO ===== -->
+  <div class="modal fade" id="modalCadastroAlteracao" tabindex="-1" aria-labelledby="modalCadastroLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="modalCadastroLabel">
+            <i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert-info-custom">
+            <i class="bi bi-info-circle-fill"></i>
+            <strong>Importante:</strong> Você pode cadastrar múltiplos tipos de alteração para um mesmo termo.
+          </div>
+          <form method="POST" action="{{ url_for('parcerias.salvar_alteracao') }}" id="formAlteracao">
+
+            <!-- SEÇÃO 1: Dados Gerais -->
+            <div class="mb-3">
+              <h6 class="border-bottom pb-2"><i class="bi bi-file-text"></i> Dados Gerais</h6>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label for="numero_termo" class="form-label">Número do Termo *</label>
+                  <select class="form-select" id="numero_termo" name="numero_termo" required>
+                    <option value="">Digite para buscar...</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label for="instrumento_alteracao" class="form-label">Instrumento Jurídico *</label>
+                  <select class="form-select" id="instrumento_alteracao" name="instrumento_alteracao" required>
+                    <option value="">-- Selecione --</option>
+                    {% for instrumento in instrumentos %}
+                    <option value="{{ instrumento }}">{{ instrumento }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label for="alt_status" class="form-label">Status *</label>
+                  <select class="form-select" id="alt_status" name="alt_status" required>
+                    <option value="">-- Selecione --</option>
+                    {% for s in status_list %}
+                    <option value="{{ s.alt_status }}">{{ s.alt_status }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <!-- SEI / Data Assinatura -->
+              <div class="row g-3 mt-2" id="campo-sei-documento-container" style="display:none;">
+                <div class="col-md-6">
+                  <label for="alt_sei_documento" class="form-label"><i class="bi bi-file-earmark-check"></i> Número SEI do Documento</label>
+                  <input type="text" class="form-control" id="alt_sei_documento" name="alt_sei_documento" placeholder="Ex: 123456789">
+                </div>
+                <div class="col-md-6">
+                  <label for="alt_data_assinatura" class="form-label"><i class="bi bi-calendar-check"></i> Data de Assinatura</label>
+                  <input type="date" class="form-control" id="alt_data_assinatura" name="alt_data_assinatura" max="9999-12-31">
+                </div>
+              </div>
+              <!-- Responsável -->
+              <div class="row g-3 mt-2">
+                <div class="col-md-12">
+                  <label for="alt_responsavel" class="form-label">Responsáveis *</label>
+                  <select class="form-select" id="alt_responsavel" name="alt_responsavel[]" multiple required size="4">
+                    {% for a in analistas_ativos %}
+                    <option value="{{ a.nome }}">{{ a.nome }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" id="mostrar_inativos" onchange="toggleAnalistasInativos()">
+                    <label class="form-check-label small" for="mostrar_inativos">Mostrar inativos</label>
+                  </div>
+                </div>
+              </div>
+              <!-- Numeração -->
+              <div class="row g-3 mt-2" id="numeracao-container" style="display:none;">
+                <div class="col-md-6" id="numero-simples-container" style="display:none;">
+                  <label class="form-label">Número (1-99)</label>
+                  <input type="number" class="form-control" id="alt_numero_simples" min="1" max="99" placeholder="1-99">
+                </div>
+                <div class="col-md-3" id="numero-apostilamento-container" style="display:none;">
+                  <label class="form-label">Nº Apostilamento</label>
+                  <input type="number" class="form-control" id="alt_numero_apostilamento" min="1" max="9">
+                </div>
+                <div class="col-md-3" id="numero-aditamento-container" style="display:none;">
+                  <label class="form-label">Nº Aditamento</label>
+                  <input type="number" class="form-control" id="alt_numero_aditamento" min="1" max="99">
+                </div>
+                <input type="hidden" id="alt_numero" name="alt_numero" value="0">
+              </div>
+            </div>
+
+            <!-- SEÇÃO 2: Planejamento (Kanban) -->
+            <div class="mb-3">
+              <h6 class="border-bottom pb-2"><i class="bi bi-calendar-week"></i> Planejamento</h6>
+              <div class="row g-3">
+                <div class="col-md-3">
+                  <label for="alt_prioridade" class="form-label">Prioridade</label>
+                  <select class="form-select" id="alt_prioridade" name="alt_prioridade">
+                    <option value="">— Nenhuma —</option>
+                    <option value="Urgente">🔴 Urgente</option>
+                    <option value="Importante">🟠 Importante</option>
+                    <option value="Média">🔵 Média</option>
+                    <option value="Baixa">⚫ Baixa</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label for="alt_data_inicio" class="form-label">Data de Início</label>
+                  <input type="date" class="form-control" id="alt_data_inicio" name="alt_data_inicio">
+                </div>
+                <div class="col-md-3">
+                  <label for="alt_data_conclusao" class="form-label">Data de Conclusão</label>
+                  <input type="date" class="form-control" id="alt_data_conclusao" name="alt_data_conclusao">
+                </div>
+                <div class="col-md-3">
+                  <label for="alt_marcadores" class="form-label">Marcadores</label>
+                  <input type="text" class="form-control" id="alt_marcadores" name="alt_marcadores"
+                         placeholder="Ex: Tipo A, Dotação X" title="Separe múltiplos marcadores por vírgula">
+                  <small class="text-muted">Separe por vírgula</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- SEÇÃO 3: Tipos de Alteração -->
+            <div class="mb-3">
+              <h6 class="border-bottom pb-2"><i class="bi bi-list-check"></i> Tipos de Alteração</h6>
+              <div id="tipos-alteracao-container"></div>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btn-adicionar-tipo">
+                <i class="bi bi-plus-circle"></i> Adicionar Tipo
+              </button>
+            </div>
+
+            <!-- SEÇÃO 4: Observações -->
+            <div class="mb-3">
+              <h6 class="border-bottom pb-2"><i class="bi bi-chat-left-text"></i> Observações</h6>
+              <textarea class="form-control" id="alt_observacao" name="alt_observacao" rows="2" placeholder="Observações adicionais…"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle"></i> Cancelar</button>
+          <button type="submit" form="formAlteracao" class="btn btn-primary"><i class="bi bi-check-circle"></i> Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container-fluid -->
+
+<!-- ===== SCRIPTS ===== -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+// ====================================================
+// DATA FROM BACKEND
+// ====================================================
+const tiposAlteracao = {{ tipos_alteracao|tojson if tipos_alteracao else '[]' }};
+const instrumentos   = {{ instrumentos|tojson if instrumentos else '[]' }};
+const analistasAtivos   = {{ analistas_ativos|tojson if analistas_ativos else '[]' }};
+const analistasInativos = {{ analistas_inativos|tojson if analistas_inativos else '[]' }};
+const statusList = {{ status_list|tojson if status_list else '[]' }};
+
+// tipo → campo dinâmico config
+const tiposCampos = {};
+tiposAlteracao.forEach(t => {
+  if (t.alt_campo_tipo) {
+    tiposCampos[t.alt_tipo] = {
+      tipo: t.alt_campo_tipo,
+      placeholder: t.alt_campo_placeholder || '',
+      maxlength: t.alt_campo_maxlength || null,
+      min: t.alt_campo_min || null
+    };
+  }
+});
+
+let contadorTipos = 0;
+let tiposSelecionados = new Set();
+
+// ====================================================
+// VIEW TOGGLE
+// ====================================================
+function setView(view) {
+  const isBoard = view === 'board';
+  document.getElementById('board-view').style.display = isBoard ? 'flex' : 'none';
+  document.getElementById('table-view').style.display  = isBoard ? 'none' : 'block';
+  document.getElementById('btnBoard').classList.toggle('active', isBoard);
+  document.getElementById('btnTable').classList.toggle('active', !isBoard);
+  localStorage.setItem('faf_kanban_view', view);
+  if (!isBoard) aplicarFiltros();
+}
+
+function toggleOcultos() {
+  const p = document.getElementById('painel-ocultos');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+// Restore saved view
+(function() {
+  const saved = localStorage.getItem('faf_kanban_view');
+  if (saved === 'table') setView('table');
+})();
+
+// ====================================================
+// ANALISTAS TOGGLE
+// ====================================================
+function toggleAnalistasInativos() {
+  const show = document.getElementById('mostrar_inativos').checked;
+  const sel = document.getElementById('alt_responsavel');
+  const selected = Array.from(sel.selectedOptions).map(o => o.value);
+  sel.innerHTML = '';
+  analistasAtivos.forEach(a => sel.add(new Option(a.nome, a.nome)));
+  if (show) analistasInativos.forEach(a => sel.add(new Option(`${a.nome} (Inativo)`, a.nome)));
+  selected.forEach(v => { const o = sel.querySelector(`option[value="${v}"]`); if (o) o.selected = true; });
+}
+
+// ====================================================
+// MODAL HELPERS
+// ====================================================
+$('#modalCadastroAlteracao').on('shown.bs.modal', function() {
+  if ($('#tipos-alteracao-container').children().length === 0) adicionarSecaoTipo();
+  $('#numero_termo').select2({
+    theme: 'bootstrap-5',
+    placeholder: 'Digite para buscar...',
+    allowClear: true,
+    minimumInputLength: 2,
+    dropdownParent: $('#modalCadastroAlteracao'),
+    ajax: {
+      url: '{{ url_for("parcerias.api_termos_parcerias") }}',
+      dataType: 'json', delay: 250,
+      data: p => ({ q: p.term }),
+      processResults: d => ({ results: d }),
+      cache: true
+    }
+  });
+  // Set today as default start date if empty
+  if (!$('#alt_data_inicio').val()) {
+    const today = new Date().toISOString().split('T')[0];
+    $('#alt_data_inicio').val(today);
+  }
+});
+
+$('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
+  if ($('#numero_termo').hasClass('select2-hidden-accessible')) $('#numero_termo').select2('destroy');
+  document.getElementById('formAlteracao').reset();
+  $('#formAlteracao').attr('action', '{{ url_for("parcerias.salvar_alteracao") }}');
+  $('#modalCadastroLabel').html('<i class="bi bi-plus-circle"></i> Cadastrar Nova Alteração');
+  $('#tipos-alteracao-container').empty();
+  contadorTipos = 0;
+  tiposSelecionados.clear();
+  $('#numeracao-container').hide();
+  $('#campo-sei-documento-container').hide();
+});
+
+// Status → show/hide SEI fields
+$(document).on('change', '#alt_status', function() {
+  if ($(this).val() === 'Concluído') {
+    $('#campo-sei-documento-container').show();
+    $('#alt_sei_documento').prop('required', true);
+    $('#alt_data_assinatura').prop('required', true);
+  } else {
+    $('#campo-sei-documento-container').hide();
+    $('#alt_sei_documento').prop('required', false).val('');
+    $('#alt_data_assinatura').prop('required', false).val('');
+  }
+});
+
+$('#btn-adicionar-tipo').click(() => adicionarSecaoTipo());
+
+// ====================================================
+// TIPOS DE ALTERAÇÃO (dinâmico)
+// ====================================================
+function adicionarSecaoTipo() {
+  contadorTipos++;
+  const nVisible = $('.tipo-alteracao-secao').length + 1;
+  const id = `tipo_${contadorTipos}`;
+  const html = `
+    <div class="tipo-alteracao-secao position-relative" id="${id}" data-index="${contadorTipos}">
+      ${nVisible > 1 ? `<button type="button" class="btn btn-sm btn-danger btn-remover-tipo" onclick="removerSecaoTipo('${id}')"><i class="bi bi-x"></i></button>` : ''}
+      <h6 class="mb-3"><i class="bi bi-tag"></i> Tipo de Alteração #${nVisible}</h6>
+      <div class="row g-3">
+        <div class="col-md-12">
+          <label class="form-label">Selecione o Tipo *</label>
+          <select class="form-select tipo-select" id="alt_tipo_${contadorTipos}" name="alt_tipo[]" required
+                  onchange="atualizarInstrumento(); atualizarCampoDinamico(${contadorTipos})">
+            <option value="">-- Selecione --</option>
+            ${tiposAlteracao.map(t => `<option value="${t.alt_tipo}" data-instrumento="${t.alt_instrumento}">${t.alt_tipo}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col-md-12" id="campo_info_${contadorTipos}" style="display:none;"></div>
+      </div>
+    </div>`;
+  $('#tipos-alteracao-container').append(html);
+  renumerarTiposAlteracao();
+}
+
+function removerSecaoTipo(id) {
+  const val = $(`#${id} select`).val();
+  if (val) tiposSelecionados.delete(val);
+  $(`#${id}`).remove();
+  atualizarInstrumento();
+  renumerarTiposAlteracao();
+}
+
+function renumerarTiposAlteracao() {
+  $('.tipo-alteracao-secao').each(function(i) {
+    $(this).find('h6').html(`<i class="bi bi-tag"></i> Tipo de Alteração #${i + 1}`);
+    $(this).find('.btn-remover-tipo')[i === 0 ? 'hide' : 'show']();
+  });
+}
+
+function atualizarInstrumento() {
+  const primeiroTipo = $('.tipo-select').first();
+  const inst = primeiroTipo.find('option:selected').data('instrumento') || '';
+  if (inst) {
+    $('#instrumento_alteracao').val(inst);
+    mostrarCamposNumeracao(inst);
+  }
+}
+
+$(document).on('change', '#instrumento_alteracao', function() {
+  mostrarCamposNumeracao($(this).val());
+  buscarProximoNumero();
+});
+
+function mostrarCamposNumeracao(instrumento) {
+  const container = $('#numeracao-container');
+  const simplesC  = $('#numero-simples-container');
+  const apoC      = $('#numero-apostilamento-container');
+  const aditC     = $('#numero-aditamento-container');
+  const vSimples  = $('#alt_numero_simples').val();
+  const vApo      = $('#alt_numero_apostilamento').val();
+  const vAdit     = $('#alt_numero_aditamento').val();
+  simplesC.hide(); apoC.hide(); aditC.hide();
+  $('#alt_numero_simples, #alt_numero_apostilamento, #alt_numero_aditamento').prop('required', false);
+  if (!instrumento || ['Informação DGP','Despacho Autorizatório','Informação da Pessoa Gestora'].includes(instrumento)) {
+    container.hide(); $('#alt_numero').val('0');
+  } else if (['Termo de Aditamento','Termo de Apostilamento'].includes(instrumento)) {
+    container.show(); simplesC.show();
+    if (vSimples) $('#alt_numero_simples').val(vSimples);
+    $('#alt_numero_simples').prop('required', true);
+  } else if (instrumento === 'Termo de Apostilamento do Aditamento') {
+    container.show(); apoC.show(); aditC.show();
+    if (vApo) $('#alt_numero_apostilamento').val(vApo);
+    if (vAdit) $('#alt_numero_aditamento').val(vAdit);
+    $('#alt_numero_apostilamento, #alt_numero_aditamento').prop('required', true);
+  } else {
+    container.hide(); $('#alt_numero').val('0');
+  }
+}
+
+$('#formAlteracao').submit(function() {
+  const inst = $('#instrumento_alteracao').val();
+  let num = 0;
+  if (['Termo de Aditamento','Termo de Apostilamento'].includes(inst)) {
+    num = parseInt($('#alt_numero_simples').val()) || 0;
+  } else if (inst === 'Termo de Apostilamento do Aditamento') {
+    const apo = parseInt($('#alt_numero_apostilamento').val()) || 0;
+    const adit = parseInt($('#alt_numero_aditamento').val()) || 0;
+    num = apo * 100 + adit;
+  }
+  $('#alt_numero').val(num);
+});
+
+function buscarProximoNumero() {
+  const num = $('#numero_termo').val();
+  const inst = $('#instrumento_alteracao').val();
+  if (!num || !inst) return;
+  if (!['Termo de Aditamento','Termo de Apostilamento'].includes(inst)) return;
+  $.get('/parcerias/alteracao/proximo_numero', {numero_termo: num, instrumento: inst}, function(r) {
+    if (r.success) $('#alt_numero_simples').val(r.proximo_numero);
+  });
+}
+
+$('#numero_termo').on('select2:select', function() {
+  buscarProximoNumero();
+});
+
+function atualizarCampoDinamico(index) {
+  const tipo = $(`#alt_tipo_${index}`).val();
+  const campoContainer = $(`#campo_info_${index}`);
+  if (!tipo || !tiposCampos[tipo]) { campoContainer.hide(); return; }
+  const config = tiposCampos[tipo];
+  let html = `<label class="form-label"><i class="bi bi-pencil-square"></i> Nova Informação *</label>`;
+  switch(config.tipo) {
+    case 'text':
+      html += `<input type="text" class="form-control" name="alt_info[]" placeholder="${config.placeholder}" ${config.maxlength ? `maxlength="${config.maxlength}"` : ''} required>`;
+      break;
+    case 'textarea':
+      html += `<textarea class="form-control" name="alt_info[]" rows="3" placeholder="${config.placeholder}" required></textarea>`;
+      break;
+    case 'number':
+      html += `<input type="number" class="form-control" name="alt_info[]" placeholder="${config.placeholder}" min="${config.min || 0}" required>`;
+      break;
+    case 'money':
+      html += `<input type="text" class="form-control money-input" name="alt_info[]" placeholder="${config.placeholder}" required>`;
+      break;
+    case 'date':
+      html += `<input type="date" class="form-control" name="alt_info[]" required>`;
+      break;
+    case 'date_range':
+      html += `<div class="row g-2"><div class="col-md-6"><label class="form-label small">Data de Início</label><input type="date" class="form-control" name="alt_info_inicio[]" required></div><div class="col-md-6"><label class="form-label small">Data de Término</label><input type="date" class="form-control" name="alt_info_fim[]" required></div></div>`;
+      break;
+    case 'select_osc':
+      html += `<select class="form-select" name="alt_info[]" required><option value="">-- Selecione a OSC --</option></select>`;
+      setTimeout(() => { $.get('/parcerias/api/lista_oscs', d => { const s = $(`#campo_info_${index} select[name="alt_info[]"]`); d.forEach(v => s.append(`<option value="${v}">${v}</option>`)); }); }, 100);
+      break;
+    case 'select_pg':
+      html += `<select class="form-select" name="alt_info[]" required><option value="">-- Selecione a Pessoa Gestora --</option></select>`;
+      setTimeout(() => { $.get('/parcerias/api/lista_pgs', d => { const s = $(`#campo_info_${index} select[name="alt_info[]"]`); d.forEach(v => s.append(`<option value="${v}">${v}</option>`)); }); }, 100);
+      break;
+    default:
+      html += `<input type="text" class="form-control" name="alt_info[]" placeholder="Nova informação" required>`;
+  }
+  html += `<small class="text-muted">Preencha a nova informação para este tipo de alteração</small>`;
+  campoContainer.html(html).show();
+  if (config.tipo === 'money') {
+    $(`#campo_info_${index} .money-input`).on('input', function() {
+      let v = this.value.replace(/\D/g, '');
+      v = (parseInt(v) / 100).toFixed(2);
+      this.value = 'R$ ' + v.replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+    });
+  }
+}
+
+// ====================================================
+// EDITAR ALTERAÇÃO
+// ====================================================
+function editarAlteracao(numeroTermo, instrumento, altNumero) {
+  $.ajax({
+    url: '/parcerias/alteracao/editar',
+    method: 'GET',
+    data: { numero_termo: numeroTermo, instrumento: instrumento, alt_numero: altNumero },
+    success: function(data) {
+      if ($('#numero_termo').hasClass('select2-hidden-accessible')) $('#numero_termo').select2('destroy');
+      $('#numero_termo').empty().append($('<option>', { value: numeroTermo, text: numeroTermo, selected: true }));
+      $('#numero_termo').select2({
+        theme: 'bootstrap-5', placeholder: 'Digite para buscar...', allowClear: true, minimumInputLength: 2,
+        dropdownParent: $('#modalCadastroAlteracao'),
+        ajax: {
+          url: '{{ url_for("parcerias.api_termos_parcerias") }}',
+          dataType: 'json', delay: 250,
+          data: p => ({ q: p.term }),
+          processResults: d => ({ results: d }),
+          cache: true
+        }
+      });
+      $('#instrumento_alteracao').val(instrumento);
+      if (altNumero >= 100) {
+        $('#alt_numero_apostilamento').val(Math.floor(altNumero / 100));
+        $('#alt_numero_aditamento').val(altNumero % 100);
+      } else if (altNumero > 0) {
+        $('#alt_numero_simples').val(altNumero);
+      }
+      $('#alt_numero').val(altNumero);
+      mostrarCamposNumeracao(instrumento);
+      $('#alt_status').val(data.status || '');
+      if (data.status === 'Concluído') {
+        $('#campo-sei-documento-container').show();
+        $('#alt_sei_documento').prop('required', true).val(data.sei_documento || '');
+        $('#alt_data_assinatura').prop('required', true).val(data.data_assinatura || '');
+      } else {
+        $('#campo-sei-documento-container').hide();
+        $('#alt_sei_documento').prop('required', false).val('');
+        $('#alt_data_assinatura').prop('required', false).val('');
+      }
+      if (data.responsavel) $('#alt_responsavel').val(data.responsavel.split(';').map(r => r.trim()));
+      $('#alt_observacao').val(data.observacao || '');
+      // New kanban fields
+      $('#alt_prioridade').val(data.prioridade || '');
+      $('#alt_data_inicio').val(data.data_inicio || '');
+      $('#alt_data_conclusao').val(data.data_conclusao || '');
+      $('#alt_marcadores').val(data.marcadores || '');
+      // Rebuild tipos
+      $('#tipos-alteracao-container').empty();
+      contadorTipos = 0;
+      tiposSelecionados.clear();
+      if (data.tipos && data.tipos.length > 0) {
+        for (let i = 0; i < data.tipos.length; i++) adicionarSecaoTipo();
+        setTimeout(() => {
+          data.tipos.forEach((tipo, idx) => {
+            const sel = $(`#alt_tipo_${idx + 1}`);
+            if (sel.length) {
+              sel.val(tipo).trigger('change');
+              atualizarCampoDinamico(idx + 1);
+              tiposSelecionados.add(tipo);
+              // Set info value after DOM update
+              setTimeout(() => {
+                const info = data.infos[idx] || '';
+                if (!info) return;
+                const conf = tiposCampos[tipo];
+                if (!conf) return;
+                if (conf.tipo === 'date_range') {
+                  const parts = info.split('|');
+                  $(`#campo_info_${idx + 1} [name="alt_info_inicio[]"]`).val(parts[0] || '');
+                  $(`#campo_info_${idx + 1} [name="alt_info_fim[]"]`).val(parts[1] || '');
+                } else if (conf.tipo === 'money') {
+                  $(`#campo_info_${idx + 1} [name="alt_info[]"]`).val(info);
+                } else {
+                  $(`#campo_info_${idx + 1} [name="alt_info[]"]`).val(info);
+                }
+              }, 200);
+            }
+          });
+        }, 100);
+      }
+      const actionUrl = `{{ url_for('parcerias.atualizar_alteracao') }}?numero_termo=${encodeURIComponent(numeroTermo)}&instrumento=${encodeURIComponent(instrumento)}&alt_numero=${altNumero}`;
+      $('#formAlteracao').attr('action', actionUrl);
+      $('#modalCadastroLabel').html('<i class="bi bi-pencil"></i> Editar Alteração');
+      $('#modalCadastroAlteracao').modal('show');
+    },
+    error: function(xhr) {
+      alert('Erro ao carregar dados: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+    }
+  });
+}
+
+// ====================================================
+// CONFIRMAR EXCLUSÃO
+// ====================================================
+function confirmarExclusao(numeroTermo, instrumento, altNumero) {
+  document.getElementById('termoExcluir').textContent = numeroTermo;
+  document.getElementById('instrumentoExcluir').textContent = instrumento;
+  document.getElementById('numeroExcluir').textContent = altNumero;
+  const url = `{{ url_for('parcerias.deletar_alteracao') }}?numero_termo=${encodeURIComponent(numeroTermo)}&instrumento=${encodeURIComponent(instrumento)}&alt_numero=${altNumero}`;
+  document.getElementById('formExcluir').action = url;
+  new bootstrap.Modal(document.getElementById('modalExcluir')).show();
+}
+
+// ====================================================
+// "NOVA ALTERAÇÃO" PRÉ-PREENCHENDO STATUS
+// ====================================================
+function novoCardStatus(status) {
+  $('#modalCadastroAlteracao').modal('show');
+  // Wait for modal to open and select2/DOM to init
+  setTimeout(() => { $('#alt_status').val(status).trigger('change'); }, 400);
+}
+
+// ====================================================
+// OCULTAR / REEXIBIR CARD
+// ====================================================
+function ocultarCard(numero, instrumento, altNumero, oculto) {
+  $.ajax({
+    url: '/parcerias/alteracao/ocultar',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify({ numero_termo: numero, instrumento: instrumento, alt_numero: parseInt(altNumero), oculto: oculto }),
+    success: function(r) {
+      if (r.success) location.reload();
+      else alert('Erro: ' + (r.error || ''));
+    },
+    error: function() { alert('Erro ao ocultar card.'); }
+  });
+}
+
+// ====================================================
+// SORTABLEJS - DRAG & DROP
+// ====================================================
+document.querySelectorAll('.sortable-container').forEach(function(el) {
+  Sortable.create(el, {
+    group: 'alteracoes',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    dragClass: 'sortable-drag',
+    onEnd: function(evt) {
+      const item = evt.item;
+      const novoStatus = evt.to.dataset.status;
+      const oldStatus  = evt.from.dataset.status;
+      if (novoStatus === oldStatus && evt.oldIndex === evt.newIndex) return;
+
+      const numero     = item.dataset.numero;
+      const instrumento = item.dataset.instrumento;
+      const altNumero  = parseInt(item.dataset.altNumero);
+      const temSei     = item.dataset.sei;
+
+      const doMove = () => {
+        $.ajax({
+          url: '/parcerias/alteracao/mover',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ numero_termo: numero, instrumento: instrumento, alt_numero: altNumero, novo_status: novoStatus }),
+          success: function(r) {
+            if (!r.success) {
+              alert('Erro ao mover: ' + (r.error || ''));
+              evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex] || null);
+            } else {
+              item.dataset.status = novoStatus;
+              // Update badges
+              atualizarBadgesContagem();
+            }
+          },
+          error: function() {
+            alert('Erro ao mover card.');
+            evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex] || null);
+          }
+        });
+      };
+
+      if (novoStatus === 'Concluído' && !temSei) {
+        if (!confirm('Este card não tem SEI cadastrado. Deseja marcar como "Concluído" mesmo assim?')) {
+          evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex] || null);
+          return;
+        }
+      }
+      doMove();
+    }
+  });
+});
+
+function atualizarBadgesContagem() {
+  document.querySelectorAll('.kanban-column').forEach(function(col, i) {
+    const body = col.querySelector('.sortable-container');
+    const badge = col.querySelector('.badge.rounded-pill');
+    if (badge && body) badge.textContent = body.querySelectorAll('.kanban-card').length;
+  });
+}
+
+// ====================================================
+// CLIENT-SIDE FILTERS
+// ====================================================
+function aplicarFiltros() {
+  const texto      = (document.getElementById('filtroTexto').value || '').toLowerCase();
+  const resp       = (document.getElementById('filtroResponsavel').value || '').toLowerCase();
+  const prio       = (document.getElementById('filtroPrioridade').value || '').toLowerCase();
+
+  // Board view: filter cards
+  document.querySelectorAll('.kanban-card').forEach(function(card) {
+    const num    = (card.dataset.numero || '').toLowerCase();
+    const osc    = (card.dataset.osc || '').toLowerCase();
+    const tipos  = (card.dataset.tipos || '').toLowerCase();
+    const cardResp = (card.dataset.responsavel || '').toLowerCase();
+    const cardPrio = (card.dataset.prioridade || '').toLowerCase();
+
+    const textMatch = !texto || num.includes(texto) || osc.includes(texto) || tipos.includes(texto);
+    const respMatch = !resp  || cardResp.includes(resp);
+    const prioMatch = !prio  || cardPrio === prio;
+
+    card.style.display = (textMatch && respMatch && prioMatch) ? '' : 'none';
+  });
+
+  // Table view: filter rows
+  document.querySelectorAll('.table-row-filterable').forEach(function(row) {
+    const num    = (row.dataset.numero || '').toLowerCase();
+    const osc    = (row.dataset.osc || '').toLowerCase();
+    const tipos  = (row.dataset.tipos || '').toLowerCase();
+    const rowResp = (row.dataset.responsavel || '').toLowerCase();
+    const rowPrio = (row.dataset.prioridade || '').toLowerCase();
+
+    const textMatch = !texto || num.includes(texto) || osc.includes(texto) || tipos.includes(texto);
+    const respMatch = !resp  || rowResp.includes(resp);
+    const prioMatch = !prio  || rowPrio === prio;
+
+    row.style.display = (textMatch && respMatch && prioMatch) ? '' : 'none';
+  });
+
+  // Update badge counts after filter
+  atualizarBadgesContagem();
+}
+
+function limparFiltros() {
+  document.getElementById('filtroTexto').value = '';
+  document.getElementById('filtroResponsavel').value = '';
+  document.getElementById('filtroPrioridade').value = '';
+  aplicarFiltros();
+}
+
+// ====================================================
+// MARCADORES: load colors on page ready and apply
+// ====================================================
+$(document).ready(function() {
+  $.get('/parcerias/api/marcadores', function(data) {
+    const coresMap = {};
+    const paleta = { 'Vermelho':'#fee2e2','Laranja':'#ffedd5','Amarelo':'#fef9c3','Verde':'#dcfce7','Azul':'#dbeafe','Roxo':'#ede9fe','Rosa':'#fce7f3','Cinza':'#e9ecef' };
+    data.forEach(m => { coresMap[m.nome] = paleta[m.cor] || paleta['Cinza']; });
+    document.querySelectorAll('.marcador-pill').forEach(function(pill) {
+      const nome = pill.dataset.nome;
+      if (nome && coresMap[nome]) pill.style.background = coresMap[nome];
+    });
+  });
+});
+</script>
+</body>
+</html>

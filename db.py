@@ -22,7 +22,7 @@ def _get_pool() -> ThreadedConnectionPool:
     """Retorna o pool de conexões, inicializando-o na primeira chamada."""
     global _pool
     if _pool is None:
-        _pool = ThreadedConnectionPool(minconn=2, maxconn=10, **DB_CONFIG)
+        _pool = ThreadedConnectionPool(minconn=2, maxconn=20, **DB_CONFIG)
     return _pool
 
 

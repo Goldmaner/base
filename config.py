@@ -25,6 +25,11 @@ DB_CONFIG = {
 }
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-padrao')
+
+# Módulos liberados automaticamente para todo usuário cadastrado (pack básico).
+# Esses módulos não precisam de permissão explícita — são garantidos pelo decorator
+# e adicionados à sessão no login, para que os botões da home apareçam corretamente.
+ACESSOS_BASICOS = ['ferias', 'manuais']
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Configuração de e-mail (SMTP)

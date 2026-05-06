@@ -1,0 +1,457 @@
+﻿<!-- templates/parcerias_metas_dicionario.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DicionÃ¡rio de Metas â€” FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f4f3f8; padding: 20px; }
+
+    .page-header {
+      background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+      color: #fff;
+      padding: 22px 28px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 18px rgba(124,58,237,.28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+    .btn-parc {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600; transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-parc:hover { opacity: .88; color: #fff; }
+    .btn-parc-sm { padding: 4px 10px; font-size: .82rem; }
+
+    /* Abas */
+    .nav-tabs .nav-link { color: #4c1d95; font-weight: 500; }
+    .nav-tabs .nav-link.active {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border-color: transparent;
+      border-radius: 8px 8px 0 0;
+    }
+    .nav-tabs { border-bottom: 2px solid #7c3aed; margin-bottom: 0; }
+
+    .tab-card {
+      background: #fff;
+      border-radius: 0 10px 10px 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+      padding: 20px 24px;
+    }
+
+    .dict-table th { background: #f0ebff; color: #4c1d95; font-weight: 600; }
+    .dict-table td { vertical-align: middle; }
+
+    .editable-field { cursor: pointer; min-height: 24px; display: block; }
+    .editable-field:empty::before { content: 'â€”'; color: #aaa; }
+    .editable-field:hover { background: #f8f5ff; border-radius: 4px; }
+    .edit-input    { width: 100%; border: 1.5px solid #7c3aed; border-radius: 6px; padding: 4px 8px; font-size: .9rem; }
+    .edit-textarea { width: 100%; border: 1.5px solid #7c3aed; border-radius: 6px; padding: 4px 8px; font-size: .85rem; min-height: 56px; resize: vertical; }
+
+    /* Toast */
+    #toastContainer { position: fixed; bottom: 24px; right: 24px; z-index: 9999; }
+    .toast-msg { min-width: 220px; border-radius: 10px; font-size: .9rem; }
+
+    /* Add form */
+    .add-row-form { background: #f8f5ff; border-radius: 8px; padding: 12px 16px; margin-top: 12px; border: 1px dashed #7c3aed; }
+  </style>
+</head>
+<body>
+
+<!-- â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+  <div>
+    <h2><i class="bi bi-book"></i> DicionÃ¡rio de Indicadores e Meios de AferiÃ§Ã£o</h2>
+    <p>Gerencie os termos utilizados no Quadro de Metas. Novos termos sÃ£o criados automaticamente ao salvar uma meta.</p>
+  </div>
+  <a href="{{ url_for('parcerias_metas.index') }}" class="btn-parc btn-parc-sm text-decoration-none">
+    <i class="bi bi-arrow-left"></i> Voltar ao Quadro de Metas
+  </a>
+</div>
+
+<!-- â”€â”€ Abas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<ul class="nav nav-tabs" id="dictTabs" role="tablist">
+  <li class="nav-item">
+    <button class="nav-link active" id="tab-ind-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-ind"
+            type="button" role="tab">
+      <i class="bi bi-graph-up-arrow me-1"></i>
+      Indicadores
+      <span class="badge bg-secondary ms-1">{{ indicadores|length }}</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" id="tab-meio-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-meio"
+            type="button" role="tab">
+      <i class="bi bi-rulers me-1"></i>
+      Meios de AferiÃ§Ã£o
+      <span class="badge bg-secondary ms-1">{{ meios_afericao|length }}</span>
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="dictTabsContent">
+
+  <!-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ TAB 1: Indicadores â”€â”€ -->
+  <div class="tab-pane fade show active" id="tab-ind" role="tabpanel">
+    <div class="tab-card">
+
+      <div class="d-flex justify-content-end mb-3">
+        <button class="btn-parc btn-parc-sm" onclick="toggleAddForm('add-indicador')">
+          <i class="bi bi-plus-circle"></i> Novo Indicador
+        </button>
+      </div>
+
+      <!-- FormulÃ¡rio adicionar -->
+      <div id="add-indicador" class="add-row-form d-none mb-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label small fw-bold mb-1">Indicador *</label>
+            <input type="text" id="new-ind-nome" class="form-control form-control-sm" placeholder="Nome do indicador">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label small fw-bold mb-1">DescriÃ§Ã£o</label>
+            <input type="text" id="new-ind-desc" class="form-control form-control-sm" placeholder="DescriÃ§Ã£o breve">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-bold mb-1">ObservaÃ§Ã£o</label>
+            <input type="text" id="new-ind-obs" class="form-control form-control-sm" placeholder="ObservaÃ§Ã£o">
+          </div>
+        </div>
+        <div class="mt-2 d-flex gap-2">
+          <button class="btn-parc btn-parc-sm" onclick="adicionarIndicador()">
+            <i class="bi bi-check2"></i> Salvar
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="toggleAddForm('add-indicador')">Cancelar</button>
+        </div>
+      </div>
+
+      <table class="table table-sm table-hover dict-table" id="tab-indicadores">
+        <thead>
+          <tr>
+            <th style="width:22%">Indicador</th>
+            <th style="width:44%">DescriÃ§Ã£o</th>
+            <th style="width:26%">ObservaÃ§Ã£o</th>
+            <th style="width:8%">AÃ§Ãµes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ind in indicadores %}
+          <tr id="ind-row-{{ ind.id }}" data-id="{{ ind.id }}">
+            <td><span class="editable-field" onclick="iniciarEdicao(this,'text')" data-field="indicador">{{ ind.indicador or '' }}</span></td>
+            <td><span class="editable-field" onclick="iniciarEdicao(this,'textarea')" data-field="descricao">{{ ind.descricao or '' }}</span></td>
+            <td><span class="editable-field" onclick="iniciarEdicao(this,'textarea')" data-field="observacao">{{ ind.observacao or '' }}</span></td>
+            <td>
+              <button class="btn btn-sm btn-outline-danger" title="Excluir" onclick="excluirIndicador({{ ind.id }})">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr id="ind-empty"><td colspan="4" class="text-center text-muted fst-italic py-3">Nenhum indicador cadastrado ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div><!-- /tab-ind -->
+
+  <!-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ TAB 2: Meios de AferiÃ§Ã£o â”€â”€ -->
+  <div class="tab-pane fade" id="tab-meio" role="tabpanel">
+    <div class="tab-card">
+
+      <div class="d-flex justify-content-end mb-3">
+        <button class="btn-parc btn-parc-sm" onclick="toggleAddForm('add-meio')">
+          <i class="bi bi-plus-circle"></i> Novo Meio de AferiÃ§Ã£o
+        </button>
+      </div>
+
+      <!-- FormulÃ¡rio adicionar -->
+      <div id="add-meio" class="add-row-form d-none mb-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label small fw-bold mb-1">Meio de AferiÃ§Ã£o *</label>
+            <input type="text" id="new-meio-nome" class="form-control form-control-sm" placeholder="Nome do meio">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label small fw-bold mb-1">DescriÃ§Ã£o</label>
+            <input type="text" id="new-meio-desc" class="form-control form-control-sm" placeholder="DescriÃ§Ã£o breve">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-bold mb-1">ObservaÃ§Ã£o</label>
+            <input type="text" id="new-meio-obs" class="form-control form-control-sm" placeholder="ObservaÃ§Ã£o">
+          </div>
+        </div>
+        <div class="mt-2 d-flex gap-2">
+          <button class="btn-parc btn-parc-sm" onclick="adicionarMeio()">
+            <i class="bi bi-check2"></i> Salvar
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="toggleAddForm('add-meio')">Cancelar</button>
+        </div>
+      </div>
+
+      <table class="table table-sm table-hover dict-table" id="tab-meios">
+        <thead>
+          <tr>
+            <th style="width:22%">Meio de AferiÃ§Ã£o</th>
+            <th style="width:44%">DescriÃ§Ã£o</th>
+            <th style="width:26%">ObservaÃ§Ã£o</th>
+            <th style="width:8%">AÃ§Ãµes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in meios_afericao %}
+          <tr id="meio-row-{{ m.id }}" data-id="{{ m.id }}">
+            <td><span class="editable-field" onclick="iniciarEdicao(this,'text')" data-field="meios_afericao">{{ m.meios_afericao or '' }}</span></td>
+            <td><span class="editable-field" onclick="iniciarEdicao(this,'textarea')" data-field="descricao">{{ m.descricao or '' }}</span></td>
+            <td><span class="editable-field" onclick="iniciarEdicao(this,'textarea')" data-field="observacao">{{ m.observacao or '' }}</span></td>
+            <td>
+              <button class="btn btn-sm btn-outline-danger" title="Excluir" onclick="excluirMeio({{ m.id }})">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr id="meio-empty"><td colspan="4" class="text-center text-muted fst-italic py-3">Nenhum meio de aferiÃ§Ã£o cadastrado ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div><!-- /tab-meio -->
+
+</div><!-- /tab-content -->
+
+<!-- â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<div id="toastContainer"></div>
+
+<!-- â”€â”€ Modal confirmaÃ§Ã£o exclusÃ£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<div class="modal fade" id="modalExcluir" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h6 class="modal-title fw-bold text-danger"><i class="bi bi-exclamation-triangle"></i> Confirmar exclusÃ£o</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-0">
+        <p id="excluirMsg" class="mb-0 text-muted small"></p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-danger" id="btnConfirmarExcluir">Excluir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const URLS = {
+  indicadores: '/parcerias-metas/api/indicadores',
+  meios:       '/parcerias-metas/api/meios-afericao',
+};
+
+// â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function mostrarToast(msg, tipo = 'success') {
+  const c = document.getElementById('toastContainer');
+  const id = 'toast_' + Date.now();
+  const bg = tipo === 'success' ? '#198754' : '#dc3545';
+  c.insertAdjacentHTML('beforeend', `
+    <div id="${id}" class="toast-msg text-white mb-2 p-3 rounded shadow" style="background:${bg}">
+      ${msg}
+    </div>`);
+  setTimeout(() => document.getElementById(id)?.remove(), 3500);
+}
+
+// â”€â”€ Toggle formulÃ¡rio de adiÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function toggleAddForm(id) {
+  document.getElementById(id).classList.toggle('d-none');
+}
+
+// â”€â”€ EdiÃ§Ã£o inline (clique na cÃ©lula) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function iniciarEdicao(span, tipo) {
+  if (span.querySelector('input,textarea')) return;
+  const valorAtual = span.textContent.trim();
+  const field = span.dataset.field;
+  const tr = span.closest('tr');
+  const id = tr.dataset.id;
+  const tabId = tr.closest('table').id;
+  const ehIndicador = tabId === 'tab-indicadores';
+
+  let el;
+  if (tipo === 'textarea') {
+    el = document.createElement('textarea');
+    el.className = 'edit-textarea';
+  } else {
+    el = document.createElement('input');
+    el.type = 'text';
+    el.className = 'edit-input';
+  }
+  el.value = valorAtual;
+  span.innerHTML = '';
+  span.appendChild(el);
+  el.focus();
+
+  async function salvar() {
+    const novoValor = el.value.trim();
+    span.textContent = novoValor;
+
+    const cells = tr.querySelectorAll('td span.editable-field');
+    const payload = {};
+    cells.forEach(s => { payload[s.dataset.field] = s.textContent.trim() || null; });
+    payload[field] = novoValor || null;
+
+    try {
+      const url = ehIndicador ? `${URLS.indicadores}/${id}` : `${URLS.meios}/${id}`;
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.erro || 'Erro ao salvar');
+      mostrarToast('Salvo com sucesso!');
+    } catch (e) {
+      mostrarToast(e.message, 'danger');
+    }
+  }
+
+  el.addEventListener('blur', salvar);
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && tipo === 'text') { e.preventDefault(); el.blur(); }
+    if (e.key === 'Escape') { span.textContent = valorAtual; }
+  });
+}
+
+// â”€â”€ Adicionar novo indicador â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function adicionarIndicador() {
+  const nome = document.getElementById('new-ind-nome').value.trim();
+  if (!nome) { mostrarToast('Nome do indicador Ã© obrigatÃ³rio', 'danger'); return; }
+  const desc = document.getElementById('new-ind-desc').value.trim();
+  const obs  = document.getElementById('new-ind-obs').value.trim();
+
+  try {
+    const res = await fetch(URLS.indicadores, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ indicador: nome, descricao: desc || null, observacao: obs || null }),
+    });
+    const json = await res.json();
+    if (res.status === 409) { mostrarToast('Este indicador jÃ¡ existe.', 'danger'); return; }
+    if (!res.ok) throw new Error(json.erro || 'Erro ao criar');
+
+    const tbody = document.querySelector('#tab-indicadores tbody');
+    document.getElementById('ind-empty')?.remove();
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr id="ind-row-${json.id}" data-id="${json.id}">
+        <td><span class="editable-field" onclick="iniciarEdicao(this,'text')" data-field="indicador">${nome}</span></td>
+        <td><span class="editable-field" onclick="iniciarEdicao(this,'textarea')" data-field="descricao">${desc}</span></td>
+        <td><span class="editable-field" onclick="iniciarEdicao(this,'textarea')" data-field="observacao">${obs}</span></td>
+        <td><button class="btn btn-sm btn-outline-danger" title="Excluir" onclick="excluirIndicador(${json.id})"><i class="bi bi-trash3"></i></button></td>
+      </tr>`);
+
+    // Atualiza badge da aba
+    const badge = document.querySelector('#tab-ind-btn .badge');
+    if (badge) badge.textContent = parseInt(badge.textContent || '0') + 1;
+
+    document.getElementById('new-ind-nome').value = '';
+    document.getElementById('new-ind-desc').value = '';
+    document.getElementById('new-ind-obs').value  = '';
+    toggleAddForm('add-indicador');
+    mostrarToast('Indicador criado!');
+  } catch (e) {
+    mostrarToast(e.message, 'danger');
+  }
+}
+
+// â”€â”€ Adicionar novo meio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function adicionarMeio() {
+  const nome = document.getElementById('new-meio-nome').value.trim();
+  if (!nome) { mostrarToast('Nome do meio Ã© obrigatÃ³rio', 'danger'); return; }
+  const desc = document.getElementById('new-meio-desc').value.trim();
+  const obs  = document.getElementById('new-meio-obs').value.trim();
+
+  try {
+    const res = await fetch(URLS.meios, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meios_afericao: nome, descricao: desc || null, observacao: obs || null }),
+    });
+    const json = await res.json();
+    if (res.status === 409) { mostrarToast('Este meio jÃ¡ existe.', 'danger'); return; }
+    if (!res.ok) throw new Error(json.erro || 'Erro ao criar');
+
+    const tbody = document.querySelector('#tab-meios tbody');
+    document.getElementById('meio-empty')?.remove();
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr id="meio-row-${json.id}" data-id="${json.id}">
+        <td><span class="editable-field" onclick="iniciarEdicao(this,'text')" data-field="meios_afericao">${nome}</span></td>
+        <td><span class="editable-field" onclick="iniciarEdicao(this,'textarea')" data-field="descricao">${desc}</span></td>
+        <td><span class="editable-field" onclick="iniciarEdicao(this,'textarea')" data-field="observacao">${obs}</span></td>
+        <td><button class="btn btn-sm btn-outline-danger" title="Excluir" onclick="excluirMeio(${json.id})"><i class="bi bi-trash3"></i></button></td>
+      </tr>`);
+
+    // Atualiza badge da aba
+    const badge = document.querySelector('#tab-meio-btn .badge');
+    if (badge) badge.textContent = parseInt(badge.textContent || '0') + 1;
+
+    document.getElementById('new-meio-nome').value = '';
+    document.getElementById('new-meio-desc').value = '';
+    document.getElementById('new-meio-obs').value  = '';
+    toggleAddForm('add-meio');
+    mostrarToast('Meio de aferiÃ§Ã£o criado!');
+  } catch (e) {
+    mostrarToast(e.message, 'danger');
+  }
+}
+
+// â”€â”€ ExclusÃ£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let _excluirCallback = null;
+const modalExcluir = new bootstrap.Modal(document.getElementById('modalExcluir'));
+
+function excluirIndicador(id) {
+  document.getElementById('excluirMsg').textContent = 'Tem certeza que deseja excluir este indicador?';
+  _excluirCallback = async () => {
+    const res = await fetch(`${URLS.indicadores}/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      document.getElementById(`ind-row-${id}`)?.remove();
+      const badge = document.querySelector('#tab-ind-btn .badge');
+      if (badge) badge.textContent = Math.max(0, parseInt(badge.textContent || '1') - 1);
+      mostrarToast('Indicador excluÃ­do.');
+    } else {
+      mostrarToast('Erro ao excluir.', 'danger');
+    }
+  };
+  modalExcluir.show();
+}
+
+function excluirMeio(id) {
+  document.getElementById('excluirMsg').textContent = 'Tem certeza que deseja excluir este meio de aferiÃ§Ã£o?';
+  _excluirCallback = async () => {
+    const res = await fetch(`${URLS.meios}/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      document.getElementById(`meio-row-${id}`)?.remove();
+      const badge = document.querySelector('#tab-meio-btn .badge');
+      if (badge) badge.textContent = Math.max(0, parseInt(badge.textContent || '1') - 1);
+      mostrarToast('Meio de aferiÃ§Ã£o excluÃ­do.');
+    } else {
+      mostrarToast('Erro ao excluir.', 'danger');
+    }
+  };
+  modalExcluir.show();
+}
+
+document.getElementById('btnConfirmarExcluir').addEventListener('click', async () => {
+  modalExcluir.hide();
+  if (_excluirCallback) { await _excluirCallback(); _excluirCallback = null; }
+});
+</script>
+</body>
+</html>
+

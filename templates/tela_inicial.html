@@ -194,7 +194,7 @@
           <i class="bi bi-house-door-fill s-icon" style="font-size:1.05rem;"></i>
           <span>Geral</span>
           <span class="s-spacer"></span>
-          <span class="s-count">5</span>
+          <span class="s-count">6</span>
           <i class="bi bi-chevron-down s-chev"></i>
         </button>
         <div id="collapseGeral" class="accordion-collapse collapse show" data-bs-parent="#accordionModulos">
@@ -222,7 +222,11 @@
             {% if is_admin or 'manuais' in user_acessos %}
             <a href="{{ url_for('manuais.index') }}" class="faf-btn">
               <i class="bi bi-journal-bookmark-fill"></i> Biblioteca Informativa
-
+            </a>
+            {% endif %}
+            {% if is_admin or 'parcerias_metas' in user_acessos %}
+            <a href="{{ url_for('parcerias_metas.index') }}" class="faf-btn">
+              <i class="bi bi-clipboard2-check"></i> Quadro de Metas
             </a>
             {% endif %}
           </div>

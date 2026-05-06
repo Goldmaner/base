@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from werkzeug.security import check_password_hash, generate_password_hash
 from db import get_cursor, get_db
 from utils import login_required
+from config import ACESSOS_BASICOS
 import secrets
 import random
 from datetime import datetime, timedelta
@@ -85,7 +86,14 @@ def login():
             session["user_id"] = user["id"]
             session["email"] = user["email"]
             session["tipo_usuario"] = user["tipo_usuario"]
-            session["acessos"] = user["acessos"] or ""
+            # Mescla o pack básico nos acessos da sessão para que os botões da home
+            # sejam exibidos mesmo sem atribuição manual dessas permissões.
+            acessos_db = user["acessos"] or ""
+            acessos_lista = [a.strip() for a in acessos_db.split(';') if a.strip()]
+            for basico in ACESSOS_BASICOS:
+                if basico not in acessos_lista:
+                    acessos_lista.append(basico)
+            session["acessos"] = ';'.join(acessos_lista)
             session["d_usuario"] = user["d_usuario"] or ""
             session["session_token"] = novo_token
             session["sessao_ativa_aviso"] = sessao_ativa  # Flag para mostrar aviso
@@ -196,14 +204,15 @@ def criar_usuario():
         # Gerar hash da senha
         senha_hash = generate_password_hash(senha)
         
-        # Inserir no banco
+        # Inserir no banco com pack básico de acessos
         cur = get_cursor()
         try:
+            acessos_padrao = ';'.join(ACESSOS_BASICOS)
             cur.execute("""
-                INSERT INTO gestao_pessoas.usuarios (email, senha, tipo_usuario, d_usuario)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO gestao_pessoas.usuarios (email, senha, tipo_usuario, d_usuario, acessos)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
-            """, (email, senha_hash, tipo_usuario, d_usuario if d_usuario else None))
+            """, (email, senha_hash, tipo_usuario, d_usuario if d_usuario else None, acessos_padrao))
             
             novo_id = cur.fetchone()["id"]
             get_db().commit()

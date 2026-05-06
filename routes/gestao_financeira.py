@@ -2435,8 +2435,8 @@ def api_sincronizar_empenhos():
             else:
                 return 'Empenhado Parcialmente'
         
-        # PASSO 1: Buscar todos os empenhos do back_empenhos
-        print("[DEBUG] Buscando empenhos do SOF...")
+        # PASSO 1: Buscar empenhos do back_empenhos a partir de 2026
+        print("[DEBUG] Buscando empenhos do SOF (a partir de 2026)...")
         cur.execute("""
             SELECT 
                 cod_idt_eph,
@@ -2449,6 +2449,7 @@ def api_sincronizar_empenhos():
             FROM gestao_financeira.back_empenhos
             WHERE cod_nro_pcss_sof IS NOT NULL
               AND cod_cta_desp = '33503900'
+              AND dt_eph >= date_trunc('year', CURRENT_DATE)
             ORDER BY cod_nro_pcss_sof, cod_item_desp_sof, cod_eph
         """)
         
@@ -2554,8 +2555,8 @@ def api_sincronizar_empenhos():
         
         print(f"[DEBUG] Mapeados {len(processo_to_termo)} processos para termos")
         
-        # PASSO 3: Buscar parcelas programadas de ultra_liquidacoes (apenas ano 2026)
-        print("[DEBUG] Buscando parcelas programadas de 2026...")
+        # PASSO 3: Buscar parcelas programadas de ultra_liquidacoes (vigência em 2026 em diante)
+        print("[DEBUG] Buscando parcelas programadas com vigência a partir de 2026...")
         cur.execute("""
             SELECT 
                 id,
@@ -2566,11 +2567,24 @@ def api_sincronizar_empenhos():
                 valor_previsto
             FROM gestao_financeira.ultra_liquidacoes
             WHERE parcela_tipo = 'Programada'
-              AND EXTRACT(YEAR FROM vigencia_inicial) = EXTRACT(YEAR FROM CURRENT_DATE)
+              AND vigencia_final >= date_trunc('year', CURRENT_DATE)
             ORDER BY numero_termo, id
         """)
         
         parcelas_programadas = cur.fetchall()
+        
+        # Buscar todos os termos que existem em ultra_liquidacoes (para distinguir encerrados de ausentes)
+        cur.execute("""
+            SELECT DISTINCT numero_termo
+            FROM gestao_financeira.ultra_liquidacoes
+            WHERE parcela_tipo = 'Programada'
+        """)
+        termos_em_ultra = set()
+        for row in cur.fetchall():
+            try:
+                termos_em_ultra.add(row['numero_termo'])
+            except (KeyError, TypeError):
+                termos_em_ultra.add(row[0])
         
         # Organizar por termo (lista ordenada por id)
         parcelas_por_termo = {}
@@ -2662,8 +2676,11 @@ def api_sincronizar_empenhos():
             
             numero_termo = processo_to_termo[processo_norm]
             
-            # Verificar se tem parcelas programadas E parcelas de acompanhamento
+            # Verificar se tem parcelas programadas com vigência a partir de 2026
             if numero_termo not in parcelas_por_termo:
+                if numero_termo in termos_em_ultra:
+                    # Termo existe mas todas as parcelas são anteriores a 2026 — encerrado, ignorar
+                    continue
                 relatorio['alertas'].append(f"⚠️ Termo {numero_termo} não tem parcelas Programadas em ultra_liquidacoes")
                 continue
             
