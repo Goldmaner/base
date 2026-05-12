@@ -152,7 +152,7 @@ Registro de todas as alterações DGP (25+ tipos).
 | `instrumento_alteracao` | varchar(80) | Tipo de instrumento (Aditamento, Apostilamento...) |
 | `alt_numero` | integer | Número sequencial da alteração |
 | `alt_tipo` | varchar(100) | Tipo específico da alteração |
-| `alt_status` | text | Status atual |
+| `alt_status` | varchar(30) | Status atual |
 | `alt_info` | text | Novo valor |
 | `alt_old_info` | text | Valor anterior |
 | `alt_responsavel` | varchar(80) | Responsável pela alteração |
@@ -1151,26 +1151,53 @@ Emendas parlamentares vinculadas a celebrações.
 
 ---
 
-### `celebracao.celebracao_metas` ⭐
-Quadro de Metas do Plano de Trabalho. Múltiplas metas por processo SEI (1:N).
+### `celebracao.celebracao_objetivos` ⭐
+Catálogo de Objetivos do Plano de Trabalho. Um objetivo agrega um conjunto de metas para um processo SEI.
 
-> **Criado em:** 05/05/2026  
-> **Referência:** Módulo Parcerias Metas (`/parcerias-metas`)  
-> **Script DDL:** `scripts/criar_tabelas_parcerias_metas.sql`
+> **Criado em:** 11/05/2026 (migração `scripts/archive/_migration_objetivos.sql`)  
+> **Referência:** Módulo Parcerias Metas (`/parcerias-metas`)
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | `id` | integer PK | |
-| `sei_numero` | varchar(30) NOT NULL | Referência lógica a processo SEI — 3 fontes possíveis |
+| `sei_numero` | varchar(30) NOT NULL | Referência lógica a processo SEI |
+| `objetivo` | text NOT NULL | Texto do objetivo específico |
+| `indicadores_ids` | integer[] | IDs de `categoricas.c_dgp_indicadores` |
+| `indicadores_ni` | boolean DEFAULT false | Indicadores "não identificados" |
+| `meta_obs_indicadores` | text[] | Observações por indicador (paralelo ao array acima) |
+| `meios_afericao_ids` | integer[] | IDs de `categoricas.c_dgp_meios_afericao` |
+| `meios_ni` | boolean DEFAULT false | Meios "não identificados" |
+| `ordem` | integer DEFAULT 0 | Ordem de exibição dentro do SEI |
+| `criado_por` | text | |
+| `criado_em` | timestamp DEFAULT NOW() | |
+| `atualizado_por` | text | |
+| `atualizado_em` | timestamp | |
+
+**Índice:**
+```sql
+CREATE INDEX idx_celebracao_objetivos_sei ON celebracao.celebracao_objetivos (sei_numero);
+```
+
+---
+
+### `celebracao.celebracao_metas` ⭐
+Metas do Plano de Trabalho. Cada meta pertence a um Objetivo (FK `objetivo_id`).  
+Hierarquia: **SEI → Objetivo (`celebracao_objetivos`) → Metas (`celebracao_metas`)**.
+
+> **Reestruturado em:** 11/05/2026 — colunas de objetivo/indicadores/meios movidas para `celebracao_objetivos`  
+> **Referência:** Módulo Parcerias Metas (`/parcerias-metas`)
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | integer PK | |
+| `objetivo_id` | integer FK NOT NULL | → `celebracao_objetivos.id` ON DELETE CASCADE |
+| `sei_numero` | varchar(30) NOT NULL | Denormalizado para facilitar queries diretas |
 | `meta_titulo` | varchar(300) NOT NULL | Título conciso da meta |
-| `meta_descricao` | text | Descrição detalhada da meta |
-| `meta_objetivo` | text | Objetivo específico desta meta |
-| `meta_tipo_ids` | **integer[]** | Array de IDs de `categoricas.c_dgp_meta_tipos` — ver nota abaixo |
-| `indicadores_id` | integer | Ref. lógica a `categoricas.c_dgp_indicadores` |
-| `meta_obs_indicador` | text | Observações complementares sobre o indicador |
-| `meios_afericao_id` | integer | Ref. lógica a `categoricas.c_dgp_meios_afericao` |
+| `meta_descricao` | text | Descrição detalhada |
+| `meta_tipo_ids` | **integer[]** | IDs de `categoricas.c_dgp_meta_tipos` — ver nota abaixo |
+| `tipos_ni` | boolean DEFAULT false | Tipos "não identificados" |
 | `observacoes` | text | Observações gerais |
-| `ordem` | integer DEFAULT 0 | Ordem de exibição no quadro de metas |
+| `ordem` | integer DEFAULT 0 | Ordem dentro do objetivo |
 | `criado_por` | text | |
 | `criado_em` | timestamp DEFAULT NOW() | |
 | `atualizado_por` | text | |
@@ -1178,8 +1205,9 @@ Quadro de Metas do Plano de Trabalho. Múltiplas metas por processo SEI (1:N).
 
 **Índices:**
 ```sql
-CREATE INDEX idx_celebracao_metas_sei_numero ON celebracao.celebracao_metas (sei_numero);
-CREATE INDEX idx_celebracao_metas_tipo_ids  ON celebracao.celebracao_metas USING GIN (meta_tipo_ids);
+CREATE INDEX idx_celebracao_metas_objetivo_id  ON celebracao.celebracao_metas (objetivo_id);
+CREATE INDEX idx_celebracao_metas_sei_numero   ON celebracao.celebracao_metas (sei_numero);
+CREATE INDEX idx_celebracao_metas_tipo_ids     ON celebracao.celebracao_metas USING GIN (meta_tipo_ids);
 ```
 
 **Fontes do campo `sei_numero`** (union query na API `/api/sei-numeros`):
@@ -1335,13 +1363,14 @@ Snapshot de encaminhamentos de pagamento para auditoria.
 
 > **Criado em:** 05/05/2026 | **Blueprint:** `/parcerias-metas` | **Script DDL:** `scripts/criar_tabelas_parcerias_metas.sql`
 
-O módulo de Quadro de Metas armazena as metas do Plano de Trabalho vinculadas a um processo SEI. Utiliza 4 tabelas categóricas como catálogos e 1 tabela principal com relação 1:N por `sei_numero`.
+O módulo de Quadro de Metas armazena as metas do Plano de Trabalho vinculadas a um processo SEI. Hierarquia de 3 níveis: **SEI → Objetivo → Metas**.
 
 ### Tabelas do módulo
 
 | Tabela | Schema | Função |
 |--------|--------|--------|
-| `celebracao.celebracao_metas` | celebracao | Tabela principal — 1:N por `sei_numero` |
+| `celebracao.celebracao_objetivos` | celebracao | Objetivo por SEI — 1:N por `sei_numero` |
+| `celebracao.celebracao_metas` | celebracao | Meta por Objetivo — 1:N via FK `objetivo_id` |
 | `categoricas.c_dgp_meta_tipos` | categoricas | Catálogo de tipos (`tipo_classificacao` livre) |
 | `categoricas.c_dgp_indicadores` | categoricas | Catálogo de indicadores |
 | `categoricas.c_dgp_meios_afericao` | categoricas | Catálogo de meios de aferição |
@@ -1440,17 +1469,19 @@ celebracao.celebracao_parcerias.sei_celeb
     ├── celebracao.celebracao_parcerias_infos_adicionais.sei_celeb (1:1)
     └── celebracao.celebracao_parcerias_sei.sei_celeb          (1:N)
 
--- Metas: sei_numero cruza 3 fontes (relação lógica, não FK declarada)
-celebracao.celebracao_metas.sei_numero
-    ← public.parcerias.sei_celeb             (Parceria)
-    ← celebracao.celebracao_parcerias.sei_celeb  (Celebração)
-    ← public.parcerias_edital.edital_processo_sei (Edital)
+-- Quadro de Metas: hierarquia SEI → Objetivo → Meta
+celebracao.celebracao_objetivos.sei_numero
+    ← public.parcerias.sei_celeb                  (lógica, sem FK)
+    ← celebracao.celebracao_parcerias.sei_celeb   (lógica, sem FK)
+    ← public.parcerias_edital.edital_processo_sei (lógica, sem FK)
+celebracao.celebracao_objetivos.indicadores_ids[]
+    ← categoricas.c_dgp_indicadores.id            (N:N via array)
+celebracao.celebracao_objetivos.meios_afericao_ids[]
+    ← categoricas.c_dgp_meios_afericao.id         (N:N via array)
+celebracao.celebracao_objetivos.id
+    └── celebracao.celebracao_metas.objetivo_id   (1:N, CASCADE DELETE)
 celebracao.celebracao_metas.meta_tipo_ids[]
-    ← categoricas.c_dgp_meta_tipos.id       (N:N via array)
-celebracao.celebracao_metas.indicadores_id
-    ← categoricas.c_dgp_indicadores.id      (N:1)
-celebracao.celebracao_metas.meios_afericao_id
-    ← categoricas.c_dgp_meios_afericao.id   (N:1)
+    ← categoricas.c_dgp_meta_tipos.id             (N:N via array)
 
 gestao_financeira.ultra_liquidacoes.parcela_numero
     └── gestao_financeira.ultra_liquidacoes_cronograma.parcela_numero (1:N)
@@ -1489,8 +1520,10 @@ CREATE INDEX idx_conc_extrato_termo_indice ON analises_pc.conc_extrato(numero_te
 CREATE INDEX idx_back_empenhos_cta_desp ON gestao_financeira.back_empenhos(cod_cta_desp);
 
 -- Quadro de Metas (celebracao)
-CREATE INDEX idx_celebracao_metas_sei_numero ON celebracao.celebracao_metas (sei_numero);
-CREATE INDEX idx_celebracao_metas_tipo_ids   ON celebracao.celebracao_metas USING GIN (meta_tipo_ids);
+CREATE INDEX idx_celebracao_objetivos_sei      ON celebracao.celebracao_objetivos (sei_numero);
+CREATE INDEX idx_celebracao_metas_objetivo_id  ON celebracao.celebracao_metas (objetivo_id);
+CREATE INDEX idx_celebracao_metas_sei_numero   ON celebracao.celebracao_metas (sei_numero);
+CREATE INDEX idx_celebracao_metas_tipo_ids     ON celebracao.celebracao_metas USING GIN (meta_tipo_ids);
 
 -- Log / Auditoria
 CREATE INDEX idx_log_recurso_tipo_id ON gestao_pessoas.log_atividades(recurso_tipo, recurso_id);

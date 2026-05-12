@@ -53,6 +53,8 @@ def listar():
     data_inicio_ate = request.args.get('data_inicio_ate', '').strip()
     data_termino_de = request.args.get('data_termino_de', '').strip()
     data_termino_ate = request.args.get('data_termino_ate', '').strip()
+    periodo_inicio = request.args.get('periodo_inicio', '').strip()
+    periodo_fim = request.args.get('periodo_fim', '').strip()
 
     # Obter parâmetro de paginação (padrão: 100)
     limite = request.args.get('limite', '100')
@@ -178,6 +180,7 @@ def listar():
             COALESCE(tp.total_pago, 0)           AS total_pago,
             p.sei_celeb,
             p.sei_pc,
+            p.edital_nome,
             lpg.pessoa_gestora,
             lpg.status_pg,
             lpg.solicitacao,
@@ -188,7 +191,8 @@ def listar():
             COALESCE(cro.valor_mes_24, 0)        AS valor_mes_24,
             inf.abrangencia,
             inf.data_suspensao,
-            inf.data_retomada
+            inf.data_retomada,
+            d.dotacao_orcamentaria
         FROM public.Parcerias p
         LEFT JOIN last_pg   lpg  ON lpg.numero_termo  = p.numero_termo
         LEFT JOIN total_pago tp  ON tp.numero_termo   = p.numero_termo
@@ -196,6 +200,13 @@ def listar():
         LEFT JOIN enderecos end_ ON end_.numero_termo = p.numero_termo
         LEFT JOIN cronograma cro ON cro.numero_termo  = p.numero_termo
         LEFT JOIN infos inf      ON inf.numero_termo  = p.numero_termo
+        LEFT JOIN LATERAL (
+            SELECT STRING_AGG(DISTINCT be.txt_dotacao_fmt, ' | ') AS dotacao_orcamentaria
+            FROM gestao_financeira.back_empenhos be
+            WHERE be.cod_nro_pcss_sof = REGEXP_REPLACE(p.sei_celeb, '[^0-9]', '', 'g')
+              AND be.txt_dotacao_fmt IS NOT NULL
+              AND be.cod_nro_pcss_sof IS NOT NULL
+        ) d ON true
         WHERE 1=1
     """
 
@@ -355,7 +366,21 @@ def listar():
     if data_termino_ate:
         query += " AND p.final <= %s"
         params.append(data_termino_ate)
-    
+
+    # Filtro por período de vigência (sobreposição): traz todos os termos que estiveram
+    # ativos em qualquer momento dentro do intervalo informado.
+    # Lógica: termo.inicio <= periodo_fim  AND  termo.final >= periodo_inicio
+    if periodo_inicio and periodo_fim:
+        query += " AND p.inicio <= %s AND p.final >= %s"
+        params.append(periodo_fim)
+        params.append(periodo_inicio)
+    elif periodo_inicio:
+        query += " AND p.final >= %s"
+        params.append(periodo_inicio)
+    elif periodo_fim:
+        query += " AND p.inicio <= %s"
+        params.append(periodo_fim)
+
     # Filtro de status
     if filtro_status:
         condicoes_status = []
@@ -452,9 +477,23 @@ def listar():
                              parcerias=[],
                              tipos_contrato=tipos_contrato,
                              pessoas_gestoras_filtro=pessoas_gestoras_filtro,
+                             editais_filtro=[],
+                             abrangencia_opcoes=[],
                              contagem_status={},
                              total_geral=0,
                              limite_atual=limite,
+                             filtro_termo=filtro_termo, filtro_osc=filtro_osc, filtro_projeto=filtro_projeto,
+                             filtro_tipo_termo=filtro_tipo_termo, filtro_status=filtro_status,
+                             filtro_pessoa_gestora=filtro_pessoa_gestora, filtro_edital=filtro_edital,
+                             filtro_endereco=filtro_endereco, filtro_abrangencia=filtro_abrangencia,
+                             filtro_cnpj=filtro_cnpj, filtro_portaria=filtro_portaria,
+                             filtro_contrapartida=filtro_contrapartida,
+                             busca_sei_celeb=busca_sei_celeb, busca_sei_pc=busca_sei_pc,
+                             data_assinatura_inicio=data_assinatura_inicio, data_assinatura_fim=data_assinatura_fim,
+                             data_inicio_de=data_inicio_de, data_inicio_ate=data_inicio_ate,
+                             data_termino_de=data_termino_de, data_termino_ate=data_termino_ate,
+                             periodo_inicio=periodo_inicio, periodo_fim=periodo_fim,
+                             limite=limite,
                              erro=f"Erro ao carregar parcerias: {str(e)}. Há uma data inválida no banco de dados.")
     
     # Calcular status para cada parceria
@@ -530,6 +569,8 @@ def listar():
                          data_inicio_ate=data_inicio_ate,
                          data_termino_de=data_termino_de,
                          data_termino_ate=data_termino_ate,
+                         periodo_inicio=periodo_inicio,
+                         periodo_fim=periodo_fim,
                          limite=limite,
                          contagem_status=contagem_status,
                          total_geral=total_geral)
@@ -1584,6 +1625,8 @@ def exportar_csv():
         data_inicio_ate = request.args.get('data_inicio_ate', '').strip()
         data_termino_de = request.args.get('data_termino_de', '').strip()
         data_termino_ate = request.args.get('data_termino_ate', '').strip()
+        periodo_inicio = request.args.get('periodo_inicio', '').strip()
+        periodo_fim = request.args.get('periodo_fim', '').strip()
         filtro_cnpj = request.args.get('filtro_cnpj', '').strip()
         filtro_portaria = request.args.get('filtro_portaria', '').strip()
         filtro_abrangencia = request.args.getlist('filtro_abrangencia')
@@ -1592,6 +1635,8 @@ def exportar_csv():
         incluir_valor_mes = request.args.get('incluir_valor_mes', 'false') == 'true'
         incluir_valor_mes_23 = request.args.get('incluir_valor_mes_23', 'false') == 'true'
         incluir_valor_mes_24 = request.args.get('incluir_valor_mes_24', 'false') == 'true'
+        incluir_edital = request.args.get('incluir_edital', 'false') == 'true'
+        incluir_dotacao = request.args.get('incluir_dotacao', 'false') == 'true'
         
         cur = get_cursor()
         
@@ -1613,6 +1658,11 @@ def exportar_csv():
                 p.sei_plano,
                 p.sei_orcamento,
                 p.transicao,
+                p.edital_nome,
+                (SELECT STRING_AGG(DISTINCT be.txt_dotacao_fmt, ' | ')
+                 FROM gestao_financeira.back_empenhos be
+                 WHERE be.cod_nro_pcss_sof = REGEXP_REPLACE(p.sei_celeb, '[^0-9]', '', 'g')
+                   AND be.txt_dotacao_fmt IS NOT NULL) AS dotacao_orcamentaria,
                 (SELECT pg.nome_pg 
                  FROM parcerias_pg pg 
                  WHERE pg.numero_termo = p.numero_termo 
@@ -1773,6 +1823,18 @@ def exportar_csv():
             query += " AND p.final <= %s"
             params.append(data_termino_ate)
 
+        # Filtro por período de vigência (sobreposição)
+        if periodo_inicio and periodo_fim:
+            query += " AND p.inicio <= %s AND p.final >= %s"
+            params.append(periodo_fim)
+            params.append(periodo_inicio)
+        elif periodo_inicio:
+            query += " AND p.final >= %s"
+            params.append(periodo_inicio)
+        elif periodo_fim:
+            query += " AND p.inicio <= %s"
+            params.append(periodo_fim)
+
         if filtro_cnpj:
             query += " AND p.cnpj ILIKE %s"
             params.append(f"%{filtro_cnpj}%")
@@ -1873,6 +1935,12 @@ def exportar_csv():
         if incluir_endereco:
             cabecalho.append('Endereço')
 
+        if incluir_edital:
+            cabecalho.append('Edital')
+
+        if incluir_dotacao:
+            cabecalho.append('Dotação Orçamentária')
+
         if incluir_valor_mes:
             cabecalho.append('Valor Mês Detalhado')
         if incluir_valor_mes_23:
@@ -1912,6 +1980,12 @@ def exportar_csv():
             if incluir_endereco:
                 endereco = parceria.get('endereco_completo') or 'Não preenchido'
                 linha.append(endereco)
+
+            if incluir_edital:
+                linha.append(parceria.get('edital_nome') or '-')
+
+            if incluir_dotacao:
+                linha.append(parceria.get('dotacao_orcamentaria') or '-')
 
             if incluir_valor_mes:
                 v = float(parceria.get('valor_mes_detalhado') or 0)
@@ -4464,6 +4538,120 @@ def salvar_alteracao():
         return redirect(url_for('parcerias.dgp_kanban'))
 
 
+@parcerias_bp.route("/alteracao/salvar-lote", methods=["POST"])
+@login_required
+@requires_access('dgp_alteracoes')
+def salvar_alteracao_lote():
+    """
+    Salva múltiplas alterações em lote para Despacho Autorizatório.
+    Cada linha gera um registro em public.termos_alteracoes com o mesmo alt_lote_id.
+    Rollback total em caso de qualquer erro.
+    """
+    cur = get_cursor()
+    try:
+        instrumento = 'Despacho Autorizatório'
+        alt_status = request.form.get('alt_status', '').strip()
+        alt_responsaveis = request.form.getlist('alt_responsavel[]')
+        alt_responsavel = ';'.join([r.strip() for r in alt_responsaveis if r.strip()])
+        alt_prioridade = request.form.get('alt_prioridade', '').strip() or None
+        alt_data_inicio = request.form.get('alt_data_inicio', '').strip() or None
+        alt_data_conclusao = request.form.get('alt_data_conclusao', '').strip() or None
+        alt_marcadores = request.form.get('alt_marcadores', '').strip() or None
+        alt_observacao = request.form.get('alt_observacao', '').strip() or None
+        data_assinatura = request.form.get('alt_data_assinatura', '').strip() or None
+
+        if not alt_status or not alt_responsavel:
+            return jsonify(success=False, message='Status e Responsável são obrigatórios.')
+
+        lote_tipos = request.form.getlist('lote_tipo[]')
+        lote_termos = request.form.getlist('lote_numero_termo[]')
+        lote_infos = request.form.getlist('lote_info[]')
+        lote_seis = request.form.getlist('lote_sei_doc[]')
+
+        # Garantir mesmo comprimento para zip
+        while len(lote_seis) < len(lote_termos):
+            lote_seis.append('')
+        while len(lote_infos) < len(lote_termos):
+            lote_infos.append('')
+
+        if not lote_termos or not any(t.strip() for t in lote_termos):
+            return jsonify(success=False, message='Adicione pelo menos uma linha ao lote.')
+
+        # Validar todas as linhas antes de qualquer insert
+        for i, (tipo, termo) in enumerate(zip(lote_tipos, lote_termos), 1):
+            if not tipo.strip() or not termo.strip():
+                return jsonify(success=False, message=f'Linha {i}: tipo e número do termo são obrigatórios.')
+
+        # Verificar duplicatas: (numero_termo + instrumento + alt_numero=0)
+        for i, (tipo, termo) in enumerate(zip(lote_tipos, lote_termos), 1):
+            cur.execute("""
+                SELECT COUNT(*) AS total FROM public.termos_alteracoes
+                WHERE numero_termo = %s AND instrumento_alteracao = %s AND alt_numero = 0
+            """, (termo.strip(), instrumento))
+            dup = cur.fetchone()
+            if dup and dup['total'] > 0:
+                return jsonify(success=False,
+                    message=f'Linha {i}: Já existe um Despacho Autorizatório para o termo {termo.strip()}.')
+
+        # Gerar alt_lote_id único
+        cur.execute("SELECT COALESCE(MAX(alt_lote_id), 0) + 1 AS novo_id FROM public.termos_alteracoes")
+        alt_lote_id = cur.fetchone()['novo_id']
+
+        usuario_atual = session.get('email', 'Sistema')
+        data_fim_sql = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+        registros = 0
+
+        for tipo, termo, info, sei in zip(lote_tipos, lote_termos, lote_infos, lote_seis):
+            tipo = tipo.strip()
+            termo = termo.strip()
+            info = info.strip() if info else None
+            sei = sei.strip() if sei else None
+
+            if not tipo or not termo:
+                continue
+
+            alt_old_info = None
+            if alt_status == 'Concluído' and info:
+                alt_old_info = _capturar_valor_antigo(cur, termo, tipo)
+
+            data_assinatura_salvar = data_assinatura if alt_status == 'Concluído' else None
+
+            cur.execute(f"""
+                INSERT INTO public.termos_alteracoes
+                (numero_termo, instrumento_alteracao, alt_numero, alt_tipo, alt_status,
+                 alt_info, alt_old_info, alt_responsavel, alt_observacao,
+                 alt_data_cadastro_inicio, alt_data_cadastro_fim, criado_por,
+                 termo_sei_doc, data_assinatura,
+                 alt_prioridade, alt_data_inicio, alt_data_conclusao, alt_marcadores,
+                 alt_lote_id)
+                VALUES (%s, %s, 0, %s, %s, %s, %s, %s, %s, NOW(), {data_fim_sql}, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                termo, instrumento, tipo, alt_status,
+                info, alt_old_info,
+                alt_responsavel, alt_observacao,
+                usuario_atual, sei, data_assinatura_salvar,
+                alt_prioridade, alt_data_inicio, alt_data_conclusao, alt_marcadores,
+                alt_lote_id
+            ))
+
+            if alt_status == 'Concluído' and info:
+                _atualizar_tabela_original(cur, termo, tipo, info, 0, instrumento)
+
+            registros += 1
+
+        get_db().commit()
+        cur.close()
+        return jsonify(success=True,
+            message=f'{registros} registro(s) cadastrado(s) em lote com sucesso! (Lote #{alt_lote_id})',
+            count=registros)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        get_db().rollback()
+        return jsonify(success=False, message=f'Erro ao salvar lote: {str(e)}')
+
+
 def _salvar_sei_parcerias(cur, numero_termo, instrumento_alteracao, alt_numero, sei_documento, data_assinatura):
     """
     Salva/atualiza o número SEI do documento e data de assinatura em public.parcerias_sei.
@@ -5242,7 +5430,8 @@ def dgp_kanban():
                 BOOL_OR(COALESCE(t.alt_oculto, FALSE)) AS alt_oculto,
                 MAX(t.alt_marcadores) AS alt_marcadores,
                 MAX(t.alt_data_cadastro_inicio) AS alt_data_cadastro_inicio,
-                p.osc AS osc
+                p.osc AS osc,
+                MAX(p.sei_celeb) AS sei_celeb
             FROM public.termos_alteracoes t
             LEFT JOIN public.parcerias p ON t.numero_termo = p.numero_termo
             GROUP BY t.numero_termo, t.instrumento_alteracao, t.alt_numero, p.osc

@@ -27,3 +27,6 @@ beautifulsoup4==4.12.3
 # Utilitarios de data e texto
 python-dateutil==2.9.0.post0
 num2words==0.5.13
+
+# Transcrição de áudio (Email Assistente)
+faster-whisper==1.1.1

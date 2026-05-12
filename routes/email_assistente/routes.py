@@ -7,14 +7,32 @@ dos emails recebidos via Outlook COM Automation (sem senha/IMAP).
 Acesso: apenas usuários do tipo 'Agente Público' (is_admin).
 """
 
+import os
+import json
+import tempfile
 from flask import (
     render_template, jsonify, request,
-    session, redirect, url_for, flash
+    session, redirect, url_for, flash,
+    Response, stream_with_context
 )
+from werkzeug.utils import secure_filename
 from utils import login_required
 from .email_reader import listar_emails, testar_conexao_imap, listar_pastas, listar_compromissos
 from .ia_resumo import resumir_lote, testar_api
 from . import email_assistente_bp
+
+# Extensões de áudio aceitas
+_AUDIO_EXTS = {'.mp3', '.mp4', '.m4a', '.wav', '.ogg', '.flac', '.webm', '.mpeg'}
+
+# Modelo Whisper carregado uma única vez (lazy)
+_whisper_model = None
+
+def _get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+    return _whisper_model
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -108,4 +126,52 @@ def calendario():
         return jsonify({'compromissos': compromissos, 'total': len(compromissos)})
     except Exception as e:
         return jsonify({'error': f'Erro ao acessar calendário: {e}'}), 500
+
+
+@email_assistente_bp.route('/transcrever', methods=['POST'])
+@login_required
+def transcrever_audio():
+    """Transcreve um arquivo de áudio via SSE — envia progresso % em tempo real."""
+    if not _apenas_admin():
+        return jsonify({'error': 'Acesso negado'}), 403
+
+    if 'audio' not in request.files:
+        return jsonify({'error': 'Nenhum arquivo enviado.'}), 400
+
+    arquivo = request.files['audio']
+    if not arquivo.filename:
+        return jsonify({'error': 'Nome de arquivo inválido.'}), 400
+
+    ext = os.path.splitext(secure_filename(arquivo.filename))[1].lower()
+    if ext not in _AUDIO_EXTS:
+        return jsonify({'error': f'Formato não suportado: {ext}. Use mp3, wav, m4a, ogg, flac ou webm.'}), 400
+
+    # Salva o arquivo ANTES do generator (fora do contexto de stream)
+    tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+    arquivo.save(tmp)
+    tmp_path = tmp.name
+    tmp.close()
+
+    def _stream(path):
+        try:
+            model = _get_whisper_model()
+            segments, info = model.transcribe(path, beam_size=5, language="pt")
+            duracao = max(info.duration, 0.001)
+            partes = []
+            for seg in segments:
+                partes.append(seg.text.strip())
+                pct = min(int(seg.end / duracao * 100), 99)
+                yield f"data: {json.dumps({'pct': pct, 'parcial': ' '.join(partes)})}\n\n"
+            yield f"data: {json.dumps({'pct': 100, 'done': True, 'texto': ' '.join(partes), 'idioma': info.language, 'duracao': round(info.duration, 1)})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    return Response(
+        stream_with_context(_stream(tmp_path)),
+        mimetype='text/event-stream',
+        headers={'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'},
+    )
 

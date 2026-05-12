@@ -113,6 +113,9 @@
       <p>Resumo automático dos seus emails Outlook com inteligência artificial (Gemini)</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+      <button class="btn-adm outline" onclick="abrirModalTranscricao()">
+        <i class="bi bi-mic-fill"></i> Transcrever Áudio
+      </button>
       <button class="btn-adm outline" onclick="testarIA()">
         <i class="bi bi-cpu"></i> Testar IA
       </button>
@@ -232,9 +235,144 @@
   </div>
 </div>
 
+<!-- ── Modal: Transcrição de Áudio ─────────────────────────────────────────── -->
+<div class="modal fade" id="modalTranscricao" tabindex="-1" aria-labelledby="modalTranscricaoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#7f1d1d,#dc2626);color:#fff;">
+        <h5 class="modal-title" id="modalTranscricaoLabel">
+          <i class="bi bi-mic-fill me-2"></i>Transcrever Áudio
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          Selecione um arquivo de áudio (mp3, wav, m4a, ogg, flac, webm). A transcrição é feita localmente com o modelo Whisper — sem envio para APIs externas.
+        </p>
+        <div class="mb-3">
+          <label for="inputAudio" class="form-label fw-semibold">Arquivo de áudio</label>
+          <input type="file" class="form-control" id="inputAudio"
+                 accept=".mp3,.mp4,.m4a,.wav,.ogg,.flac,.webm,.mpeg">
+        </div>
+        <div id="transcricaoLoading" class="py-3 d-none">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>Transcrevendo...</span>
+            <span id="transcricaoPct" class="fw-bold small" style="color:#dc2626;">0%</span>
+          </div>
+          <div class="progress mb-2" style="height:8px;">
+            <div id="transcricaoBar" class="progress-bar" role="progressbar"
+                 style="width:0%;background:#dc2626;transition:width .3s ease;"
+                 aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+          <p class="text-muted small mb-0" id="transcricaoParcial"
+             style="font-style:italic;min-height:1.5em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"></p>
+        </div>
+        <div id="transcricaoResultado" class="d-none">
+          <label class="form-label fw-semibold">Transcrição</label>
+          <div id="transcricaoMeta" class="text-muted small mb-2"></div>
+          <textarea id="transcricaoTexto" class="form-control" rows="10"
+                    style="font-size:.9rem;resize:vertical;" readonly></textarea>
+          <button class="btn-adm mt-2" onclick="copiarTranscricao()">
+            <i class="bi bi-clipboard me-1"></i>Copiar
+          </button>
+        </div>
+        <div id="transcricaoErro" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn-adm" id="btnTranscreveEnviar" onclick="enviarTranscricao()">
+          <i class="bi bi-send me-1"></i>Transcrever
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ─────────────────────────────────────────────────────────────────────────── -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  let _modalTranscricao = null;
+
+  function abrirModalTranscricao() {
+    if (!_modalTranscricao) {
+      _modalTranscricao = new bootstrap.Modal(document.getElementById('modalTranscricao'));
+    }
+    // reset state
+    document.getElementById('inputAudio').value = '';
+    document.getElementById('transcricaoLoading').classList.add('d-none');
+    document.getElementById('transcricaoResultado').classList.add('d-none');
+    document.getElementById('transcricaoErro').classList.add('d-none');
+    document.getElementById('btnTranscreveEnviar').disabled = false;
+    _atualizarProgresso(0, '');
+    _modalTranscricao.show();
+  }
+
+  async function enviarTranscricao() {
+    const input = document.getElementById('inputAudio');
+    if (!input.files.length) {
+      document.getElementById('transcricaoErro').textContent = 'Selecione um arquivo de áudio.';
+      document.getElementById('transcricaoErro').classList.remove('d-none');
+      return;
+    }
+    document.getElementById('transcricaoErro').classList.add('d-none');
+    document.getElementById('transcricaoResultado').classList.add('d-none');
+    document.getElementById('transcricaoLoading').classList.remove('d-none');
+    document.getElementById('btnTranscreveEnviar').disabled = true;
+    _atualizarProgresso(0, '');
+
+    const form = new FormData();
+    form.append('audio', input.files[0]);
+
+    try {
+      const r = await fetch('/email-assistente/transcrever', {method: 'POST', body: form});
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({error: 'Erro desconhecido'}));
+        throw new Error(err.error || 'Erro na requisição');
+      }
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, {stream: true});
+        const blocos = buf.split('\n\n');
+        buf = blocos.pop();
+        for (const bloco of blocos) {
+          if (!bloco.startsWith('data: ')) continue;
+          const d = JSON.parse(bloco.slice(6));
+          if (d.error) throw new Error(d.error);
+          _atualizarProgresso(d.pct, d.parcial || '');
+          if (d.done) {
+            document.getElementById('transcricaoLoading').classList.add('d-none');
+            document.getElementById('transcricaoTexto').value = d.texto || '(sem resultado)';
+            document.getElementById('transcricaoMeta').textContent =
+              `Idioma detectado: ${d.idioma || '-'} · Duração: ${d.duracao || '-'}s`;
+            document.getElementById('transcricaoResultado').classList.remove('d-none');
+          }
+        }
+      }
+    } catch(e) {
+      document.getElementById('transcricaoLoading').classList.add('d-none');
+      document.getElementById('transcricaoErro').textContent = 'Erro: ' + e.message;
+      document.getElementById('transcricaoErro').classList.remove('d-none');
+    } finally {
+      document.getElementById('btnTranscreveEnviar').disabled = false;
+    }
+  }
+
+  function _atualizarProgresso(pct, parcial) {
+    document.getElementById('transcricaoBar').style.width = pct + '%';
+    document.getElementById('transcricaoPct').textContent = pct + '%';
+    if (parcial) document.getElementById('transcricaoParcial').textContent = parcial.slice(-150);
+  }
+
+  function copiarTranscricao() {
+    const txt = document.getElementById('transcricaoTexto');
+    txt.select();
+    navigator.clipboard.writeText(txt.value).catch(() => document.execCommand('copy'));
+  }
+
   let _todosEmails = [];
 
   // ── Testar conexão Outlook COM ────────────────────────────────────────────

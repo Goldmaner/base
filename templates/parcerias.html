@@ -270,6 +270,26 @@
             </button>
             <div class="collapse" id="secaoDatas">
               <div class="card card-body mt-2">
+                <!-- Período de Vigência (sobreposição) -->
+                <div class="row g-3 mb-3">
+                  <div class="col-md-12">
+                    <h6 class="text-muted mb-1"><i class="bi bi-calendar-check"></i> Período de Vigência</h6>
+                    <small class="text-muted">Traz termos que estiveram ativos em <strong>qualquer momento</strong> dentro do intervalo.</small>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="periodo_inicio" class="form-label">De</label>
+                    <input type="date" class="form-control" id="periodo_inicio" name="periodo_inicio"
+                           value="{{ periodo_inicio or '' }}">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="periodo_fim" class="form-label">Até</label>
+                    <input type="date" class="form-control" id="periodo_fim" name="periodo_fim"
+                           value="{{ periodo_fim or '' }}">
+                  </div>
+                </div>
+
+                <hr>
+
                 <!-- Data de Assinatura -->
                 <div class="row g-3 mb-3">
                   <div class="col-md-12">
@@ -368,6 +388,18 @@
           Endereço
         </label>
       </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="chk_edital" onchange="toggleColunaEdital()">
+        <label class="form-check-label" for="chk_edital">
+          Edital
+        </label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="chk_dotacao" onchange="toggleColunaDotacao()">
+        <label class="form-check-label" for="chk_dotacao">
+          Dotação Orçamentária
+        </label>
+      </div>
     </div>
 
     <!-- Tabela de Parcerias -->
@@ -405,6 +437,8 @@
               <th class="text-center">SEI de Celebração</th>
               <th class="text-center">SEI de Pagamento</th>
               <th class="text-center col-endereco" style="display: none;">Endereço</th>
+              <th class="text-center col-edital" style="display: none;">Edital</th>
+              <th class="text-center col-dotacao" style="display: none;">Dotação Orçamentária</th>
               <th class="text-center">Ações</th>
             </tr>
           </thead>
@@ -456,6 +490,14 @@
                     {% endif %}
                   {% else %}
                     <span class="text-muted">Não preenchido</span>
+                  {% endif %}
+                </td>
+                <td class="col-edital text-center" style="display: none;">{{ parceria.edital_nome or '-' }}</td>
+                <td class="col-dotacao" style="display: none;">
+                  {% if parceria.dotacao_orcamentaria %}
+                    <span title="{{ parceria.dotacao_orcamentaria }}">{{ parceria.dotacao_orcamentaria[:60] }}{% if parceria.dotacao_orcamentaria|length > 60 %}...{% endif %}</span>
+                  {% else %}
+                    <span class="text-muted">-</span>
                   {% endif %}
                 </td>
                 <td class="text-center">
@@ -551,11 +593,31 @@
       });
       salvarPreferencias();
     }
+
+    // Toggle da coluna de edital
+    function toggleColunaEdital() {
+      const mostrar = document.getElementById('chk_edital').checked;
+      document.querySelectorAll('.col-edital').forEach(col => {
+        col.style.display = mostrar ? '' : 'none';
+      });
+      salvarPreferencias();
+    }
+
+    // Toggle da coluna de dotação orçamentária
+    function toggleColunaDotacao() {
+      const mostrar = document.getElementById('chk_dotacao').checked;
+      document.querySelectorAll('.col-dotacao').forEach(col => {
+        col.style.display = mostrar ? '' : 'none';
+      });
+      salvarPreferencias();
+    }
     
     // Salvar preferências no localStorage
     function salvarPreferencias() {
       const preferencias = {
         chk_endereco: document.getElementById('chk_endereco').checked,
+        chk_edital: document.getElementById('chk_edital').checked,
+        chk_dotacao: document.getElementById('chk_dotacao').checked,
         filtro_endereco_preenchido: document.getElementById('endereco_preenchido').checked,
         filtro_endereco_nao_preenchido: document.getElementById('endereco_nao_preenchido').checked
       };
@@ -573,6 +635,18 @@
           if (prefs.chk_endereco) {
             document.getElementById('chk_endereco').checked = true;
             toggleColunaEndereco();
+          }
+
+          // Restaurar checkbox de edital
+          if (prefs.chk_edital) {
+            document.getElementById('chk_edital').checked = true;
+            toggleColunaEdital();
+          }
+
+          // Restaurar checkbox de dotação
+          if (prefs.chk_dotacao) {
+            document.getElementById('chk_dotacao').checked = true;
+            toggleColunaDotacao();
           }
           
           // Restaurar filtros de endereço (apenas se não vieram da URL)
@@ -639,6 +713,18 @@
       const incluirEndereco = document.getElementById('chk_endereco').checked;
       if (incluirEndereco) {
         params.set('incluir_endereco', 'true');
+      }
+
+      // Adicionar parâmetro de edital se checkbox estiver marcado
+      const incluirEdital = document.getElementById('chk_edital').checked;
+      if (incluirEdital) {
+        params.set('incluir_edital', 'true');
+      }
+
+      // Adicionar parâmetro de dotação se checkbox estiver marcado
+      const incluirDotacao = document.getElementById('chk_dotacao').checked;
+      if (incluirDotacao) {
+        params.set('incluir_dotacao', 'true');
       }
       
       const exportUrl = '{{ url_for("parcerias.exportar_csv") }}' + '?' + params.toString();

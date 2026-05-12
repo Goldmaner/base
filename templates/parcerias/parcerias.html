@@ -406,6 +406,21 @@
             </div>
 
             <div class="row g-3">
+              <!-- Período de Vigência (overlap) -->
+              <div class="col-md-4">
+                <label class="form-label fw-semibold" style="font-size:.82rem;"><i class="bi bi-calendar-check me-1"></i>Período de Vigência</label>
+                <div style="font-size:.74rem;color:#64748b;margin-bottom:4px;">Traz termos ativos em <strong>qualquer momento</strong> do intervalo.</div>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text" style="font-size:.75rem;">De</span>
+                  <input type="date" class="form-control" name="periodo_inicio" id="periodo_inicio"
+                         value="{{ periodo_inicio or '' }}" onchange="atualizarContadorFiltros()">
+                </div>
+                <div class="input-group input-group-sm mt-1">
+                  <span class="input-group-text" style="font-size:.75rem;">Até</span>
+                  <input type="date" class="form-control" name="periodo_fim" id="periodo_fim"
+                         value="{{ periodo_fim or '' }}" onchange="atualizarContadorFiltros()">
+                </div>
+              </div>
               <!-- Assinatura -->
               <div class="col-md-4">
                 <label class="form-label fw-semibold" style="font-size:.82rem;"><i class="bi bi-pen me-1"></i>Assinatura</label>
@@ -434,7 +449,7 @@
                          value="{{ data_inicio_ate or '' }}" onchange="atualizarContadorFiltros()">
                 </div>
               </div>
-              <!-- Término -->
+              <!-- Término (segunda linha) -->
               <div class="col-md-4">
                 <label class="form-label fw-semibold" style="font-size:.82rem;"><i class="bi bi-stop-circle me-1"></i>Data de Término</label>
                 <div class="input-group input-group-sm">
@@ -475,6 +490,14 @@
     <div class="form-check mb-0">
       <input class="form-check-input" type="checkbox" id="chk_endereco" onchange="toggleColunaEndereco()">
       <label class="form-check-label" for="chk_endereco">Endereço</label>
+    </div>
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" id="chk_edital" onchange="toggleColunaEdital()">
+      <label class="form-check-label" for="chk_edital">Edital</label>
+    </div>
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" id="chk_dotacao" onchange="toggleColunaDotacao()">
+      <label class="form-check-label" for="chk_dotacao">Dotação Orçamentária</label>
     </div>
     <div class="form-check mb-0">
       <input class="form-check-input" type="checkbox" id="chk_valor_mes" onchange="toggleColunaValorMes()">
@@ -525,6 +548,8 @@
               <th class="text-center">SEI de Celebração</th>
               <th class="text-center">SEI de Pagamento</th>
               <th class="text-center col-endereco" style="display: none;">Endereço</th>
+              <th class="text-center col-edital" style="display: none;">Edital</th>
+              <th class="text-center col-dotacao" style="display: none;">Dotação Orçamentária</th>
               <th class="text-center col-valor-mes" style="display: none;">Valor Mês Detalhado</th>
               <th class="text-center col-valor-mes-23" style="display: none;">Valor Mês 23</th>
               <th class="text-center col-valor-mes-24" style="display: none;">Valor Mês 24</th>
@@ -579,6 +604,14 @@
                     {% endif %}
                   {% else %}
                     <span class="text-muted">Não preenchido</span>
+                  {% endif %}
+                </td>
+                <td class="text-center col-edital" style="display: none;">{{ parceria.edital_nome or '-' }}</td>
+                <td class="col-dotacao" style="display: none;">
+                  {% if parceria.dotacao_orcamentaria %}
+                    <span title="{{ parceria.dotacao_orcamentaria }}">{{ parceria.dotacao_orcamentaria[:60] }}{% if parceria.dotacao_orcamentaria|length > 60 %}...{% endif %}</span>
+                  {% else %}
+                    <span class="text-muted">-</span>
                   {% endif %}
                 </td>
                 <td class="text-end col-valor-mes" style="display: none;">
@@ -689,7 +722,8 @@
       const dataPairs = [
         ['data_assinatura_inicio', 'data_assinatura_fim'],
         ['data_inicio_de', 'data_inicio_ate'],
-        ['data_termino_de', 'data_termino_ate']
+        ['data_termino_de', 'data_termino_ate'],
+        ['periodo_inicio', 'periodo_fim']
       ];
       dataPairs.forEach(([d1, d2]) => {
         if ((document.getElementById(d1)?.value || '') || (document.getElementById(d2)?.value || ''))
@@ -755,7 +789,8 @@
     function limparDatas() {
       ['data_assinatura_inicio','data_assinatura_fim',
        'data_inicio_de','data_inicio_ate',
-       'data_termino_de','data_termino_ate'].forEach(id => {
+       'data_termino_de','data_termino_ate',
+       'periodo_inicio','periodo_fim'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -766,6 +801,18 @@
     function toggleColunaEndereco() {
       const mostrar = document.getElementById('chk_endereco').checked;
       document.querySelectorAll('.col-endereco').forEach(col => col.style.display = mostrar ? '' : 'none');
+      salvarPreferencias();
+    }
+
+    function toggleColunaEdital() {
+      const mostrar = document.getElementById('chk_edital').checked;
+      document.querySelectorAll('.col-edital').forEach(col => col.style.display = mostrar ? '' : 'none');
+      salvarPreferencias();
+    }
+
+    function toggleColunaDotacao() {
+      const mostrar = document.getElementById('chk_dotacao').checked;
+      document.querySelectorAll('.col-dotacao').forEach(col => col.style.display = mostrar ? '' : 'none');
       salvarPreferencias();
     }
 
@@ -791,6 +838,8 @@
     function salvarPreferencias() {
       localStorage.setItem('parcerias_preferencias', JSON.stringify({
         chk_endereco: document.getElementById('chk_endereco').checked,
+        chk_edital: document.getElementById('chk_edital').checked,
+        chk_dotacao: document.getElementById('chk_dotacao').checked,
         chk_valor_mes: document.getElementById('chk_valor_mes').checked,
         chk_valor_mes_23: document.getElementById('chk_valor_mes_23').checked,
         chk_valor_mes_24: document.getElementById('chk_valor_mes_24').checked
@@ -801,6 +850,8 @@
       try {
         const prefs = JSON.parse(localStorage.getItem('parcerias_preferencias') || '{}');
         if (prefs.chk_endereco)    { document.getElementById('chk_endereco').checked    = true; toggleColunaEndereco(); }
+        if (prefs.chk_edital)      { document.getElementById('chk_edital').checked      = true; toggleColunaEdital(); }
+        if (prefs.chk_dotacao)     { document.getElementById('chk_dotacao').checked     = true; toggleColunaDotacao(); }
         if (prefs.chk_valor_mes)   { document.getElementById('chk_valor_mes').checked   = true; toggleColunaValorMes(); }
         if (prefs.chk_valor_mes_23){ document.getElementById('chk_valor_mes_23').checked = true; toggleColunaValorMes23(); }
         if (prefs.chk_valor_mes_24){ document.getElementById('chk_valor_mes_24').checked = true; toggleColunaValorMes24(); }
@@ -815,6 +866,8 @@
       btnExportar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Exportando...';
       const params = new URLSearchParams(window.location.search);
       if (document.getElementById('chk_endereco').checked) params.set('incluir_endereco', 'true');
+      if (document.getElementById('chk_edital').checked) params.set('incluir_edital', 'true');
+      if (document.getElementById('chk_dotacao').checked) params.set('incluir_dotacao', 'true');
       if (document.getElementById('chk_valor_mes').checked) params.set('incluir_valor_mes', 'true');
       if (document.getElementById('chk_valor_mes_23').checked) params.set('incluir_valor_mes_23', 'true');
       if (document.getElementById('chk_valor_mes_24').checked) params.set('incluir_valor_mes_24', 'true');

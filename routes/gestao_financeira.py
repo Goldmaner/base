@@ -2555,8 +2555,8 @@ def api_sincronizar_empenhos():
         
         print(f"[DEBUG] Mapeados {len(processo_to_termo)} processos para termos")
         
-        # PASSO 3: Buscar parcelas programadas de ultra_liquidacoes (vigência em 2026 em diante)
-        print("[DEBUG] Buscando parcelas programadas com vigência a partir de 2026...")
+        # PASSO 3: Buscar parcelas programadas de ultra_liquidacoes (vigencia_inicial dentro do ano vigente)
+        print("[DEBUG] Buscando parcelas programadas com vigência dentro do ano vigente...")
         cur.execute("""
             SELECT 
                 id,
@@ -2567,7 +2567,8 @@ def api_sincronizar_empenhos():
                 valor_previsto
             FROM gestao_financeira.ultra_liquidacoes
             WHERE parcela_tipo = 'Programada'
-              AND vigencia_final >= date_trunc('year', CURRENT_DATE)
+              AND vigencia_inicial >= date_trunc('year', CURRENT_DATE)
+              AND vigencia_inicial <= (date_trunc('year', CURRENT_DATE) + INTERVAL '1 year' - INTERVAL '1 day')
             ORDER BY numero_termo, id
         """)
         

@@ -13,11 +13,8 @@
     /* ── Page header ── */
     .page-header {
       background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
-      color: #fff;
-      padding: 22px 28px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 18px rgba(124,58,237,.28);
+      color: #fff; padding: 22px 28px; border-radius: 12px;
+      margin-bottom: 20px; box-shadow: 0 4px 18px rgba(124,58,237,.28);
     }
     .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
     .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
@@ -47,68 +44,122 @@
       border-left: 4px solid #7c3aed;
     }
 
-    /* ── Content card ── */
-    .content-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden; }
-    .content-card-header {
-      background: linear-gradient(135deg, #4c1d95, #7c3aed);
-      color: #fff; padding: 14px 20px;
-      display: flex; justify-content: space-between; align-items: center;
-      flex-wrap: wrap; gap: 8px;
+    /* ── Accordion ── */
+    .accordion-item { border: none; margin-bottom: 12px; }
+    .accordion-button {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed) !important;
+      color: #fff !important; font-weight: 700; border-radius: 10px !important;
+      padding: 14px 20px; box-shadow: 0 3px 10px rgba(124,58,237,.25);
     }
-    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+    .accordion-button::after { filter: invert(1); }
+    .accordion-button:not(.collapsed) { border-radius: 10px 10px 0 0 !important; }
+    .accordion-body { background: #f9f7ff; border-radius: 0 0 10px 10px; padding: 16px; }
 
-    /* ── Table ── */
-    #tabelaMetas thead tr th {
-      background: linear-gradient(135deg, #4c1d95, #7c3aed);
-      color: #fff; border: none; white-space: nowrap; font-size: .82rem;
+    /* ── Objetivo card ── */
+    .obj-card {
+      background: #fff; border-radius: 10px; margin-bottom: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden;
     }
-    #tabelaMetas tbody tr:hover { background-color: #f5f0ff; }
-    #tabelaMetas td { font-size: .83rem; vertical-align: middle; }
-    .table-responsive { max-height: 62vh; overflow-y: auto; }
-    #tabelaMetas thead th { position: sticky; top: 0; z-index: 5; }
+    .obj-card-header {
+      background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+      padding: 12px 16px; border-bottom: 1px solid #c4b5fd;
+      display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap;
+    }
+    .obj-card-header .obj-titulo {
+      font-weight: 700; color: #4c1d95; font-size: .95rem; flex: 1;
+    }
+    .obj-card-body { padding: 12px 16px; }
 
-    /* ── Tipo badges ── */
-    .badge-tipo { background: #ede9fe; color: #5b21b6; font-size: .75rem; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
-    .badge-cls  { background: #ddd6fe; color: #4c1d95; font-size: .7rem; padding: 2px 6px; border-radius: 4px; }
+    /* Drag handles */
+    .drag-handle { cursor: grab; color: #9ca3af; font-size: 1rem; user-select: none; }
+    .drag-handle:hover, .drag-handle-meta:hover { color: #7c3aed; }
+    .drag-handle-meta { cursor: grab; color: #9ca3af; }
+    .sortable-ghost { opacity: .4; background: #ede9fe; }
+
+    /* ── Indicador / Meio badges ── */
+    .badge-ind  { background: #e0e7ff; color: #3730a3; font-size: .75rem; padding: 3px 9px; border-radius: 6px; cursor: default; }
+    .badge-meio { background: #d1fae5; color: #065f46; font-size: .75rem; padding: 3px 9px; border-radius: 6px; cursor: default; }
+    .badge-ni   { background: #fef3c7; color: #92400e; font-size: .73rem; padding: 2px 7px; border-radius: 5px; }
+    .badge-tipo { background: #ede9fe; color: #5b21b6; font-size: .75rem; padding: 2px 7px; border-radius: 5px; white-space: nowrap; cursor: default; }
+    .badge-cls  { background: #ddd6fe; color: #4c1d95; font-size: .7rem;  padding: 2px 6px;  border-radius: 4px; }
+
+    /* ── Tipos wrap compacto ── */
+    .tipos-wrap { display: flex; flex-wrap: wrap; gap: 3px; }
+
+    /* ── Collapse toggle button (metas por objetivo) ── */
+    .toggle-metas-btn { font-size: .78rem; padding: 2px 9px; border-color: #c4b5fd; color: #6d28d9; }
+    .toggle-metas-btn:hover { background: #ede9fe; border-color: #7c3aed; color: #4c1d95; }
+
+    /* ── Pagination ── */
+    .pagination .page-link { color: #7c3aed; border-color: #e9d5ff; }
+    .pagination .page-item.active .page-link { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+    .pagination .page-link:hover { background: #ede9fe; color: #4c1d95; }
+
+    /* ── Autocomplete dropdown ── */
+    .ac-wrapper { position: relative; flex: 1; }
+    .ac-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0;
+      z-index: 1060; background: #fff;
+      border: 1.5px solid #c4b5fd; border-radius: 0 0 8px 8px;
+      max-height: 180px; overflow-y: auto;
+      box-shadow: 0 6px 16px rgba(124,58,237,.18);
+      list-style: none; padding: 0; margin: 0;
+    }
+    .ac-dropdown li { padding: 6px 12px; cursor: pointer; font-size: .85rem; border-bottom: 1px solid #f3f0ff; }
+    .ac-dropdown li:hover { background: #ede9fe; color: #4c1d95; }
+    .ac-dropdown li:last-child { border-bottom: none; }
+
+    /* ── Meta table ── */
+    .meta-table thead tr th {
+      background: linear-gradient(135deg, #5b21b6, #7c3aed);
+      color: #fff; border: none; font-size: .8rem; white-space: nowrap;
+    }
+    .meta-table td { font-size: .82rem; vertical-align: middle; }
+    .meta-table tbody tr:hover { background-color: #f5f0ff; }
+    .empty-metas { text-align: center; padding: 16px; color: #9ca3af; font-size: .85rem; }
 
     /* ── Modals ── */
     .modal .modal-header { background: linear-gradient(135deg, #4c1d95, #7c3aed); color: #fff; }
     .modal .modal-header .btn-close { filter: invert(1); }
 
-    /* ── Checkbox group ── */
+    /* ── Tipo checkboxes ── */
     .tipo-group { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
     .tipo-group-label { font-size: .78rem; font-weight: 700; color: #7c3aed; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
     .tipo-check { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: .85rem; }
-
-    /* ── Help icon ── */
-    .help-icon { color: #7c3aed; cursor: pointer; font-size: .9rem; }
-    .help-icon:hover { color: #4c1d95; }
 
     /* ── SEI input wrapper ── */
     .sei-input-wrapper { position: relative; }
     .sei-input-wrapper i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #7c3aed; pointer-events: none; }
     .sei-input-wrapper input { padding-left: 32px; border-color: #d8b4fe; }
 
-    /* ── Não Identificado checkbox ── */
+    /* ── NI ── */
     .ni-check-wrapper { margin-bottom: 6px; }
     .ni-check-wrapper .form-check-label { color: #6b7280; font-size: .8rem; }
     .ni-check-wrapper .form-check-input:checked { background-color: #7c3aed; border-color: #7c3aed; }
     .ni-disabled { opacity: .45; pointer-events: none; }
 
-    /* ── Indicador row com obs ── */
+    /* ── Indicador row ── */
     .indicador-row { background: #faf8ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
     .indicador-row textarea { font-size: .8rem; }
+
+    /* ── Help icon ── */
+    .help-icon { color: #7c3aed; cursor: pointer; font-size: .9rem; }
+    .help-icon:hover { color: #4c1d95; }
   </style>
 </head>
 <body>
 
+<!-- ── Page Header ── -->
 <div class="page-header">
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
       <h2><i class="bi bi-clipboard2-check me-2"></i>Quadro de Metas</h2>
-      <p>Plano de Trabalho — metas vinculadas a processos SEI</p>
+      <p>Plano de Trabalho — objetivos e metas vinculados a processos SEI</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+      <button type="button" class="btn-parc" onclick="abrirModalObjetivo('')">
+        <i class="bi bi-plus-circle"></i> Novo Objetivo
+      </button>
       <a href="{{ url_for('parcerias_metas.dicionario') }}" class="btn-parc outline">
         <i class="bi bi-book"></i> Dicionário
       </a>
@@ -121,153 +172,423 @@
 
 <!-- ── Filtros ── -->
 <div class="filter-section">
-  <h6 class="mb-3">
-    <i class="bi bi-funnel me-1" style="color:#7c3aed;"></i>Filtrar por SEI
-  </h6>
-  <form method="get" action="{{ url_for('parcerias_metas.index') }}" class="row g-2 align-items-end">
-    <div class="col-md-5">
+  <h6 class="mb-3"><i class="bi bi-funnel me-1" style="color:#7c3aed;"></i>Filtrar</h6>
+  <form method="get" action="{{ url_for('parcerias_metas.index') }}" class="row g-2 align-items-end" id="formFiltros">
+    <!-- SEI -->
+    <div class="col-md-3">
+      <label class="form-label small text-muted mb-1">Processo SEI</label>
       <div class="sei-input-wrapper">
         <i class="bi bi-search"></i>
         <input type="text" name="filtro_sei" id="filtroSei" list="seiDatalist"
                class="form-control" value="{{ filtro_sei }}"
-               placeholder="Digite ou selecione o número SEI..."
-               autocomplete="off">
+               placeholder="Número SEI..." autocomplete="off">
       </div>
       <datalist id="seiDatalist"></datalist>
     </div>
-    <div class="col-auto">
-      <button type="submit" class="btn-parc">
-        <i class="bi bi-search"></i> Filtrar
-      </button>
-      {% if filtro_sei %}
-      <a href="{{ url_for('parcerias_metas.index') }}" class="btn-parc warning ms-1">
+    <!-- Indicador -->
+    <div class="col-md-3">
+      <label class="form-label small text-muted mb-1">Indicador</label>
+      <div class="sei-input-wrapper">
+        <i class="bi bi-graph-up"></i>
+        <input type="text" name="filtro_ind" id="filtroInd" list="indFiltroDatalist"
+               class="form-control" value="{{ filtro_ind }}"
+               placeholder="Indicador exato..." autocomplete="off">
+      </div>
+      <datalist id="indFiltroDatalist"></datalist>
+    </div>
+    <!-- Meio -->
+    <div class="col-md-3">
+      <label class="form-label small text-muted mb-1">Meio de Aferição</label>
+      <div class="sei-input-wrapper">
+        <i class="bi bi-rulers"></i>
+        <input type="text" name="filtro_meio" id="filtroMeio" list="meioFiltroDatalist"
+               class="form-control" value="{{ filtro_meio }}"
+               placeholder="Meio exato..." autocomplete="off">
+      </div>
+      <datalist id="meioFiltroDatalist"></datalist>
+    </div>
+    <!-- Texto livre -->
+    <div class="col-md-3">
+      <label class="form-label small text-muted mb-1">Busca livre</label>
+      <div class="sei-input-wrapper">
+        <i class="bi bi-search"></i>
+        <input type="text" name="filtro_texto" id="filtroTexto"
+               class="form-control" value="{{ filtro_texto }}"
+               placeholder="Objetivo ou meta..." autocomplete="off">
+      </div>
+    </div>
+    <!-- Botões -->
+    <div class="col-12 d-flex gap-2 flex-wrap align-items-center">
+      <button type="submit" class="btn-parc"><i class="bi bi-search"></i> Filtrar</button>
+      {% if filtro_sei or filtro_ind or filtro_meio or filtro_texto %}
+      <a href="{{ url_for('parcerias_metas.index') }}" class="btn-parc warning">
         <i class="bi bi-x-circle"></i> Limpar
       </a>
       {% endif %}
-    </div>
-    <div class="col-auto ms-auto">
-      <div class="d-flex flex-column align-items-end gap-2">
-        <div class="d-flex gap-2">
-          <a href="{{ url_for('parcerias_metas.exportar_csv', filtro_sei=filtro_sei) }}" class="btn-parc" style="background:linear-gradient(135deg,#065f46,#059669);">
-            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
-          </a>
-          <button type="button" class="btn-parc ms-1" onclick="abrirModalCriar()">
-            <i class="bi bi-plus-circle"></i> Nova Meta
-          </button>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="checkOrdem" onchange="toggleOrdemColuna(this.checked)">
-          <label class="form-check-label small text-muted" for="checkOrdem">Mostrar coluna Ordem</label>
-        </div>
+      <div class="ms-auto d-flex gap-2">
+        <a href="{{ url_for('parcerias_metas.exportar_csv', filtro_sei=filtro_sei, filtro_ind=filtro_ind, filtro_meio=filtro_meio, filtro_texto=filtro_texto) }}"
+           class="btn-parc success">
+          <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+        </a>
+        <a href="{{ url_for('parcerias_metas.exportar_excel', filtro_sei=filtro_sei, filtro_ind=filtro_ind, filtro_meio=filtro_meio, filtro_texto=filtro_texto) }}"
+           class="btn-parc success">
+          <i class="bi bi-file-earmark-excel"></i> Excel
+        </a>
       </div>
     </div>
   </form>
 </div>
 
-<!-- ── Tabela ── -->
-<div class="content-card">
-  <div class="content-card-header">
-    <h5><i class="bi bi-table me-2"></i>Metas cadastradas
-      <span class="badge bg-white text-purple ms-2" style="color:#4c1d95;font-size:.75rem;">{{ metas|length }}</span>
-    </h5>
-  </div>
-  <div class="table-responsive">
-    <table class="table table-hover mb-0" id="tabelaMetas">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>SEI</th>
-          <th>Nº Termo</th>
-          <th>OSC</th>
-          <th>Título</th>
-          <th>Objetivo</th>
-          <th>Tipos</th>
-          <th>Indicador</th>
-          <th>Obs. Indicador</th>
-          <th>Meios de Aferição</th>
-          <th>Obs.</th>
-          <th class="col-ord d-none">Ord.</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for m in metas %}
-        <tr>
-          <td class="text-muted">{{ m.id }}</td>
-          <td><span class="fw-semibold" style="color:#5b21b6;">{{ m.sei_numero }}</span></td>
-          <td style="white-space:nowrap;">{{ m.numero_termo }}</td>
-          <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ m.osc }}">{{ m.osc }}</td>
-          <td style="max-width:200px;">
-            <div class="fw-semibold" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ m.meta_titulo }}">{{ m.meta_titulo }}</div>
-            {% if m.meta_descricao %}
-            <small class="text-muted" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;" title="{{ m.meta_descricao }}">{{ m.meta_descricao }}</small>
-            {% endif %}
-          </td>
-          <td style="max-width:160px;">
-            {% if m.meta_objetivo %}
-            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:160px;" title="{{ m.meta_objetivo }}">{{ m.meta_objetivo }}</span>
-            {% else %}<span class="text-muted">—</span>{% endif %}
-          </td>
-          <td style="max-width:180px;">
-            {% if m.meta_tipos_labels %}
-              {% set grupos = {} %}
-              {% for t in m.meta_tipos_labels %}
-                {% set cls = t.tipo_classificacao or 'Sem classificação' %}
-                {% if cls not in grupos %}{% set _ = grupos.update({cls: []}) %}{% endif %}
-                {% set _ = grupos[cls].append(t.meta_tipo) %}
-              {% endfor %}
-              {% for cls, tipos in grupos.items() %}
-                <div class="mb-1">
-                  <span class="badge-cls">{{ cls }}</span>
-                  {% for tipo in tipos %}
-                  <span class="badge-tipo ms-1">{{ tipo }}</span>
-                  {% endfor %}
-                </div>
-              {% endfor %}
-            {% else %}<span class="text-muted">—</span>{% endif %}
-          </td>
-          <td>{{ m.indicador_label or '—' }}</td>
-          <td style="max-width:140px;">
-            {% if m.meta_obs_indicador %}
-            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:140px;" title="{{ m.meta_obs_indicador }}">{{ m.meta_obs_indicador }}</span>
-            {% else %}<span class="text-muted">—</span>{% endif %}
-          </td>
-          <td>{{ m.meios_afericao_label or '—' }}</td>
-          <td style="max-width:120px;">
-            {% if m.observacoes %}
-            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:120px;" title="{{ m.observacoes }}">{{ m.observacoes }}</span>
-            {% else %}<span class="text-muted">—</span>{% endif %}
-          </td>
-          <td class="col-ord d-none text-center text-muted">{{ m.ordem }}</td>
-          <td>
-            <div class="d-flex gap-1">
-              <button class="btn btn-sm btn-outline-primary" title="Editar"
-                onclick='abrirModalEditar({{ m|tojson }})'>
+<!-- ── Accordion por SEI ── -->
+{% if sei_groups %}
+<div class="accordion" id="accordionSei">
+  {% for sg in sei_groups %}
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button class="accordion-button {% if loop.index > 1 %}collapsed{% endif %}"
+              type="button" data-bs-toggle="collapse"
+              data-bs-target="#sei_{{ loop.index }}" aria-expanded="{{ 'true' if loop.index == 1 else 'false' }}">
+        <div class="d-flex align-items-center gap-3 flex-wrap w-100 me-3">
+          <span><i class="bi bi-folder2-open me-2"></i>{{ sg.sei_numero }}</span>
+          {% if sg.numero_termo and sg.numero_termo != '-' %}
+          <span class="badge bg-white text-dark fw-normal" style="font-size:.78rem;">{{ sg.numero_termo }}</span>
+          {% endif %}
+          {% if sg.osc and sg.osc != '-' %}
+          <span class="badge bg-white text-dark fw-normal" style="font-size:.78rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ sg.osc }}">{{ sg.osc }}</span>
+          {% endif %}
+          {% if sg.status %}
+          {% set status_colors = {
+            'Termo Assinado': 'bg-success',
+            'Publicação': 'bg-primary',
+            'Em análise': 'bg-info text-dark',
+            'Arquivado': 'bg-secondary',
+            'Custódia': 'bg-secondary',
+            'Desistência, Cancelamento ou Rejeição': 'bg-danger',
+            'Parceria Reprovada na Visita (RCE)': 'bg-danger',
+            'Documentação Parcial': 'bg-warning text-dark',
+            'Notificado': 'bg-warning text-dark',
+            'Aguardando Assinaturas': 'bg-warning text-dark',
+            'Em processo de empenho': 'bg-info text-dark',
+            'Reserva Orçamentária': 'bg-info text-dark',
+          } %}
+          <span class="badge {{ status_colors.get(sg.status, 'bg-light text-dark') }}" style="font-size:.75rem;" title="{{ sg.status }}">
+            {{ sg.status }}
+          </span>
+          {% endif %}
+          <span class="badge ms-auto" style="background:rgba(255,255,255,.25);color:#fff;font-size:.78rem;">
+            {{ sg.objetivos|length }} objetivo{{ 's' if sg.objetivos|length != 1 else '' }}
+          </span>
+        </div>
+      </button>
+    </h2>
+    <div id="sei_{{ loop.index }}" class="accordion-collapse collapse {% if loop.index == 1 %}show{% endif %}">
+      <div class="accordion-body">
+        <!-- Controles por SEI -->
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+          <button class="btn btn-sm btn-outline-secondary"
+                  onclick="toggleTodasMetas(this, 'sei_{{ loop.index }}')">
+            <i class="bi bi-chevron-expand me-1"></i>Mostrar tudo
+          </button>
+          <button class="btn-parc" onclick="abrirModalObjetivo('{{ sg.sei_numero }}')">
+            <i class="bi bi-plus-circle"></i> Novo Objetivo
+          </button>
+        </div>
+
+        <div class="sortable-obj-list" data-sei="{{ sg.sei_numero }}">
+        {% for obj in sg.objetivos %}
+        <div class="obj-card" data-obj-id="{{ obj.id }}">
+          <!-- Cabeçalho do objetivo -->
+          <div class="obj-card-header">
+            <span class="drag-handle me-2" title="Arrastar para reordenar"><i class="bi bi-grip-vertical"></i></span>
+            <div class="obj-titulo flex-grow-1">
+              <span class="text-muted fw-normal me-1" style="font-size:.78rem;">Obj. {{ loop.index }}:</span>
+              {{ obj.objetivo }}
+            </div>
+            <!-- Badges compactos: indicadores / meios -->
+            <div class="d-flex flex-wrap gap-1 align-items-center mt-1 mt-md-0">
+              {% if obj.indicadores_ni %}
+                <span class="badge-ni" title="Indicador: Não Identificado"><i class="bi bi-graph-up me-1"></i>Ind. NI</span>
+              {% elif obj.indicadores_textos %}
+                {%- set ind_tooltip = [] -%}
+                {%- for ind in obj.indicadores_textos -%}
+                  {%- set obs = (obj.obs_indicadores or [])[loop.index0] or '' -%}
+                  {%- set _ = ind_tooltip.append(ind + ((' — ' + obs) if obs else '')) -%}
+                {%- endfor -%}
+                <span class="badge-ind" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                      title="{{ ind_tooltip|join(' \n') }}">
+                  <i class="bi bi-graph-up me-1"></i>{{ obj.indicadores_textos|length }}
+                  indicador{{ 'es' if obj.indicadores_textos|length != 1 else '' }}
+                </span>
+              {% endif %}
+              {% if obj.meios_ni %}
+                <span class="badge-ni" title="Meios: Não Identificado"><i class="bi bi-file-check me-1"></i>Meios NI</span>
+              {% elif obj.meios_textos %}
+                <span class="badge-meio" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                      title="{{ obj.meios_textos|join(' \n') }}">
+                  <i class="bi bi-file-check me-1"></i>{{ obj.meios_textos|length }}
+                  meio{{ 's' if obj.meios_textos|length != 1 else '' }}
+                </span>
+              {% endif %}
+            </div>
+            <!-- Ações do objetivo -->
+            <div class="d-flex gap-1 flex-shrink-0 ms-auto align-items-center">
+              <button class="toggle-metas-btn btn btn-sm"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#metas_obj_{{ obj.id }}"
+                      aria-expanded="false">
+                <i class="bi bi-list-ul me-1"></i>{{ obj.metas|length }} meta{{ 's' if obj.metas|length != 1 else '' }}
+              </button>
+              <button class="btn btn-sm btn-outline-primary ms-1" title="Editar objetivo"
+                onclick='abrirModalEditarObjetivo({{ obj|tojson }})'>
                 <i class="bi bi-pencil"></i>
               </button>
-              <button class="btn btn-sm btn-outline-danger" title="Excluir"
-                onclick="confirmarExcluir({{ m.id }}, '{{ m.meta_titulo|e }}')">
+              <button class="btn btn-sm btn-outline-danger" title="Excluir objetivo"
+                onclick="confirmarExcluirObjetivo({{ obj.id }}, '{{ obj.objetivo|e }}')">
                 <i class="bi bi-trash"></i>
               </button>
+              <button class="btn-parc ms-2" style="padding:4px 12px;font-size:.78rem;"
+                onclick="abrirModalMeta({{ obj.id }})">
+                <i class="bi bi-plus"></i> Meta
+              </button>
             </div>
-          </td>
-        </tr>
+          </div>
+
+          <!-- Tabela de metas (oculta por padrão) -->
+          <div class="collapse metas-collapse" id="metas_obj_{{ obj.id }}">
+            <div class="obj-card-body">
+            {% if obj.metas %}
+            <div class="table-responsive">
+              <table class="table table-hover mb-0 meta-table">
+                <thead>
+                  <tr>
+                    <th style="width:24px;"></th>
+                    <th>Título da Meta</th>
+                    <th>Descrição</th>
+                    <th>Tipos</th>
+                    <th>Obs.</th>
+                    <th style="width:46px;text-align:center;">Ord.</th>
+                    <th style="width:80px;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody class="sortable-meta-list" data-obj-id="{{ obj.id }}">
+                  {% for m in obj.metas %}
+                  <tr data-meta-id="{{ m.id }}">
+                    <td style="width:24px;cursor:grab;" class="drag-handle-meta text-muted" title="Arrastar"><i class="bi bi-grip-vertical"></i></td>
+                    <td style="max-width:260px;">
+                      <div class="fw-semibold" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                           title="{{ m.meta_titulo }}">
+                        {{ m.meta_titulo }}
+                      </div>
+                    </td>
+                    <td style="max-width:180px;">
+                      {% if m.meta_descricao and m.meta_descricao != 'Não identificado' %}
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:180px;"
+                            title="{{ m.meta_descricao }}">{{ m.meta_descricao }}</span>
+                      {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td style="max-width:220px;">
+                      {% if m.tipos_ni %}
+                        <span class="badge-ni">NI</span>
+                      {% elif m.meta_tipos_labels %}
+                        <div class="tipos-wrap">
+                        {% for t in m.meta_tipos_labels %}
+                        <span class="badge-tipo"
+                              title="{{ t.tipo_classificacao or 'Sem classificação' }}: {{ t.meta_tipo }}"
+                              data-bs-toggle="tooltip">{{ t.meta_tipo }}</span>
+                        {% endfor %}
+                        </div>
+                      {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td style="max-width:120px;">
+                      {% if m.observacoes %}
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:120px;"
+                            title="{{ m.observacoes }}">{{ m.observacoes }}</span>
+                      {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="text-center text-muted" style="width:46px;">{{ m.meta_ordem }}</td>
+                    <td style="width:80px;">
+                      <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-primary" title="Editar meta"
+                          onclick='abrirModalEditarMeta({{ m|tojson }}, {{ obj.id }})'>
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" title="Excluir meta"
+                          onclick="confirmarExcluirMeta({{ m.id }}, '{{ m.meta_titulo|e }}')">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div class="empty-metas">
+              <i class="bi bi-inbox me-2"></i>Nenhuma meta cadastrada para este objetivo.
+              <a href="javascript:void(0)" onclick="abrirModalMeta({{ obj.id }})" style="color:#7c3aed;">+ Nova Meta</a>
+            </div>
+            {% endif %}
+          </div>
+          </div>{# /collapse metas #}
+        </div>{# /obj-card #}
         {% else %}
-        <tr>
-          <td colspan="13" class="text-center text-muted py-4">
-            <i class="bi bi-inbox me-2"></i>Nenhuma meta encontrada.
-            {% if filtro_sei %}Use outro filtro de SEI ou <a href="{{ url_for('parcerias_metas.index') }}">limpe o filtro</a>.{% endif %}
-          </td>
-        </tr>
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-inbox me-2"></i>Nenhum objetivo cadastrado para este SEI.
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+        </div>{# /sortable-obj-list #}
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── Paginação ── -->
+{% if total_pages > 1 %}
+<nav class="d-flex justify-content-center align-items-center gap-3 mt-3" aria-label="Paginação SEI">
+  <small class="text-muted">{{ total_seis }} processos — página {{ page }} de {{ total_pages }}</small>
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item {% if page == 1 %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('parcerias_metas.index', filtro_sei=filtro_sei, filtro_ind=filtro_ind, filtro_meio=filtro_meio, filtro_texto=filtro_texto, page=page-1) }}">‹</a>
+    </li>
+    {% for p in range(1, total_pages + 1) %}
+      {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for('parcerias_metas.index', filtro_sei=filtro_sei, filtro_ind=filtro_ind, filtro_meio=filtro_meio, filtro_texto=filtro_texto, page=p) }}">{{ p }}</a>
+        </li>
+      {% elif p == page - 3 or p == page + 3 %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('parcerias_metas.index', filtro_sei=filtro_sei, filtro_ind=filtro_ind, filtro_meio=filtro_meio, filtro_texto=filtro_texto, page=page+1) }}">›</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-inbox" style="font-size:2.5rem;color:#d8b4fe;"></i>
+  <p class="mt-3">Nenhum registro encontrado.
+    {% if filtro_sei or filtro_ind or filtro_meio or filtro_texto %}
+    <a href="{{ url_for('parcerias_metas.index') }}">Limpe o filtro</a> ou
+    {% endif %}
+    <a href="javascript:void(0)" onclick="abrirModalObjetivo('')">crie o primeiro objetivo</a>.
+  </p>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL: Objetivo (criar / editar)
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalObjetivo" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalObjetivoTitulo">
+          <i class="bi bi-bullseye me-2"></i>Novo Objetivo
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="objId">
+
+        <div class="row g-3">
+
+          <!-- SEI -->
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Número SEI <span class="text-danger">*</span></label>
+            <div class="sei-input-wrapper">
+              <i class="bi bi-search"></i>
+              <input type="text" id="objSei" list="seiDatalistObj"
+                     class="form-control" placeholder="Ex: 2025-0.123.456-0" autocomplete="off">
+            </div>
+            <datalist id="seiDatalistObj"></datalist>
+            <div id="seiDuplicadoWarn" class="alert alert-warning py-1 px-2 mt-1 d-none" style="font-size:.82rem;">
+              <i class="bi bi-exclamation-triangle me-1"></i>Este SEI já possui objetivos cadastrados. O novo objetivo será adicionado ao mesmo processo.
+            </div>
+          </div>
+
+          <!-- Ordem (edição) -->
+          <div class="col-md-2 d-none" id="objOrdemWrapper">
+            <label class="form-label fw-semibold">Ordem</label>
+            <input type="number" id="objOrdem" class="form-control" value="0" min="0">
+          </div>
+
+          <!-- Objetivo -->
+          <div class="col-12">
+            <label class="form-label fw-semibold">Objetivo <span class="text-danger">*</span></label>
+            <textarea id="objTexto" class="form-control" rows="3"
+                      placeholder="Descreva o objetivo específico deste conjunto de metas..."></textarea>
+          </div>
+
+          <!-- Indicadores -->
+          <div class="col-12">
+            <label class="form-label fw-semibold">
+              Indicadores
+              <i class="bi bi-question-circle help-icon ms-1" id="helpIndicadorObj" data-bs-toggle="tooltip" title=""></i>
+            </label>
+            <div class="ni-check-wrapper">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="objNiIndicadores"
+                       onchange="toggleNIContainer('objIndicadoresContainer', this, 'objBtnAddIndicador')">
+                <label class="form-check-label" for="objNiIndicadores">Não identificado</label>
+              </div>
+            </div>
+            <div id="objIndicadoresContainer"></div>
+            <button type="button" id="objBtnAddIndicador" class="btn btn-sm btn-outline-secondary mt-1"
+                    onclick="adicionarLinhaIndicadorObj()">
+              <i class="bi bi-plus-circle me-1"></i>Adicionar indicador
+            </button>
+            <datalist id="datalistIndicadoresObj"></datalist>
+            <small class="text-muted d-block mt-1">
+              <i class="bi bi-magic me-1" style="color:#7c3aed;"></i>Novos indicadores são salvos automaticamente
+            </small>
+          </div>
+
+          <!-- Meios de Aferição -->
+          <div class="col-12">
+            <label class="form-label fw-semibold">
+              Meios de Aferição
+              <i class="bi bi-question-circle help-icon ms-1" id="helpMeiosObj" data-bs-toggle="tooltip" title=""></i>
+            </label>
+            <div class="ni-check-wrapper">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="objNiMeios"
+                       onchange="toggleNIContainer('objMeiosContainer', this, 'objBtnAddMeio')">
+                <label class="form-check-label" for="objNiMeios">Não identificado</label>
+              </div>
+            </div>
+            <div id="objMeiosContainer"></div>
+            <button type="button" id="objBtnAddMeio" class="btn btn-sm btn-outline-secondary mt-1"
+                    onclick="adicionarLinhaMeioObj()">
+              <i class="bi bi-plus-circle me-1"></i>Adicionar meio de aferição
+            </button>
+            <datalist id="datalistMeiosObj"></datalist>
+            <small class="text-muted d-block mt-1">
+              <i class="bi bi-magic me-1" style="color:#7c3aed;"></i>Novos meios são salvos automaticamente
+            </small>
+          </div>
+
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn-parc success" onclick="salvarObjetivo()">
+          <i class="bi bi-check-all"></i> Salvar Objetivo
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     MODAL CRIAR / EDITAR
+     MODAL: Meta (criar / editar)
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalMeta" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -280,36 +601,18 @@
       </div>
       <div class="modal-body">
         <input type="hidden" id="metaId">
+        <input type="hidden" id="metaObjetivoId">
 
         <div class="row g-3">
-
-          <!-- SEI -->
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">Número SEI <span class="text-danger">*</span></label>
-            <div class="sei-input-wrapper">
-              <i class="bi bi-search"></i>
-              <input type="text" id="metaSei" list="seiDatalistModal"
-                     class="form-control" placeholder="Ex: 2025-0.123.456-0" autocomplete="off">
-            </div>
-            <datalist id="seiDatalistModal"></datalist>
-            <small class="text-muted">Fontes: Parceria, Celebração, Edital</small>
-          </div>
-
-          <!-- Ordem (só visível na edição) -->
-          <div class="col-md-2 d-none" id="ordemWrapper">
-            <label class="form-label fw-semibold">Ordem</label>
-            <input type="number" id="metaOrdem" class="form-control" value="0" min="0">
-            <small class="text-muted">Auto na criação</small>
-          </div>
 
           <!-- Título -->
           <div class="col-12">
             <label class="form-label fw-semibold">Título da Meta <span class="text-danger">*</span></label>
             <div class="ni-check-wrapper">
               <div class="form-check">
-                <input class="form-check-input ni-check" type="checkbox" id="niTitulo"
+                <input class="form-check-input" type="checkbox" id="metaNiTitulo"
                        onchange="toggleNIField('metaTitulo', this)">
-                <label class="form-check-label" for="niTitulo">Não possui ou não identificado</label>
+                <label class="form-check-label" for="metaNiTitulo">Não possui ou não identificado</label>
               </div>
             </div>
             <input type="text" id="metaTitulo" class="form-control" placeholder="Título conciso da meta">
@@ -317,34 +620,19 @@
 
           <!-- Descrição -->
           <div class="col-12">
-            <label class="form-label fw-semibold">
-              Descrição
-              <i class="bi bi-question-circle help-icon ms-1" title="" id="helpMeta" data-bs-toggle="tooltip"></i>
-            </label>
+            <label class="form-label fw-semibold">Descrição</label>
             <div class="ni-check-wrapper">
               <div class="form-check">
-                <input class="form-check-input ni-check" type="checkbox" id="niDescricao"
+                <input class="form-check-input" type="checkbox" id="metaNiDescricao"
                        onchange="toggleNIField('metaDescricao', this)">
-                <label class="form-check-label" for="niDescricao">Não possui ou não identificado</label>
+                <label class="form-check-label" for="metaNiDescricao">Não possui ou não identificado</label>
               </div>
             </div>
-            <textarea id="metaDescricao" class="form-control" rows="3" placeholder="Descreva a meta detalhadamente..."></textarea>
+            <textarea id="metaDescricao" class="form-control" rows="3"
+                      placeholder="Descreva a meta detalhadamente..."></textarea>
           </div>
 
-          <!-- Objetivo -->
-          <div class="col-12">
-            <label class="form-label fw-semibold">Objetivo</label>
-            <div class="ni-check-wrapper">
-              <div class="form-check">
-                <input class="form-check-input ni-check" type="checkbox" id="niObjetivo"
-                       onchange="toggleNIField('metaObjetivo', this)">
-                <label class="form-check-label" for="niObjetivo">Não possui ou não identificado</label>
-              </div>
-            </div>
-            <textarea id="metaObjetivo" class="form-control" rows="2" placeholder="Objetivo específico desta meta..."></textarea>
-          </div>
-
-          <!-- Tipos de Meta -->
+          <!-- Tipos -->
           <div class="col-12">
             <label class="form-label fw-semibold d-flex align-items-center gap-2">
               Tipos de Meta
@@ -352,68 +640,27 @@
             </label>
             <div class="ni-check-wrapper">
               <div class="form-check">
-                <input class="form-check-input ni-check" type="checkbox" id="niTipos"
-                       onchange="toggleNIContainer('tiposContainer', this)">
-                <label class="form-check-label" for="niTipos">Não identificado</label>
+                <input class="form-check-input" type="checkbox" id="metaNiTipos"
+                       onchange="toggleNIContainer('metaTiposContainer', this)">
+                <label class="form-check-label" for="metaNiTipos">Não identificado</label>
               </div>
             </div>
-            <div id="tiposContainer" class="row g-2">
+            <div id="metaTiposContainer" class="row g-2">
               <div class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>Carregando tipos...</div>
             </div>
           </div>
 
-          <!-- Indicadores (multi) -->
-          <div class="col-12">
-            <label class="form-label fw-semibold">
-              Indicadores
-              <i class="bi bi-question-circle help-icon ms-1" title="" id="helpIndicador" data-bs-toggle="tooltip"></i>
-            </label>
-            <div class="ni-check-wrapper">
-              <div class="form-check">
-                <input class="form-check-input ni-check" type="checkbox" id="niIndicadores"
-                       onchange="toggleNIContainer('indicadoresContainer', this, 'btnAddIndicador')">
-                <label class="form-check-label" for="niIndicadores">Não identificado</label>
-              </div>
-            </div>
-            <div id="indicadoresContainer"></div>
-            <button type="button" id="btnAddIndicador" class="btn btn-sm btn-outline-secondary mt-1"
-                    onclick="adicionarLinhaIndicador()">
-              <i class="bi bi-plus-circle me-1"></i>Adicionar indicador
-            </button>
-            <datalist id="datalistIndicadores"></datalist>
-            <small class="text-muted d-block mt-1">
-              <i class="bi bi-magic me-1" style="color:#7c3aed;"></i>Novos indicadores são salvos automaticamente
-            </small>
+          <!-- Ordem (edição) -->
+          <div class="col-md-2 d-none" id="metaOrdemWrapper">
+            <label class="form-label fw-semibold">Ordem</label>
+            <input type="number" id="metaOrdem" class="form-control" value="0" min="0">
           </div>
 
-          <!-- Meios de Aferição (multi) -->
-          <div class="col-12">
-            <label class="form-label fw-semibold">
-              Meios de Aferição
-              <i class="bi bi-question-circle help-icon ms-1" title="" id="helpMeios" data-bs-toggle="tooltip"></i>
-            </label>
-            <div class="ni-check-wrapper">
-              <div class="form-check">
-                <input class="form-check-input ni-check" type="checkbox" id="niMeios"
-                       onchange="toggleNIContainer('meiosContainer', this, 'btnAddMeio')">
-                <label class="form-check-label" for="niMeios">Não identificado</label>
-              </div>
-            </div>
-            <div id="meiosContainer"></div>
-            <button type="button" id="btnAddMeio" class="btn btn-sm btn-outline-secondary mt-1"
-                    onclick="adicionarLinhaMeio()">
-              <i class="bi bi-plus-circle me-1"></i>Adicionar meio de aferição
-            </button>
-            <datalist id="datalistMeios"></datalist>
-            <small class="text-muted d-block mt-1">
-              <i class="bi bi-magic me-1" style="color:#7c3aed;"></i>Novos meios são salvos automaticamente
-            </small>
-          </div>
-
-          <!-- Observações gerais -->
+          <!-- Observações -->
           <div class="col-12">
             <label class="form-label fw-semibold">Observações gerais</label>
-            <textarea id="metaObservacoes" class="form-control" rows="2" placeholder="Outras observações..."></textarea>
+            <textarea id="metaObservacoes" class="form-control" rows="2"
+                      placeholder="Outras observações..."></textarea>
           </div>
 
         </div>
@@ -430,7 +677,7 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     MODAL CONFIRMAR EXCLUSÃO
+     MODAL: Confirmar Exclusão
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalExcluir" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
@@ -440,8 +687,8 @@
         <button type="button" class="btn-close" style="filter:invert(1);" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p>Tem certeza que deseja excluir a meta:</p>
-        <p class="fw-semibold" id="excluirTituloTexto"></p>
+        <p id="excluirDescricao"></p>
+        <p class="fw-semibold" id="excluirTexto"></p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -468,120 +715,34 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
-// ── Estado ────────────────────────────────────────────────────────────────────
-let excluirIdPendente = null;
-let tiposGrupos = {};      // { "Tipo Q": [{id,meta_tipo,...}], ... }
-let definicoes  = {};
+// ── Estado global ────────────────────────────────────────────────────────────
+let tiposGrupos     = {};
+let excluirUrl      = null;
+let excluirDescricao = '';
+let _indCache  = [];   // cache indicadores para autocomplete
+let _meioCache = [];   // cache meios para autocomplete
+
+// SEIs já cadastrados nesta página (para aviso de duplicado)
+const seisCadastrados = new Set({{ sei_groups | map(attribute='sei_numero') | list | tojson }});
 
 // ── Bootstrap instances ───────────────────────────────────────────────────────
-const modalMeta   = new bootstrap.Modal(document.getElementById('modalMeta'));
-const modalExcluir = new bootstrap.Modal(document.getElementById('modalExcluir'));
-const toastEl     = document.getElementById('toastMsg');
-const toastInst   = new bootstrap.Toast(toastEl, { delay: 3500 });
+const modalObjetivo = new bootstrap.Modal(document.getElementById('modalObjetivo'));
+const modalMeta     = new bootstrap.Modal(document.getElementById('modalMeta'));
+const modalExcluir  = new bootstrap.Modal(document.getElementById('modalExcluir'));
+const toastEl       = document.getElementById('toastMsg');
+const toastInst     = new bootstrap.Toast(toastEl, { delay: 3500 });
 
-// ── Toast helper ──────────────────────────────────────────────────────────────
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function mostrarToast(msg, tipo = 'success') {
-  const body = document.getElementById('toastBody');
-  body.textContent = msg;
+  document.getElementById('toastBody').textContent = msg;
   toastEl.className = 'toast align-items-center text-white border-0 bg-' +
     (tipo === 'success' ? 'success' : 'danger');
   toastInst.show();
 }
 
-// ── Carregar dados do servidor ────────────────────────────────────────────────
-async function carregarSeiDatalist() {
-  try {
-    const res = await fetch('{{ url_for("parcerias_metas.api_sei_numeros") }}');
-    const data = await res.json();
-    ['seiDatalist', 'seiDatalistModal'].forEach(id => {
-      const dl = document.getElementById(id);
-      if (!dl) return;
-      dl.innerHTML = data.map(d => {
-        // Parcerias firmadas: só o número SEI, sem rótulo de fonte
-        // Celebração/Edital: número + identificação da fonte
-        const label = d.fonte === 'Parceria'
-          ? d.sei_numero
-          : `${d.sei_numero} (${d.fonte})`;
-        return `<option value="${d.sei_numero}">${label}</option>`;
-      }).join('');
-    });
-  } catch(e) { console.warn('Erro ao carregar SEIs', e); }
-}
-
-async function carregarDatalists() {
-  try {
-    const [resInd, resMeio] = await Promise.all([
-      fetch('{{ url_for("parcerias_metas.api_indicadores") }}'),
-      fetch('{{ url_for("parcerias_metas.api_meios") }}'),
-    ]);
-    const inds  = await resInd.json();
-    const meios = await resMeio.json();
-
-    const dlInd  = document.getElementById('datalistIndicadores');
-    const dlMeio = document.getElementById('datalistMeios');
-    if (dlInd)  dlInd.innerHTML  = inds.map(i  => `<option value="${i.indicador}"></option>`).join('');
-    if (dlMeio) dlMeio.innerHTML = meios.map(m => `<option value="${m.meios_afericao}"></option>`).join('');
-  } catch(e) { console.warn('Erro ao carregar datalists', e); }
-}
-
-async function carregarMetaTipos() {
-  try {
-    const res = await fetch('{{ url_for("parcerias_metas.api_meta_tipos") }}');
-    tiposGrupos = await res.json();
-  } catch(e) { console.warn('Erro ao carregar tipos', e); }
-}
-
-async function carregarDefinicoes() {
-  try {
-    const res = await fetch('{{ url_for("parcerias_metas.api_definicoes") }}');
-    const lista = await res.json();
-    // lista = [{conceito, definicao, observacoes}, ...]
-    const por_conceito = {};
-    lista.forEach(d => { por_conceito[d.conceito.toLowerCase()] = d.definicao; });
-    setTooltip('helpMeta',       por_conceito['meta']);
-    setTooltip('helpIndicador',  por_conceito['indicador']);
-    setTooltip('helpMeios',      por_conceito['meios de aferição']);
-  } catch(e) { console.warn('Erro ao carregar definições', e); }
-}
-
-function setTooltip(id, text) {
-  const el = document.getElementById(id);
-  if (!el || !text) return;
-  el.setAttribute('title', text);
-  el.setAttribute('data-bs-original-title', text);
-}
-
-// ── Renderizar checkboxes de tipos ────────────────────────────────────────────
-function renderizarTipos(selecionadosIds = []) {
-  const container = document.getElementById('tiposContainer');
-  if (!Object.keys(tiposGrupos).length) {
-    container.innerHTML = '<p class="text-muted small">Nenhum tipo cadastrado. <a href="{{ url_for("listas.index") }}">Cadastrar em Listas</a></p>';
-    return;
-  }
-  let html = '';
-  for (const [cls, tipos] of Object.entries(tiposGrupos)) {
-    html += `<div class="col-md-4">
-      <div class="tipo-group">
-        <div class="tipo-group-label">${cls}</div>`;
-    for (const t of tipos) {
-      const checked = selecionadosIds.includes(t.id) ? 'checked' : '';
-      html += `<div class="tipo-check">
-        <input class="form-check-input tipo-checkbox" type="checkbox"
-               id="tipo_${t.id}" value="${t.id}" ${checked}>
-        <label class="form-check-label" for="tipo_${t.id}">${t.meta_tipo}</label>
-        ${t.descricao ? `<i class="bi bi-info-circle text-muted ms-1" title="${t.descricao}" style="font-size:.8rem;cursor:help;" data-bs-toggle="tooltip"></i>` : ''}
-      </div>`;
-    }
-    html += `</div></div>`;
-  }
-  container.innerHTML = html;
-  // Inicializar tooltips nos ícones de info
-  container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
-}
-
-// ── Helpers: linhas multi-input ──────────────────────────────────────────────
-// ── Helpers NI (Não Identificado) ───────────────────────────────────────────
+// ── NI helpers ────────────────────────────────────────────────────────────────
 function toggleNIField(fieldId, checkbox) {
   const field = document.getElementById(fieldId);
   if (!field) return;
@@ -590,22 +751,53 @@ function toggleNIField(fieldId, checkbox) {
 }
 
 function toggleNIContainer(containerId, checkbox, addBtnId) {
-  const container = document.getElementById(containerId);
-  if (container) container.classList.toggle('ni-disabled', checkbox.checked);
+  const c = document.getElementById(containerId);
+  if (c) c.classList.toggle('ni-disabled', checkbox.checked);
   if (addBtnId) {
-    const btn = document.getElementById(addBtnId);
-    if (btn) btn.disabled = checkbox.checked;
+    const b = document.getElementById(addBtnId);
+    if (b) b.disabled = checkbox.checked;
   }
 }
 
-// ── Helpers: linhas indicadores (com obs individual) ─────────────────────────
-function adicionarLinhaIndicador(valor = '', obs = '') {
-  const container = document.getElementById('indicadoresContainer');
+// ── Multi-input: indicadores com obs (Modal Objetivo) ─────────────────────────
+function attachAutocomplete(input, tipo) {
+  // Envolve o input num wrapper posicionado para o dropdown ficar corretamente abaixo
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ac-wrapper';
+  input.parentElement.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+
+  const drop = document.createElement('ul');
+  drop.className = 'ac-dropdown';
+  wrapper.appendChild(drop);
+
+  const render = () => {
+    const q = input.value.toLowerCase().trim();
+    drop.innerHTML = '';
+    if (!q) return;
+    const list = tipo === 'ind' ? _indCache : _meioCache;
+    const key  = tipo === 'ind' ? 'indicador' : 'meios_afericao';
+    const matches = list.filter(i => i[key].toLowerCase().includes(q)).slice(0, 12);
+    matches.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = item[key];
+      li.addEventListener('mousedown', e => { e.preventDefault(); input.value = item[key]; drop.innerHTML = ''; });
+      drop.appendChild(li);
+    });
+  };
+
+  input.addEventListener('input', render);
+  input.addEventListener('focus', render);
+  input.addEventListener('blur', () => setTimeout(() => { drop.innerHTML = ''; }, 200));
+}
+
+function adicionarLinhaIndicadorObj(valor = '', obs = '') {
+  const container = document.getElementById('objIndicadoresContainer');
   const div = document.createElement('div');
   div.className = 'indicador-row';
   div.innerHTML = `
     <div class="d-flex gap-1 align-items-center">
-      <input type="text" list="datalistIndicadores"
+      <input type="text"
              class="form-control form-control-sm multi-item-ind"
              placeholder="Selecione ou digite um indicador..." autocomplete="off">
       <button type="button" class="btn btn-sm btn-outline-danger px-2 flex-shrink-0"
@@ -617,36 +809,38 @@ function adicionarLinhaIndicador(valor = '', obs = '') {
               placeholder="Observação sobre este indicador (opcional)..."
               style="resize:vertical;"></textarea>`;
   container.appendChild(div);
+  attachAutocomplete(div.querySelector('.multi-item-ind'), 'ind');
   if (valor) div.querySelector('.multi-item-ind').value = valor;
   if (obs)   div.querySelector('.ind-obs').value = obs;
 }
 
-function adicionarLinhaMeio(valor = '') {
-  const container = document.getElementById('meiosContainer');
+function adicionarLinhaMeioObj(valor = '') {
+  const container = document.getElementById('objMeiosContainer');
   const div = document.createElement('div');
   div.className = 'd-flex gap-1 mb-1';
   div.innerHTML = `
-    <input type="text" list="datalistMeios" class="form-control form-control-sm multi-item"
+    <input type="text" class="form-control form-control-sm multi-item-meio"
            placeholder="Selecione ou digite um meio..." autocomplete="off">
     <button type="button" class="btn btn-sm btn-outline-danger px-2 flex-shrink-0"
             onclick="this.closest('div').remove()" title="Remover">
       <i class="bi bi-x"></i>
     </button>`;
   container.appendChild(div);
-  if (valor) div.querySelector('.multi-item').value = valor;
+  attachAutocomplete(div.querySelector('.multi-item-meio'), 'meio');
+  if (valor) div.querySelector('.multi-item-meio').value = valor;
 }
 
-function coletarIndicadores() {
-  return [...document.querySelectorAll('#indicadoresContainer .indicador-row')]
+function coletarIndicadoresObj() {
+  return [...document.querySelectorAll('#objIndicadoresContainer .indicador-row')]
     .map(row => ({
       texto: (row.querySelector('.multi-item-ind')?.value || '').trim(),
       obs:   (row.querySelector('.ind-obs')?.value        || '').trim(),
     }))
-    .filter(item => item.texto !== '');
+    .filter(i => i.texto !== '');
 }
 
-function coletarMultiInput(containerId) {
-  return [...document.querySelectorAll(`#${containerId} .multi-item`)]
+function coletarMeiosObj() {
+  return [...document.querySelectorAll('#objMeiosContainer .multi-item-meio')]
     .map(el => el.value.trim()).filter(v => v !== '');
 }
 
@@ -654,199 +848,368 @@ function limparContainer(id) {
   document.getElementById(id).innerHTML = '';
 }
 
-// ── Abrir modal criar ─────────────────────────────────────────────────────────
-function abrirModalCriar() {
+// ── Carregar dados ────────────────────────────────────────────────────────────
+async function carregarSeiDatalists() {
+  try {
+    const res  = await fetch('{{ url_for("parcerias_metas.api_sei_numeros") }}');
+    const data = await res.json();
+    ['seiDatalist', 'seiDatalistObj'].forEach(id => {
+      const dl = document.getElementById(id);
+      if (!dl) return;
+      dl.innerHTML = data.map(d => {
+        const label = d.fonte === 'Parceria' ? d.sei_numero : `${d.sei_numero} (${d.fonte})`;
+        return `<option value="${d.sei_numero}">${label}</option>`;
+      }).join('');
+    });
+  } catch(e) { console.warn('Erro ao carregar SEIs', e); }
+}
+
+async function carregarDatalistsIndicadoresMeios() {
+  try {
+    const [resInd, resMeio] = await Promise.all([
+      fetch('{{ url_for("parcerias_metas.api_indicadores") }}'),
+      fetch('{{ url_for("parcerias_metas.api_meios") }}'),
+    ]);
+    _indCache  = await resInd.json();
+    _meioCache = await resMeio.json();
+    // Preencher datalists dos filtros
+    const dlInd = document.getElementById('indFiltroDatalist');
+    if (dlInd) dlInd.innerHTML = _indCache.map(i => `<option value="${i.indicador}">`).join('');
+    const dlMeio = document.getElementById('meioFiltroDatalist');
+    if (dlMeio) dlMeio.innerHTML = _meioCache.map(m => `<option value="${m.meios_afericao}">`).join('');
+  } catch(e) { console.warn('Erro ao carregar listas', e); }
+}
+
+async function carregarMetaTipos() {
+  try {
+    const res = await fetch('{{ url_for("parcerias_metas.api_meta_tipos") }}');
+    tiposGrupos = await res.json();
+  } catch(e) { console.warn('Erro ao carregar tipos', e); }
+}
+
+async function carregarDefinicoes() {
+  try {
+    const res   = await fetch('{{ url_for("parcerias_metas.api_definicoes") }}');
+    const lista = await res.json();
+    const por   = {};
+    lista.forEach(d => { por[d.conceito.toLowerCase()] = d.definicao; });
+    const setTip = (id, key) => {
+      const el = document.getElementById(id);
+      if (el && por[key]) { el.setAttribute('title', por[key]); el.setAttribute('data-bs-original-title', por[key]); }
+    };
+    setTip('helpIndicadorObj', 'indicador');
+    setTip('helpMeiosObj',     'meios de aferição');
+  } catch(e) { console.warn('Erro ao carregar definições', e); }
+}
+
+// ── Renderizar checkboxes de tipos (Modal Meta) ───────────────────────────────
+function renderizarTipos(selecionadosIds = []) {
+  const container = document.getElementById('metaTiposContainer');
+  if (!Object.keys(tiposGrupos).length) {
+    container.innerHTML = '<p class="text-muted small col-12">Nenhum tipo cadastrado. <a href="{{ url_for("listas.index") }}">Cadastrar em Listas</a></p>';
+    return;
+  }
+  let html = '';
+  for (const [cls, tipos] of Object.entries(tiposGrupos)) {
+    html += `<div class="col-md-4"><div class="tipo-group">
+      <div class="tipo-group-label">${cls}</div>`;
+    for (const t of tipos) {
+      const checked = selecionadosIds.includes(t.id) ? 'checked' : '';
+      html += `<div class="tipo-check">
+        <input class="form-check-input tipo-checkbox" type="checkbox" id="tipo_${t.id}" value="${t.id}" ${checked}>
+        <label class="form-check-label" for="tipo_${t.id}">${t.meta_tipo}</label>
+        ${t.descricao ? `<i class="bi bi-info-circle text-muted ms-1" title="${t.descricao}" style="font-size:.8rem;cursor:help;" data-bs-toggle="tooltip"></i>` : ''}
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+}
+
+function coletarTipoIds() {
+  return [...document.querySelectorAll('.tipo-checkbox:checked')].map(cb => parseInt(cb.value));
+}
+
+function resetNI(id, defaultChecked = false) {
+  const cb = document.getElementById(id);
+  if (!cb) return;
+  cb.checked = defaultChecked;
+  cb.dispatchEvent(new Event('change'));
+}
+
+// ── Toggle todas as metas de um SEI ──────────────────────────────────────────
+function toggleTodasMetas(btn, seiId) {
+  const accordionBody = document.querySelector(`#${seiId}`);
+  if (!accordionBody) return;
+  const collapses = accordionBody.querySelectorAll('.metas-collapse');
+  const anyHidden = [...collapses].some(c => !c.classList.contains('show'));
+  collapses.forEach(c => {
+    const inst = bootstrap.Collapse.getOrCreateInstance(c, { toggle: false });
+    anyHidden ? inst.show() : inst.hide();
+  });
+  btn.innerHTML = anyHidden
+    ? '<i class="bi bi-chevron-contract me-1"></i>Ocultar tudo'
+    : '<i class="bi bi-chevron-expand me-1"></i>Mostrar tudo';
+}
+
+// ── Modal Objetivo ────────────────────────────────────────────────────────────
+function abrirModalObjetivo(seiNumero) {
+  document.getElementById('modalObjetivoTitulo').innerHTML =
+    '<i class="bi bi-bullseye me-2"></i>Novo Objetivo';
+  document.getElementById('objId').value    = '';
+  document.getElementById('objSei').value   = seiNumero || '{{ filtro_sei }}';
+  document.getElementById('objSei').readOnly = false;
+  document.getElementById('objTexto').value = '';
+  document.getElementById('objOrdemWrapper').classList.add('d-none');
+  document.getElementById('seiDuplicadoWarn').classList.add('d-none');
+
+  resetNI('objNiIndicadores'); resetNI('objNiMeios');
+  limparContainer('objIndicadoresContainer');
+  limparContainer('objMeiosContainer');
+  adicionarLinhaIndicadorObj();
+  adicionarLinhaMeioObj();
+  modalObjetivo.show();
+}
+
+function abrirModalEditarObjetivo(obj) {
+  document.getElementById('modalObjetivoTitulo').innerHTML =
+    '<i class="bi bi-pencil me-2"></i>Editar Objetivo';
+  document.getElementById('objId').value     = obj.id;
+  document.getElementById('objSei').value    = obj.sei_numero || '';
+  document.getElementById('objSei').readOnly = true;    // SEI não muda ao editar
+  document.getElementById('objTexto').value  = obj.objetivo || '';
+  document.getElementById('objOrdem').value  = obj.obj_ordem ?? 0;
+  document.getElementById('objOrdemWrapper').classList.remove('d-none');
+
+  // Indicadores
+  const niInd = document.getElementById('objNiIndicadores');
+  niInd.checked = !!obj.indicadores_ni;
+  niInd.dispatchEvent(new Event('change'));
+  limparContainer('objIndicadoresContainer');
+  const inds   = obj.indicadores_textos || [];
+  const obsArr = obj.obs_indicadores    || [];
+  if (inds.length) { inds.forEach((v, i) => adicionarLinhaIndicadorObj(v, obsArr[i] || '')); }
+  else { adicionarLinhaIndicadorObj(); }
+
+  // Meios
+  const niMeios = document.getElementById('objNiMeios');
+  niMeios.checked = !!obj.meios_ni;
+  niMeios.dispatchEvent(new Event('change'));
+  limparContainer('objMeiosContainer');
+  const meios = obj.meios_textos || [];
+  if (meios.length) { meios.forEach(v => adicionarLinhaMeioObj(v)); }
+  else { adicionarLinhaMeioObj(); }
+
+  modalObjetivo.show();
+}
+
+async function salvarObjetivo() {
+  const id  = document.getElementById('objId').value;
+  const sei = document.getElementById('objSei').value.trim();
+  const obj = document.getElementById('objTexto').value.trim();
+  if (!sei || !obj) { mostrarToast('SEI e Objetivo são obrigatórios.', 'danger'); return; }
+
+  const niInd   = document.getElementById('objNiIndicadores').checked;
+  const niMeios = document.getElementById('objNiMeios').checked;
+  const indsC   = niInd   ? [] : coletarIndicadoresObj();
+  const meiosC  = niMeios ? [] : coletarMeiosObj();
+
+  const payload = {
+    sei_numero:         sei,
+    objetivo:           obj,
+    indicadores_textos: indsC.map(i => i.texto),
+    obs_indicadores:    indsC.map(i => i.obs),
+    indicadores_ni:     niInd,
+    meios_textos:       meiosC,
+    meios_ni:           niMeios,
+    ordem:              parseInt(document.getElementById('objOrdem')?.value) || 0,
+  };
+
+  const url    = id ? `/parcerias-metas/objetivo/editar/${id}` : '/parcerias-metas/objetivo/criar';
+  const method = id ? 'PUT' : 'POST';
+
+  try {
+    const res  = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.erro || 'Erro ao salvar');
+    mostrarToast('Objetivo salvo com sucesso!');
+    modalObjetivo.hide();
+    setTimeout(() => location.reload(), 800);
+  } catch(e) { mostrarToast(e.message, 'danger'); }
+}
+
+// ── Modal Meta ────────────────────────────────────────────────────────────────
+function abrirModalMeta(objId) {
   document.getElementById('modalMetaTitulo').innerHTML =
     '<i class="bi bi-clipboard2-plus me-2"></i>Nova Meta';
-  document.getElementById('metaId').value      = '';
-  document.getElementById('metaSei').value     = '{{ filtro_sei }}';
-  document.getElementById('metaTitulo').value  = '';
-  document.getElementById('metaDescricao').value = '';
-  document.getElementById('metaObjetivo').value  = '';
+  document.getElementById('metaId').value         = '';
+  document.getElementById('metaObjetivoId').value = objId;
+  document.getElementById('metaTitulo').value     = '';
+  document.getElementById('metaDescricao').value  = '';
   document.getElementById('metaObservacoes').value = '';
-  // Ordem oculta na criação (auto no backend)
-  document.getElementById('ordemWrapper').classList.add('d-none');
-  // Resetar checkboxes NI
-  ['niTitulo','niDescricao','niObjetivo','niTipos','niIndicadores','niMeios'].forEach(id => {
-    const cb = document.getElementById(id);
-    if (cb) { cb.checked = false; cb.dispatchEvent(new Event('change')); }
-  });
-  limparContainer('indicadoresContainer');
-  limparContainer('meiosContainer');
-  adicionarLinhaIndicador();
-  adicionarLinhaMeio();
+  document.getElementById('metaOrdemWrapper').classList.add('d-none');
+
+  resetNI('metaNiTitulo'); resetNI('metaNiDescricao'); resetNI('metaNiTipos');
   renderizarTipos([]);
-  inicializarTooltipsModal();
   modalMeta.show();
 }
 
-// ── Abrir modal editar ────────────────────────────────────────────────────────
-function abrirModalEditar(m) {
+function abrirModalEditarMeta(m, objId) {
   document.getElementById('modalMetaTitulo').innerHTML =
     '<i class="bi bi-pencil me-2"></i>Editar Meta';
-  document.getElementById('metaId').value    = m.id;
-  document.getElementById('metaSei').value   = m.sei_numero || '';
-  document.getElementById('metaOrdem').value = m.ordem ?? 0;
-  // Ordem visível na edição
-  document.getElementById('ordemWrapper').classList.remove('d-none');
+  document.getElementById('metaId').value         = m.id;
+  document.getElementById('metaObjetivoId').value = objId;
+  document.getElementById('metaOrdem').value      = m.meta_ordem ?? 0;
+  document.getElementById('metaOrdemWrapper').classList.remove('d-none');
 
-  // Título
-  const niTit = document.getElementById('niTitulo');
+  const niTit = document.getElementById('metaNiTitulo');
   niTit.checked = (m.meta_titulo || '') === 'Não identificado';
   toggleNIField('metaTitulo', niTit);
   document.getElementById('metaTitulo').value = niTit.checked ? '' : (m.meta_titulo || '');
 
-  // Descrição
-  const niDesc = document.getElementById('niDescricao');
+  const niDesc = document.getElementById('metaNiDescricao');
   niDesc.checked = (m.meta_descricao || '') === 'Não identificado';
   toggleNIField('metaDescricao', niDesc);
   document.getElementById('metaDescricao').value = niDesc.checked ? '' : (m.meta_descricao || '');
 
-  // Objetivo
-  const niObj = document.getElementById('niObjetivo');
-  niObj.checked = (m.meta_objetivo || '') === 'Não identificado';
-  toggleNIField('metaObjetivo', niObj);
-  document.getElementById('metaObjetivo').value = niObj.checked ? '' : (m.meta_objetivo || '');
-
-  // Tipos NI
-  const niTipos = document.getElementById('niTipos');
+  const niTipos = document.getElementById('metaNiTipos');
   niTipos.checked = !!m.tipos_ni;
-  toggleNIContainer('tiposContainer', niTipos);
-
-  // Indicadores
-  const niInd = document.getElementById('niIndicadores');
-  niInd.checked = !!m.indicadores_ni;
-  toggleNIContainer('indicadoresContainer', niInd, 'btnAddIndicador');
-  limparContainer('indicadoresContainer');
-  const inds = m.indicadores_textos || [];
-  const obsArr = m.obs_indicadores || [];
-  if (inds.length > 0) {
-    inds.forEach((v, i) => adicionarLinhaIndicador(v, obsArr[i] || ''));
-  } else {
-    adicionarLinhaIndicador();
-  }
-
-  // Meios
-  const niMeios = document.getElementById('niMeios');
-  niMeios.checked = !!m.meios_ni;
-  toggleNIContainer('meiosContainer', niMeios, 'btnAddMeio');
-  limparContainer('meiosContainer');
-  const meios = m.meios_textos || [];
-  if (meios.length > 0) { meios.forEach(v => adicionarLinhaMeio(v)); }
-  else { adicionarLinhaMeio(); }
+  toggleNIContainer('metaTiposContainer', niTipos);
 
   document.getElementById('metaObservacoes').value = m.observacoes || '';
 
   const ids = (m.meta_tipo_ids || []).map(Number);
   renderizarTipos(ids);
-  inicializarTooltipsModal();
   modalMeta.show();
 }
 
-function inicializarTooltipsModal() {
-  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
-    if (!bootstrap.Tooltip.getInstance(el)) new bootstrap.Tooltip(el);
-  });
-}
-
-// ── Coletar IDs selecionados ──────────────────────────────────────────────────
-function coletarTipoIds() {
-  return [...document.querySelectorAll('.tipo-checkbox:checked')].map(cb => parseInt(cb.value));
-}
-
-// ── Salvar (criar ou editar) ──────────────────────────────────────────────────
 async function salvarMeta() {
-  const id  = document.getElementById('metaId').value;
-  const sei = document.getElementById('metaSei').value.trim();
+  const id      = document.getElementById('metaId').value;
+  const objId   = document.getElementById('metaObjetivoId').value;
+  const niTit   = document.getElementById('metaNiTitulo').checked;
+  const tituloRaw = document.getElementById('metaTitulo').value.trim();
+  const titulo  = niTit ? 'Não identificado' : tituloRaw;
+  if (!titulo) { mostrarToast('Título é obrigatório.', 'danger'); return; }
 
-  const niTitulo = document.getElementById('niTitulo').checked;
-  const titulo_raw = document.getElementById('metaTitulo').value.trim();
-  const meta_titulo = niTitulo ? 'Não identificado' : titulo_raw;
-
-  if (!sei || !meta_titulo) {
-    mostrarToast('SEI e Título são obrigatórios.', 'danger'); return;
-  }
-
-  const niDesc  = document.getElementById('niDescricao').checked;
-  const niObj   = document.getElementById('niObjetivo').checked;
-  const niTipos = document.getElementById('niTipos').checked;
-  const niInd   = document.getElementById('niIndicadores').checked;
-  const niMeios = document.getElementById('niMeios').checked;
-
-  const indsColetados = niInd ? [] : coletarIndicadores();
+  const niDesc  = document.getElementById('metaNiDescricao').checked;
+  const niTipos = document.getElementById('metaNiTipos').checked;
 
   const payload = {
-    sei_numero:         sei,
-    meta_titulo:        meta_titulo,
-    meta_descricao:     niDesc  ? 'Não identificado' : (document.getElementById('metaDescricao').value || null),
-    meta_objetivo:      niObj   ? 'Não identificado' : (document.getElementById('metaObjetivo').value  || null),
-    meta_tipo_ids:      coletarTipoIds(),
-    tipos_ni:           niTipos,
-    indicadores_textos: indsColetados.map(i => i.texto),
-    obs_indicadores:    indsColetados.map(i => i.obs),
-    indicadores_ni:     niInd,
-    meios_textos:       niMeios ? [] : coletarMultiInput('meiosContainer'),
-    meios_ni:           niMeios,
-    observacoes:        document.getElementById('metaObservacoes').value || null,
-    ordem:              parseInt(document.getElementById('metaOrdem').value) || 0,
+    objetivo_id:    parseInt(objId),
+    meta_titulo:    titulo,
+    meta_descricao: niDesc  ? 'Não identificado' : (document.getElementById('metaDescricao').value || null),
+    meta_tipo_ids:  coletarTipoIds(),
+    tipos_ni:       niTipos,
+    observacoes:    document.getElementById('metaObservacoes').value || null,
+    ordem:          parseInt(document.getElementById('metaOrdem')?.value) || 0,
   };
 
-  const url    = id ? `/parcerias-metas/editar/${id}` : '/parcerias-metas/criar';
+  const url    = id ? `/parcerias-metas/meta/editar/${id}` : '/parcerias-metas/meta/criar';
   const method = id ? 'PUT' : 'POST';
 
   try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const res  = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const json = await res.json();
     if (!res.ok) throw new Error(json.erro || 'Erro ao salvar');
     mostrarToast('Meta salva com sucesso!');
     modalMeta.hide();
-    carregarDatalists();
-    setTimeout(() => location.reload(), 900);
-  } catch(e) {
-    mostrarToast(e.message, 'danger');
-  }
+    setTimeout(() => location.reload(), 800);
+  } catch(e) { mostrarToast(e.message, 'danger'); }
 }
 
-// ── Toggle coluna Ordem ───────────────────────────────────────────────────────
-function toggleOrdemColuna(mostrar) {
-  document.querySelectorAll('.col-ord').forEach(el => {
-    el.classList.toggle('d-none', !mostrar);
-  });
+// ── Exclusão ──────────────────────────────────────────────────────────────────
+function confirmarExcluirObjetivo(id, texto) {
+  excluirUrl = `/parcerias-metas/objetivo/excluir/${id}`;
+  document.getElementById('excluirDescricao').textContent = 'Excluir objetivo (e todas as metas filhas):';
+  document.getElementById('excluirTexto').textContent = texto;
+  modalExcluir.show();
 }
 
-// ── Excluir ───────────────────────────────────────────────────────────────────
-function confirmarExcluir(id, titulo) {
-  excluirIdPendente = id;
-  document.getElementById('excluirTituloTexto').textContent = titulo;
+function confirmarExcluirMeta(id, texto) {
+  excluirUrl = `/parcerias-metas/meta/excluir/${id}`;
+  document.getElementById('excluirDescricao').textContent = 'Excluir meta:';
+  document.getElementById('excluirTexto').textContent = texto;
   modalExcluir.show();
 }
 
 async function executarExcluir() {
-  if (!excluirIdPendente) return;
+  if (!excluirUrl) return;
   try {
-    const res = await fetch(`/parcerias-metas/excluir/${excluirIdPendente}`, { method: 'DELETE' });
+    const res = await fetch(excluirUrl, { method: 'DELETE' });
     if (!res.ok) throw new Error('Erro ao excluir');
-    mostrarToast('Meta excluída.');
+    mostrarToast('Registro excluído.');
     modalExcluir.hide();
-    setTimeout(() => location.reload(), 900);
-  } catch(e) {
-    mostrarToast(e.message, 'danger');
-  }
+    setTimeout(() => location.reload(), 800);
+  } catch(e) { mostrarToast(e.message, 'danger'); }
 }
 
-// ── Persistir filtro SEI no localStorage ─────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const input = document.getElementById('filtroSei');
-  const salvo = localStorage.getItem('parcerias_metas_sei');
-  if (salvo && !input.value) input.value = salvo;
-  input.addEventListener('change', () => localStorage.setItem('parcerias_metas_sei', input.value));
+  Promise.all([
+    carregarSeiDatalists(),
+    carregarMetaTipos(),
+    carregarDefinicoes(),
+    carregarDatalistsIndicadoresMeios(),
+  ]);
 
-  // Carregar dados assíncronos
-  Promise.all([carregarSeiDatalist(), carregarMetaTipos(), carregarDefinicoes(), carregarDatalists()]);
+  // Ativar tooltips Bootstrap na página (badges de indicadores/meios e tipos)
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+  // Aviso SEI duplicado no modal de novo objetivo
+  document.getElementById('objSei').addEventListener('input', function() {
+    const warn = document.getElementById('seiDuplicadoWarn');
+    const isEdit = !!document.getElementById('objId').value;
+    if (warn && !isEdit && this.value.trim() && seisCadastrados.has(this.value.trim())) {
+      warn.classList.remove('d-none');
+    } else if (warn) {
+      warn.classList.add('d-none');
+    }
+  });
+
+  // Persistir filtro SEI
+  const filtroInput = document.getElementById('filtroSei');
+  const salvo = localStorage.getItem('parcerias_metas_sei');
+  if (salvo && !filtroInput.value) filtroInput.value = salvo;
+  filtroInput.addEventListener('change', () => localStorage.setItem('parcerias_metas_sei', filtroInput.value));
+
+  // Drag-and-drop: objetivos por SEI
+  document.querySelectorAll('.sortable-obj-list').forEach(container => {
+    Sortable.create(container, {
+      handle: '.drag-handle',
+      animation: 150,
+      onEnd(evt) {
+        const items = [...container.querySelectorAll('.obj-card[data-obj-id]')];
+        items.forEach((el, idx) => {
+          const id = el.dataset.objId;
+          fetch(`/parcerias-metas/objetivo/${id}/reordenar`, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ordem: idx + 1})
+          }).catch(e => console.warn('Erro ao reordenar objetivo', e));
+        });
+      }
+    });
+  });
+
+  // Drag-and-drop: metas por objetivo
+  document.querySelectorAll('.sortable-meta-list').forEach(tbody => {
+    Sortable.create(tbody, {
+      handle: '.drag-handle-meta',
+      animation: 150,
+      onEnd(evt) {
+        const items = [...tbody.querySelectorAll('tr[data-meta-id]')];
+        items.forEach((el, idx) => {
+          const id = el.dataset.metaId;
+          fetch(`/parcerias-metas/meta/${id}/reordenar`, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ordem: idx + 1})
+          }).catch(e => console.warn('Erro ao reordenar meta', e));
+        });
+      }
+    });
+  });
 });
 </script>
 </body>
