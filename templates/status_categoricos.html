@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Status Categóricos - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f4f3f8; padding: 20px; }
+
+    .page-header {
+      background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+      color: #fff; padding: 22px 28px; border-radius: 12px;
+      margin-bottom: 20px; box-shadow: 0 4px 18px rgba(124,58,237,.28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+    .panel {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    }
+    .panel-header {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; padding: 12px 18px; border-radius: 10px 10px 0 0;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .panel-header h5 { margin: 0; font-weight: 700; font-size: .95rem; flex: 1; }
+    .panel-body { padding: 18px; }
+
+    /* Sidebar de listas */
+    .lista-item {
+      cursor: pointer; padding: 9px 14px; border-radius: 7px;
+      border: 1px solid #e9e3ff; margin-bottom: 5px;
+      display: flex; justify-content: space-between; align-items: center;
+      transition: background .12s;
+      font-size: .875rem;
+    }
+    .lista-item:hover  { background: #f5f0ff; border-color: #c4b5fd; }
+    .lista-item.active { background: #ede9fe; border-color: #7c3aed; font-weight: 600; color: #4c1d95; }
+    .lista-item .badge-count {
+      background: #7c3aed; color: #fff; border-radius: 10px;
+      padding: 1px 8px; font-size: .75rem; font-weight: 600; min-width: 28px; text-align: center;
+    }
+    .lista-item.active .badge-count { background: #4c1d95; }
+
+    /* Tabela de itens */
+    #tabelaItens thead th {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border: none; white-space: nowrap; font-size: .84rem;
+    }
+    #tabelaItens tbody tr:hover { background: #f5f0ff; }
+    #tabelaItens td { vertical-align: middle; font-size: .88rem; }
+
+    .btn-violet {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border: none; border-radius: 7px;
+      padding: 6px 14px; font-weight: 600; font-size: .84rem;
+      display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+      transition: opacity .15s; text-decoration: none;
+    }
+    .btn-violet:hover { opacity: .88; color: #fff; }
+    .btn-violet.btn-sm { padding: 4px 10px; font-size: .78rem; }
+    .btn-violet.danger  { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
+    .btn-violet.warning { background: linear-gradient(135deg, #78350f, #d97706); }
+    .btn-violet.success { background: linear-gradient(135deg, #064e3b, #059669); }
+    .btn-violet.outline {
+      background: transparent; border: 1.5px solid #7c3aed; color: #7c3aed;
+    }
+    .btn-violet.outline:hover { background: #f5f0ff; opacity: 1; }
+
+    /* Edição inline */
+    .editing-row td { background: #faf5ff !important; }
+    .editing-row input, .editing-row textarea {
+      font-size: .84rem; border-color: #a78bfa; border-radius: 5px;
+    }
+    .editing-row input:focus, .editing-row textarea:focus {
+      border-color: #7c3aed; box-shadow: 0 0 0 .15rem rgba(124,58,237,.2);
+    }
+
+    /* Nova lista / novo item */
+    .add-row td input { font-size: .84rem; }
+
+    /* Placeholder */
+    #areaVazia { color: #9ca3af; padding: 40px 0; }
+
+    /* Responsividade da coluna lateral */
+    @media (max-width: 767px) {
+      #colunaListas { margin-bottom: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Cabeçalho -->
+<div class="page-header d-flex align-items-center gap-3">
+  <a href="/listas" class="text-white text-decoration-none" title="Voltar para Listas">
+    <i class="bi bi-arrow-left-circle fs-4"></i>
+  </a>
+  <div>
+    <h2><i class="bi bi-list-check me-2"></i>Status Categóricos</h2>
+    <p>Gerencie as listas de status usadas nos dropdowns do sistema (c_geral_status)</p>
+  </div>
+</div>
+
+<div class="row g-3">
+
+  <!-- ── Coluna esquerda: lista de grupos ──────────────────────────────── -->
+  <div class="col-12 col-md-4" id="colunaListas">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <i class="bi bi-folder2"></i>
+        <h5>Listas disponíveis</h5>
+        <button class="btn-violet btn-sm" onclick="abrirModalNovaLista()" title="Nova lista">
+          <i class="bi bi-plus-lg"></i> Nova
+        </button>
+      </div>
+      <div class="panel-body">
+        <div class="mb-2">
+          <input type="text" id="filtroPesquisaLista" class="form-control form-control-sm"
+                 placeholder="Filtrar listas…" oninput="filtrarListas()" style="border-color:#d8b4fe;">
+        </div>
+        <div id="containerListas">
+          <div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Coluna direita: itens do grupo selecionado ───────────────────── -->
+  <div class="col-12 col-md-8">
+    <div class="panel">
+      <div class="panel-header">
+        <i class="bi bi-tags"></i>
+        <h5 id="tituloGrupo" class="text-truncate">Selecione uma lista à esquerda</h5>
+        <div id="acoesGrupo" style="display:none;" class="d-flex gap-2 flex-wrap">
+          <button class="btn-violet btn-sm success" onclick="adicionarItemNovo()">
+            <i class="bi bi-plus-lg"></i> Adicionar
+          </button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <!-- Tag do campo referenciado (oculto — referência interna) -->
+        <div id="tagCampo" style="display:none;">
+          <span id="labelCampo"></span>
+        </div>
+
+        <!-- Área vazia -->
+        <div id="areaVazia" class="text-center">
+          <i class="bi bi-hand-point-left display-5"></i>
+          <p class="mt-2">Selecione uma lista para ver seus itens</p>
+        </div>
+
+        <!-- Tabela -->
+        <div id="areaTabela" style="display:none;">
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle" id="tabelaItens">
+              <thead>
+                <tr>
+                  <th style="width:40px">#</th>
+                  <th>Valor</th>
+                  <th>Descrição / Rótulo</th>
+                  <th style="width:70px" class="text-center">Ativo</th>
+                  <th style="width:60px" class="text-center">Editar</th>
+                </tr>
+              </thead>
+              <tbody id="corpoTabela"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="areaLoading" style="display:none;" class="text-center py-3">
+          <div class="spinner-border spinner-border-sm text-primary"></div>
+          <span class="ms-2 text-muted">Carregando…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /row -->
+
+
+<!-- ── Modal: Nova lista ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalNovaLista" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;">
+        <h5 class="modal-title"><i class="bi bi-folder-plus me-2"></i>Nova Lista</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nome da lista (referência do campo)</label>
+          <input type="text" id="novaListaNome" class="form-control font-monospace"
+                 placeholder="ex: public.parcerias_monit.visita_status">
+          <div class="form-text">Use o padrão <code>schema.tabela.coluna</code></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Primeiro valor obrigatório</label>
+          <input type="text" id="novaListaStatus" class="form-control" placeholder="ex: Não analisado">
+        </div>
+        <div>
+          <label class="form-label">Descrição do primeiro valor <span class="text-muted">(opcional)</span></label>
+          <input type="text" id="novaListaDescricao" class="form-control" placeholder="Rótulo exibido ao usuário">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn-violet" onclick="criarNovaLista()"><i class="bi bi-check-lg"></i> Criar lista</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Confirmar exclusão de lista ────────────────────────────────── -->
+<div class="modal fade" id="modalConfExcluir" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#7f1d1d,#dc2626);color:#fff;">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Excluir lista?</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-1">Isso excluirá <strong>todos os itens</strong> da lista:</p>
+        <code id="textoListaExcluir" class="text-break"></code>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-danger btn-sm" onclick="excluirListaConfirmado()"><i class="bi bi-trash3"></i> Excluir tudo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast de feedback -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="toastMsg" class="toast align-items-center text-bg-success border-0" role="alert" data-bs-autohide="true" data-bs-delay="2800">
+    <div class="d-flex">
+      <div class="toast-body" id="toastTexto">Salvo com sucesso!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Nomes amigáveis para os campos técnicos
+// ─────────────────────────────────────────────────────────────────────────────
+const LABELS = {
+  'public.parcerias_monit.visita_status':              'M&A › Visita — Status',
+  'public.parcerias_monit.visita_avaliacao':           'M&A › Visita — Avaliação',
+  'public.parcerias_monit.monit_status':               'M&A › Monitoramento — Status',
+  'public.parcerias_monit.monit_avaliacao':            'M&A › Monitoramento — Avaliação',
+  'public.parcerias_monit_adicional.justificativa_status': 'M&A › Justificativa — Status',
+  'public.parcerias_monit_adicional.comissao_visita':  'M&A › Comissão — Visita',
+};
+
+function getLabel(lista) {
+  return LABELS[lista] || lista;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Estado global
+// ─────────────────────────────────────────────────────────────────────────────
+let todosGrupos   = [];   // [{lista, total}]
+let grupoAtivo    = null; // string schema_table_coluna_r
+let itensAtivos   = [];   // [{id, status, descricao}]
+let editandoId    = null; // id do item em edição, ou 'novo' para nova linha
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bootstrap modais / toast
+// ─────────────────────────────────────────────────────────────────────────────
+const modalNovaLista  = new bootstrap.Modal('#modalNovaLista');
+const modalConfExcluir = new bootstrap.Modal('#modalConfExcluir');
+
+function toast(msg, tipo = 'success') {
+  const el = document.getElementById('toastMsg');
+  el.className = `toast align-items-center text-bg-${tipo} border-0`;
+  document.getElementById('toastTexto').textContent = msg;
+  bootstrap.Toast.getOrCreateInstance(el).show();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Carregar lista de grupos (sidebar)
+// ─────────────────────────────────────────────────────────────────────────────
+async function carregarGrupos() {
+  try {
+    const res  = await fetch('/listas/api/status-cat/listas');
+    todosGrupos = await res.json();
+    renderizarSidebar(todosGrupos);
+  } catch(e) {
+    document.getElementById('containerListas').innerHTML =
+      '<p class="text-danger small">Erro ao carregar listas.</p>';
+  }
+}
+
+function renderizarSidebar(grupos) {
+  const cont = document.getElementById('containerListas');
+  if (!grupos.length) {
+    cont.innerHTML = '<p class="text-muted small text-center">Nenhuma lista cadastrada.</p>';
+    return;
+  }
+  cont.innerHTML = grupos.map(g => `
+    <div class="lista-item ${g.lista === grupoAtivo ? 'active' : ''}"
+         onclick="selecionarGrupo('${g.lista.replace(/'/g,"\\'")}')">
+      <div class="me-2" style="min-width:0;">
+        <div class="fw-semibold text-truncate" style="font-size:.83rem;">${esc(getLabel(g.lista))}</div>
+
+      </div>
+      <span class="badge-count flex-shrink-0">${g.total}</span>
+    </div>
+  `).join('');
+}
+
+function filtrarListas() {
+  const q = document.getElementById('filtroPesquisaLista').value.toLowerCase();
+  const filtrado = todosGrupos.filter(g => g.lista.toLowerCase().includes(q));
+  renderizarSidebar(filtrado);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Selecionar um grupo e carregar seus itens
+// ─────────────────────────────────────────────────────────────────────────────
+async function selecionarGrupo(lista) {
+  if (editandoId !== null) cancelarEdicao();
+  grupoAtivo = lista;
+  editandoId = null;
+
+  // Atualizar sidebar
+  renderizarSidebar(document.getElementById('filtroPesquisaLista').value
+    ? todosGrupos.filter(g => g.lista.toLowerCase().includes(
+        document.getElementById('filtroPesquisaLista').value.toLowerCase()))
+    : todosGrupos);
+
+  // Título e controles
+  document.getElementById('tituloGrupo').textContent = getLabel(lista);
+  document.getElementById('acoesGrupo').style.display = '';
+  document.getElementById('tagCampo').style.display = '';
+  document.getElementById('labelCampo').textContent = lista;
+  document.getElementById('areaVazia').style.display  = 'none';
+  document.getElementById('areaTabela').style.display = 'none';
+  document.getElementById('areaLoading').style.display = '';
+
+  try {
+    const res = await fetch(`/listas/api/status-cat/itens?lista=${encodeURIComponent(lista)}`);
+    itensAtivos = await res.json();
+    renderizarTabela();
+    document.getElementById('areaLoading').style.display = 'none';
+    document.getElementById('areaTabela').style.display  = '';
+  } catch(e) {
+    document.getElementById('areaLoading').style.display = 'none';
+    toast('Erro ao carregar itens.', 'danger');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Renderizar tabela de itens
+// ─────────────────────────────────────────────────────────────────────────────
+function renderizarTabela() {
+  const tbody = document.getElementById('corpoTabela');
+  tbody.innerHTML = '';
+
+  itensAtivos.forEach((item, idx) => {
+    if (editandoId === item.id) {
+      tbody.innerHTML += `
+        <tr class="editing-row" id="row-${item.id}">
+          <td class="text-muted">${idx + 1}</td>
+          <td><input type="text" class="form-control form-control-sm" id="edit-status-${item.id}" value="${esc(item.status)}"></td>
+          <td><input type="text" class="form-control form-control-sm" id="edit-desc-${item.id}" value="${esc(item.descricao)}"></td>
+          <td class="text-center">
+            <input type="checkbox" class="form-check-input" ${item.ativo ? 'checked' : ''} disabled style="width:1.15em;height:1.15em;">
+          </td>
+          <td class="text-center">
+            <button class="btn-violet btn-sm success me-1" onclick="salvarEdicao(${item.id})"><i class="bi bi-check-lg"></i></button>
+            <button class="btn-violet btn-sm outline"       onclick="cancelarEdicao()"><i class="bi bi-x-lg"></i></button>
+          </td>
+        </tr>`;
+    } else {
+      tbody.innerHTML += `
+        <tr id="row-${item.id}" ${!item.ativo ? 'style="opacity:.45;"' : ''}>
+          <td class="text-muted">${idx + 1}</td>
+          <td><span class="badge rounded-pill bg-light text-dark border" style="font-size:.82rem;">${esc(item.status)}</span></td>
+          <td class="text-muted">${esc(item.descricao)}</td>
+          <td class="text-center">
+            <input type="checkbox" class="form-check-input" ${item.ativo ? 'checked' : ''}
+                   onchange="toggleAtivo(${item.id}, this.checked)"
+                   style="width:1.15em;height:1.15em;cursor:pointer;">
+          </td>
+          <td class="text-center">
+            <button class="btn-violet btn-sm warning" onclick="iniciarEdicao(${item.id})" title="Editar"><i class="bi bi-pencil"></i></button>
+          </td>
+        </tr>`;
+    }
+  });
+
+  // Linha de novo item
+  if (editandoId === 'novo') {
+    tbody.innerHTML += `
+      <tr class="editing-row table-success" id="row-novo">
+        <td><i class="bi bi-plus text-success"></i></td>
+        <td><input type="text" class="form-control form-control-sm" id="novo-status" placeholder="Valor do status…" autofocus></td>
+        <td><input type="text" class="form-control form-control-sm" id="novo-desc"   placeholder="Descrição (opcional)"></td>
+        <td class="text-center"><input type="checkbox" class="form-check-input" checked disabled style="width:1.15em;height:1.15em;"></td>
+        <td class="text-center">
+          <button class="btn-violet btn-sm success me-1" onclick="salvarNovoItem()"><i class="bi bi-check-lg"></i></button>
+          <button class="btn-violet btn-sm outline"       onclick="cancelarEdicao()"><i class="bi bi-x-lg"></i></button>
+        </td>
+      </tr>`;
+    setTimeout(() => document.getElementById('novo-status')?.focus(), 50);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Edição inline de item existente
+// ─────────────────────────────────────────────────────────────────────────────
+function iniciarEdicao(id) {
+  editandoId = id;
+  renderizarTabela();
+  document.getElementById(`edit-status-${id}`)?.focus();
+}
+
+function cancelarEdicao() {
+  editandoId = null;
+  renderizarTabela();
+}
+
+async function salvarEdicao(id) {
+  const status   = document.getElementById(`edit-status-${id}`).value.trim();
+  const descricao = document.getElementById(`edit-desc-${id}`).value.trim();
+  if (!status) { toast('O valor (status) é obrigatório.', 'warning'); return; }
+
+  try {
+    const res = await fetch(`/listas/api/status-cat/itens/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, descricao })
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.erro || 'Erro ao salvar.', 'danger'); return; }
+
+    const item = itensAtivos.find(i => i.id === id);
+    if (item) { item.status = status; item.descricao = descricao; }
+    editandoId = null;
+    renderizarTabela();
+    toast('Salvo com sucesso!');
+  } catch(e) { toast('Erro de conexão.', 'danger'); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Adicionar novo item
+// ─────────────────────────────────────────────────────────────────────────────
+function adicionarItemNovo() {
+  editandoId = 'novo';
+  renderizarTabela();
+}
+
+async function salvarNovoItem() {
+  const status   = document.getElementById('novo-status').value.trim();
+  const descricao = document.getElementById('novo-desc').value.trim();
+  if (!status) { toast('O valor (status) é obrigatório.', 'warning'); return; }
+
+  try {
+    const res = await fetch('/listas/api/status-cat/itens', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lista: grupoAtivo, status, descricao })
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.erro || 'Erro ao criar.', 'danger'); return; }
+
+    itensAtivos.push({ id: data.id, status, descricao, ativo: true });
+    editandoId = null;
+    renderizarTabela();
+    // Atualizar contador na sidebar
+    const g = todosGrupos.find(x => x.lista === grupoAtivo);
+    if (g) g.total++;
+    renderizarSidebar(todosGrupos);
+    toast('Item adicionado!');
+  } catch(e) { toast('Erro de conexão.', 'danger'); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Toggle ativo/inativo
+// ─────────────────────────────────────────────────────────────────────────────
+async function toggleAtivo(id, novoValor) {
+  try {
+    const res = await fetch(`/listas/api/status-cat/itens/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ativo: novoValor })
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.erro || 'Erro ao atualizar.', 'danger'); return; }
+    const item = itensAtivos.find(i => i.id === id);
+    if (item) item.ativo = novoValor;
+    renderizarTabela();
+    toast(novoValor ? 'Ativado.' : 'Inativado.');
+  } catch(e) { toast('Erro de conexão.', 'danger'); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Nova lista
+// ─────────────────────────────────────────────────────────────────────────────
+function abrirModalNovaLista() {
+  document.getElementById('novaListaNome').value     = '';
+  document.getElementById('novaListaStatus').value   = '';
+  document.getElementById('novaListaDescricao').value = '';
+  modalNovaLista.show();
+}
+
+async function criarNovaLista() {
+  const lista    = document.getElementById('novaListaNome').value.trim();
+  const status   = document.getElementById('novaListaStatus').value.trim();
+  const descricao = document.getElementById('novaListaDescricao').value.trim();
+  if (!lista || !status) { toast('Nome da lista e primeiro valor são obrigatórios.', 'warning'); return; }
+
+  try {
+    const res = await fetch('/listas/api/status-cat/listas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lista, status, descricao })
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.erro || 'Erro ao criar lista.', 'danger'); return; }
+
+    todosGrupos.push({ lista, total: 1 });
+    todosGrupos.sort((a, b) => a.lista.localeCompare(b.lista));
+    modalNovaLista.hide();
+    await selecionarGrupo(lista);
+    toast('Lista criada com sucesso!');
+  } catch(e) { toast('Erro de conexão.', 'danger'); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Excluir lista inteira
+// ─────────────────────────────────────────────────────────────────────────────
+function confirmarExcluirLista() {
+  document.getElementById('textoListaExcluir').textContent = grupoAtivo;
+  modalConfExcluir.show();
+}
+
+async function excluirListaConfirmado() {
+  modalConfExcluir.hide();
+  try {
+    const res = await fetch(`/listas/api/status-cat/listas?lista=${encodeURIComponent(grupoAtivo)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.erro || 'Erro ao excluir.', 'danger'); return; }
+
+    todosGrupos = todosGrupos.filter(g => g.lista !== grupoAtivo);
+    grupoAtivo  = null;
+    itensAtivos = [];
+    document.getElementById('tituloGrupo').textContent = 'Selecione uma lista à esquerda';
+    document.getElementById('acoesGrupo').style.display = 'none';
+    document.getElementById('tagCampo').style.display   = 'none';
+    document.getElementById('areaTabela').style.display = 'none';
+    document.getElementById('areaVazia').style.display  = '';
+    renderizarSidebar(todosGrupos);
+    toast('Lista excluída.');
+  } catch(e) { toast('Erro de conexão.', 'danger'); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utilitário: escapar HTML
+// ─────────────────────────────────────────────────────────────────────────────
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enter confirma edição
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (editandoId === 'novo')          salvarNovoItem();
+  else if (editandoId !== null)       salvarEdicao(editandoId);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────────────────────
+carregarGrupos();
+</script>
+</body>
+</html>

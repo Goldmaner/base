@@ -1926,3 +1926,199 @@ def deletar_contato_vereador(id):
         get_db().rollback()
         return jsonify({'erro': str(e)}), 500
 
+
+# =============================================================================
+# STATUS CATEGÓRICOS (c_geral_status)
+# =============================================================================
+
+@listas_bp.route("/status-categoricos", methods=["GET"], endpoint="status_categoricos")
+@login_required
+@requires_access('listas')
+def status_categoricos():
+    """Página de gerenciamento das listas de status categóricos."""
+    return render_template('status_categoricos.html')
+
+
+@listas_bp.route("/api/status-cat/listas", methods=["GET"])
+@login_required
+@requires_access('listas')
+def status_cat_listar_grupos():
+    """Retorna todos os grupos (schema_table_coluna_r distintos) com contagem."""
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT schema_table_coluna_r AS lista, COUNT(*) AS total
+            FROM categoricas.c_geral_status
+            GROUP BY schema_table_coluna_r
+            ORDER BY schema_table_coluna_r
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        return jsonify([{'lista': r['lista'], 'total': r['total']} for r in rows])
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/status-cat/itens", methods=["GET"])
+@login_required
+@requires_access('listas')
+def status_cat_listar_itens():
+    """Retorna todos os itens de um grupo específico."""
+    try:
+        lista = request.args.get('lista', '').strip()
+        if not lista:
+            return jsonify([])
+        cur = get_cursor()
+        cur.execute("""
+            SELECT id, status, descricao, ativo
+            FROM categoricas.c_geral_status
+            WHERE schema_table_coluna_r = %s
+            ORDER BY id
+        """, (lista,))
+        rows = cur.fetchall()
+        cur.close()
+        return jsonify([{'id': r['id'], 'status': r['status'], 'descricao': r['descricao'] or '', 'ativo': r['ativo']} for r in rows])
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/status-cat/itens", methods=["POST"])
+@login_required
+@requires_access('listas')
+def status_cat_criar_item():
+    """Cria um novo item em um grupo."""
+    try:
+        data = request.get_json(force=True)
+        lista   = (data.get('lista')   or '').strip()
+        status  = (data.get('status')  or '').strip()
+        descricao = (data.get('descricao') or '').strip() or None
+        if not lista or not status:
+            return jsonify({'erro': 'Campos "lista" e "status" são obrigatórios'}), 400
+        cur = get_cursor()
+        cur.execute("""
+            INSERT INTO categoricas.c_geral_status (schema_table_coluna_r, status, descricao)
+            VALUES (%s, %s, %s) RETURNING id
+        """, (lista, status, descricao))
+        novo_id = cur.fetchone()['id']
+        get_db().commit()
+        cur.close()
+        return jsonify({'id': novo_id, 'status': status, 'descricao': descricao or ''}), 201
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/status-cat/itens/<int:item_id>", methods=["PUT"])
+@login_required
+@requires_access('listas')
+def status_cat_editar_item(item_id):
+    """Atualiza status, descrição e/ou ativo de um item."""
+    try:
+        data = request.get_json(force=True)
+        status    = (data.get('status')    or '').strip()
+        descricao = (data.get('descricao') or '').strip() or None
+        ativo     = data.get('ativo')
+
+        # Toggle rápido de ativo (apenas esse campo)
+        if ativo is not None and 'status' not in data:
+            cur = get_cursor()
+            cur.execute("""
+                UPDATE categoricas.c_geral_status
+                SET ativo = %s, atualizado_em = now()
+                WHERE id = %s
+            """, (bool(ativo), item_id))
+            if cur.rowcount == 0:
+                get_db().rollback()
+                return jsonify({'erro': 'Item não encontrado'}), 404
+            get_db().commit()
+            cur.close()
+            return jsonify({'ok': True})
+
+        if not status:
+            return jsonify({'erro': 'O campo "status" é obrigatório'}), 400
+        cur = get_cursor()
+        cur.execute("""
+            UPDATE categoricas.c_geral_status
+            SET status = %s, descricao = %s,
+                ativo = COALESCE(%s, ativo),
+                atualizado_em = now()
+            WHERE id = %s
+        """, (status, descricao, None if ativo is None else bool(ativo), item_id))
+        if cur.rowcount == 0:
+            get_db().rollback()
+            return jsonify({'erro': 'Item não encontrado'}), 404
+        get_db().commit()
+        cur.close()
+        return jsonify({'ok': True})
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/status-cat/itens/<int:item_id>", methods=["DELETE"])
+@login_required
+@requires_access('listas')
+def status_cat_excluir_item(item_id):
+    """Exclui um item pelo id."""
+    try:
+        cur = get_cursor()
+        cur.execute("DELETE FROM categoricas.c_geral_status WHERE id = %s", (item_id,))
+        if cur.rowcount == 0:
+            return jsonify({'erro': 'Item não encontrado'}), 404
+        get_db().commit()
+        cur.close()
+        return jsonify({'ok': True})
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/status-cat/listas", methods=["POST"])
+@login_required
+@requires_access('listas')
+def status_cat_criar_lista():
+    """Cria uma nova lista (schema_table_coluna_r) com o primeiro item."""
+    try:
+        data = request.get_json(force=True)
+        lista   = (data.get('lista')   or '').strip()
+        status  = (data.get('status')  or '').strip()
+        descricao = (data.get('descricao') or '').strip() or None
+        if not lista or not status:
+            return jsonify({'erro': 'Nome da lista e primeiro valor são obrigatórios'}), 400
+        cur = get_cursor()
+        # Verificar se já existe
+        cur.execute("SELECT 1 FROM categoricas.c_geral_status WHERE schema_table_coluna_r = %s LIMIT 1", (lista,))
+        if cur.fetchone():
+            return jsonify({'erro': 'Já existe uma lista com esse nome'}), 409
+        cur.execute("""
+            INSERT INTO categoricas.c_geral_status (schema_table_coluna_r, status, descricao)
+            VALUES (%s, %s, %s) RETURNING id
+        """, (lista, status, descricao))
+        novo_id = cur.fetchone()['id']
+        get_db().commit()
+        cur.close()
+        return jsonify({'id': novo_id, 'lista': lista, 'status': status}), 201
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/status-cat/listas", methods=["DELETE"])
+@login_required
+@requires_access('listas')
+def status_cat_excluir_lista():
+    """Exclui todos os itens de uma lista inteira."""
+    try:
+        lista = request.args.get('lista', '').strip()
+        if not lista:
+            return jsonify({'erro': 'Parâmetro "lista" é obrigatório'}), 400
+        cur = get_cursor()
+        cur.execute("DELETE FROM categoricas.c_geral_status WHERE schema_table_coluna_r = %s", (lista,))
+        total = cur.rowcount
+        get_db().commit()
+        cur.close()
+        return jsonify({'ok': True, 'excluidos': total})
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+

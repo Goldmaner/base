@@ -21,6 +21,63 @@
 - [Relacionamentos Principais](#-relacionamentos-principais)
 - [Índices de Performance](#-índices-de-performance)
 - [Extensões e Convenções](#-extensões-e-convenções)
+- [⚠️ Onde rodar migrations e scripts](#️-onde-rodar-migrations-e-scripts)
+
+---
+
+## ⚠️ Onde rodar migrations e scripts
+
+> **Atenção: o projeto usa dois ambientes de banco distintos. Rodar um script no lugar errado não dá erro imediato — mas a aplicação não verá as mudanças.**
+
+### Qual banco a aplicação usa?
+
+O Flask lê as variáveis do arquivo **`.env`** na raiz do projeto.  
+Verifique qual `DB_HOST` está ativo:
+
+```bash
+# .env ativo com Supabase (banco que a aplicação usa em produção/dev):
+DB_HOST=<host>.pooler.supabase.com
+DB_PORT=6543
+DB_DATABASE=postgres
+DB_USER=postgres.<project-ref>
+
+# .env alternativo com banco local (comentado por padrão):
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_DATABASE=projeto_parcerias
+# DB_USER=postgres
+```
+
+Enquanto as linhas do Supabase estiverem ativas no `.env`, **toda a aplicação** (Flask + APIs) opera contra o Supabase. O PostgreSQL local não é utilizado.
+
+### Regra de ouro: sempre rodar scripts no Supabase
+
+Para executar qualquer `.sql` de migração/criação de tabelas, use a connection string do Supabase:
+
+```powershell
+# Lê host, user e senha diretamente do .env (sem expor credenciais no terminal)
+$h = (Get-Content .env | Where-Object { $_ -match '^DB_HOST=' }     | ForEach-Object { $_ -replace '^DB_HOST=','' })
+$p = (Get-Content .env | Where-Object { $_ -match '^DB_PORT=' }     | ForEach-Object { $_ -replace '^DB_PORT=','' })
+$u = (Get-Content .env | Where-Object { $_ -match '^DB_USER=' }     | ForEach-Object { $_ -replace '^DB_USER=','' })
+$d = (Get-Content .env | Where-Object { $_ -match '^DB_DATABASE=' } | ForEach-Object { $_ -replace '^DB_DATABASE=','' })
+$env:PGPASSWORD = (Get-Content .env | Where-Object { $_ -match '^DB_PASSWORD=' } | ForEach-Object { $_ -replace '^DB_PASSWORD=','' })
+psql "host=$h port=$p dbname=$d user=$u sslmode=require" -f scripts/seu_script.sql
+```
+
+> **Nunca use** `psql -d projeto_parcerias` ou `psql -U postgres -d projeto_parcerias` sem verificar antes — esses comandos conectam no banco **local** e as tabelas criadas lá serão invisíveis para a aplicação.
+
+### Como verificar rapidamente onde a aplicação está conectada
+
+```powershell
+# Abre o .env e mostra apenas as linhas de conexão (sem senha)
+Get-Content .env | Where-Object { $_ -match '^DB_HOST|^DB_PORT|^DB_DATABASE|^DB_USER' }
+```
+
+### Checklist antes de rodar qualquer migration
+
+- [ ] Confirmei que o `.env` aponta para Supabase (ou o ambiente correto)?
+- [ ] Usei a connection string completa do Supabase no comando `psql`?
+- [ ] Testei o script com `BEGIN; ... ROLLBACK;` antes de fazer `COMMIT`?
 
 ---
 

@@ -14,7 +14,11 @@
     .badge-regularidade-no-prazo { background-color: #28a745; }
     .badge-regularidade-pendente { background-color: #ffc107; color: #000; }
     .badge-regularidade-atrasado { background-color: #dc3545; }
-    
+
+    /* Tabs de modo */
+    .nav-tabs-modo .nav-link { font-weight: 600; }
+    .nav-tabs-modo .nav-link.active { background-color: #0d6efd; color: #fff; border-color: #0d6efd; }
+
     /* Centralizar todas as células da tabela */
     .table th, .table td {
       text-align: center;
@@ -56,8 +60,22 @@
       </div>
     </div>
 
-    <!-- Filtros -->
-    <div class="filtro-row">
+    <!-- Tabs Padrão Financeiro / Padrão Físico -->
+    <ul class="nav nav-tabs nav-tabs-modo mb-3" id="tabsModo">
+      <li class="nav-item">
+        <button class="nav-link active" id="tabFinanceiro" onclick="trocarModo('financeiro')">
+          <i class="bi bi-currency-dollar me-1"></i>Padrão Financeiro
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" id="tabFisico" onclick="trocarModo('fisico')">
+          <i class="bi bi-binoculars me-1"></i>Padrão Físico (M&amp;A)
+        </button>
+      </li>
+    </ul>
+
+    <!-- Filtros Padrão Financeiro -->
+    <div id="filtrosFinanceiro" class="filtro-row">
       <div class="row g-3">
         <div class="col-md-2">
           <label class="form-label fw-bold">Limite de Linhas</label>
@@ -178,6 +196,122 @@
       </div>
     </div>
 
+    <!-- Filtros Padrão Físico (M&A) -->
+    <div id="filtrosFisico" class="filtro-row" style="display:none;">
+      <div class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Limite de Linhas</label>
+          <select id="filtroLimiteFisico" class="form-select">
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+            <option value="todas">Todas</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Tipo de Prestação</label>
+          <input type="text" id="filtroTipoFisico" class="form-control" placeholder="Final, Semestral...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Termo</label>
+          <input type="text" id="filtroTermoFisico" class="form-control" placeholder="TFM/001/2024...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">OSC</label>
+          <input type="text" id="filtroOSCFisico" class="form-control" placeholder="Nome da OSC...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Responsabilidade</label>
+          <select id="filtroResponsabilidadeFisico" class="form-select">
+            <option value="">Todas</option>
+            <option value="1">DP</option>
+            <option value="2">Compartilhada</option>
+            <option value="3">Pessoa Gestora</option>
+            <option value="null">Vazia</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="filtroIncluirTCV">
+            <label class="form-check-label fw-bold" for="filtroIncluirTCV">Incluir TCV</label>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Status Visita</label>
+          <select id="filtroVisitaStatus" class="form-select">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Avaliação Visita</label>
+          <select id="filtroVisitaAvaliacao" class="form-select">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Status M&amp;A</label>
+          <select id="filtroMonitStatus" class="form-select">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Avaliação M&amp;A</label>
+          <select id="filtroMonitAvaliacao" class="form-select">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Colunas Adicionais</label>
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button"
+                    data-bs-toggle="dropdown" aria-expanded="false">
+              <span id="labelColunasAdicionais">Ocultas</span>
+            </button>
+            <ul class="dropdown-menu" style="min-width:240px;">
+              <li><label class="d-flex align-items-center gap-2 px-3 py-1">
+                <input type="checkbox" id="chkJustStatus"> Justificativa Status</label></li>
+              <li><label class="d-flex align-items-center gap-2 px-3 py-1">
+                <input type="checkbox" id="chkJustAval"> Justificativa Avaliação</label></li>
+              <li><label class="d-flex align-items-center gap-2 px-3 py-1">
+                <input type="checkbox" id="chkJustData"> Justificativa Data</label></li>
+              <li><label class="d-flex align-items-center gap-2 px-3 py-1">
+                <input type="checkbox" id="chkJustResp"> Justificativa Responsável</label></li>
+              <li><label class="d-flex align-items-center gap-2 px-3 py-1">
+                <input type="checkbox" id="chkComissaoVisita"> Comissão Visita</label></li>
+              <li><label class="d-flex align-items-center gap-2 px-3 py-1">
+                <input type="checkbox" id="chkComissaoMA"> Comissão M&amp;A</label></li>
+              <li><label class="d-flex align-items-center gap-2 px-3 py-1">
+                <input type="checkbox" id="chkComissaoDesc"> Comissão Descumprimento</label></li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Vigência — Início a partir de</label>
+          <input type="date" id="filtroVigInicio" class="form-control">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-bold">Vigência — Fim até</label>
+          <input type="date" id="filtroVigFim" class="form-control">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Responsável</label>
+          <input type="text" id="filtroResponsavelFisico" class="form-control"
+                 list="listaResponsaveisFisico" placeholder="Nome do responsável...">
+          <datalist id="listaResponsaveisFisico"></datalist>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-primary w-100" onclick="aplicarFiltrosFisico()">
+            <i class="bi bi-search me-2"></i>Buscar
+          </button>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-secondary w-100" onclick="limparFiltrosFisico()">
+            <i class="bi bi-x-circle me-2"></i>Limpar
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Contador de resultados -->
     <div id="contadorResultados" class="alert alert-info mb-3 text-center" style="display: none;">
       <i class="bi bi-info-circle-fill me-2"></i>
@@ -186,12 +320,12 @@
 
     <!-- Botões de ação -->
     <div class="mb-3">
-      <button class="btn btn-info" onclick="exportarCSV()">
+      <button class="btn btn-info" id="btnExportarCSV" onclick="exportarCSV()">
         <i class="bi bi-download me-2"></i>Exportar CSV
       </button>
     </div>
 
-    <!-- Tabela de dados -->
+    <!-- Tabela Padrão Financeiro -->
     <div id="areaTabela" style="display: none;">
       <div class="card">
         <div class="card-body p-0">
@@ -226,7 +360,51 @@
                 </tr>
               </thead>
               <tbody id="corpoTabela">
-                <!-- Dados carregados via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela Padrão Físico (M&A) -->
+    <div id="areaTabelaFisica" style="display: none;">
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0" id="tabelaFisica">
+              <thead class="table-dark" id="cabecalhoFisico">
+                <tr>
+                  <th>Tipo</th>
+                  <th>Número</th>
+                  <th>Vigência Inicial</th>
+                  <th>Vigência Final</th>
+                  <th>Termo</th>
+                  <th>SEI PC</th>
+                  <th>OSC</th>
+                  <th>Responsabilidade</th>
+                  <th>Status Visita</th>
+                  <th>Data Visita</th>
+                  <th>Horário</th>
+                  <th>Responsável Visita</th>
+                  <th>Avaliação Visita</th>
+                  <th>Status M&amp;A</th>
+                  <th>Responsável M&amp;A</th>
+                  <th>Avaliação M&amp;A</th>
+                  <th>Data M&amp;A</th>
+                  <th>Observações</th>
+                  <!-- colunas adicionais (toggle) -->
+                  <th class="col-adicional" style="display:none;">Just. Status</th>
+                  <th class="col-adicional" style="display:none;">Just. Avaliação</th>
+                  <th class="col-adicional" style="display:none;">Just. Data</th>
+                  <th class="col-adicional" style="display:none;">Just. Responsável</th>
+                  <th class="col-adicional" style="display:none;">Comissão Visita</th>
+                  <th class="col-adicional" style="display:none;">Comissão M&amp;A</th>
+                  <th class="col-adicional" style="display:none;">Comissão Descump.</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="corpoTabelaFisica">
               </tbody>
             </table>
           </div>
@@ -319,7 +497,7 @@
           
           // Aplicar filtros automaticamente
           console.log('[DEBUG] Aplicando filtros restaurados automaticamente');
-          buscarAnalises();
+          aplicarFiltros();
         }
         
       } catch (error) {
@@ -581,6 +759,215 @@
       
       window.location.href = `/analises/api/exportar?${params}`;
     }
+
+    // =====================================================================
+    // MODO FÍSICO (M&A) — funções auxiliares
+    // =====================================================================
+
+    let modoAtual = 'financeiro'; // 'financeiro' | 'fisico'
+
+    function trocarModo(modo) {
+      modoAtual = modo;
+      const tabFin  = document.getElementById('tabFinanceiro');
+      const tabFis  = document.getElementById('tabFisico');
+      const ffin    = document.getElementById('filtrosFinanceiro');
+      const ffis    = document.getElementById('filtrosFisico');
+      const tbFin   = document.getElementById('areaTabela');
+      const tbFis   = document.getElementById('areaTabelaFisica');
+      const msgArea = document.getElementById('mensagemInicial');
+
+      if (modo === 'fisico') {
+        tabFin.classList.remove('active');
+        tabFis.classList.add('active');
+        ffin.style.display = 'none';
+        ffis.style.display = '';
+        tbFin.style.display  = 'none';
+        tbFis.style.display  = 'none';
+        document.getElementById('btnExportarCSV').style.display = 'none';
+        msgArea.innerHTML = '<div class="alert alert-info text-center"><i class="bi bi-info-circle-fill me-2"></i>Configure os filtros e clique em <strong>Buscar</strong> para visualizar os dados de M&amp;A.</div>';
+        msgArea.style.display = 'block';
+        // Carregar opções dos selects físicos na primeira troca
+        if (!tabFis.dataset.loaded) {
+          tabFis.dataset.loaded = '1';
+          carregarOpcoesStatus();
+        }
+      } else {
+        tabFin.classList.add('active');
+        tabFis.classList.remove('active');
+        ffin.style.display = '';
+        ffis.style.display = 'none';
+        tbFin.style.display  = 'none';
+        tbFis.style.display  = 'none';
+        document.getElementById('btnExportarCSV').style.display = '';
+        msgArea.innerHTML = '<div class="alert alert-info text-center"><i class="bi bi-info-circle-fill me-2"></i>Configure os filtros e clique em <strong>Buscar</strong> para visualizar as análises.</div>';
+        msgArea.style.display = 'block';
+      }
+    }
+
+    async function carregarOpcoesStatus() {
+      const campos = [
+        { campo: 'public.parcerias_monit.visita_status',    selectorId: 'filtroVisitaStatus' },
+        { campo: 'public.parcerias_monit.visita_avaliacao', selectorId: 'filtroVisitaAvaliacao' },
+        { campo: 'public.parcerias_monit.monit_status',     selectorId: 'filtroMonitStatus' },
+        { campo: 'public.parcerias_monit.monit_avaliacao',  selectorId: 'filtroMonitAvaliacao' },
+      ];
+      for (const { campo, selectorId } of campos) {
+        try {
+          const resp = await fetch(`/analises/api/status-disponiveis?campo=${encodeURIComponent(campo)}`);
+          const lista = await resp.json();
+          const sel = document.getElementById(selectorId);
+          lista.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.status;
+            opt.textContent = item.descricao || item.status;
+            sel.appendChild(opt);
+          });
+        } catch (e) { console.error('Erro ao carregar opções', campo, e); }
+      }
+      // Carregar nomes de responsáveis para o datalist
+      try {
+        const rResp = await fetch('/analises/api/responsaveis-fisico');
+        const nomes = await rResp.json();
+        const dl = document.getElementById('listaResponsaveisFisico');
+        if (dl) nomes.forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+      } catch(e) { console.error('Erro ao carregar responsáveis', e); }
+    }
+
+    async function aplicarFiltrosFisico() {
+      try {
+        document.getElementById('areaTabelaFisica').style.display = 'none';
+        document.getElementById('mensagemInicial').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p class="mt-2">Carregando dados de M&amp;A...</p></div>';
+        document.getElementById('mensagemInicial').style.display = 'block';
+
+        const colsAdicionais = verificarColunasAdicionais();
+        const params = new URLSearchParams({
+          limite: document.getElementById('filtroLimiteFisico')?.value || '50',
+          filtro_tipo: document.getElementById('filtroTipoFisico')?.value || '',
+          filtro_termo: document.getElementById('filtroTermoFisico')?.value || '',
+          filtro_osc: document.getElementById('filtroOSCFisico')?.value || '',
+          filtro_responsabilidade: document.getElementById('filtroResponsabilidadeFisico')?.value || '',
+          filtro_visita_status: document.getElementById('filtroVisitaStatus')?.value || '',
+          filtro_visita_avaliacao: document.getElementById('filtroVisitaAvaliacao')?.value || '',
+          filtro_monit_status: document.getElementById('filtroMonitStatus')?.value || '',
+          filtro_monit_avaliacao: document.getElementById('filtroMonitAvaliacao')?.value || '',
+          incluir_adicional: colsAdicionais ? '1' : '0',
+          incluir_tcv: document.getElementById('filtroIncluirTCV')?.checked ? '1' : '0',
+          filtro_vig_inicio: document.getElementById('filtroVigInicio')?.value || '',
+          filtro_vig_fim: document.getElementById('filtroVigFim')?.value || '',
+          filtro_responsavel: document.getElementById('filtroResponsavelFisico')?.value || '',
+        });
+
+        const response = await fetch(`/analises/api/dados-fisico?${params}`);
+        const dados = await response.json();
+
+        if (dados.length === 0) {
+          document.getElementById('mensagemInicial').innerHTML = '<div class="alert alert-warning text-center">Nenhum registro encontrado.</div>';
+          document.getElementById('areaTabelaFisica').style.display = 'none';
+          document.getElementById('contadorResultados').style.display = 'none';
+          return;
+        }
+
+        document.getElementById('numeroResultados').textContent = dados.length;
+        document.getElementById('contadorResultados').style.display = 'block';
+
+        renderizarTabelaFisica(dados, colsAdicionais);
+        document.getElementById('mensagemInicial').style.display = 'none';
+        document.getElementById('areaTabelaFisica').style.display = 'block';
+
+      } catch (error) {
+        document.getElementById('mensagemInicial').innerHTML = '<div class="alert alert-danger">Erro ao carregar dados físicos: ' + error.message + '</div>';
+        document.getElementById('mensagemInicial').style.display = 'block';
+      }
+    }
+
+    function verificarColunasAdicionais() {
+      const chks = ['chkJustStatus','chkJustAval','chkJustData','chkJustResp',
+                    'chkComissaoVisita','chkComissaoMA','chkComissaoDesc'];
+      return chks.some(id => document.getElementById(id)?.checked);
+    }
+
+    function renderizarTabelaFisica(dados, colsAdicionais) {
+      const tbody = document.getElementById('corpoTabelaFisica');
+      tbody.innerHTML = '';
+
+      // Mostrar/ocultar colunas adicionais no header
+      document.querySelectorAll('#tabelaFisica th.col-adicional').forEach(th => {
+        th.style.display = colsAdicionais ? '' : 'none';
+      });
+
+      const chkIds = ['chkJustStatus','chkJustAval','chkJustData','chkJustResp',
+                      'chkComissaoVisita','chkComissaoMA','chkComissaoDesc'];
+      const adicionaisVisiveis = chkIds.map(id => document.getElementById(id)?.checked);
+
+      dados.forEach(row => {
+        const tr = document.createElement('tr');
+        const v = (val) => val ?? '';
+
+        let cellsAdicionais = '';
+        if (colsAdicionais) {
+          const adFields = [
+            row.justificativa_status, row.justificativa_avaliacao,
+            row.justificativa_data, row.justificativa_responsavel,
+            row.comissao_visita, row.comissao_ma, row.comissao_descumprimento
+          ];
+          cellsAdicionais = adFields.map((f, i) =>
+            `<td style="${adicionaisVisiveis[i] ? '' : 'display:none;'}">${v(f)}</td>`
+          ).join('');
+        } else {
+          cellsAdicionais = chkIds.map(() => `<td style="display:none;"></td>`).join('');
+        }
+
+        tr.innerHTML = `
+          <td>${v(row.tipo_prestacao)}</td>
+          <td>${v(row.numero_prestacao)}</td>
+          <td>${v(row.vigencia_inicial)}</td>
+          <td>${v(row.vigencia_final)}</td>
+          <td>${v(row.numero_termo)}</td>
+          <td>${v(row.sei_pc)}</td>
+          <td>${v(row.osc)}</td>
+          <td>${v(row.responsabilidade_analise)}</td>
+          <td>${v(row.visita_status)}</td>
+          <td>${v(row.visita_data)}</td>
+          <td>${v(row.visita_horario)}</td>
+          <td>${v(row.visita_responsavel)}</td>
+          <td>${v(row.visita_avaliacao)}</td>
+          <td>${v(row.monit_status)}</td>
+          <td>${v(row.monit_responsavel)}</td>
+          <td>${v(row.monit_avaliacao)}</td>
+          <td>${v(row.monit_data)}</td>
+          <td title="${v(row.observacoes_monit)}">${v(row.observacoes_monit).substring ? v(row.observacoes_monit).substring(0,40) : ''}</td>
+          ${cellsAdicionais}
+          <td>
+            <button class="btn btn-sm btn-warning" onclick="editarPorTermo('${row.numero_termo}')" title="Editar">
+              <i class="bi bi-pencil"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function limparFiltrosFisico() {
+      const tcvCk = document.getElementById('filtroIncluirTCV');
+      if (tcvCk) tcvCk.checked = false;
+      ['filtroLimiteFisico','filtroTipoFisico','filtroTermoFisico','filtroOSCFisico',
+       'filtroResponsabilidadeFisico','filtroVisitaStatus','filtroVisitaAvaliacao',
+       'filtroMonitStatus','filtroMonitAvaliacao',
+       'filtroVigInicio','filtroVigFim','filtroResponsavelFisico'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = id === 'filtroLimiteFisico' ? '50' : '';
+      });
+      ['chkJustStatus','chkJustAval','chkJustData','chkJustResp',
+       'chkComissaoVisita','chkComissaoMA','chkComissaoDesc'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = false;
+      });
+      document.getElementById('areaTabelaFisica').style.display = 'none';
+      document.getElementById('contadorResultados').style.display = 'none';
+      document.getElementById('mensagemInicial').innerHTML = '<div class="alert alert-info text-center"><i class="bi bi-info-circle-fill me-2"></i>Configure os filtros e clique em <strong>Buscar</strong> para visualizar os dados de M&amp;A.</div>';
+      document.getElementById('mensagemInicial').style.display = 'block';
+    }
+
   </script>
 </body>
 </html>

@@ -368,7 +368,27 @@ def create_app():
     # ========================================================================
     # FIM DOS HOOKS DE LOGGING
     # ========================================================================
-    
+
+    # ========================================================================
+    # HANDLER DE ERROS 500 — imprime traceback completo no terminal
+    # Necessário porque o Waitress (produção) engole exceções silenciosamente
+    # ========================================================================
+    @app.errorhandler(500)
+    def internal_error(e):
+        import traceback, sys
+        print("=" * 70, file=sys.stderr)
+        print(f"[ERRO 500] {request.method} {request.path}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+        print("=" * 70, file=sys.stderr)
+        sys.stderr.flush()
+        from flask import jsonify
+        if request.accept_mimetypes.best == 'application/json' or \
+           request.path.startswith('/api/') or '/api/' in request.path:
+            return jsonify({'erro': 'Erro interno do servidor', 'detalhe': str(e)}), 500
+        return e
+
+    # ========================================================================
+
     return app
 
 

@@ -644,19 +644,83 @@ def editar_por_termo():
             ORDER BY pa.id ASC
         """, (numero_termo,))
         analises = cur.fetchall()
-        
-        # Buscar lista de analistas para dropdown
+
+        # Buscar dados de monit para cada análise
+        cur.execute("""
+            SELECT * FROM public.parcerias_monit
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        monit_rows = cur.fetchall()
+        monit_por_chave = {
+            (r['tipo_prestacao'], int(r['numero_prestacao'])): dict(r)
+            for r in monit_rows
+        }
+
+        # Buscar dados de monit_adicional
+        cur.execute("""
+            SELECT * FROM public.parcerias_monit_adicional
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        adicional_rows = cur.fetchall()
+        adicional_por_chave = {
+            (r['tipo_prestacao'], int(r['numero_prestacao'])): dict(r)
+            for r in adicional_rows
+        }
+
+        # Buscar lista de analistas para dropdown (financeiro)
         cur.execute("""
             SELECT id, nome_analista
             FROM categoricas.c_dac_analistas
             ORDER BY nome_analista
         """)
         analistas = cur.fetchall()
+
+        # Buscar lista de agentes DGP para dropdowns físicos (sem FK constraint)
+        cur.execute("""
+            SELECT nome_analista
+            FROM categoricas.c_dgp_analistas
+            WHERE status = true
+            ORDER BY nome_analista
+        """)
+        agentes_dgp = [r['nome_analista'] for r in cur.fetchall()]
+
+        # Agregar pessoas gestoras à lista de sugestões
+        cur.execute("""
+            SELECT nome_pg
+            FROM categoricas.c_geral_pessoa_gestora
+            WHERE nome_pg IS NOT NULL
+            ORDER BY nome_pg
+        """)
+        pessoas_gestoras = [r['nome_pg'] for r in cur.fetchall()]
+        agentes_dgp = list(dict.fromkeys(agentes_dgp + pessoas_gestoras))
+
+        # Buscar opções de status para cada campo do monit (para os selects do template)
+        campos_status = {
+            'visita_status':      'public.parcerias_monit.visita_status',
+            'visita_avaliacao':   'public.parcerias_monit.visita_avaliacao',
+            'monit_status':       'public.parcerias_monit.monit_status',
+            'monit_avaliacao':    'public.parcerias_monit.monit_avaliacao',
+            'justificativa_status': 'public.parcerias_monit_adicional.justificativa_status',
+            'comissao_visita':    'public.parcerias_monit_adicional.comissao_visita',
+        }
+        status_options = {}
+        for key, campo_ref in campos_status.items():
+            cur.execute("""
+                SELECT status, descricao FROM categoricas.c_geral_status
+                WHERE schema_table_coluna_r = %s
+                ORDER BY id
+            """, (campo_ref,))
+            status_options[key] = [dict(r) for r in cur.fetchall()]
+
         cur.close()
-        
-        return render_template('editar_analises_termo.html', 
+
+        return render_template('editar_analises_termo.html',
                              analises=analises,
                              analistas=analistas,
+                             agentes_dgp=agentes_dgp,
+                             monit_por_chave=monit_por_chave,
+                             adicional_por_chave=adicional_por_chave,
+                             status_options=status_options,
                              numero_termo=numero_termo)
     
     else:  # POST
@@ -667,7 +731,8 @@ def editar_por_termo():
             
             cur = get_cursor()
             for analise in analises_atualizadas:
-                query = """
+                # --- Atualizar parcerias_analises (dados financeiros) ---
+                query_fin = """
                     UPDATE parcerias_analises SET
                         responsabilidade_analise = %s,
                         entregue = %s,
@@ -685,7 +750,7 @@ def editar_por_termo():
                         observacoes = %s
                     WHERE id = %s
                 """
-                params = (
+                cur.execute(query_fin, (
                     analise.get('responsabilidade_analise') or None,
                     analise.get('entregue'),
                     analise.get('cobrado'),
@@ -701,15 +766,88 @@ def editar_por_termo():
                     analise.get('responsavel_pg'),
                     analise.get('observacoes'),
                     analise.get('id')
-                )
-                cur.execute(query, params)
-            
+                ))
+
+                # --- Atualizar parcerias_monit (dados físicos grupo 1) ---
+                if analise.get('_has_monit'):
+                    termo = analise.get('numero_termo')
+                    tipo  = analise.get('tipo_prestacao')
+                    num   = analise.get('numero_prestacao')
+                    cur.execute("""
+                        INSERT INTO public.parcerias_monit
+                            (numero_termo, tipo_prestacao, numero_prestacao,
+                             visita_status, visita_data, visita_horario,
+                             visita_responsavel, visita_avaliacao,
+                             monit_status, monit_responsavel, monit_avaliacao,
+                             monit_data, observacoes, atualizado_em)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+                        ON CONFLICT (numero_termo, tipo_prestacao, numero_prestacao)
+                        DO UPDATE SET
+                            visita_status     = EXCLUDED.visita_status,
+                            visita_data       = EXCLUDED.visita_data,
+                            visita_horario    = EXCLUDED.visita_horario,
+                            visita_responsavel= EXCLUDED.visita_responsavel,
+                            visita_avaliacao  = EXCLUDED.visita_avaliacao,
+                            monit_status      = EXCLUDED.monit_status,
+                            monit_responsavel = EXCLUDED.monit_responsavel,
+                            monit_avaliacao   = EXCLUDED.monit_avaliacao,
+                            monit_data        = EXCLUDED.monit_data,
+                            observacoes       = EXCLUDED.observacoes,
+                            atualizado_em     = now()
+                    """, (
+                        termo, tipo, num,
+                        analise.get('visita_status') or None,
+                        analise.get('visita_data') or None,
+                        analise.get('visita_horario') or None,
+                        analise.get('visita_responsavel') or None,
+                        analise.get('visita_avaliacao') or None,
+                        analise.get('monit_status') or None,
+                        analise.get('monit_responsavel') or None,
+                        analise.get('monit_avaliacao') or None,
+                        analise.get('monit_data') or None,
+                        analise.get('monit_observacoes') or None,
+                    ))
+
+                # --- Atualizar parcerias_monit_adicional (grupo 2, lazy) ---
+                if analise.get('_has_adicional'):
+                    termo = analise.get('numero_termo')
+                    tipo  = analise.get('tipo_prestacao')
+                    num   = analise.get('numero_prestacao')
+                    cur.execute("""
+                        INSERT INTO public.parcerias_monit_adicional
+                            (numero_termo, tipo_prestacao, numero_prestacao,
+                             justificativa_status, justificativa_avaliacao,
+                             justificativa_data, justificativa_responsavel,
+                             comissao_visita, comissao_ma, comissao_descumprimento,
+                             atualizado_em)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+                        ON CONFLICT (numero_termo, tipo_prestacao, numero_prestacao)
+                        DO UPDATE SET
+                            justificativa_status     = EXCLUDED.justificativa_status,
+                            justificativa_avaliacao  = EXCLUDED.justificativa_avaliacao,
+                            justificativa_data       = EXCLUDED.justificativa_data,
+                            justificativa_responsavel= EXCLUDED.justificativa_responsavel,
+                            comissao_visita          = EXCLUDED.comissao_visita,
+                            comissao_ma              = EXCLUDED.comissao_ma,
+                            comissao_descumprimento  = EXCLUDED.comissao_descumprimento,
+                            atualizado_em            = now()
+                    """, (
+                        termo, tipo, num,
+                        analise.get('justificativa_status') or None,
+                        analise.get('justificativa_avaliacao') or None,
+                        analise.get('justificativa_data') or None,
+                        analise.get('justificativa_responsavel') or None,
+                        analise.get('comissao_visita') or None,
+                        analise.get('comissao_ma') or None,
+                        analise.get('comissao_descumprimento') or None,
+                    ))
+
             from db import get_db
             get_db().commit()
             cur.close()
-            
+
             return jsonify({'mensagem': 'Análises atualizadas com sucesso!'}), 200
-            
+
         except Exception as e:
             print(f"[ERRO] Erro ao atualizar análises: {str(e)}")
             import traceback
@@ -1275,6 +1413,10 @@ def atualizar_prestacoes():
                     total_prestacoes = contagem['total'] if contagem else 0
                     prestacoes_entregues = contagem['entregues'] if contagem else 0
                     
+                    # Deletar monit + adicional antes das análises
+                    cur.execute("DELETE FROM public.parcerias_monit WHERE numero_termo = %s", (numero_termo,))
+                    cur.execute("DELETE FROM public.parcerias_monit_adicional WHERE numero_termo = %s", (numero_termo,))
+
                     # Deletar todas as prestações
                     cur.execute("DELETE FROM parcerias_analises WHERE numero_termo = %s", (numero_termo,))
                     get_db().commit()
@@ -1316,11 +1458,17 @@ def atualizar_prestacoes():
             # Criar mapa das prestações antigas (chave: tipo+numero)
             mapa_antigas = {}
             prestacoes_deletadas = []
-            
+
+            # Chaves novas (para identificar orphans de monit)
+            chaves_novas = {
+                (numero_termo, p['tipo_prestacao'], p['numero_prestacao'])
+                for p in prestacoes_novas
+            }
+
             for p in prestacoes_antigas:
                 chave = f"{p['tipo_prestacao']}_{p['numero_prestacao']}"
                 mapa_antigas[chave] = p
-                
+
                 # Se foi rescindido e a prestação tinha vigência_final posterior à rescisão
                 if data_rescisao and p['vigencia_final'] and p['vigencia_final'] > data_rescisao:
                     # Marcar para logging
@@ -1329,7 +1477,21 @@ def atualizar_prestacoes():
                         obs_antiga += ", estava marcada como entregue"
                     obs_antiga += ")"
                     prestacoes_deletadas.append(f"{p['tipo_prestacao']} {p['numero_prestacao']} {obs_antiga}")
-            
+
+            # Deletar orphans de monit (chaves que existem agora mas não existirão após recálculo)
+            # Isso garante que dados de monitoramento de prestações removidas não fiquem órfãos
+            for p in prestacoes_antigas:
+                chave_tuple = (numero_termo, p['tipo_prestacao'], int(p['numero_prestacao']))
+                if chave_tuple not in chaves_novas:
+                    cur.execute("""
+                        DELETE FROM public.parcerias_monit
+                         WHERE numero_termo = %s AND tipo_prestacao = %s AND numero_prestacao = %s
+                    """, chave_tuple)
+                    cur.execute("""
+                        DELETE FROM public.parcerias_monit_adicional
+                         WHERE numero_termo = %s AND tipo_prestacao = %s AND numero_prestacao = %s
+                    """, chave_tuple)
+
             # Deletar todas as prestações antigas
             cur.execute("DELETE FROM parcerias_analises WHERE numero_termo = %s", (numero_termo,))
             
@@ -1617,6 +1779,10 @@ def limpar_prestacoes_sem_recursos():
             total_prestacoes = contagem['total']
             prestacoes_entregues = contagem['entregues']
             
+            # Deletar monit + adicional do termo antes de deletar análises
+            cur.execute("DELETE FROM public.parcerias_monit WHERE numero_termo = %s", (numero_termo,))
+            cur.execute("DELETE FROM public.parcerias_monit_adicional WHERE numero_termo = %s", (numero_termo,))
+
             # Deletar todas as prestações deste termo
             cur.execute("DELETE FROM parcerias_analises WHERE numero_termo = %s", (numero_termo,))
             
@@ -1642,3 +1808,235 @@ def limpar_prestacoes_sem_recursos():
         import traceback
         traceback.print_exc()
         return jsonify({'erro': str(e)}), 500
+
+
+# ===========================================================================
+# M&A — APIs do módulo Monitoramento & Avaliação (Padrão Físico)
+# ===========================================================================
+
+@analises_bp.route('/api/status-disponiveis', methods=['GET'])
+@login_required
+@requires_access('analises')
+def obter_status_disponiveis():
+    """
+    Retorna a lista de status disponíveis para um campo específico.
+    Parâmetro: campo=public.parcerias_monit.visita_avaliacao
+    """
+    try:
+        campo = request.args.get('campo', '')
+        if not campo:
+            return jsonify({'erro': 'Parâmetro campo é obrigatório'}), 400
+
+        cur = get_cursor()
+        cur.execute("""
+            SELECT status, descricao
+            FROM categoricas.c_geral_status
+            WHERE schema_table_coluna_r = %s
+            ORDER BY id
+        """, (campo,))
+        rows = cur.fetchall()
+        cur.close()
+
+        return jsonify([{'status': r['status'], 'descricao': r['descricao'] or ''} for r in rows]), 200
+
+    except Exception as e:
+        print(f'[ERRO] obter_status_disponiveis: {e}')
+        return jsonify({'erro': str(e)}), 500
+
+
+@analises_bp.route('/api/dados-fisico', methods=['GET'])
+@login_required
+@requires_access('analises')
+def obter_dados_fisico():
+    """
+    API para buscar dados físicos de M&A com filtros.
+    Retorna colunas de parcerias_monit (e opcionalmente parcerias_monit_adicional).
+    """
+    try:
+        limite             = request.args.get('limite', '50')
+        filtro_tipo        = request.args.get('filtro_tipo', '')
+        filtro_sei_pc      = request.args.get('filtro_sei_pc', '')
+        filtro_termo       = request.args.get('filtro_termo', '')
+        filtro_osc         = request.args.get('filtro_osc', '')
+        filtro_responsabilidade = request.args.get('filtro_responsabilidade', '')
+        filtro_visita_status    = request.args.get('filtro_visita_status', '')
+        filtro_monit_status     = request.args.get('filtro_monit_status', '')
+        filtro_visita_avaliacao = request.args.get('filtro_visita_avaliacao', '')
+        filtro_monit_avaliacao  = request.args.get('filtro_monit_avaliacao', '')
+        filtro_vig_inicio  = request.args.get('filtro_vig_inicio', '')
+        filtro_vig_fim     = request.args.get('filtro_vig_fim', '')
+        filtro_responsavel = request.args.get('filtro_responsavel', '')
+        incluir_adicional  = request.args.get('incluir_adicional', '0') == '1'
+        incluir_tcv        = request.args.get('incluir_tcv', '0') == '1'
+
+        cur = get_cursor()
+
+        query = """
+            SELECT
+                pa.id,
+                pa.tipo_prestacao,
+                pa.numero_prestacao,
+                pa.vigencia_inicial,
+                pa.vigencia_final,
+                pa.numero_termo,
+                pa.responsabilidade_analise,
+                p.sei_pc,
+                p.osc,
+                pm.visita_status,
+                pm.visita_data,
+                pm.visita_horario,
+                pm.visita_responsavel,
+                pm.visita_avaliacao,
+                pm.monit_status,
+                pm.monit_responsavel,
+                pm.monit_avaliacao,
+                pm.monit_data,
+                pm.observacoes
+                {adicional_cols}
+            FROM parcerias_analises pa
+            LEFT JOIN public.parcerias p         ON pa.numero_termo = p.numero_termo
+            LEFT JOIN public.parcerias_monit pm
+                   ON pm.numero_termo     = pa.numero_termo
+                  AND pm.tipo_prestacao   = pa.tipo_prestacao
+                  AND pm.numero_prestacao = pa.numero_prestacao
+            {adicional_join}
+            WHERE 1=1
+        """
+
+        if incluir_adicional:
+            adicional_cols = """,
+                pma.justificativa_status,
+                pma.justificativa_avaliacao,
+                pma.justificativa_data,
+                pma.justificativa_responsavel,
+                pma.comissao_visita,
+                pma.comissao_ma,
+                pma.comissao_descumprimento"""
+            adicional_join = """
+            LEFT JOIN public.parcerias_monit_adicional pma
+                   ON pma.numero_termo     = pa.numero_termo
+                  AND pma.tipo_prestacao   = pa.tipo_prestacao
+                  AND pma.numero_prestacao = pa.numero_prestacao"""
+        else:
+            adicional_cols = ''
+            adicional_join = ''
+
+        query = query.format(adicional_cols=adicional_cols, adicional_join=adicional_join)
+
+        params = []
+
+        if not incluir_tcv:
+            query += " AND pa.numero_termo NOT ILIKE 'TCV%%'"
+
+        if filtro_tipo:
+            query += " AND pa.tipo_prestacao ILIKE %s"
+            params.append(f'%{filtro_tipo}%')
+        if filtro_sei_pc:
+            query += " AND p.sei_pc ILIKE %s"
+            params.append(f'%{filtro_sei_pc}%')
+        if filtro_termo:
+            query += " AND pa.numero_termo ILIKE %s"
+            params.append(f'%{filtro_termo}%')
+        if filtro_osc:
+            query += " AND p.osc ILIKE %s"
+            params.append(f'%{filtro_osc}%')
+        if filtro_responsabilidade:
+            if filtro_responsabilidade == 'null':
+                query += " AND pa.responsabilidade_analise IS NULL"
+            else:
+                query += " AND pa.responsabilidade_analise = %s"
+                params.append(filtro_responsabilidade)
+        if filtro_visita_status:
+            query += " AND pm.visita_status = %s"
+            params.append(filtro_visita_status)
+        if filtro_monit_status:
+            query += " AND pm.monit_status = %s"
+            params.append(filtro_monit_status)
+        if filtro_visita_avaliacao:
+            query += " AND pm.visita_avaliacao = %s"
+            params.append(filtro_visita_avaliacao)
+        if filtro_monit_avaliacao:
+            query += " AND pm.monit_avaliacao = %s"
+            params.append(filtro_monit_avaliacao)
+        if filtro_vig_inicio:
+            query += " AND p.vigencia_final >= %s"
+            params.append(filtro_vig_inicio)
+        if filtro_vig_fim:
+            query += " AND p.vigencia_inicial <= %s"
+            params.append(filtro_vig_fim)
+        if filtro_responsavel:
+            query += " AND (pm.visita_responsavel ILIKE %s OR pm.monit_responsavel ILIKE %s)"
+            params.append(f'%%{filtro_responsavel}%%')
+            params.append(f'%%{filtro_responsavel}%%')
+
+        query += " ORDER BY pa.id ASC"
+        if limite != 'todas':
+            query += f" LIMIT {int(limite)}"
+
+        cur.execute(query, params)
+        resultados = cur.fetchall()
+        cur.close()
+
+        resp_map = {1: 'DP', 2: 'Compartilhada', 3: 'Pessoa Gestora'}
+
+        dados = []
+        for row in resultados:
+            d = {
+                'id':                    row['id'],
+                'tipo_prestacao':        row['tipo_prestacao'] or '',
+                'numero_prestacao':      row['numero_prestacao'],
+                'vigencia_inicial':      row['vigencia_inicial'].strftime('%d/%m/%Y') if row['vigencia_inicial'] else '',
+                'vigencia_final':        row['vigencia_final'].strftime('%d/%m/%Y')   if row['vigencia_final']   else '',
+                'numero_termo':          row['numero_termo'] or '',
+                'sei_pc':                row['sei_pc'] or '',
+                'osc':                   row['osc'] or '',
+                'responsabilidade_analise': resp_map.get(row['responsabilidade_analise'], ''),
+                'visita_status':         row['visita_status'] or '',
+                'visita_data':           row['visita_data'].strftime('%d/%m/%Y') if row['visita_data'] else '',
+                'visita_horario':        str(row['visita_horario'])[:5] if row['visita_horario'] else '',
+                'visita_responsavel':    row['visita_responsavel'] or '',
+                'visita_avaliacao':      row['visita_avaliacao'] or '',
+                'monit_status':          row['monit_status'] or '',
+                'monit_responsavel':     row['monit_responsavel'] or '',
+                'monit_avaliacao':       row['monit_avaliacao'] or '',
+                'monit_data':            row['monit_data'].strftime('%d/%m/%Y') if row['monit_data'] else '',
+                'observacoes':           row['observacoes'] or '',
+            }
+            if incluir_adicional:
+                d.update({
+                    'justificativa_status':      row['justificativa_status'] or '',
+                    'justificativa_avaliacao':   row['justificativa_avaliacao'] or '',
+                    'justificativa_data':        row['justificativa_data'].strftime('%d/%m/%Y') if row['justificativa_data'] else '',
+                    'justificativa_responsavel': row['justificativa_responsavel'] or '',
+                    'comissao_visita':           row['comissao_visita'] or '',
+                    'comissao_ma':               row['comissao_ma'] or '',
+                    'comissao_descumprimento':   row['comissao_descumprimento'] or '',
+                })
+            dados.append(d)
+
+        return jsonify(dados), 200
+
+    except Exception as e:
+        print(f'[ERRO] obter_dados_fisico: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'erro': str(e)}), 500
+
+
+@analises_bp.route('/api/responsaveis-fisico', methods=['GET'])
+def obter_responsaveis_fisico():
+    """Retorna lista distinta de responsáveis registrados em parcerias_monit."""
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT DISTINCT unnest(ARRAY[visita_responsavel, monit_responsavel]) AS nome
+            FROM public.parcerias_monit
+            WHERE visita_responsavel IS NOT NULL OR monit_responsavel IS NOT NULL
+            ORDER BY nome
+        """)
+        nomes = [r['nome'] for r in cur.fetchall() if r['nome']]
+        cur.close()
+        return jsonify(nomes), 200
+    except Exception as e:
+        print(f'[ERRO] obter_responsaveis_fisico: {e}')
+        return jsonify([]), 200

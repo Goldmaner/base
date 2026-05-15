@@ -151,6 +151,8 @@ def index():
             co.meios_afericao_ids,
             co.meios_ni,
             co.ordem                                           AS obj_ordem,
+            co.objetivo_inicio,
+            co.objetivo_fim,
             co.criado_por                                      AS obj_criado_por,
             co.criado_em                                       AS obj_criado_em,
             COALESCE(
@@ -231,6 +233,8 @@ def index():
                 'meios_textos':       [meio_map[i] for i in meio_ids if i in meio_map],
                 'obs_indicadores':    list(r['meta_obs_indicadores'] or []),
                 'obj_ordem':          r['obj_ordem'],
+                'objetivo_inicio':    r['objetivo_inicio'].isoformat() if r['objetivo_inicio'] else None,
+                'objetivo_fim':       r['objetivo_fim'].isoformat()    if r['objetivo_fim']    else None,
                 'criado_por':         r['obj_criado_por'],
                 'criado_em':          r['obj_criado_em'],
                 'metas':              [],
@@ -349,6 +353,41 @@ def api_sei_numeros():
     """)
     rows = cur.fetchall()
     return jsonify([{'sei_numero': r['sei_numero'], 'fonte': r['fonte']} for r in rows])
+
+
+# ── API: datas do termo por SEI ───────────────────────────────────────────────
+
+@parcerias_metas_bp.route("/api/sei-datas", methods=["GET"])
+@login_required
+def api_sei_datas():
+    """Retorna { inicio, fim } do termo identificado pelo SEI (de qualquer das duas tabelas)."""
+    sei = (request.args.get('sei') or '').strip()
+    if not sei:
+        return jsonify({}), 400
+    cur = get_cursor()
+    cur.execute("""
+        SELECT
+            COALESCE(p.inicio, cp.inicio) AS inicio,
+            COALESCE(p.final,  cp.final)  AS fim
+        FROM (
+            SELECT MIN(inicio) AS inicio, MAX(final) AS final
+            FROM public.parcerias
+            WHERE sei_celeb = %s
+        ) p
+        FULL JOIN (
+            SELECT MIN(inicio) AS inicio, MAX(final) AS final
+            FROM celebracao.celebracao_parcerias
+            WHERE sei_celeb = %s
+        ) cp ON true
+        LIMIT 1
+    """, (sei, sei))
+    r = cur.fetchone()
+    if not r or (r['inicio'] is None and r['fim'] is None):
+        return jsonify({})
+    return jsonify({
+        'inicio': r['inicio'].isoformat() if r['inicio'] else None,
+        'fim':    r['fim'].isoformat()    if r['fim']    else None,
+    })
 
 
 # ── API: Meta tipos agrupados ─────────────────────────────────────────────────
@@ -730,6 +769,9 @@ def criar_objetivo():
     obs_raw         = data.get('obs_indicadores') or []
     obs_indicadores = [str(o) if o else '' for o in obs_raw] or None
 
+    objetivo_inicio = data.get('objetivo_inicio') or None
+    objetivo_fim    = data.get('objetivo_fim')    or None
+
     cur = get_cursor()
     cur.execute(
         "SELECT COALESCE(MAX(ordem), 0) + 1 AS prox_ordem "
@@ -741,15 +783,18 @@ def criar_objetivo():
     cur.execute("""
         INSERT INTO celebracao.celebracao_objetivos
             (sei_numero, objetivo, indicadores_ids, indicadores_ni,
-             meta_obs_indicadores, meios_afericao_ids, meios_ni, ordem, criado_por)
-        VALUES (%s, %s, %s::INTEGER[], %s, %s::TEXT[], %s::INTEGER[], %s, %s, %s)
+             meta_obs_indicadores, meios_afericao_ids, meios_ni, ordem,
+             objetivo_inicio, objetivo_fim, criado_por)
+        VALUES (%s, %s, %s::INTEGER[], %s, %s::TEXT[], %s::INTEGER[], %s, %s, %s, %s, %s)
         RETURNING id
     """, (
         sei_numero, objetivo,
         indicadores_ids, indicadores_ni,
         obs_indicadores,
         meios_afericao_ids, meios_ni,
-        ordem, usuario,
+        ordem,
+        objetivo_inicio, objetivo_fim,
+        usuario,
     ))
     novo_id = cur.fetchone()['id']
     get_db().commit()
@@ -776,6 +821,9 @@ def editar_objetivo(obj_id):
     obs_raw         = data.get('obs_indicadores') or []
     obs_indicadores = [str(o) if o else '' for o in obs_raw] or None
 
+    objetivo_inicio = data.get('objetivo_inicio') or None
+    objetivo_fim    = data.get('objetivo_fim')    or None
+
     cur = get_cursor()
     cur.execute("""
         UPDATE celebracao.celebracao_objetivos SET
@@ -786,6 +834,8 @@ def editar_objetivo(obj_id):
             meios_afericao_ids    = %s::INTEGER[],
             meios_ni              = %s,
             ordem                 = %s,
+            objetivo_inicio       = %s,
+            objetivo_fim          = %s,
             atualizado_por        = %s,
             atualizado_em         = NOW()
         WHERE id = %s
@@ -795,6 +845,7 @@ def editar_objetivo(obj_id):
         obs_indicadores,
         meios_afericao_ids, meios_ni,
         int(data.get('ordem') or 0),
+        objetivo_inicio, objetivo_fim,
         usuario,
         obj_id,
     ))

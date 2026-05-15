@@ -526,7 +526,19 @@
                       placeholder="Descreva o objetivo específico deste conjunto de metas..."></textarea>
           </div>
 
-          <!-- Indicadores -->
+          <!-- Temporalidade -->
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Início do Objetivo</label>
+            <input type="date" id="objInicio" class="form-control">
+            <small class="text-muted">Limitado ao período do termo</small>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Fim do Objetivo</label>
+            <input type="date" id="objFim" class="form-control">
+            <small class="text-muted">Limitado ao período do termo</small>
+          </div>
+
+
           <div class="col-12">
             <label class="form-label fw-semibold">
               Indicadores
@@ -961,6 +973,8 @@ function abrirModalObjetivo(seiNumero) {
   document.getElementById('objSei').value   = seiNumero || '{{ filtro_sei }}';
   document.getElementById('objSei').readOnly = false;
   document.getElementById('objTexto').value = '';
+  document.getElementById('objInicio').value = '';
+  document.getElementById('objFim').value    = '';
   document.getElementById('objOrdemWrapper').classList.add('d-none');
   document.getElementById('seiDuplicadoWarn').classList.add('d-none');
 
@@ -969,6 +983,10 @@ function abrirModalObjetivo(seiNumero) {
   limparContainer('objMeiosContainer');
   adicionarLinhaIndicadorObj();
   adicionarLinhaMeioObj();
+
+  // Se já veio um SEI pré-preenchido, buscar as datas do termo
+  if (seiNumero) _carregarDatasTermoObj(seiNumero);
+
   modalObjetivo.show();
 }
 
@@ -979,8 +997,13 @@ function abrirModalEditarObjetivo(obj) {
   document.getElementById('objSei').value    = obj.sei_numero || '';
   document.getElementById('objSei').readOnly = true;    // SEI não muda ao editar
   document.getElementById('objTexto').value  = obj.objetivo || '';
+  document.getElementById('objInicio').value = obj.objetivo_inicio || '';
+  document.getElementById('objFim').value    = obj.objetivo_fim    || '';
   document.getElementById('objOrdem').value  = obj.obj_ordem ?? 0;
   document.getElementById('objOrdemWrapper').classList.remove('d-none');
+
+  // Carregar limites do termo para validação
+  if (obj.sei_numero) _carregarDatasTermoObj(obj.sei_numero);
 
   // Indicadores
   const niInd = document.getElementById('objNiIndicadores');
@@ -1024,6 +1047,8 @@ async function salvarObjetivo() {
     meios_textos:       meiosC,
     meios_ni:           niMeios,
     ordem:              parseInt(document.getElementById('objOrdem')?.value) || 0,
+    objetivo_inicio:    document.getElementById('objInicio').value || null,
+    objetivo_fim:       document.getElementById('objFim').value    || null,
   };
 
   const url    = id ? `/parcerias-metas/objetivo/editar/${id}` : '/parcerias-metas/objetivo/criar';
@@ -1037,6 +1062,24 @@ async function salvarObjetivo() {
     modalObjetivo.hide();
     setTimeout(() => location.reload(), 800);
   } catch(e) { mostrarToast(e.message, 'danger'); }
+}
+
+async function _carregarDatasTermoObj(sei) {
+  try {
+    const res  = await fetch(`/parcerias-metas/api/sei-datas?sei=${encodeURIComponent(sei)}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    const inputInicio = document.getElementById('objInicio');
+    const inputFim    = document.getElementById('objFim');
+    if (d.inicio) { inputInicio.min = d.inicio; inputInicio.max = d.fim || ''; }
+    if (d.fim)    { inputFim.min    = d.inicio || ''; inputFim.max = d.fim; }
+    // Para novos objetivos, pré-preencher com as datas do termo
+    const isNovo = !document.getElementById('objId').value;
+    if (isNovo) {
+      if (d.inicio) inputInicio.value = d.inicio;
+      if (d.fim)    inputFim.value    = d.fim;
+    }
+  } catch(_) {}
 }
 
 // ── Modal Meta ────────────────────────────────────────────────────────────────
@@ -1165,6 +1208,12 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (warn) {
       warn.classList.add('d-none');
     }
+  });
+
+  // Ao selecionar SEI no modal, buscar datas do termo para limitar os campos de data
+  document.getElementById('objSei').addEventListener('change', function() {
+    const sei = this.value.trim();
+    if (sei) _carregarDatasTermoObj(sei);
   });
 
   // Persistir filtro SEI

@@ -104,12 +104,12 @@
             <!-- Datas e valores -->
             <div class="col-md-4">
               <label for="data_parecer_dp_{{ loop.index }}" class="form-label">Data Parecer DP</label>
-              <input type="date" class="form-control" id="data_parecer_dp_{{ loop.index }}" name="data_parecer_dp_{{ loop.index }}" value="{{ analise.data_parecer_dp }}">
+              <input type="date" class="form-control" id="data_parecer_dp_{{ loop.index }}" name="data_parecer_dp_{{ loop.index }}" value="{{ analise.data_parecer_dp.strftime('%Y-%m-%d') if analise.data_parecer_dp else '' }}">
             </div>
 
             <div class="col-md-4">
               <label for="data_parecer_pg_{{ loop.index }}" class="form-label">Data Parecer PG</label>
-              <input type="date" class="form-control" id="data_parecer_pg_{{ loop.index }}" name="data_parecer_pg_{{ loop.index }}" value="{{ analise.data_parecer_pg }}">
+              <input type="date" class="form-control" id="data_parecer_pg_{{ loop.index }}" name="data_parecer_pg_{{ loop.index }}" value="{{ analise.data_parecer_pg.strftime('%Y-%m-%d') if analise.data_parecer_pg else '' }}">
             </div>
 
             <div class="col-md-4">
@@ -143,9 +143,171 @@
               <textarea class="form-control" id="observacoes_{{ loop.index }}" name="observacoes_{{ loop.index }}" rows="3">{{ analise.observacoes or '' }}</textarea>
             </div>
           </div>
-        </div>
-      </div>
+
+          <!-- === Seção M&A (Monitoramento & Avaliação) === -->
+          {%- set mk = (analise.tipo_prestacao, analise.numero_prestacao|int) %}
+          {%- set monit = monit_por_chave.get(mk, {}) %}
+          {%- set adic  = adicional_por_chave.get(mk, {}) %}
+
+          <!-- campos ocultos de chave para o JS -->
+          <input type="hidden" id="numero_termo_{{ loop.index }}" value="{{ numero_termo }}">
+          <input type="hidden" id="tipo_prestacao_{{ loop.index }}" value="{{ analise.tipo_prestacao }}">
+          <input type="hidden" id="numero_prestacao_{{ loop.index }}" value="{{ analise.numero_prestacao }}">
+
+          <div class="mt-3">
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#monit_{{ loop.index }}">
+              <i class="bi bi-binoculars me-1"></i>Monitoramento &amp; Avaliação
+            </button>
+          </div>
+
+          <div class="collapse show mt-3" id="monit_{{ loop.index }}">
+            <div class="card card-body border-secondary">
+              <h6 class="text-secondary mb-3"><i class="bi bi-binoculars"></i> Padrão Físico</h6>
+
+              <div class="row g-3">
+                <!-- Visita -->
+                <div class="col-md-3">
+                  <label class="form-label">Status Visita</label>
+                  <select class="form-select" id="visita_status_{{ loop.index }}">
+                    <option value="">-- Selecione --</option>
+                    {% for s in status_options.get('visita_status', []) %}
+                    <option value="{{ s.status }}" {{ 'selected' if monit.get('visita_status') == s.status else '' }}>{{ s.descricao or s.status }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Data Visita</label>
+                  <input type="date" class="form-control" id="visita_data_{{ loop.index }}"
+                         value="{{ monit.get('visita_data').strftime('%Y-%m-%d') if monit.get('visita_data') else '' }}">
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Horário</label>
+                  <input type="time" class="form-control" id="visita_horario_{{ loop.index }}"
+                         value="{{ monit.get('visita_horario') or '' }}">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Responsável Visita</label>
+                  <input type="text" class="form-control" id="visita_responsavel_{{ loop.index }}"
+                         value="{{ monit.get('visita_responsavel') or '' }}"
+                         list="listaAgentesDGP">
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Avaliação Visita</label>
+                  <select class="form-select" id="visita_avaliacao_{{ loop.index }}">
+                    <option value="">-- Selecione --</option>
+                    {% for s in status_options.get('visita_avaliacao', []) %}
+                    <option value="{{ s.status }}" {{ 'selected' if monit.get('visita_avaliacao') == s.status else '' }}>{{ s.descricao or s.status }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <!-- M&A -->
+                <div class="col-md-3">
+                  <label class="form-label">Status M&amp;A</label>
+                  <select class="form-select" id="monit_status_{{ loop.index }}">
+                    <option value="">-- Selecione --</option>
+                    {% for s in status_options.get('monit_status', []) %}
+                    <option value="{{ s.status }}" {{ 'selected' if monit.get('monit_status') == s.status else '' }}>{{ s.descricao or s.status }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Responsável M&amp;A</label>
+                  <input type="text" class="form-control" id="monit_responsavel_{{ loop.index }}"
+                         value="{{ monit.get('monit_responsavel') or '' }}"
+                         list="listaAgentesDGP">
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Data M&amp;A</label>
+                  <input type="date" class="form-control" id="monit_data_{{ loop.index }}"
+                         value="{{ monit.get('monit_data').strftime('%Y-%m-%d') if monit.get('monit_data') else '' }}">
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Avaliação M&amp;A</label>
+                  <select class="form-select" id="monit_avaliacao_{{ loop.index }}">
+                    <option value="">-- Selecione --</option>
+                    {% for s in status_options.get('monit_avaliacao', []) %}
+                    <option value="{{ s.status }}" {{ 'selected' if monit.get('monit_avaliacao') == s.status else '' }}>{{ s.descricao or s.status }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <!-- Observações M&A -->
+                <div class="col-md-12">
+                  <label class="form-label">Observações (M&amp;A)</label>
+                  <textarea class="form-control" id="monit_observacoes_{{ loop.index }}" rows="2">{{ monit.get('observacoes') or '' }}</textarea>
+                </div>
+
+                <!-- Adicional -->
+                <div class="col-12">
+                  <button type="button" class="btn btn-outline-info btn-sm"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#adicional_{{ loop.index }}">
+                    <i class="bi bi-plus-circle me-1"></i>Informações Adicionais (Justificativa / Comissão)
+                  </button>
+                </div>
+                <div class="collapse" id="adicional_{{ loop.index }}">
+                  <div class="row g-3 mt-1">
+                    <div class="col-md-3">
+                      <label class="form-label">Justificativa Status</label>
+                      <select class="form-select" id="justificativa_status_{{ loop.index }}">
+                        <option value="">-- Selecione --</option>
+                        {% for s in status_options.get('justificativa_status', []) %}
+                        <option value="{{ s.status }}" {{ 'selected' if adic.get('justificativa_status') == s.status else '' }}>{{ s.descricao or s.status }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Justificativa Avaliação</label>
+                      <input type="text" class="form-control" id="justificativa_avaliacao_{{ loop.index }}"
+                             value="{{ adic.get('justificativa_avaliacao') or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label">Justificativa Data</label>
+                      <input type="date" class="form-control" id="justificativa_data_{{ loop.index }}"
+                             value="{{ adic.get('justificativa_data').strftime('%Y-%m-%d') if adic.get('justificativa_data') else '' }}">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Justificativa Responsável</label>
+                      <input type="text" class="form-control" id="justificativa_responsavel_{{ loop.index }}"
+                             value="{{ adic.get('justificativa_responsavel') or '' }}"
+                             list="listaAgentesDGP">
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label">Comissão Visita</label>
+                      <select class="form-select" id="comissao_visita_{{ loop.index }}">
+                        <option value="">-- Selecione --</option>
+                        {% for s in status_options.get('comissao_visita', []) %}
+                        <option value="{{ s.status }}" {{ 'selected' if adic.get('comissao_visita') == s.status else '' }}>{{ s.descricao or s.status }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label">Comissão M&amp;A</label>
+                      <input type="text" class="form-control" id="comissao_ma_{{ loop.index }}"
+                             value="{{ adic.get('comissao_ma') or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label">Comissão Descumprimento</label>
+                      <input type="text" class="form-control" id="comissao_descumprimento_{{ loop.index }}"
+                             value="{{ adic.get('comissao_descumprimento') or '' }}">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /card-body -->
+      </div><!-- /card -->
       {% endfor %}
+
+      <!-- datalist para agentes DGP -->
+      <datalist id="listaAgentesDGP">
+        {% for nome in agentes_dgp %}<option value="{{ nome }}">{% endfor %}
+      </datalist>
 
       <!-- Botões de ação -->
       <div class="mb-4 text-end">
@@ -223,9 +385,13 @@
       inputs.forEach((input, index) => {
         const idx = index + 1;
         const id = input.value;
-        
-        analises.push({
+
+        // --- Campos financeiros ---
+        const obj = {
           id: parseInt(id),
+          numero_termo: document.getElementById(`numero_termo_${idx}`).value,
+          tipo_prestacao: document.getElementById(`tipo_prestacao_${idx}`).value,
+          numero_prestacao: parseInt(document.getElementById(`numero_prestacao_${idx}`).value),
           responsabilidade_analise: document.getElementById(`responsabilidade_analise_${idx}`).value || null,
           entregue: document.getElementById(`entregue_${idx}`).checked,
           cobrado: document.getElementById(`cobrado_${idx}`).checked,
@@ -239,8 +405,55 @@
           responsavel_pg: document.getElementById(`responsavel_pg_${idx}`).value || null,
           valor_devolucao: document.getElementById(`valor_devolucao_${idx}`).value || null,
           valor_devolvido: document.getElementById(`valor_devolvido_${idx}`).value || null,
-          observacoes: document.getElementById(`observacoes_${idx}`).value || null
-        });
+          observacoes: document.getElementById(`observacoes_${idx}`).value || null,
+        };
+
+        // --- Campos M&A (monit) ---
+        const vsEl   = document.getElementById(`visita_status_${idx}`);
+        const vaEl   = document.getElementById(`visita_avaliacao_${idx}`);
+        const msEl   = document.getElementById(`monit_status_${idx}`);
+        const maEl   = document.getElementById(`monit_avaliacao_${idx}`);
+        const hasMonit = vsEl || vaEl || msEl || maEl;
+
+        if (hasMonit) {
+          obj._has_monit = true;
+          obj.visita_status     = document.getElementById(`visita_status_${idx}`)?.value     || null;
+          obj.visita_data       = document.getElementById(`visita_data_${idx}`)?.value       || null;
+          obj.visita_horario    = document.getElementById(`visita_horario_${idx}`)?.value    || null;
+          obj.visita_responsavel= document.getElementById(`visita_responsavel_${idx}`)?.value|| null;
+          obj.visita_avaliacao  = document.getElementById(`visita_avaliacao_${idx}`)?.value  || null;
+          obj.monit_status      = document.getElementById(`monit_status_${idx}`)?.value      || null;
+          obj.monit_responsavel = document.getElementById(`monit_responsavel_${idx}`)?.value || null;
+          obj.monit_avaliacao   = document.getElementById(`monit_avaliacao_${idx}`)?.value   || null;
+          obj.monit_data        = document.getElementById(`monit_data_${idx}`)?.value        || null;
+          obj.monit_observacoes = document.getElementById(`monit_observacoes_${idx}`)?.value || null;
+        }
+
+        // --- Campos M&A adicionais ---
+        const jsEl = document.getElementById(`justificativa_status_${idx}`);
+        if (jsEl) {
+          const adFields = [
+            document.getElementById(`justificativa_status_${idx}`)?.value,
+            document.getElementById(`justificativa_avaliacao_${idx}`)?.value,
+            document.getElementById(`justificativa_data_${idx}`)?.value,
+            document.getElementById(`justificativa_responsavel_${idx}`)?.value,
+            document.getElementById(`comissao_visita_${idx}`)?.value,
+            document.getElementById(`comissao_ma_${idx}`)?.value,
+            document.getElementById(`comissao_descumprimento_${idx}`)?.value,
+          ];
+          if (adFields.some(v => v)) {
+            obj._has_adicional = true;
+            obj.justificativa_status      = adFields[0] || null;
+            obj.justificativa_avaliacao   = adFields[1] || null;
+            obj.justificativa_data        = adFields[2] || null;
+            obj.justificativa_responsavel = adFields[3] || null;
+            obj.comissao_visita           = adFields[4] || null;
+            obj.comissao_ma               = adFields[5] || null;
+            obj.comissao_descumprimento   = adFields[6] || null;
+          }
+        }
+
+        analises.push(obj);
       });
 
       try {
