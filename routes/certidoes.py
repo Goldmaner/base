@@ -55,12 +55,14 @@ def index():
     cur.execute("""
         SELECT
             c.osc,
-            COALESCE(MAX(p.cnpj), 'N/A')                                          AS cnpj,
+            COALESCE(
+                (SELECT MAX(p.cnpj) FROM public.parcerias p WHERE p.osc = c.osc),
+                'N/A'
+            )                                                                      AS cnpj,
             COUNT(c.id)::int                                                       AS total_certidoes,
             COUNT(c.id) FILTER (WHERE c.certidao_vencimento >= CURRENT_DATE)::int AS em_dia,
             COUNT(c.id) FILTER (WHERE c.certidao_vencimento < CURRENT_DATE)::int  AS atrasadas
         FROM public.certidoes c
-        LEFT JOIN public.parcerias p ON p.osc = c.osc
         GROUP BY c.osc
         ORDER BY c.osc
     """)
@@ -952,14 +954,12 @@ def deletar_certidao_individual(certidao_id):
         if not certidao:
             return jsonify({'success': False, 'erro': 'Certidão não encontrada'}), 404
         
-        # Excluir arquivo físico
+        # Excluir arquivo do storage (local ou Supabase)
         if certidao['certidao_path']:
-            caminho_completo = os.path.join(UPLOAD_FOLDER, certidao['certidao_path'])
             try:
-                if os.path.exists(caminho_completo):
-                    os.remove(caminho_completo)
+                storage.delete_file(f"Certidoes/{certidao['certidao_path']}")
             except Exception as e:
-                print(f"[AVISO] Erro ao deletar arquivo físico: {e}")
+                print(f"[AVISO] Erro ao deletar arquivo do storage: {e}")
         
         # Excluir registro do banco
         cur.execute("DELETE FROM public.certidoes WHERE id = %s", [certidao_id])
@@ -1000,14 +1000,12 @@ def excluir_certidao(certidao_id):
         if not certidao:
             return jsonify({'success': False, 'erro': 'Certidão não encontrada'}), 404
         
-        # Tentar excluir arquivo físico
+        # Excluir arquivo do storage (local ou Supabase)
         if certidao['certidao_path']:
-            caminho_completo = os.path.join(UPLOAD_FOLDER, certidao['certidao_path'])
             try:
-                if os.path.exists(caminho_completo):
-                    os.remove(caminho_completo)
+                storage.delete_file(f"Certidoes/{certidao['certidao_path']}")
             except Exception as e:
-                print(f"[AVISO] Não foi possível excluir arquivo físico: {e}")
+                print(f"[AVISO] Não foi possível excluir arquivo do storage: {e}")
         
         # Excluir registro do banco
         cur.execute("DELETE FROM public.certidoes WHERE id = %s", [certidao_id])
@@ -1044,14 +1042,13 @@ def juntar_pdfs(nome_pasta):
         osc_data = None
         certidoes_por_path = None
         
-        # ========================================
-        # OPÇÃO 0: Buscar diretamente pelo certidao_path (mais confiável)
-        # ========================================
+        # OPÇÃO 0: Buscar pelo certidao_path normalizado (suporta / e \)
+        # REPLACE(certidao_path, chr(92), '/') converte barras invertidas antes do LIKE
         print(f"[DEBUG PDF] OPÇÃO 0: Buscando em certidoes pelo path da pasta...")
         cur.execute("""
             SELECT DISTINCT osc, cnpj 
             FROM public.certidoes 
-            WHERE certidao_path LIKE %s
+            WHERE REPLACE(certidao_path, chr(92), '/') LIKE %s
             LIMIT 1
         """, [f'{nome_pasta}/%'])
         
@@ -1059,7 +1056,6 @@ def juntar_pdfs(nome_pasta):
         print(f"[DEBUG PDF] OPÇÃO 0 - Resultado: {osc_data is not None}")
         
         if osc_data:
-            # Buscar todas as certidões diretamente pelo path (evita confusão de nome)
             cur.execute("""
                 SELECT 
                     certidao_nome,
@@ -1067,7 +1063,7 @@ def juntar_pdfs(nome_pasta):
                     certidao_vencimento,
                     certidao_status
                 FROM public.certidoes
-                WHERE certidao_path LIKE %s
+                WHERE REPLACE(certidao_path, chr(92), '/') LIKE %s
                 ORDER BY 
                     CASE certidao_nome
                         WHEN 'CNPJ' THEN 1
@@ -1135,28 +1131,20 @@ def juntar_pdfs(nome_pasta):
         # OPÇÃO 3: Se não encontrou no banco, tentar ler arquivos físicos da pasta
         # ========================================
         if not osc_data:
-            print(f"[DEBUG PDF] OPÇÃO 3: OSC não encontrada no banco. Tentando ler arquivos físicos da pasta...")
-            pasta_fisica = os.path.join(UPLOAD_FOLDER, nome_pasta)
+            print(f"[DEBUG PDF] OPÇÃO 3: OSC não encontrada no banco. Tentando ler arquivos no storage...")
             
-            if os.path.exists(pasta_fisica):
-                todos_arquivos = os.listdir(pasta_fisica)
-                arquivos_pdf = [f for f in todos_arquivos if f.lower().endswith('.pdf')]
-                print(f"[DEBUG PDF] OPÇÃO 3 - Pasta existe. Total arquivos: {len(todos_arquivos)}, PDFs: {len(arquivos_pdf)}")
-                print(f"[DEBUG PDF] OPÇÃO 3 - Arquivos na pasta: {todos_arquivos}")
-                
-                if len(arquivos_pdf) > 0:
-                    # Criar osc_data fictício com nome da pasta
-                    osc_data = {
-                        'osc': nome_pasta.replace('_', ' ').title(),
-                        'cnpj': 'Não cadastrado'
-                    }
-                    print(f"[DEBUG PDF] OPÇÃO 3 - Usando arquivos físicos para OSC: {osc_data['osc']}")
-                else:
-                    print(f"[DEBUG PDF] Pasta existe mas não contém PDFs")
-                    return jsonify({'success': False, 'erro': 'Pasta encontrada mas não contém arquivos PDF'}), 404
+            arquivos_pdf = [f for f in storage.list_files(f'Certidoes/{nome_pasta}') if f.lower().endswith('.pdf')]
+            print(f"[DEBUG PDF] OPÇÃO 3 - Arquivos no storage: {arquivos_pdf}")
+            
+            if len(arquivos_pdf) > 0:
+                osc_data = {
+                    'osc': nome_pasta.replace('_', ' ').title(),
+                    'cnpj': 'Não cadastrado'
+                }
+                print(f"[DEBUG PDF] OPÇÃO 3 - Usando storage para OSC: {osc_data['osc']}")
             else:
-                print(f"[DEBUG PDF] OSC não encontrada e pasta física não existe: {nome_busca}")
-                return jsonify({'success': False, 'erro': 'OSC não encontrada no banco de dados e pasta física não existe'}), 404
+                print(f"[DEBUG PDF] OSC não encontrada no banco e sem arquivos no storage: {nome_busca}")
+                return jsonify({'success': False, 'erro': 'OSC não encontrada no banco de dados e sem arquivos no storage'}), 404
         
         print(f"[DEBUG PDF] OSC identificada: {osc_data['osc']}")
         

@@ -207,12 +207,12 @@ def delete_file(storage_path: str) -> None:
         client = _get_client()
         try:
             client.storage.from_(BUCKET).remove([storage_path])
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f'[AVISO] delete_file falhou para {storage_path!r}: {exc}')
     else:
         local = _local_path(storage_path)
         try:
             if os.path.isfile(local):
                 os.remove(local)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f'[AVISO] delete_file local falhou para {local!r}: {exc}')

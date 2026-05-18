@@ -20,6 +20,12 @@ meu_banco.db
 meu_banco.db-shm
 meu_banco.db-wal
 
+# Documentação interna (pode conter estrutura sensível do banco)
+docs/GUIA_BANCO_DADOS.md
+
+# Arquivo de scripts antigos/migrações já executadas
+scripts/archive/
+
 # Backups do banco de dados (arquivos grandes e sensíveis)
 backups/*.sql
 backups/*.dump

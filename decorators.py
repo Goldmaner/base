@@ -236,8 +236,6 @@ def requires_access(modulo):
             lista_acessos = parse_access_list(acessos)
             status_acesso = get_module_access_status(lista_acessos, modulo)
             
-            print(f"[DEBUG ACESSO] Usuário {session.get('user_id')} - Email: {session.get('email')} - Tipo: {session.get('tipo_usuario')} - Módulo: {modulo} - Acessos: {lista_acessos}")
-            
             if not status_acesso['tem_acesso']:
                 print(f"[ACESSO NEGADO] Módulo '{modulo}' não encontrado na lista de acessos do usuário")
                 flash(f'Você não tem permissão para acessar o módulo: {modulo}. Entre em contato com o administrador.', 'danger')

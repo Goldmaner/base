@@ -426,9 +426,12 @@
     let anosSelecionadosDP = new Set();
     let anosSelecionadosPG = new Set();
 
-    // Carregar anos disponíveis ao iniciar a página
+    // Carregar anos disponíveis ao iniciar a página; restaurar aba M&A se necessário
     document.addEventListener('DOMContentLoaded', function() {
       carregarAnosDisponiveis();
+      if (localStorage.getItem('faf_analises_tab') === 'fisico') {
+        trocarModo('fisico'); // carregarOpcoesStatus chamará restaurarEstadoFiltros no fim
+      }
     });
 
     async function carregarAnosDisponiveis() {
@@ -768,6 +771,7 @@
 
     function trocarModo(modo) {
       modoAtual = modo;
+      localStorage.setItem('faf_analises_tab', modo);
       const tabFin  = document.getElementById('tabFinanceiro');
       const tabFis  = document.getElementById('tabFisico');
       const ffin    = document.getElementById('filtrosFinanceiro');
@@ -831,6 +835,8 @@
         const dl = document.getElementById('listaResponsaveisFisico');
         if (dl) nomes.forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
       } catch(e) { console.error('Erro ao carregar responsáveis', e); }
+      // Após opções carregadas, restaurar estado salvo se houver
+      restaurarEstadoFiltros();
     }
 
     async function aplicarFiltrosFisico() {
@@ -871,6 +877,7 @@
         document.getElementById('contadorResultados').style.display = 'block';
 
         renderizarTabelaFisica(dados, colsAdicionais);
+        salvarEstadoFiltros();
         document.getElementById('mensagemInicial').style.display = 'none';
         document.getElementById('areaTabelaFisica').style.display = 'block';
 
@@ -947,7 +954,52 @@
       });
     }
 
+    function salvarEstadoFiltros() {
+      const estado = {
+        filtroLimiteFisico: document.getElementById('filtroLimiteFisico')?.value || '50',
+        filtroTipoFisico: document.getElementById('filtroTipoFisico')?.value || '',
+        filtroTermoFisico: document.getElementById('filtroTermoFisico')?.value || '',
+        filtroOSCFisico: document.getElementById('filtroOSCFisico')?.value || '',
+        filtroResponsabilidadeFisico: document.getElementById('filtroResponsabilidadeFisico')?.value || '',
+        filtroIncluirTCV: document.getElementById('filtroIncluirTCV')?.checked || false,
+        filtroVisitaStatus: document.getElementById('filtroVisitaStatus')?.value || '',
+        filtroVisitaAvaliacao: document.getElementById('filtroVisitaAvaliacao')?.value || '',
+        filtroMonitStatus: document.getElementById('filtroMonitStatus')?.value || '',
+        filtroMonitAvaliacao: document.getElementById('filtroMonitAvaliacao')?.value || '',
+        filtroVigInicio: document.getElementById('filtroVigInicio')?.value || '',
+        filtroVigFim: document.getElementById('filtroVigFim')?.value || '',
+        filtroResponsavelFisico: document.getElementById('filtroResponsavelFisico')?.value || '',
+        chkJustStatus: document.getElementById('chkJustStatus')?.checked || false,
+        chkJustAval: document.getElementById('chkJustAval')?.checked || false,
+        chkJustData: document.getElementById('chkJustData')?.checked || false,
+        chkJustResp: document.getElementById('chkJustResp')?.checked || false,
+        chkComissaoVisita: document.getElementById('chkComissaoVisita')?.checked || false,
+        chkComissaoMA: document.getElementById('chkComissaoMA')?.checked || false,
+        chkComissaoDesc: document.getElementById('chkComissaoDesc')?.checked || false,
+      };
+      localStorage.setItem('faf_analises_fisico', JSON.stringify(estado));
+    }
+
+    function restaurarEstadoFiltros() {
+      const estado = JSON.parse(localStorage.getItem('faf_analises_fisico') || 'null');
+      if (!estado) return;
+      ['filtroLimiteFisico','filtroTipoFisico','filtroTermoFisico','filtroOSCFisico',
+       'filtroResponsabilidadeFisico','filtroVisitaStatus','filtroVisitaAvaliacao',
+       'filtroMonitStatus','filtroMonitAvaliacao',
+       'filtroVigInicio','filtroVigFim','filtroResponsavelFisico'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && estado[id] !== undefined) el.value = estado[id];
+      });
+      ['filtroIncluirTCV','chkJustStatus','chkJustAval','chkJustData','chkJustResp',
+       'chkComissaoVisita','chkComissaoMA','chkComissaoDesc'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && estado[id] !== undefined) el.checked = estado[id];
+      });
+      aplicarFiltrosFisico();
+    }
+
     function limparFiltrosFisico() {
+      localStorage.removeItem('faf_analises_fisico');
       const tcvCk = document.getElementById('filtroIncluirTCV');
       if (tcvCk) tcvCk.checked = false;
       ['filtroLimiteFisico','filtroTipoFisico','filtroTermoFisico','filtroOSCFisico',

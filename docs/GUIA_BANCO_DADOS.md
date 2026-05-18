@@ -20,6 +20,7 @@
 - [Schema `calendario`](#-schema-calendario--calendário-institucional)
 - [Relacionamentos Principais](#-relacionamentos-principais)
 - [Índices de Performance](#-índices-de-performance)
+- [Row Level Security (RLS)](#-row-level-security-rls)
 - [Extensões e Convenções](#-extensões-e-convenções)
 - [⚠️ Onde rodar migrations e scripts](#️-onde-rodar-migrations-e-scripts)
 
@@ -85,12 +86,12 @@ Get-Content .env | Where-Object { $_ -match '^DB_HOST|^DB_PORT|^DB_DATABASE|^DB_
 
 | Schema | Tabelas | Descrição |
 |--------|---------|-----------|
-| `public` | 15 | Core de parcerias, certidões, editais, despesas |
+| `public` | 22 | Core de parcerias, certidões, editais, despesas |
 | `analises_pc` | 14 | Conciliação bancária, checklists, inconsistências |
-| `gestao_financeira` | 8 | Ultra liquidações, cronogramas, empenhos SOF |
-| `gestao_pessoas` | 5 | Usuários, logs de atividade e erros |
-| `categoricas` | 36 | Listas suspensas e catálogos editáveis |
-| `celebracao` | 7 | Processo de celebração de novos termos e Quadro de Metas |
+| `gestao_financeira` | 9 | Ultra liquidações, cronogramas, empenhos SOF |
+| `gestao_pessoas` | 6 | Usuários, logs de atividade e erros |
+| `categoricas` | 41 | Listas suspensas e catálogos editáveis |
+| `celebracao` | 8 | Processo de celebração de novos termos e Quadro de Metas |
 | `auditoria_memoria` | 1 | Auditoria de encaminhamentos de pagamento |
 | `calendario` | 5 | Férias, registros pessoais, eventos e documentos |
 
@@ -1589,7 +1590,66 @@ CREATE INDEX idx_log_detalhes_gin ON gestao_pessoas.log_atividades USING GIN (de
 
 ---
 
-## 🔧 Extensões e Convenções
+## � Row Level Security (RLS)
+
+> **Implementado a partir de: 18/05/2026**  
+> O Flask app conecta como `postgres` (role com `BYPASSRLS`) e **nunca é afetado** pelas policies. A RLS protege acessos via Supabase client (anon key / authenticated).
+
+### Arquitetura de acesso
+
+| Role | Acesso | Quem usa |
+|------|--------|---------|
+| `postgres` | BYPASSRLS — irrestrito | Flask app (psycopg2 com credenciais do `.env`) |
+| `authenticated` | Controlado pelas policies abaixo | Supabase client com JWT válido |
+| `anon` | **Bloqueado** — sem nenhuma policy | — (anon key não usada ainda) |
+
+### UIDs OAuth configurados
+
+| UID Supabase | Tipo | Mapeamento |
+|---|---|---|
+| `<uid-admin>` | Admin | `id = 1` — administrador do sistema |
+| `<uid-usuarios>` | Usuários | Todos os demais usuários cadastrados |
+
+> O campo `gestao_pessoas.usuarios.auth_user_id` (uuid) é a ponte entre cada usuário da aplicação e seu UID Supabase.
+
+### Padrão de policy — acesso total para authenticated
+
+Aplicado em schemas onde **todos os `authenticated` têm acesso completo** (sem filtragem por linha):
+
+```sql
+-- Remove a policy aberta de anon (legado)
+DROP POLICY IF EXISTS "Acesso_Total_PWA" ON <schema>.<tabela>;
+
+-- Authenticated → ALL (SELECT, INSERT, UPDATE, DELETE)
+CREATE POLICY "authenticated_acesso_total"
+ON <schema>.<tabela>
+FOR ALL
+TO authenticated
+USING (true)
+WITH CHECK (true);
+```
+
+> **Regra**: ausência de policy = acesso negado. Não é necessário criar nada para `anon` — a omissão já bloqueia.
+
+### Status de migração por schema
+
+| Schema | Tabelas | Status | Data | Policy |
+|--------|---------|--------|------|--------|
+| `analises_pc` | 14 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+| `auditoria_memoria` | 1 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+| `calendario` | 5 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+| `categoricas` | 41 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+| `celebracao` | 8 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+| `gestao_financeira` | 9 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+| `gestao_pessoas` | 6 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+| `pessoa_gestora` | 1 | ⚙️ Policies customizadas | — | `auth.uid()` por linha |
+| `public` | 22 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+
+> Scripts de migração em `scripts/_rls_<schema>.py`.
+
+---
+
+## �🔧 Extensões e Convenções
 
 ### Extensões PostgreSQL ativas
 ```sql
@@ -1626,4 +1686,4 @@ Tabelas que armazenam ações do usuário sempre incluem:
 
 ---
 
-*Última atualização: 28/04/2026 | Fonte: `backup_faf_20260428_143800.sql`*
+*Última atualização: 18/05/2026 | Fonte: `backup_faf_20260428_143800.sql` + migrações incrementais*
