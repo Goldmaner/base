@@ -5,6 +5,7 @@ Rotas para OCR de Testes - Conversão de Extratos Bancários
 from flask import Blueprint, render_template, request, jsonify, send_file, session
 from db import get_cursor, get_db
 from functools import wraps
+from decorators import requires_access
 import re
 import csv
 import io
@@ -30,6 +31,7 @@ def login_required(f):
 
 @bp.route('/')
 @login_required
+@requires_access('ocr_testes')
 def index():
     """Página principal do OCR de testes"""
     return render_template('analises_pc/ocr_testes.html')
@@ -37,6 +39,7 @@ def index():
 
 @bp.route('/api/processar-ocr', methods=['POST'])
 @login_required
+@requires_access('ocr_testes')
 def processar_ocr():
     """Processa o texto do extrato e retorna CSV"""
     try:
@@ -98,6 +101,7 @@ def processar_ocr():
 
 @bp.route('/api/processar-pdf', methods=['POST'])
 @login_required
+@requires_access('ocr_testes')
 def processar_pdf():
     """Processa PDF do extrato e retorna CSV"""
     if not PDF_AVAILABLE:

@@ -357,6 +357,11 @@
                   </div>
                 </div>
                 <div class="p-3">
+                  <div class="alert alert-info py-2 small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Acessos marcados como herdados são liberados automaticamente pelo módulo base
+                    <strong>Análises de Contas / Menu de PC</strong>.
+                  </div>
                   <div class="mb-2">
                     <input type="text" class="form-control form-control-sm" id="filtroUsuarioPagina"
                            placeholder="🔍 Filtrar usuário..."
@@ -812,6 +817,8 @@
     { id: 'conc_rendimentos',       nome: 'Rendimentos',                        grupo: 'Módulos Técnicos' },
     { id: 'conc_contrapartida',     nome: 'Contrapartida',                      grupo: 'Módulos Técnicos' },
     { id: 'conc_relatorio',         nome: 'Relatório de Conciliação',           grupo: 'Módulos Técnicos' },
+    { id: 'conc_demonstrativo',     nome: 'Demonstrativo',                      grupo: 'Módulos Técnicos' },
+    { id: 'ocr_testes',             nome: 'OCR Testes',                         grupo: 'Módulos Técnicos' },
   ];
 
   const GRUPO_ICONS = {
@@ -940,18 +947,32 @@
         const dep = u.d_usuario
           ? `<small class="text-muted ms-2"><i class="bi bi-building"></i> ${u.d_usuario}</small>`
           : '';
+        const acessoHerdado = !!u.tem_acesso_herdado;
+        const badgeTexto = acessoHerdado
+          ? `Herdado de ${u.herdado_de === 'analises' ? 'Análises' : u.herdado_de}`
+          : (u.tem_acesso ? 'Tem acesso' : 'Sem acesso');
+        const badgeClasse = acessoHerdado
+          ? 'bg-info text-dark'
+          : (u.tem_acesso ? 'bg-success' : 'bg-light text-muted border');
+        const corFundo = acessoHerdado
+          ? '#e0f2fe'
+          : (u.tem_acesso ? '#e8f5e9' : '#fafafa');
+        const corBorda = acessoHerdado
+          ? '#7dd3fc'
+          : (u.tem_acesso ? '#81c784' : '#dee2e6');
+        const disabledAttr = acessoHerdado ? 'disabled' : '';
         html += `<div class="d-flex align-items-center py-2 px-2 rounded mb-1"
-                      style="background:${u.tem_acesso ? '#e8f5e9' : '#fafafa'};
-                             border:1px solid ${u.tem_acesso ? '#81c784' : '#dee2e6'};">
+                      style="background:${corFundo};
+                             border:1px solid ${corBorda};">
           <div class="form-check mb-0 me-auto">
             <input class="form-check-input usuario-acesso-cb" type="checkbox"
-                   id="cb_u_${u.id}" data-uid="${u.id}" ${u.tem_acesso ? 'checked' : ''}>
+                   id="cb_u_${u.id}" data-uid="${u.id}" ${u.tem_acesso ? 'checked' : ''} ${disabledAttr}>
             <label class="form-check-label" for="cb_u_${u.id}">
               <i class="bi bi-person-circle me-1"></i>${u.email}${dep}
             </label>
           </div>
-          <span class="badge ${u.tem_acesso ? 'bg-success' : 'bg-light text-muted border'}" id="badge_u_${u.id}">
-            ${u.tem_acesso ? 'Tem acesso' : 'Sem acesso'}
+          <span class="badge ${badgeClasse}" id="badge_u_${u.id}">
+            ${badgeTexto}
           </span>
         </div>`;
       });
@@ -984,7 +1005,7 @@
   }
 
   function marcarTodosPagina(valor) {
-    document.querySelectorAll('.usuario-acesso-cb').forEach(cb => {
+    document.querySelectorAll('.usuario-acesso-cb:not(:disabled)').forEach(cb => {
       cb.checked = valor;
       cb.dispatchEvent(new Event('change'));
     });
@@ -992,7 +1013,7 @@
 
   async function salvarAcessosPorPagina() {
     if (!moduloAtual) return;
-    const ids = Array.from(document.querySelectorAll('.usuario-acesso-cb:checked'))
+    const ids = Array.from(document.querySelectorAll('.usuario-acesso-cb:checked:not(:disabled)'))
                      .map(cb => parseInt(cb.dataset.uid));
 
     const btn = document.querySelector('#painelDireitoConteudo .btn-parc');
@@ -1008,8 +1029,11 @@
       });
       const result = await r.json();
       if (!r.ok) throw new Error(result.erro);
-
-      usuariosModuloCache.forEach(u => { u.tem_acesso = ids.includes(u.id); });
+      const rAtualizado = await fetch(`/api/acessos-por-pagina/${moduloAtual}`);
+      if (rAtualizado.ok) {
+        usuariosModuloCache = await rAtualizado.json();
+        renderizarUsuariosPainel(document.getElementById('filtroUsuarioPagina').value);
+      }
 
       const alertEl = document.getElementById('alertSalvoPagina');
       document.getElementById('msgSalvoPagina').textContent = result.mensagem;

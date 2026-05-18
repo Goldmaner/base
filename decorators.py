@@ -8,6 +8,68 @@ import traceback as _traceback
 from flask import session, redirect, url_for, flash, request, current_app
 from config import ACESSOS_BASICOS
 
+ACCESS_INHERITANCE = {
+    'analises': [
+        'conc_bancaria',
+        'conc_rendimentos',
+        'conc_contrapartida',
+        'conc_relatorio',
+        'conc_demonstrativo',
+        'ocr_testes',
+    ],
+}
+
+
+def parse_access_list(user_acessos):
+    """Normaliza a lista de acessos do usuário a partir de string ou coleção."""
+    if not user_acessos:
+        return []
+    if isinstance(user_acessos, str):
+        return [a.strip() for a in user_acessos.split(';') if a.strip()]
+    if isinstance(user_acessos, (list, tuple, set)):
+        return [str(a).strip() for a in user_acessos if str(a).strip()]
+    return []
+
+
+def get_module_access_status(user_acessos, modulo):
+    """
+    Retorna o status de acesso ao módulo, incluindo acesso herdado.
+
+    Returns:
+        dict: {
+            'tem_acesso': bool,
+            'tem_acesso_direto': bool,
+            'tem_acesso_herdado': bool,
+            'origem': str | None
+        }
+    """
+    acessos_lista = parse_access_list(user_acessos)
+    acessos_set = set(acessos_lista)
+
+    if modulo in acessos_set:
+        return {
+            'tem_acesso': True,
+            'tem_acesso_direto': True,
+            'tem_acesso_herdado': False,
+            'origem': modulo,
+        }
+
+    for modulo_origem, modulos_herdados in ACCESS_INHERITANCE.items():
+        if modulo in modulos_herdados and modulo_origem in acessos_set:
+            return {
+                'tem_acesso': True,
+                'tem_acesso_direto': False,
+                'tem_acesso_herdado': True,
+                'origem': modulo_origem,
+            }
+
+    return {
+        'tem_acesso': False,
+        'tem_acesso_direto': False,
+        'tem_acesso_herdado': False,
+        'origem': None,
+    }
+
 
 # =============================================================================
 # LOGGING DE ERROS ASSÍNCRONO
@@ -171,11 +233,12 @@ def requires_access(modulo):
                 return redirect(url_for('main.index'))
             
             # Verificar se o módulo está na lista de acessos
-            lista_acessos = [a.strip() for a in acessos.split(';') if a.strip()]
+            lista_acessos = parse_access_list(acessos)
+            status_acesso = get_module_access_status(lista_acessos, modulo)
             
             print(f"[DEBUG ACESSO] Usuário {session.get('user_id')} - Email: {session.get('email')} - Tipo: {session.get('tipo_usuario')} - Módulo: {modulo} - Acessos: {lista_acessos}")
             
-            if modulo not in lista_acessos:
+            if not status_acesso['tem_acesso']:
                 print(f"[ACESSO NEGADO] Módulo '{modulo}' não encontrado na lista de acessos do usuário")
                 flash(f'Você não tem permissão para acessar o módulo: {modulo}. Entre em contato com o administrador.', 'danger')
                 return redirect(url_for('main.index'))
@@ -199,8 +262,4 @@ def check_module_access(user_acessos, modulo):
     Returns:
         bool: True se tem acesso, False caso contrário
     """
-    if not user_acessos:
-        return False
-    
-    lista_acessos = [a.strip() for a in user_acessos.split(';') if a.strip()]
-    return modulo in lista_acessos
+    return get_module_access_status(user_acessos, modulo)['tem_acesso']

@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 from db import get_cursor
 from utils import login_required
 from decorators import requires_access
+import utils_storage as storage
 
 manuais_bp = Blueprint('manuais', __name__, url_prefix='/manuais')
 
@@ -85,15 +86,33 @@ def _get_tipos_doc_opcoes(cur):
 
 
 def _save_upload(arquivo, manual_id):
-    """Salva o arquivo enviado e retorna o caminho relativo ou None."""
+    """Salva o arquivo enviado via storage (local ou Supabase) e retorna o caminho relativo ou None."""
     if not arquivo or not arquivo.filename:
         return None
     if not _allowed_file(arquivo.filename):
         return None
-    pasta = os.path.join(UPLOAD_FOLDER, str(manual_id))
-    os.makedirs(pasta, exist_ok=True)
     filename = secure_filename(arquivo.filename)
-    arquivo.save(os.path.join(pasta, filename))
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    content_types = {
+        'pdf': 'application/pdf',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'xls': 'application/vnd.ms-excel',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'doc': 'application/msword',
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'ppt': 'application/vnd.ms-powerpoint',
+        'txt': 'text/plain',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'odt': 'application/vnd.oasis.opendocument.text',
+        'ods': 'application/vnd.oasis.opendocument.spreadsheet',
+    }
+    content_type = content_types.get(ext, 'application/octet-stream')
+    storage_path = f'Manuais/{manual_id}/{filename}'
+    file_bytes = arquivo.read()
+    storage.upload_file(storage_path, file_bytes, content_type)
+    # Retorna caminho compatível com registros antigos no banco (prefixo modelos/)
     return f'modelos/Manuais/{manual_id}/{filename}'
 
 
@@ -421,8 +440,22 @@ def download_doc(versao_id):
     if not row or not row['manual_doc']:
         abort(404)
 
-    filepath = os.path.join(_BASE_DIR, row['manual_doc'])
-    if not os.path.isfile(filepath):
+    # DB pode ter 'modelos/Manuais/{id}/{file}' (antigo) ou 'Manuais/{id}/{file}'
+    # storage espera sem o prefixo 'modelos/'
+    doc_path = row['manual_doc'].replace('\\', '/')
+    if doc_path.startswith('modelos/'):
+        storage_path = doc_path[len('modelos/'):]
+    else:
+        storage_path = doc_path
+
+    try:
+        file_bytes = storage.download_file(storage_path)
+    except FileNotFoundError:
         abort(404)
 
-    return send_file(filepath, as_attachment=True)
+    import io as _io
+    return send_file(
+        _io.BytesIO(file_bytes),
+        as_attachment=True,
+        download_name=os.path.basename(doc_path),
+    )

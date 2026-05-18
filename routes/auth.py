@@ -7,6 +7,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from db import get_cursor, get_db
 from utils import login_required
 from config import ACESSOS_BASICOS
+from decorators import get_module_access_status
 import secrets
 import random
 from datetime import datetime, timedelta
@@ -553,13 +554,16 @@ def acessos_por_pagina_get(modulo):
 
         resultado = []
         for u in usuarios:
-            acessos_lista = [a.strip() for a in (u['acessos'] or '').split(';') if a.strip()]
+            status_acesso = get_module_access_status(u['acessos'], modulo)
             resultado.append({
                 "id": u["id"],
                 "email": u["email"],
                 "tipo_usuario": u["tipo_usuario"],
                 "d_usuario": u["d_usuario"],
-                "tem_acesso": modulo in acessos_lista
+                "tem_acesso": status_acesso["tem_acesso"],
+                "tem_acesso_direto": status_acesso["tem_acesso_direto"],
+                "tem_acesso_herdado": status_acesso["tem_acesso_herdado"],
+                "herdado_de": status_acesso["origem"] if status_acesso["tem_acesso_herdado"] else None
             })
         return jsonify(resultado), 200
     except Exception as e:

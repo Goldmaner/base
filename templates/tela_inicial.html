@@ -388,7 +388,7 @@
           <i class="bi bi-gear-fill s-icon" style="font-size:1.05rem;"></i>
           <span>Opções de Administrador</span>
           <span class="s-spacer"></span>
-          <span class="s-count">2</span>
+          <span class="s-count">1</span>
           <i class="bi bi-chevron-down s-chev"></i>
         </button>
         <div id="collapseAdmin" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
@@ -398,11 +398,7 @@
               <i class="bi bi-file-earmark-text"></i> Gerenciar Portarias/Legislações
             </a>
             {% endif %}
-            {% if is_admin %}
-            <a href="{{ url_for('email_assistente.index') }}" class="faf-btn">
-              <i class="bi bi-envelope-open-fill"></i> Email Assistente (IA)
-            </a>
-            {% endif %}
+
           </div>
         </div>
       </div>

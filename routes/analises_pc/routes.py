@@ -1,6 +1,8 @@
-from flask import render_template, request, jsonify, g, send_from_directory, session, redirect, url_for, Response
+from flask import render_template, request, jsonify, g, send_from_directory, send_file, session, redirect, url_for, Response
 from . import analises_pc_bp
 from db import get_db
+from utils import login_required
+from decorators import requires_access
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import execute_values
@@ -16,6 +18,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+import utils_storage as storage
 
 
 def normalizar_rf(rf):
@@ -41,6 +44,8 @@ def normalizar_rf(rf):
 
 
 @analises_pc_bp.route('/')
+@login_required
+@requires_access('analises')
 def index():
     """Página inicial do checklist de análise de prestação de contas"""
     conn = get_db()
@@ -60,6 +65,8 @@ def index():
 
 
 @analises_pc_bp.route('/meus_processos')
+@login_required
+@requires_access('analises')
 def meus_processos():
     """Página que lista os processos atribuídos ao usuário logado, processos de analista específico ou processos não atribuídos (admin)"""
     
@@ -1170,10 +1177,6 @@ def inserir_modelos_padrao():
 def download_modelo(filename):
     """Download de arquivo modelo"""
     try:
-        # Diretório dos modelos (na raiz do projeto)
-        modelos_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'modelos')
-        
-        # Validar que o arquivo existe e está na lista permitida
         arquivos_permitidos = [
             'modelo_termo_celebrado.pdf',
             'modelo_solicitacao_alteracao.pdf',
@@ -1186,12 +1189,15 @@ def download_modelo(filename):
             'modelo_facc.pdf',
             'modelo_memoria_calculo.xlsx'
         ]
-        
+
         if filename not in arquivos_permitidos:
             return "Arquivo não autorizado", 403
-        
-        return send_from_directory(modelos_dir, filename, as_attachment=True)
-    
+
+        file_bytes = storage.download_file(f'Modelos/{filename}')
+        return send_file(BytesIO(file_bytes), as_attachment=True, download_name=filename)
+
+    except FileNotFoundError:
+        return f"Arquivo não encontrado: {filename}", 404
     except Exception as e:
         print(f"[ERRO] Erro ao fazer download: {e}")
         return f"Erro ao baixar arquivo: {str(e)}", 500
@@ -1230,30 +1236,26 @@ def upload_modelo():
                 'error': 'O nome do arquivo deve começar com "modelo_" (ex: modelo_novo_documento.pdf)'
             }), 400
         
-        # Diretório de destino
-        modelos_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'modelos')
-        
-        # Criar diretório se não existir
-        os.makedirs(modelos_dir, exist_ok=True)
-        
-        # Caminho completo do arquivo
-        filepath = os.path.join(modelos_dir, filename)
-        
-        # Verificar se arquivo já existe
-        if os.path.exists(filepath):
+        # Verificar se arquivo já existe no storage
+        arquivos_existentes = storage.list_files('Modelos')
+        if filename in arquivos_existentes:
             return jsonify({
                 'error': f'Arquivo "{filename}" já existe. Renomeie ou exclua o arquivo existente primeiro.'
             }), 409
         
-        # Salvar arquivo
-        arquivo.save(filepath)
+        # Fazer upload para storage (local ou Supabase)
+        arquivo.seek(0)
+        file_bytes = arquivo.read()
+        content_type = 'application/pdf' if extensao == 'pdf' else \
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        storage.upload_file(f'Modelos/{filename}', file_bytes, content_type)
         
         print(f"[INFO] Upload realizado: {filename} por {session.get('email')}")
         
         return jsonify({
             'mensagem': 'Arquivo enviado com sucesso!',
             'filename': filename,
-            'tamanho': os.path.getsize(filepath),
+            'tamanho': len(file_bytes),
             'usuario': session.get('email')
         }), 200
     
@@ -1417,21 +1419,14 @@ def criar_modelo():
 
 @analises_pc_bp.route('/api/arquivos-disponiveis', methods=['GET'])
 def listar_arquivos_disponiveis():
-    """Lista arquivos disponíveis na pasta modelos/"""
+    """Lista arquivos disponíveis na pasta modelos/ (ou Supabase)"""
     if session.get('tipo_usuario') != 'Agente Público':
         return jsonify({'error': 'Acesso negado'}), 403
     
-    import os
-    modelos_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'modelos')
-    
     try:
-        arquivos = []
-        for arquivo in os.listdir(modelos_dir):
-            if arquivo.endswith(('.pdf', '.xlsx', '.xls', '.docx', '.doc')):
-                arquivos.append(arquivo)
-        
-        return jsonify({'arquivos': sorted(arquivos)})
-    
+        arquivos = storage.list_files('Modelos')
+        arquivos_filtrados = [f for f in arquivos if f.endswith(('.pdf', '.xlsx', '.xls', '.docx', '.doc'))]
+        return jsonify({'arquivos': sorted(arquivos_filtrados)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -12,6 +12,7 @@ import os
 from datetime import datetime, date
 from PyPDF2 import PdfMerger
 import io
+import utils_storage as storage
 
 certidoes_bp = Blueprint('certidoes', __name__, url_prefix='/certidoes')
 
@@ -49,204 +50,53 @@ def index():
         current_app.logger.info(f"📋 Carregando sem filtro de data")
     
     t1 = time.time()
-    
-    t1 = time.time()
-    # Listar todas as pastas de OSCs
-    oscs_com_pastas = []
-    
-    if os.path.exists(UPLOAD_FOLDER):
-        pastas = os.listdir(UPLOAD_FOLDER)
-        
-        # Buscar todos os CNPJs de uma vez para otimizar
-        cur.execute("""
-            SELECT DISTINCT 
-                LOWER(SUBSTRING(osc FROM 1 FOR 50)) as osc_inicio,
-                osc as osc_completo,
-                cnpj
-            FROM public.parcerias
-        """)
-        
-        oscs_banco = cur.fetchall()
-        # Criar mapa de busca
-        mapa_cnpj = {}
-        for row in oscs_banco:
-            # Remover acentos e caracteres especiais para indexar
-            chave = row['osc_completo'].lower()
-            chave_limpa = chave.replace('á', 'a').replace('à', 'a').replace('ã', 'a').replace('â', 'a')\
-                              .replace('é', 'e').replace('è', 'e').replace('ê', 'e')\
-                              .replace('í', 'i').replace('ì', 'i').replace('î', 'i')\
-                              .replace('ó', 'o').replace('ò', 'o').replace('õ', 'o').replace('ô', 'o')\
-                              .replace('ú', 'u').replace('ù', 'u').replace('û', 'u')\
-                              .replace('ç', 'c')\
-                              .replace('-', ' ').replace(':', ' ').replace('.', ' ')
-            
-            # Indexar por várias versões
-            mapa_cnpj[chave_limpa] = row['cnpj']
-            mapa_cnpj[chave_limpa.replace(' ', '')] = row['cnpj']  # Sem espaços
-        
-        for pasta in pastas:
-            caminho_completo = os.path.join(UPLOAD_FOLDER, pasta)
-            
-            # Verificar se é um diretório
-            if os.path.isdir(caminho_completo):
-                # Converter nome da pasta para nome legível
-                nome_osc = pasta.replace('_', ' ')
-                
-                # Aplicar filtro de busca se houver
-                if not filtro_busca or filtro_busca in nome_osc.lower():
-                    # Contar quantos arquivos tem na pasta
-                    try:
-                        arquivos = [f for f in os.listdir(caminho_completo) if os.path.isfile(os.path.join(caminho_completo, f))]
-                        total_certidoes = len(arquivos)
-                    except:
-                        total_certidoes = 0
-                    
-                    # Buscar CNPJ no mapa
-                    cnpj = 'N/A'
-                    
-                    # Tentar várias versões do nome
-                    nome_busca = nome_osc.lower()
-                    nome_busca_limpo = nome_busca.replace(' ', '')
-                    
-                    # Procurar no mapa
-                    if nome_busca in mapa_cnpj:
-                        cnpj = mapa_cnpj[nome_busca]
-                    elif nome_busca_limpo in mapa_cnpj:
-                        cnpj = mapa_cnpj[nome_busca_limpo]
-                    else:
-                        # Tentar busca parcial pelas primeiras palavras
-                        palavras = nome_busca.split()[:3]  # Primeiras 3 palavras
-                        for chave, valor_cnpj in mapa_cnpj.items():
-                            if all(palavra in chave for palavra in palavras):
-                                cnpj = valor_cnpj
-                                break
-                    
-                    oscs_com_pastas.append({
-                        'nome_pasta': pasta,
-                        'nome_exibicao': nome_osc,
-                        'cnpj': cnpj,
-                        'total_certidoes': total_certidoes
-                    })
-    
-    print(f"⏱️ [PERF] Listar pastas: {(time.time() - t1)*1000:.0f}ms ({len(oscs_com_pastas)} OSCs)")
-    
-    # ========================================
-    # OTIMIZAÇÃO: Bulk Queries
-    # ========================================
-    
-    t2 = time.time()
-    # Criar mapa de nomes de pastas para OSCs do banco
-    nomes_busca = [osc['nome_exibicao'].lower() for osc in oscs_com_pastas]
-    
-    # Query 1: Buscar todas as OSCs do banco de uma vez usando unaccent
+    # Carregar OSCs com certidões direto do banco — zero chamadas ao Storage
+    hoje = date.today()
     cur.execute("""
-        SELECT DISTINCT 
-            osc,
-            unaccent(LOWER(osc)) as osc_normalized
-        FROM public.parcerias
+        SELECT
+            c.osc,
+            COALESCE(MAX(p.cnpj), 'N/A')                                          AS cnpj,
+            COUNT(c.id)::int                                                       AS total_certidoes,
+            COUNT(c.id) FILTER (WHERE c.certidao_vencimento >= CURRENT_DATE)::int AS em_dia,
+            COUNT(c.id) FILTER (WHERE c.certidao_vencimento < CURRENT_DATE)::int  AS atrasadas
+        FROM public.certidoes c
+        LEFT JOIN public.parcerias p ON p.osc = c.osc
+        GROUP BY c.osc
+        ORDER BY c.osc
     """)
-    
-    todas_oscs_banco = cur.fetchall()
-    
-    # Criar mapa: nome_normalizado -> nome_real
-    mapa_oscs = {}
-    for row in todas_oscs_banco:
-        mapa_oscs[row['osc_normalized']] = row['osc']
-    
-    # Associar cada pasta com seu nome real no banco
-    oscs_nomes_reais = []
-    for osc_data in oscs_com_pastas:
-        nome_busca = osc_data['nome_exibicao'].lower()
-        palavras = nome_busca.split()
-        
-        # Tentar match por unaccent
-        nome_real = None
-        
-        # Tentar do nome mais completo para o menor (evita match ambíguo)
-        # Estratégia: reduzir palavras gradualmente até encontrar correspondência única
-        max_palavras = len(palavras)
-        for n in range(max_palavras, 2, -1):
-            busca_n = ' '.join(palavras[:n])
-            candidatos = [(norm, real) for norm, real in mapa_oscs.items() if busca_n in norm]
-            if len(candidatos) == 1:
-                nome_real = candidatos[0][1]
-                break
-            elif len(candidatos) > 1:
-                # Múltiplos candidatos: favorece o que tem maior sobreposição
-                melhor = max(candidatos, key=lambda x: len(x[0]))
-                nome_real = melhor[1]
-                break
-        
-        # Fallback: nome completo
-        if not nome_real:
-            for norm, real in mapa_oscs.items():
-                if nome_busca in norm or norm.startswith(nome_busca):
-                    nome_real = real
-                    break
-        
-        # Fallback final: primeira palavra
-        if not nome_real and palavras:
-            candidatos = [(norm, real) for norm, real in mapa_oscs.items() if norm.startswith(palavras[0])]
-            if candidatos:
-                nome_real = candidatos[0][1]
+    oscs_db = cur.fetchall()
 
-        # Tentativa final: comparar pelo nome que secure_filename geraria
-        # Isso cobre OSCs com caracteres especiais como @ que unaccent não trata
-        if not nome_real:
-            pasta_lower = osc_data['nome_pasta'].lower()
-            for row in todas_oscs_banco:
-                computed = secure_filename(row['osc'].replace(' ', '_')).lower()
-                if computed == pasta_lower:
-                    nome_real = row['osc']
-                    break
+    oscs_com_pastas   = []
+    oscs_nomes_reais  = []
+    certidoes_por_osc = {}
 
-        if nome_real:
-            oscs_nomes_reais.append(nome_real)
-            osc_data['osc_nome_banco'] = nome_real
-        else:
-            osc_data['osc_nome_banco'] = None
-    
-    print(f"⏱️ [PERF] Mapear OSCs: {(time.time() - t2)*1000:.0f}ms")
-    
-    # Query 2: Buscar TODAS as certidões de uma vez
-    t3 = time.time()
-    if oscs_nomes_reais:
-        placeholders = ','.join(['%s'] * len(oscs_nomes_reais))
-        cur.execute(f"""
-            SELECT 
-                osc,
-                certidao_nome,
-                certidao_vencimento
-            FROM public.certidoes
-            WHERE osc IN ({placeholders})
-        """, oscs_nomes_reais)
-        
-        todas_certidoes = cur.fetchall()
-        
-        # Agrupar certidões por OSC
-        certidoes_por_osc = {}
-        hoje = date.today()
-        
-        for cert in todas_certidoes:
-            osc_nome = cert['osc']
-            if osc_nome not in certidoes_por_osc:
-                certidoes_por_osc[osc_nome] = {'em_dia': 0, 'atrasadas': 0, 'total': 0}
-            
-            certidoes_por_osc[osc_nome]['total'] += 1
-            if cert['certidao_vencimento'] >= hoje:
-                certidoes_por_osc[osc_nome]['em_dia'] += 1
-            else:
-                certidoes_por_osc[osc_nome]['atrasadas'] += 1
-        
-        print(f"⏱️ [PERF] Buscar certidões (bulk): {(time.time() - t3)*1000:.0f}ms ({len(todas_certidoes)} certidões)")
-    else:
-        certidoes_por_osc = {}
-    
-    # Query 3: Buscar TODAS as parcelas pendentes de uma vez
+    for row in oscs_db:
+        osc_nome = row['osc']
+        if filtro_busca and filtro_busca not in osc_nome.lower():
+            continue
+        pasta = secure_filename(osc_nome.replace(' ', '_'))
+        oscs_com_pastas.append({
+            'nome_pasta':     pasta,
+            'nome_exibicao':  osc_nome,
+            'osc_nome_banco': osc_nome,
+            'cnpj':           row['cnpj'] or 'N/A',
+            'total_certidoes': row['total_certidoes'],
+        })
+        oscs_nomes_reais.append(osc_nome)
+        certidoes_por_osc[osc_nome] = {
+            'em_dia':    row['em_dia'],
+            'atrasadas': row['atrasadas'],
+            'total':     row['total_certidoes'],
+        }
+
+    print(f"⏱️ [PERF] Listar OSCs (DB): {(time.time() - t1)*1000:.0f}ms ({len(oscs_com_pastas)} OSCs)")
+
+    # Query 2: Buscar TODAS as parcelas pendentes de uma vez
     t4 = time.time()
     parcelas_por_osc = {}
     
     if oscs_nomes_reais:
+        placeholders = ','.join(['%s'] * len(oscs_nomes_reais))
         if filtro_data_parcela:
             # Filtro específico por data
             data_ref = datetime.strptime(filtro_data_parcela, '%Y-%m-%d').date()
@@ -827,19 +677,14 @@ def upload_certidao_individual():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         nome_arquivo = f"{certidao_nome_resumido}_{timestamp}_{nome_arquivo_original}"
         
-        # Criar pasta da OSC se não existir
+        # Caminho relativo para salvar no banco (barras normais para compatibilidade)
         nome_pasta_osc = secure_filename(osc.replace(' ', '_'))
-        caminho_pasta_osc = os.path.join(UPLOAD_FOLDER, nome_pasta_osc)
+        caminho_relativo = f"{nome_pasta_osc}/{nome_arquivo}"
         
-        if not os.path.exists(caminho_pasta_osc):
-            os.makedirs(caminho_pasta_osc)
-        
-        # Salvar arquivo
-        caminho_completo = os.path.join(caminho_pasta_osc, nome_arquivo)
-        arquivo.save(caminho_completo)
-        
-        # Caminho relativo para salvar no banco
-        caminho_relativo = os.path.join(nome_pasta_osc, nome_arquivo)
+        # Ler bytes e enviar ao storage (local ou Supabase conforme USE_SUPABASE_STORAGE)
+        arquivo.seek(0)
+        file_bytes = arquivo.read()
+        storage.upload_file(f"Certidoes/{caminho_relativo}", file_bytes, 'application/pdf')
         
         # Obter usuário logado
         usuario = session.get('email', 'Sistema')
@@ -863,11 +708,9 @@ def upload_certidao_individual():
             
             # Deletar arquivo antigo
             if cert_existente['certidao_path']:
-                caminho_antigo = os.path.join(UPLOAD_FOLDER, cert_existente['certidao_path'])
                 try:
-                    if os.path.exists(caminho_antigo):
-                        os.remove(caminho_antigo)
-                        print(f"[INFO] Arquivo antigo deletado: {caminho_antigo}")
+                    storage.delete_file(f"Certidoes/{cert_existente['certidao_path']}")
+                    print(f"[INFO] Arquivo antigo deletado: {cert_existente['certidao_path']}")
                 except Exception as e:
                     print(f"[AVISO] Erro ao deletar arquivo antigo: {e}")
             
@@ -1347,20 +1190,19 @@ def juntar_pdfs(nome_pasta):
         
         # Se não encontrou no banco, usar arquivos físicos
         if len(certidoes) == 0:
-            print(f"[DEBUG PDF] Nenhuma certidão no banco. Usando arquivos físicos da pasta...")
-            pasta_fisica = os.path.join(UPLOAD_FOLDER, nome_pasta)
-            arquivos_pdf = sorted([f for f in os.listdir(pasta_fisica) if f.lower().endswith('.pdf')])
+            print(f"[DEBUG PDF] Nenhuma certidão no banco. Usando arquivos do storage...")
+            arquivos_pdf = sorted([f for f in storage.list_files(f'Certidoes/{nome_pasta}') if f.lower().endswith('.pdf')])
             
             certidoes = []
             for arquivo in arquivos_pdf:
                 certidoes.append({
                     'certidao_nome': arquivo.replace('.pdf', '').replace('_', ' '),
-                    'certidao_path': os.path.join(nome_pasta, arquivo),
+                    'certidao_path': f'{nome_pasta}/{arquivo}',
                     'certidao_vencimento': None,  # Sem validação de vencimento
                     'certidao_status': 'física'
                 })
             
-            print(f"[DEBUG PDF] Arquivos físicos carregados: {len(certidoes)} - {[c['certidao_nome'] for c in certidoes]}")
+            print(f"[DEBUG PDF] Arquivos do storage carregados: {len(certidoes)} - {[c['certidao_nome'] for c in certidoes]}")
         else:
             print(f"[DEBUG PDF] Certidões encontradas no banco: {len(certidoes)} - {[c['certidao_nome'] for c in certidoes]}")
         
@@ -1390,16 +1232,16 @@ def juntar_pdfs(nome_pasta):
         merger = PdfMerger()
         
         for cert in certidoes:
-            caminho_completo = os.path.join(UPLOAD_FOLDER, cert['certidao_path'])
-            
-            if not os.path.exists(caminho_completo):
+            try:
+                cert_bytes = storage.download_file(f"Certidoes/{cert['certidao_path']}")
+            except FileNotFoundError:
                 return jsonify({
                     'success': False,
                     'erro': f'Arquivo não encontrado: {cert["certidao_nome"]}'
                 }), 404
             
             try:
-                merger.append(caminho_completo)
+                merger.append(io.BytesIO(cert_bytes))
             except Exception as e:
                 return jsonify({
                     'success': False,
@@ -1469,11 +1311,12 @@ def juntar_pdfs_selecionados():
 
         merger = PdfMerger()
         for cert in certidoes:
-            caminho_completo = os.path.join(UPLOAD_FOLDER, cert['certidao_path'])
-            if not os.path.exists(caminho_completo):
+            try:
+                cert_bytes = storage.download_file(f"Certidoes/{cert['certidao_path']}")
+            except FileNotFoundError:
                 return jsonify({'success': False, 'erro': f'Arquivo não encontrado: {cert["certidao_nome"]}'}), 404
             try:
-                merger.append(caminho_completo)
+                merger.append(io.BytesIO(cert_bytes))
             except Exception as e:
                 return jsonify({'success': False, 'erro': f'Erro ao processar {cert["certidao_nome"]}: {str(e)}'}), 400
 
@@ -1535,16 +1378,17 @@ def download_certidao(certidao_id):
             flash('Certidão não encontrada', 'error')
             return redirect(url_for('certidoes.index'))
         
-        caminho_completo = os.path.join(UPLOAD_FOLDER, certidao['certidao_path'])
-        
-        if not os.path.exists(caminho_completo):
+        try:
+            file_bytes = storage.download_file(f"Certidoes/{certidao['certidao_path']}")
+        except FileNotFoundError:
             flash('Arquivo não encontrado no servidor', 'error')
             return redirect(url_for('certidoes.index'))
         
         return send_file(
-            caminho_completo,
+            io.BytesIO(file_bytes),
             as_attachment=True,
-            download_name=certidao['certidao_arquivo_nome']
+            download_name=certidao['certidao_arquivo_nome'],
+            mimetype='application/pdf'
         )
         
     except Exception as e:

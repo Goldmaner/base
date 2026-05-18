@@ -47,7 +47,6 @@ from routes.gestao_pessoas import gestao_pessoas_bp
 from routes.manuais import manuais_bp
 from routes.admin import admin_bp
 from routes.datas_importantes import datas_importantes_bp
-from routes.email_assistente import email_assistente_bp
 from routes.relatos import relatos_bp
 
 
@@ -294,7 +293,6 @@ def create_app():
     app.register_blueprint(manuais_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(datas_importantes_bp)
-    app.register_blueprint(email_assistente_bp)
     app.register_blueprint(relatos_bp)
     
     # ========================================================================

@@ -45,3 +45,9 @@ MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', os.environ.get('MAIL
 SOF_API_USERNAME = os.environ.get('SOF_API_USERNAME', '')
 SOF_API_PASSWORD = os.environ.get('SOF_API_PASSWORD', '')
 SOF_AUTH_BASE64 = os.environ.get('SOF_AUTH_BASE64', '')
+
+# Supabase Storage
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY', '')
+# True = usa Supabase Storage; False = usa disco local (comportamento original)
+USE_SUPABASE_STORAGE = os.environ.get('USE_SUPABASE_STORAGE', 'False').upper() == 'TRUE'
