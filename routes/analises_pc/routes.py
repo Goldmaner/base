@@ -7,7 +7,7 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.extras import execute_values
 import traceback
-import audit_log  # Módulo de auditoria
+import core.audit_log as audit_log  # Módulo de auditoria
 import os
 from werkzeug.utils import secure_filename
 import re

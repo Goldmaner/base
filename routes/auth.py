@@ -11,7 +11,7 @@ from decorators import get_module_access_status
 import secrets
 import random
 from datetime import datetime, timedelta
-from email_utils import enviar_email, gerar_email_reset_senha
+from core.email_utils import enviar_email, gerar_email_reset_senha
 
 auth_bp = Blueprint('auth', __name__)
 
