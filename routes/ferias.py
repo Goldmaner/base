@@ -504,6 +504,94 @@ def calendario():
         except Exception as e_di:
             print(f'[ferias] Erro ao carregar datas_importantes: {e_di}')
 
+        # Buscar escala de teletrabalho do ano
+        escala_teletrabalho = []
+        try:
+            if eh_admin_ou_publico:
+                cur.execute("""
+                    SELECT et.usuario_email, et.data_teletrabalho,
+                           COALESCE(ui.usuario_nome, et.usuario_email) AS usuario_nome,
+                           u.d_usuario, u.tipo_usuario
+                    FROM calendario.escala_teletrabalho et
+                    JOIN gestao_pessoas.usuarios u ON u.email = et.usuario_email
+                    LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = et.usuario_email
+                    WHERE et.data_teletrabalho IS NOT NULL
+                      AND EXTRACT(YEAR FROM et.data_teletrabalho) = %s
+                    ORDER BY et.data_teletrabalho
+                """, (ano_filtro,))
+            else:
+                cur.execute("""
+                    SELECT et.usuario_email, et.data_teletrabalho,
+                           COALESCE(ui.usuario_nome, et.usuario_email) AS usuario_nome,
+                           u.d_usuario, u.tipo_usuario
+                    FROM calendario.escala_teletrabalho et
+                    JOIN gestao_pessoas.usuarios u ON u.email = et.usuario_email
+                    LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = et.usuario_email
+                    WHERE et.data_teletrabalho IS NOT NULL
+                      AND EXTRACT(YEAR FROM et.data_teletrabalho) = %s
+                      AND u.tipo_usuario = %s
+                    ORDER BY et.data_teletrabalho
+                """, (ano_filtro, tipo_usuario_logado))
+
+            for r in cur.fetchall():
+                escala_teletrabalho.append({
+                    'usuario_email': r['usuario_email'],
+                    'data_teletrabalho': r['data_teletrabalho'].isoformat() if r['data_teletrabalho'] else None,
+                    'usuario_nome': r['usuario_nome'],
+                    'd_usuario': r['d_usuario'],
+                })
+        except Exception as e_tt:
+            print(f'[ferias] Erro ao carregar escala_teletrabalho: {e_tt}')
+
+        # Buscar eventos institucionais (datas_eventos)
+        datas_eventos_cal = []
+        try:
+            cur.execute("""
+                SELECT de.id, de.nome_atividade, de.descritivo, de.data_inicio,
+                       de.datas_adicionais, de.participacao, de.local, de.observacoes,
+                       de.cancelado,
+                       COALESCE(ui.usuario_nome, de.usuario_email) AS usuario_nome
+                FROM calendario.datas_eventos de
+                LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = de.usuario_email
+                WHERE de.cancelado IS NOT TRUE
+                  AND de.data_inicio IS NOT NULL
+                  AND EXTRACT(YEAR FROM de.data_inicio) = %s
+                ORDER BY de.data_inicio
+            """, (ano_filtro,))
+            for r in cur.fetchall():
+                datas_eventos_cal.append({
+                    'id': r['id'],
+                    'nome_atividade': r['nome_atividade'],
+                    'descritivo': r['descritivo'],
+                    'data_inicio': r['data_inicio'].isoformat() if r['data_inicio'] else None,
+                    'datas_adicionais': r['datas_adicionais'],
+                    'participacao': r['participacao'],
+                    'local': r['local'],
+                    'observacoes': r['observacoes'],
+                    'usuario_nome': r['usuario_nome'],
+                })
+        except Exception as e_ev:
+            print(f'[ferias] Erro ao carregar datas_eventos: {e_ev}')
+
+        # Buscar feriados do ano
+        feriados = []
+        try:
+            cur.execute("""
+                SELECT data_feriado, nome_feriado, tipo_feriado
+                FROM calendario.data_feriados
+                WHERE ativo = TRUE
+                  AND EXTRACT(YEAR FROM data_feriado) = %s
+                ORDER BY data_feriado
+            """, (ano_filtro,))
+            for r in cur.fetchall():
+                feriados.append({
+                    'data_feriado': r['data_feriado'].isoformat() if r['data_feriado'] else None,
+                    'nome_feriado': r['nome_feriado'],
+                    'tipo_feriado': r['tipo_feriado'],
+                })
+        except Exception as e_fer:
+            print(f'[ferias] Erro ao carregar feriados: {e_fer}')
+
         cur.close()
         
         # Converter para formato JSON para o calendário
@@ -525,7 +613,10 @@ def calendario():
             ano_atual=ano_filtro,
             anos_disponiveis=anos_disponiveis,
             aniversarios=aniversarios,
-            datas_importantes=datas_importantes
+            datas_importantes=datas_importantes,
+            escala_teletrabalho=escala_teletrabalho,
+            datas_eventos_cal=datas_eventos_cal,
+            feriados=feriados,
         )
         
     except Exception as e:

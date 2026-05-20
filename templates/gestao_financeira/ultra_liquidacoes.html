@@ -372,6 +372,7 @@
         <label><input type="checkbox" id="chk_projeto" onchange="atualizarColunas()"> Projeto</label>
         <label><input type="checkbox" id="chk_sei_celeb" onchange="atualizarColunas()"> Processo Celebração</label>
         <label><input type="checkbox" id="chk_sei_pc" onchange="atualizarColunas()"> Processo PGTO/PC</label>
+        <label><input type="checkbox" id="chk_objeto" onchange="atualizarColunas()"> Objeto</label>
     </div>
     
     <!-- Filtros Colapsáveis -->
@@ -574,6 +575,7 @@
                     <th class="col-projeto" style="display: none;">Projeto</th>
                     <th class="col-sei-celeb" style="display: none;">Proc. Celeb.</th>
                     <th class="col-sei-pc" style="display: none;">Proc. PGTO/PC</th>
+                    <th class="col-objeto" style="display: none;">Objeto</th>
                     <th>Ações</th>
                 </tr>
             </thead>
@@ -1549,6 +1551,7 @@
         const mostrarProjeto = document.getElementById('chk_projeto').checked;
         const mostrarSeiCeleb = document.getElementById('chk_sei_celeb').checked;
         const mostrarSeiPc = document.getElementById('chk_sei_pc').checked;
+        const mostrarObjeto = document.getElementById('chk_objeto').checked;
         
         document.querySelectorAll('.col-status-sec').forEach(el => {
             el.style.display = mostrarStatusSec ? '' : 'none';
@@ -1578,6 +1581,9 @@
         document.querySelectorAll('.col-sei-pc').forEach(el => {
             el.style.display = mostrarSeiPc ? '' : 'none';
         });
+        document.querySelectorAll('.col-objeto').forEach(el => {
+            el.style.display = mostrarObjeto ? '' : 'none';
+        });
         
         salvarFiltros(); // ⚡ NOVO: Salvar estado das colunas
         carregarDados();
@@ -1603,6 +1609,7 @@
             mostrar_projeto: document.getElementById('chk_projeto').checked,
             mostrar_sei_celeb: document.getElementById('chk_sei_celeb').checked,
             mostrar_sei_pc: document.getElementById('chk_sei_pc').checked,
+            mostrar_objeto: document.getElementById('chk_objeto').checked,
             numero_termo: $('#filtro_numero_termo').val() || '',
             parcela_tipo: $('#filtro_parcela_tipo').val() || '',
             parcela_numero: $('#filtro_parcela_numero').val() || '',
@@ -1958,6 +1965,9 @@
             }
             if (parcela.sei_pc !== null && parcela.sei_pc !== undefined) {
                 tr.append($('<td>').addClass('col-sei-pc').css('display', document.getElementById('chk_sei_pc').checked ? '' : 'none').text(parcela.sei_pc));
+            }
+            if (parcela.parcela_objeto !== null && parcela.parcela_objeto !== undefined) {
+                tr.append($('<td>').addClass('col-objeto').css('display', document.getElementById('chk_objeto').checked ? '' : 'none').text(parcela.parcela_objeto));
             }
             
             // Ações
@@ -6774,6 +6784,7 @@
             chk_projeto: $('#chk_projeto').is(':checked'),
             chk_sei_celeb: $('#chk_sei_celeb').is(':checked'),
             chk_sei_pc: $('#chk_sei_pc').is(':checked'),
+            chk_objeto: $('#chk_objeto').is(':checked'),
             
             // Seção ativa
             secao: secaoAtual
@@ -6827,6 +6838,7 @@
             $('#chk_projeto').prop('checked', filtros.chk_projeto || false);
             $('#chk_sei_celeb').prop('checked', filtros.chk_sei_celeb || false);
             $('#chk_sei_pc').prop('checked', filtros.chk_sei_pc || false);
+            $('#chk_objeto').prop('checked', filtros.chk_objeto || false);
             
             // Aplicar visibilidade das colunas
             document.querySelectorAll('.col-status-sec').forEach(el => {
@@ -6852,6 +6864,9 @@
             });
             document.querySelectorAll('.col-sei-pc').forEach(el => {
                 el.style.display = filtros.chk_sei_pc ? '' : 'none';
+            });
+            document.querySelectorAll('.col-objeto').forEach(el => {
+                el.style.display = filtros.chk_objeto ? '' : 'none';
             });
             
             // Restaurar seção ativa

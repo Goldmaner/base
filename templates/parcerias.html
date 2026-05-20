@@ -400,6 +400,12 @@
           Dotação Orçamentária
         </label>
       </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="chk_objeto" onchange="toggleColunaObjeto()">
+        <label class="form-check-label" for="chk_objeto">
+          Objeto
+        </label>
+      </div>
     </div>
 
     <!-- Tabela de Parcerias -->
@@ -439,6 +445,7 @@
               <th class="text-center col-endereco" style="display: none;">Endereço</th>
               <th class="text-center col-edital" style="display: none;">Edital</th>
               <th class="text-center col-dotacao" style="display: none;">Dotação Orçamentária</th>
+              <th class="text-center col-objeto" style="display: none;">Objeto</th>
               <th class="text-center">Ações</th>
             </tr>
           </thead>
@@ -500,6 +507,7 @@
                     <span class="text-muted">-</span>
                   {% endif %}
                 </td>
+                <td class="col-objeto" style="display: none;">{{ parceria.parceria_objeto or '-' }}</td>
                 <td class="text-center">
                   <a class="btn btn-sm" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:6px;" href="{{ url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
                     <i class="bi bi-pencil"></i> Modificar
@@ -611,6 +619,15 @@
       });
       salvarPreferencias();
     }
+
+    // Toggle da coluna de objeto
+    function toggleColunaObjeto() {
+      const mostrar = document.getElementById('chk_objeto').checked;
+      document.querySelectorAll('.col-objeto').forEach(col => {
+        col.style.display = mostrar ? '' : 'none';
+      });
+      salvarPreferencias();
+    }
     
     // Salvar preferências no localStorage
     function salvarPreferencias() {
@@ -618,6 +635,7 @@
         chk_endereco: document.getElementById('chk_endereco').checked,
         chk_edital: document.getElementById('chk_edital').checked,
         chk_dotacao: document.getElementById('chk_dotacao').checked,
+        chk_objeto: document.getElementById('chk_objeto').checked,
         filtro_endereco_preenchido: document.getElementById('endereco_preenchido').checked,
         filtro_endereco_nao_preenchido: document.getElementById('endereco_nao_preenchido').checked
       };
@@ -647,6 +665,12 @@
           if (prefs.chk_dotacao) {
             document.getElementById('chk_dotacao').checked = true;
             toggleColunaDotacao();
+          }
+
+          // Restaurar checkbox de objeto
+          if (prefs.chk_objeto) {
+            document.getElementById('chk_objeto').checked = true;
+            toggleColunaObjeto();
           }
           
           // Restaurar filtros de endereço (apenas se não vieram da URL)
@@ -725,6 +749,12 @@
       const incluirDotacao = document.getElementById('chk_dotacao').checked;
       if (incluirDotacao) {
         params.set('incluir_dotacao', 'true');
+      }
+
+      // Adicionar parâmetro de objeto se checkbox estiver marcado
+      const incluirObjeto = document.getElementById('chk_objeto').checked;
+      if (incluirObjeto) {
+        params.set('incluir_objeto', 'true');
       }
       
       const exportUrl = '{{ url_for("parcerias.exportar_csv") }}' + '?' + params.toString();

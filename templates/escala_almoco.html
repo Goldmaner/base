@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escala de Almoço - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f4f3f8; padding: 20px; }
+
+    .page-header {
+      background: linear-gradient(135deg, #065f46 0%, #059669 100%);
+      color: #fff;
+      padding: 22px 28px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 18px rgba(5, 150, 105, .28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+    .btn-parc {
+      background: linear-gradient(135deg, #065f46, #059669);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600; transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; cursor: pointer; font-size: .875rem;
+    }
+    .btn-parc:hover { opacity: .88; color: #fff; }
+    .btn-parc.outline {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+    }
+    .btn-parc.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+    .btn-parc.blue { background: linear-gradient(135deg, #0369a1, #0ea5e9); }
+    .btn-parc.danger { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
+
+    .content-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .content-card-header {
+      background: linear-gradient(135deg, #065f46, #059669);
+      color: #fff; padding: 14px 20px;
+      display: flex; justify-content: space-between;
+      align-items: center; flex-wrap: wrap; gap: 8px;
+    }
+    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+    .content-card-body { padding: 0; overflow-x: auto; }
+
+    /* Tabela */
+    .almoco-table { width: 100%; border-collapse: collapse; }
+    .almoco-table thead th {
+      background: linear-gradient(135deg, #065f46, #059669);
+      color: #fff; padding: 10px 14px; font-size: .85rem;
+      white-space: nowrap; text-align: left;
+    }
+    .almoco-table tbody tr:hover { background-color: #f0fdf4; }
+    .almoco-table tbody td {
+      padding: 10px 14px; border-bottom: 1px solid #e5e7eb;
+      vertical-align: middle;
+    }
+
+    /* Separador de departamento */
+    .dep-row td {
+      background: #d1fae5 !important;
+      color: #065f46; font-weight: 700; font-size: .78rem;
+      text-transform: uppercase; letter-spacing: .06em;
+      padding: 6px 14px;
+    }
+
+    /* Modal */
+    .modal .modal-header {
+      background: linear-gradient(135deg, #065f46, #059669); color: #fff;
+    }
+    .modal .modal-header .btn-close { filter: invert(1); }
+
+    /* Readonly banner */
+    .readonly-banner {
+      background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px;
+      padding: 10px 16px; margin-bottom: 16px; font-size: .875rem; color: #78350f;
+    }
+
+    /* Badge horário */
+    .badge-horario {
+      background: #d1fae5; color: #065f46;
+      border: 1px solid #6ee7b7;
+      font-size: .82rem; padding: 4px 10px; border-radius: 20px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .sem-horario { color: #9ca3af; font-style: italic; font-size: .85rem; }
+
+    /* Estágio 4h */
+    .badge-estagio {
+      background: #fef3c7; color: #92400e;
+      border: 1px solid #fcd34d;
+      font-size: .82rem; padding: 4px 10px; border-radius: 20px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .campo-inativo { opacity: .45; pointer-events: none; background: #f9fafb !important; }
+
+    /* Abas de equipe */
+    .equipe-tabs { border-bottom: 2px solid #d1fae5; background: #f9fefb; }
+    .equipe-tabs .nav-link { color: #065f46; border-color: transparent; font-size: .88rem; padding: 8px 16px; }
+    .equipe-tabs .nav-link:hover { border-color: #a7f3d0 #a7f3d0 transparent; background: #ecfdf5; }
+    .equipe-tabs .nav-link.active {
+      color: #065f46; font-weight: 700;
+      border-color: #6ee7b7 #6ee7b7 #fff;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+
+  <!-- Cabeçalho -->
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2><i class="bi bi-egg-fried me-2"></i>Escala de Almoço</h2>
+        <p>Horário fixo de almoço por servidor — válido para todos os dias úteis</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('escalas.teletrabalho') }}" class="btn-parc outline blue"
+           style="background:linear-gradient(135deg,#0369a1,#0ea5e9);border:none;">
+          <i class="bi bi-laptop"></i> Escala de Teletrabalho
+        </a>
+        <a href="{{ url_for('ferias.calendario') }}" class="btn-parc outline">
+          <i class="bi bi-calendar3"></i> Calendário Geral
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message|safe }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if not pode_editar %}
+  <div class="readonly-banner">
+    <i class="bi bi-person-check me-2"></i>
+    Você pode editar apenas o <strong>seu próprio horário</strong>. Para editar os demais, é necessária permissão de gestor.
+  </div>
+  {% endif %}
+
+<!-- Tabela por equipe -->
+  <div class="content-card">
+    <div class="content-card-header">
+      <h5><i class="bi bi-clock me-2"></i>Horários por Servidor</h5>
+      <div class="d-flex gap-3 align-items-center flex-wrap">
+        <div class="form-check form-switch mb-0" style="color:#d1fae5">
+          <input class="form-check-input" type="checkbox" id="mostrarEstagio4h"
+                 onchange="toggleEstagio4h(this)">
+          <label class="form-check-label small" for="mostrarEstagio4h">
+            <i class="bi bi-mortarboard me-1"></i>Mostrar Estágio 4h
+          </label>
+        </div>
+        <small class="opacity-75 align-self-center">
+          {{ servidores|length }} servidor(es) no total
+        </small>
+      </div>
+    </div>
+
+    <!-- Nav-tabs de equipe -->
+    <ul class="nav nav-tabs equipe-tabs px-3 pt-2" id="equipeTabs" role="tablist">
+      {% set ns_btn = namespace(first=true) %}
+      {% for dep in equipes %}
+        {% if pode_ver_todas or dep == user_unidade %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link{% if ns_btn.first %} active{% endif %}"
+                  id="tab-btn-{{ loop.index }}"
+                  data-bs-toggle="tab"
+                  data-bs-target="#tab-equipe-{{ loop.index }}"
+                  type="button" role="tab"
+                  aria-controls="tab-equipe-{{ loop.index }}"
+                  aria-selected="{{ 'true' if ns_btn.first else 'false' }}">
+            <i class="bi bi-people me-1"></i>{{ dep }}
+            <span class="badge rounded-pill ms-1" style="background:#059669;color:#fff;font-size:.72rem;">
+              {{ servidores_por_equipe[dep]|length }}
+            </span>
+          </button>
+        </li>
+        {% set ns_btn.first = false %}
+        {% endif %}
+      {% endfor %}
+    </ul>
+
+    <!-- Conteúdo das abas -->
+    <div class="tab-content" id="equipeTabsContent">
+      {% set ns_pane = namespace(first=true) %}
+      {% for dep in equipes %}
+        {% if pode_ver_todas or dep == user_unidade %}
+        <div class="tab-pane fade{% if ns_pane.first %} show active{% endif %}"
+             id="tab-equipe-{{ loop.index }}"
+             role="tabpanel"
+             aria-labelledby="tab-btn-{{ loop.index }}">
+          <div class="content-card-body">
+            <table class="almoco-table">
+              <thead>
+                <tr>
+                  <th style="width:34%"><i class="bi bi-person me-1"></i>Servidor</th>
+                  <th style="width:22%"><i class="bi bi-clock me-1"></i>Horário de Almoço</th>
+                  <th>Observações</th>
+                  <th class="text-center" style="width:100px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for srv in servidores_por_equipe[dep] %}
+                <tr{% if srv.almoco_obs == 'Estágio 4h' %} class="row-estagio-4h"{% endif %}>
+                  <td>
+                    <strong>{{ srv.usuario_nome }}</strong>
+                    {% if srv.d_usuario %}
+                    <br><small class="text-muted"><code>{{ srv.d_usuario }}</code></small>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if srv.almoco_obs == 'Estágio 4h' %}
+                      <span class="badge-estagio">
+                        <i class="bi bi-mortarboard"></i>Estágio 4h
+                      </span>
+                    {% elif srv.horario_inicio and srv.horario_fim %}
+                      <span class="badge-horario">
+                        <i class="bi bi-clock"></i>
+                        {{ srv.horario_inicio.strftime('%H:%M') if srv.horario_inicio else srv.horario_inicio }}
+                        —
+                        {{ srv.horario_fim.strftime('%H:%M') if srv.horario_fim else srv.horario_fim }}
+                      </span>
+                    {% else %}
+                      <span class="sem-horario">Não definido</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <small class="text-muted">
+                      {% if srv.almoco_obs and srv.almoco_obs != 'Estágio 4h' %}
+                        {{ srv.almoco_obs }}
+                      {% else %}—{% endif %}
+                    </small>
+                  </td>
+                  {% if pode_editar or srv.email == current_user_email %}
+                  <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-outline-success me-1"
+                            onclick="abrirModal('{{ srv.email }}', '{{ srv.usuario_nome|replace("'", "\\'") }}',
+                                     '{{ srv.horario_inicio.strftime("%H:%M") if srv.horario_inicio else "" }}',
+                                     '{{ srv.horario_fim.strftime("%H:%M") if srv.horario_fim else "" }}',
+                                     '{{ (srv.almoco_obs or "")|replace("'", "\\'") }}')"
+                            title="Editar horário">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    {% if srv.horario_inicio or srv.almoco_obs %}
+                    <form method="POST"
+                          action="{{ url_for('escalas.almoco_remover', srv_email=srv.email) }}"
+                          id="formRemover-{{ srv.email|replace('@','--')|replace('.','_') }}"
+                          style="display:inline;">
+                      <button type="button" class="btn btn-sm btn-outline-danger" title="Remover"
+                              onclick="confirmarRemover('formRemover-{{ srv.email|replace('@','--')|replace('.','_') }}', '{{ srv.usuario_nome|replace("'", "\\'") }}')">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                    {% endif %}
+                  </td>
+                  {% else %}
+                  <td></td>
+                  {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted p-4">
+                    <i class="bi bi-people me-2"></i>Nenhum servidor nesta equipe.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% set ns_pane.first = false %}
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="text-muted" style="font-size:.82rem;">
+    <i class="bi bi-info-circle me-1"></i>
+    Os horários de almoço não aparecem no Calendário Geral — são exibidos apenas nesta página como referência da equipe.
+  </div>
+
+</div>
+
+<!-- Modal de confirmação de remoção -->
+<div class="modal fade" id="modalConfirmarRemover" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h6 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar remoção</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="modalConfirmarTexto">
+        Remover o horário de almoço?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btnConfirmarRemover">
+          <i class="bi bi-trash me-1"></i>Remover
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de edição -->
+<div class="modal fade" id="modalAlmoco" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-clock me-2"></i>Editar Horário de Almoço
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('escalas.almoco_salvar') }}">
+        <div class="modal-body">
+          <input type="hidden" name="usuario_email" id="modalEmail">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Servidor</label>
+            <input type="text" class="form-control bg-light" id="modalNome" readonly>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">Início do Almoço</label>
+              <input type="time" class="form-control" name="horario_inicio" id="modalInicio">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">Fim do Almoço</label>
+              <input type="time" class="form-control" name="horario_fim" id="modalFim">
+            </div>
+          </div>
+          <div class="mb-3 p-2 rounded" style="background:#fefce8;border:1px solid #fcd34d">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="chkEstagio4h"
+                     onchange="toggleEstagio4hModal(this)">
+              <label class="form-check-label fw-semibold" for="chkEstagio4h">
+                <i class="bi bi-mortarboard me-1"></i>Estágio 4h
+              </label>
+              <div class="text-muted" style="font-size:.78rem;margin-top:2px">
+                Oculta este servidor da escala de almoço e registra como estagiante de meio período
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Observações</label>
+            <input type="text" class="form-control" name="observacoes" id="modalObs"
+                   placeholder="Ex: retorna às 13h nos dias de reunião">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn-parc">
+            <i class="bi bi-check-circle me-1"></i>Salvar Horário
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function abrirModal(email, nome, inicio, fim, obs) {
+    document.getElementById('modalEmail').value  = email;
+    document.getElementById('modalNome').value   = nome;
+    document.getElementById('modalInicio').value = inicio;
+    document.getElementById('modalFim').value    = fim;
+    document.getElementById('modalObs').value    = obs;
+
+    const chk = document.getElementById('chkEstagio4h');
+    const isEstagio = (obs === 'Estágio 4h');
+    chk.checked = isEstagio;
+    const campos = ['modalInicio', 'modalFim', 'modalObs'];
+    campos.forEach(id => {
+      const el = document.getElementById(id);
+      isEstagio ? el.classList.add('campo-inativo') : el.classList.remove('campo-inativo');
+    });
+
+    new bootstrap.Modal(document.getElementById('modalAlmoco')).show();
+  }
+
+  function toggleEstagio4hModal(chk) {
+    const inicio = document.getElementById('modalInicio');
+    const fim    = document.getElementById('modalFim');
+    const obs    = document.getElementById('modalObs');
+    if (chk.checked) {
+      inicio.value = '';
+      fim.value    = '';
+      obs.value    = 'Estágio 4h';
+      [inicio, fim, obs].forEach(c => c.classList.add('campo-inativo'));
+    } else {
+      if (obs.value === 'Estágio 4h') obs.value = '';
+      [inicio, fim, obs].forEach(c => c.classList.remove('campo-inativo'));
+    }
+  }
+
+  function toggleEstagio4h(checkbox) {
+    document.querySelectorAll('tr.row-estagio-4h').forEach(row => {
+      row.style.display = checkbox.checked ? '' : 'none';
+    });
+  }
+
+  let _formRemoverPendente = null;
+  function confirmarRemover(formId, nome) {
+    _formRemoverPendente = document.getElementById(formId);
+    document.getElementById('modalConfirmarTexto').textContent =
+      `Remover o horário de almoço de ${nome}?`;
+    new bootstrap.Modal(document.getElementById('modalConfirmarRemover')).show();
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('btnConfirmarRemover').addEventListener('click', function() {
+      if (_formRemoverPendente) _formRemoverPendente.submit();
+    });
+    // Ocultar linhas de Estágio 4h por padrão
+    document.querySelectorAll('tr.row-estagio-4h').forEach(r => r.style.display = 'none');
+  });
+</script>
+</body>
+</html>

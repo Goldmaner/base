@@ -583,7 +583,7 @@
             <button class="btn btn-outline-danger me-2" onclick="limparTabela()">
                 <i class="bi bi-trash me-2"></i>Limpar
             </button>
-            <a href="/analises_pc" class="btn btn-outline-secondary me-2">
+            <a href="/analises_pc" id="btnVoltar" class="btn btn-outline-secondary me-2" onclick="voltarParaAnalises(event)">
                 <i class="bi bi-arrow-left me-2"></i>Voltar
             </a>
             <button class="btn btn-warning" id="btnAtualizarGuias" onclick="atualizarGuiasAutomaticamente()" style="display: none;" title="Atualizar Guias e preencher Competências automaticamente">
@@ -707,6 +707,21 @@
 
     <!-- Filtros Avançados -->
     <div class="conc-card" id="filtrosAvancados" style="display: none;">
+        <div class="row mb-3">
+            <div class="col-12">
+                <label for="filtroBuscaLivre" class="form-label"><strong><i class="bi bi-search me-1"></i>Busca livre — Categoria, Origem/Destino e Observações</strong></label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="filtroBuscaLivre"
+                        placeholder="Digite texto para buscar em qualquer coluna de texto (ex: Fulano, Pessoal, NF...)"
+                        oninput="agendarFiltroBusca()">
+                    <button class="btn btn-outline-secondary" type="button" onclick="limparBuscaLivre()" title="Limpar busca">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <small class="text-muted">Busca parcial e sem distinção de maiúsculas/minúsculas. Combinada com os filtros abaixo.</small>
+            </div>
+        </div>
         <div class="row g-3">
             <div class="col-md-2">
                 <label for="filtroData" class="form-label"><strong><i class="bi bi-funnel me-1"></i>Filtrar por Data (Mês/Ano)</strong></label>
@@ -1282,6 +1297,9 @@
     
     // Autosave no cache (localStorage)
     let autosaveTimer = null;
+    let bancoDirty = false; // dirty tracking para banco/conta
+    let linhasExcluidasIds = new Set(); // IDs de linhas excluídas não-persistidas no banco
+    let buscaLivreTimer = null; // debounce para busca livre
     
     // ============================================================
     // SISTEMA DE TOAST NOTIFICATIONS (NÃO INTRUSIVO)
@@ -1362,6 +1380,8 @@
             const select = document.getElementById(id);
             if (select) select.selectedIndex = -1;
         });
+        const inputBusca = document.getElementById('filtroBuscaLivre');
+        if (inputBusca) inputBusca.value = '';
         
         // Limpar filtros de mês
         mesesSelecionados = [];
@@ -1375,6 +1395,7 @@
         }
         
         console.log('[FILTROS] Todos os filtros foram limpos');
+        salvarPreferenciasTermo();
     }
     
     // ============================================================
@@ -1420,18 +1441,21 @@
         // Salvar estado no histórico (para Undo)
         salvarEstadoNoHistorico();
         
+        // Detectar grupo composto no ponto de inserção → herdar data/valor/competência
+        const _linhaRefInsercao = _detectarLinhaReferencia(index);
+        
         // Criar e inserir as novas linhas
         const novasLinhas = [];
         for (let i = 0; i < quantidade; i++) {
             const novaLinha = {
                 id: null,
                 indice: 0, // Será recalculado
-                data: '',
-                credito: null,
-                debito: null,
+                data:        _linhaRefInsercao ? _linhaRefInsercao.data        : '',
+                credito:     _linhaRefInsercao ? _linhaRefInsercao.credito     : null,
+                debito:      _linhaRefInsercao ? _linhaRefInsercao.debito      : null,
                 discriminacao: null,
                 cat_transacao: null,
-                competencia: null,
+                competencia: _linhaRefInsercao ? _linhaRefInsercao.competencia : null,
                 origem_destino: null,
                 cat_avaliacao: null,
                 avaliacao_analista: null,
@@ -1523,7 +1547,39 @@
         }
         console.log('Cache limpo');
     }
-    
+
+    // ============================================================
+    // PERSISTÊNCIA DE PREFERÊNCIAS DE VISUALIZAÇÃO POR TERMO
+    // Salva/restaura: modo, meses, filtros, painel, seções
+    // ============================================================
+    function salvarPreferenciasTermo() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) return;
+        const filtros = {};
+        ['filtroData','filtroCompetencia','filtroCategoria','filtroOrigemDestino','filtroAvaliacao','filtroObservacoes']
+            .forEach(id => {
+                const sel = document.getElementById(id);
+                filtros[id] = sel ? Array.from(sel.selectedOptions).map(o => o.value).filter(v => v) : [];
+            });
+        const prefs = {
+            modoVisualizacao,
+            mesesSelecionados: [...mesesSelecionados],
+            filtros,
+            buscaLivre: document.getElementById('filtroBuscaLivre')?.value || '',
+            filtrosVisiveis: document.getElementById('filtrosAvancados').style.display !== 'none',
+            secaoNotasFiscais: secaoNotasFiscaisAtiva,
+            secaoDocumentos: secaoDocumentosAtiva
+        };
+        try { localStorage.setItem(`prefs_conc_${numeroTermo}`, JSON.stringify(prefs)); } catch(e) {}
+    }
+
+    function obterPreferenciasTermo(numeroTermo) {
+        try {
+            const raw = localStorage.getItem(`prefs_conc_${numeroTermo}`);
+            return raw ? JSON.parse(raw) : null;
+        } catch(e) { return null; }
+    }
+
     function agendarAutosave() {
         atualizarBadgeEstado('pendente');
         // Cancelar timer anterior
@@ -1550,6 +1606,19 @@
             btn.classList.remove('btn-info');
             btn.classList.add('btn-outline-info');
         }
+        salvarPreferenciasTermo();
+    }
+
+    function agendarFiltroBusca() {
+        clearTimeout(buscaLivreTimer);
+        buscaLivreTimer = setTimeout(() => {
+            aplicarFiltros();
+        }, 300);
+    }
+
+    function limparBuscaLivre() {
+        document.getElementById('filtroBuscaLivre').value = '';
+        aplicarFiltros();
     }
     
     function toggleMenuSecoes() {
@@ -1584,6 +1653,7 @@
         
         // Re-renderizar tabela com skip de filtros (debounce)
         renderizarTabela(true);
+        salvarPreferenciasTermo();
     }
     
     async function toggleSecaoDocumentos() {
@@ -1609,6 +1679,7 @@
         
         // Re-renderizar tabela com skip de filtros (debounce)
         renderizarTabela(true);
+        salvarPreferenciasTermo();
     }
     
     function mostrarInfo(campo) {
@@ -1744,6 +1815,8 @@
                     if (this.value.trim()) {
                         destacarCampoObrigatorio(campoId, false);
                     }
+                    bancoDirty = true;
+                    agendarAutosave();
                 });
             }
         });
@@ -2035,19 +2108,60 @@
             popularCheckboxesMeses();
             performanceMetrics.end(timerMeses);
             
-            // Selecionar primeiro mês por padrão no modo páginas
-            if (modoVisualizacao === 'paginas' && mesesDisponiveis.length > 0) {
+            // Restaurar preferências do termo (modo, meses) ou usar padrão (primeiro mês)
+            const _prefs = obterPreferenciasTermo(numeroTermo);
+            if (_prefs) {
+                if (_prefs.modoVisualizacao) {
+                    modoVisualizacao = _prefs.modoVisualizacao;
+                    document.getElementById('selectModoVisualizacao').value = modoVisualizacao;
+                    document.getElementById('divNavegacaoMes').style.display = (modoVisualizacao === 'paginas') ? 'block' : 'none';
+                }
+                if (_prefs.mesesSelecionados && _prefs.mesesSelecionados.length > 0) {
+                    const validos = _prefs.mesesSelecionados.filter(m => mesesDisponiveis.includes(m));
+                    mesesSelecionados = validos.length > 0 ? validos : (mesesDisponiveis.length > 0 ? [mesesDisponiveis[0]] : []);
+                } else if (modoVisualizacao === 'paginas' && mesesDisponiveis.length > 0) {
+                    mesesSelecionados = [mesesDisponiveis[0]];
+                }
+            } else if (modoVisualizacao === 'paginas' && mesesDisponiveis.length > 0) {
                 mesesSelecionados = [mesesDisponiveis[0]];
-                document.getElementById('selectMesVisualizacao').value = mesesDisponiveis[0];
+            }
+            if (mesesSelecionados.length > 0) {
+                document.getElementById('selectMesVisualizacao').value = mesesSelecionados[0];
                 atualizarCheckboxesMeses();
             }
-            
+
             const timerRender = performanceMetrics.start('carregarExtrato - Renderizar tabela');
             renderizarTabela();
             performanceMetrics.end(timerRender);
             
             document.getElementById('btnSalvar').style.display = 'block';
-            
+
+            // Restaurar estado visual (painel de filtros, valores de filtros)
+            if (_prefs) {
+                if (_prefs.filtrosVisiveis) {
+                    document.getElementById('filtrosAvancados').style.display = 'block';
+                    const btnF = document.getElementById('btnToggleFiltros');
+                    btnF.classList.remove('btn-outline-info');
+                    btnF.classList.add('btn-info');
+                }
+                if (_prefs.filtros) {
+                    let temFiltro = false;
+                    Object.entries(_prefs.filtros).forEach(([id, vals]) => {
+                        if (!vals || vals.length === 0) return;
+                        const sel = document.getElementById(id);
+                        if (!sel) return;
+                        Array.from(sel.options).forEach(opt => { opt.selected = vals.includes(opt.value); });
+                        temFiltro = true;
+                    });
+                    if (_prefs.buscaLivre) {
+                        const inputBusca = document.getElementById('filtroBuscaLivre');
+                        if (inputBusca) inputBusca.value = _prefs.buscaLivre;
+                        temFiltro = true;
+                    }
+                    if (temFiltro) aplicarFiltros();
+                }
+            }
+
             // Se seção de Notas Fiscais está ativa, carregar os dados
             if (secaoNotasFiscaisAtiva) {
                 const timerNF = performanceMetrics.start('carregarExtrato - Carregar notas fiscais');
@@ -2107,10 +2221,12 @@
                 atualizarCheckboxesMeses();
             }
             renderizarTabela();
+            salvarPreferenciasTermo();
         } else {
             divNavegacao.style.display = 'none';
             mesesSelecionados = [];
             renderizarTabela();
+            salvarPreferenciasTermo();
         }
     }
     
@@ -2212,6 +2328,7 @@
         }
         
         renderizarTabela();
+        salvarPreferenciasTermo();
     }
     
     function atualizarCheckboxesMeses() {
@@ -2231,6 +2348,7 @@
             select.value = mesesSelecionados[0];
         }
         renderizarTabela();
+        salvarPreferenciasTermo();
     }
     
     function desmarcarTodosMeses() {
@@ -2238,6 +2356,7 @@
         atualizarCheckboxesMeses();
         document.getElementById('selectMesVisualizacao').value = '';
         renderizarTabela();
+        salvarPreferenciasTermo();
     }
     
     async function carregarCategoriasDespesas(numeroTermo) {
@@ -2479,6 +2598,8 @@
             } else {
                 document.getElementById('contaExecucao').value = '';
             }
+            bancoDirty = false; // dados carregados do banco, não há alterações pendentes
+            linhasExcluidasIds.clear(); // reload = estado do banco é autoritativo
         } catch (error) {
             console.error('Erro ao carregar banco do termo:', error);
             document.getElementById('bancoExtrato').value = '';
@@ -2599,6 +2720,7 @@
             linhas[index].competencia_valida = true;
             linhas[index].competencia_erro = null;
             delete linhas[index]._competencia_deletada; // Não é deleção, é valor especial
+            linhas[index]._dirty = true;
             
             // Atualização otimizada: só atualizar a célula, não toda a tabela
             const row = document.querySelector(`tr[data-index="${index}"]`);
@@ -2634,6 +2756,7 @@
         linhas[index].competencia = competenciaParsed;
         linhas[index].competencia_valida = validacao.valido;
         linhas[index].competencia_erro = validacao.valido ? null : validacao.mensagem;
+        linhas[index]._dirty = true;
         
         if (!validacao.valido) {
             renderizarTabela(); // Só renderiza quando há erro para mostrar mensagem
@@ -2664,14 +2787,7 @@
         // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
         // para evitar conflitos de índice com linhas que existem no banco
         if (limiteAtual !== 'todas') {
-            const confirmar = confirm(
-                'Para adicionar novas linhas com segurança, o sistema precisa carregar TODAS as linhas disponíveis.\n\n' +
-                'Deseja continuar?'
-            );
-            
-            if (!confirmar) return;
-            
-            // Carregar todas as linhas
+            showToast('Carregando todas as linhas para garantir integridade...', 'info', 2000);
             limiteAtual = 'todas';
             await carregarExtrato();
         }
@@ -2700,14 +2816,7 @@
     async function adicionarLinhaAcima(index) {
         // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
         if (limiteAtual !== 'todas') {
-            const confirmar = confirm(
-                'Para adicionar novas linhas com segurança, o sistema precisa carregar TODAS as linhas disponíveis.\n\n' +
-                'Deseja continuar?'
-            );
-            
-            if (!confirmar) return;
-            
-            // Carregar todas as linhas
+            showToast('Carregando todas as linhas para garantir integridade...', 'info', 2000);
             limiteAtual = 'todas';
             await carregarExtrato();
         }
@@ -2728,23 +2837,27 @@
             _novo: true
         };
         
+        // Se o ponto de inserção está dentro de um grupo composto, herdar data/valor/competência
+        const _linhaRefAcima = _detectarLinhaReferencia(index);
+        if (_linhaRefAcima) {
+            novaLinha.data        = _linhaRefAcima.data;
+            novaLinha.debito      = _linhaRefAcima.debito;
+            novaLinha.credito     = _linhaRefAcima.credito;
+            novaLinha.competencia = _linhaRefAcima.competencia;
+        }
+        
+        salvarEstadoNoHistorico();
         linhas.splice(index, 0, novaLinha);
         recalcularIndices();
         renderizarTabela();
         document.getElementById('btnSalvar').style.display = 'block';
+        agendarAutosave();
     }
 
     async function adicionarLinhasEmLote() {
         // Se estamos em modo limitado (100 ou 200), carregar todas as linhas primeiro
         if (limiteAtual !== 'todas') {
-            const confirmar = confirm(
-                'Para adicionar novas linhas com segurança, o sistema precisa carregar TODAS as linhas disponíveis.\n\n' +
-                'Deseja continuar?'
-            );
-            
-            if (!confirmar) return;
-            
-            // Carregar todas as linhas
+            showToast('Carregando todas as linhas para garantir integridade...', 'info', 2000);
             limiteAtual = 'todas';
             await carregarExtrato();
         }
@@ -3144,7 +3257,7 @@
             
             //  Continuar construindo htmlParts com as células restantes
             htmlParts.push(`
-                <td class="${!validarComposicao(index) ? 'composicao-invalida' : ''}">
+                <td class="${!validarComposicao(index) ? 'composicao-invalida' : ''}"${_tooltipComposicao(index)}>
                     <input type="text" class="cell-input cell-money" 
                            value="${formatarMoeda(linha.discriminacao)}" 
                            onchange="atualizarValor(${index}, 'discriminacao', this.value)"
@@ -3900,6 +4013,39 @@
         }
     }
 
+    // Retorna a linha de referência (data/débito-crédito/competência) se o ponto de
+    // inserção estiver dentro ou logo após um grupo composto; caso contrário retorna null.
+    // Retorna o atributo title="..." com o detalhamento da diferença de composição,
+    // ou string vazia quando o grupo está balanceado.
+    function _tooltipComposicao(index) {
+        const linha = linhas[index];
+        const valorRef = linha.credito || linha.debito;
+        if (!valorRef) return '';
+        const grupoInfo = identificarGrupoComposicao(index);
+        if (!grupoInfo.ehGrupo) return '';
+        let somaComp = 0;
+        for (let i = grupoInfo.inicioGrupo; i <= grupoInfo.fimGrupo; i++) {
+            somaComp += linhas[i].discriminacao || 0;
+        }
+        const diferenca = valorRef - somaComp;
+        if (Math.abs(diferenca) <= 0.02) return '';
+        const tipo  = linha.credito ? 'Crédito' : 'Débito';
+        const sinal = diferenca > 0 ? 'Faltam' : 'Excesso de';
+        return ` title="${tipo}: ${formatarMoeda(valorRef)} | Soma: ${formatarMoeda(somaComp)} | ${sinal}: ${formatarMoeda(Math.abs(diferenca))}"`;
+    }
+
+    function _detectarLinhaReferencia(index) {
+        // 1. Linha imediatamente acima do ponto de inserção
+        if (index > 0 && identificarGrupoComposicao(index - 1).ehGrupo) {
+            return linhas[index - 1];
+        }
+        // 2. Linha abaixo do ponto (inserindo antes do 1º componente)
+        if (index < linhas.length && identificarGrupoComposicao(index).ehGrupo) {
+            return linhas[index];
+        }
+        return null;
+    }
+
     function identificarGrupoComposicao(index) {
         // Identifica se a linha faz parte de um grupo de composição
         // Retorna: { ehGrupo: boolean, ehPrimeira: boolean, inicioGrupo: number, fimGrupo: number, tipo: 'credito'|'debito' }
@@ -4448,7 +4594,15 @@
 
     function popularFiltros() {
         const timerPopular = performanceMetrics.start('popularFiltros - TOTAL');
-        
+
+        // Preservar seleções atuais antes de reconstruir os selects
+        const selecoesSalvas = {};
+        ['filtroData','filtroCompetencia','filtroCategoria','filtroOrigemDestino','filtroAvaliacao','filtroObservacoes',
+         'filtroCategoriaExpandido','filtroOrigemDestinoExpandido','filtroObservacoesExpandido'].forEach(id => {
+            const sel = document.getElementById(id);
+            if (sel) selecoesSalvas[id] = Array.from(sel.selectedOptions).map(o => o.value);
+        });
+
         // Popular filtro de datas (por mês/ano)
         const selectData = document.getElementById('filtroData');
         const datasUnicas = new Set();
@@ -4586,10 +4740,20 @@
         }
         
         performanceMetrics.end(timerPopular);
+
+        // Restaurar seleções após reconstruir (mantém filtros ativos após save/re-render)
+        Object.entries(selecoesSalvas).forEach(([id, vals]) => {
+            if (!vals || vals.length === 0) return;
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            Array.from(sel.options).forEach(opt => { opt.selected = vals.includes(opt.value); });
+        });
     }
     
     function aplicarFiltros() {
         const timerAplicar = performanceMetrics.start('aplicarFiltros - TOTAL');
+
+        const buscaLivre = (document.getElementById('filtroBuscaLivre')?.value || '').trim().toLowerCase();
         
         const selectData = document.getElementById('filtroData');
         const selectCompetencia = document.getElementById('filtroCompetencia');
@@ -4728,11 +4892,22 @@
                     mostrar = mostrar && true;
                 }
             }
+
+            // Busca livre (parcial, case-insensitive, em múltiplas colunas de texto)
+            if (buscaLivre) {
+                const textoLinha = [
+                    linha.cat_transacao || '',
+                    linha.origem_destino || '',
+                    linha.avaliacao_analista || ''
+                ].join(' ').toLowerCase();
+                mostrar = mostrar && textoLinha.includes(buscaLivre);
+            }
             
             row.style.display = mostrar ? '' : 'none';
         });
         
         performanceMetrics.end(timerAplicar);
+        salvarPreferenciasTermo();
     }
     
     function atualizarDatalistOrigemDestino() {
@@ -4834,6 +5009,11 @@
         // Salvar estado antes de modificar
         salvarEstadoNoHistorico();
         
+        // Capturar IDs das linhas a excluir antes de filtrar (para persistir no banco)
+        const idsLoteParaExcluir = linhas
+            .filter(l => indicesParaExcluir.has(l.indice) && l.id)
+            .map(l => l.id);
+        
         // Filtrar linhas pelo índice
         const linhasOriginais = linhas.length;
         linhas = linhas.filter(linha => !indicesParaExcluir.has(linha.indice));
@@ -4850,6 +5030,11 @@
             // Desfazer via histórico
             desfazerAlteracao();
             return;
+        }
+        
+        // Confirmado: registrar IDs para exclusão no banco no próximo save
+        for (const id of idsLoteParaExcluir) {
+            linhasExcluidasIds.add(id);
         }
         
         // Recalcular índices
@@ -4986,6 +5171,8 @@
         document.getElementById('filtroCompetencia').selectedIndex = -1;
         document.getElementById('filtroCategoria').selectedIndex = -1;
         document.getElementById('filtroOrigemDestino').selectedIndex = -1;
+        const inputBusca = document.getElementById('filtroBuscaLivre');
+        if (inputBusca) inputBusca.value = '';
         
         const tbody = document.getElementById('tbodyConciliacao');
         const rows = tbody.getElementsByTagName('tr');
@@ -4994,6 +5181,7 @@
         for (let row of rows) {
             row.style.display = '';
         }
+        salvarPreferenciasTermo();
     }
 
     function moverLinha(index, direcao) {
@@ -5039,6 +5227,12 @@
             index = novoIndex;
         }
         
+        // Registrar ID para exclusão no banco no próximo save
+        const linhaRemovida = linhas[index];
+        if (linhaRemovida.id) {
+            linhasExcluidasIds.add(linhaRemovida.id);
+        }
+
         linhas.splice(index, 1);
         recalcularIndices();
         renderizarTabela();
@@ -5048,7 +5242,11 @@
 
     function recalcularIndices() {
         linhas.forEach((linha, i) => {
-            linha.indice = i + 1;
+            const novoIndice = i + 1;
+            if (linha.indice !== novoIndice) {
+                linha.indice = novoIndice;
+                linha._dirty = true; // índice mudou → precisa ser salvo para evitar colisão no banco
+            }
         });
         proximoIndice = linhas.length + 1;
     }
@@ -5255,6 +5453,14 @@
     
     function baixarModelo() {
         window.location.href = '/conc_bancaria/api/modelo-importacao';
+    }
+
+    function voltarParaAnalises(event) {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (numeroTermo) {
+            event.preventDefault();
+            window.location.href = `/analises_pc/?termo=${encodeURIComponent(numeroTermo)}&meses=1-7&autoload=true`;
+        }
     }
 
     function atualizarHrefRendimentos() {
@@ -5498,7 +5704,9 @@
         if (!modoCompleto) {
             const temDocsDirty = documentosAnaliseDirty.size > 0;
             const temLinhasDirty = linhasFonte.length > 0;
-            if (!temLinhasDirty && !temDocsDirty) {
+            const temBancoDirty = bancoDirty;
+            const temExclusoes = linhasExcluidasIds.size > 0;
+            if (!temLinhasDirty && !temDocsDirty && !temBancoDirty && !temExclusoes) {
                 showToast('Nada para salvar — sem alterações desde o último save.', 'info', 3000);
                 console.groupEnd();
                 return;
@@ -5544,9 +5752,14 @@
             }
             
             // Auto-preencher composição se estiver vazia
+            // EXCETO para linhas de grupo composto (composição parcial deve ser preenchida manualmente)
             let discriminacao = linha.discriminacao;
             if (!discriminacao && (linha.credito || linha.debito)) {
-                discriminacao = linha.credito || linha.debito;
+                const _idxLinha = linhas.indexOf(linha);
+                const _isComposto = _idxLinha !== -1 && identificarGrupoComposicao(_idxLinha).ehGrupo;
+                if (!_isComposto) {
+                    discriminacao = linha.credito || linha.debito;
+                }
             }
             
             return {
@@ -5594,12 +5807,11 @@
                 throw new Error(error.erro || 'Erro ao salvar extrato');
             }
 
-            // Salvar banco e conta (se preenchidos)
+            // Salvar banco e conta (se preenchidos ou sujos)
             const contaEspecifica = document.getElementById('contaEspecifica').value.trim();
-            
-            if (bancoExtrato || contaEspecifica) {
-                const contaExecucao = document.getElementById('contaExecucao').value.trim();
-                
+            const contaExecucao = document.getElementById('contaExecucao').value.trim();
+
+            if (bancoExtrato || contaEspecifica || contaExecucao || bancoDirty) {
                 const bancResponse = await fetch('/conc_bancaria/api/banco', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -5613,6 +5825,8 @@
 
                 if (!bancResponse.ok) {
                     console.warn('Aviso: Não foi possível salvar banco/conta');
+                } else {
+                    bancoDirty = false;
                 }
             }
 
@@ -5713,6 +5927,15 @@
                 });
             }
             
+            // Excluir do banco as linhas removidas do array (save sujo não usa modo_completo)
+            if (linhasExcluidasIds.size > 0) {
+                await Promise.all([...linhasExcluidasIds].map(id =>
+                    fetch(`/conc_bancaria/api/extrato/${id}`, { method: 'DELETE' })
+                        .catch(e => console.warn(`Falha ao excluir id=${id}:`, e))
+                ));
+                linhasExcluidasIds.clear();
+            }
+
             // Limpar dirty flags após save bem-sucedido
             linhas.forEach(l => l._dirty = false);
             documentosAnaliseDirty.clear();

@@ -851,14 +851,14 @@
   </script>
 
   {% set total_lembretes = (lembretes_hoje|length) + (lembretes_amanha|length) %}
-  {% if total_lembretes > 0 %}
+  {% if total_lembretes > 0 or alerta_escala_tt %}
   <!-- Floating Lembretes Panel -->
   <div id="lembretesFloat" style="position:fixed;bottom:22px;right:22px;z-index:1055;width:340px;">
     <div class="text-end mb-1">
       <button id="lembretesToggle" onclick="toggleLembretes()"
               class="btn btn-primary btn-sm shadow-sm" style="border-radius:30px;padding:6px 14px;font-size:0.82rem;">
         <i class="bi bi-bell-fill"></i>
-        <span class="badge bg-danger ms-1">{{ total_lembretes }}</span>
+        <span class="badge bg-danger ms-1">{{ total_lembretes + (1 if alerta_escala_tt else 0) }}</span>
         <span class="ms-1">Lembretes</span>
       </button>
     </div>
@@ -871,6 +871,18 @@
         <button onclick="toggleLembretes()" class="btn-close btn-close-white p-0" style="font-size:0.65rem;"></button>
       </div>
       <div class="card-body p-0" style="max-height:310px;overflow-y:auto;font-size:0.82rem;">
+        {% if alerta_escala_tt %}
+        <a href="{{ url_for('escalas.teletrabalho', semana=next_monday_iso) }}"
+           class="d-flex align-items-start gap-2 px-3 py-2 text-decoration-none border-bottom"
+           style="background:#fef3c7;transition:background .15s;"
+           onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fef3c7'">
+          <i class="bi bi-laptop mt-1" style="color:#d97706;font-size:0.9rem;flex-shrink:0;"></i>
+          <div style="min-width:0;">
+            <div class="fw-semibold" style="color:#92400e;"><i class="bi bi-exclamation-circle me-1"></i>Escala de Teletrabalho</div>
+            <small style="color:#78350f;">Preencha a escala da próxima semana</small>
+          </div>
+        </a>
+        {% endif %}
         {% if lembretes_hoje %}
         <div class="px-3 pt-2 pb-1" style="font-size:0.75rem;font-weight:700;color:#2563eb;letter-spacing:.4px;">
           <i class="bi bi-calendar-check me-1"></i> HOJE

@@ -511,6 +511,10 @@
       <input class="form-check-input" type="checkbox" id="chk_valor_mes_24" onchange="toggleColunaValorMes24()">
       <label class="form-check-label" for="chk_valor_mes_24">Valor Mês 24</label>
     </div>
+    <div class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" id="chk_objeto" onchange="toggleColunaObjeto()">
+      <label class="form-check-label" for="chk_objeto">Objeto</label>
+    </div>
   </div>
 
     <!-- Tabela de Parcerias -->
@@ -553,6 +557,7 @@
               <th class="text-center col-valor-mes" style="display: none;">Valor Mês Detalhado</th>
               <th class="text-center col-valor-mes-23" style="display: none;">Valor Mês 23</th>
               <th class="text-center col-valor-mes-24" style="display: none;">Valor Mês 24</th>
+              <th class="text-center col-objeto" style="display: none;">Objeto</th>
               <th class="text-center">Ações</th>
             </tr>
           </thead>
@@ -623,6 +628,7 @@
                 <td class="text-end col-valor-mes-24" style="display: none;">
                   R$ {{ parceria.valor_mes_24|format_brl }}
                 </td>
+                <td class="col-objeto" style="display: none;">{{ parceria.parceria_objeto or '-' }}</td>
                 <td class="text-center">
                   <a class="btn btn-sm" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:6px;" href="{{ url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
                     <i class="bi bi-pencil"></i> Modificar
@@ -834,6 +840,12 @@
       salvarPreferencias();
     }
 
+    function toggleColunaObjeto() {
+      const mostrar = document.getElementById('chk_objeto').checked;
+      document.querySelectorAll('.col-objeto').forEach(col => col.style.display = mostrar ? '' : 'none');
+      salvarPreferencias();
+    }
+
     // ── Preferências (localStorage) ───────────────────────────
     function salvarPreferencias() {
       localStorage.setItem('parcerias_preferencias', JSON.stringify({
@@ -842,7 +854,8 @@
         chk_dotacao: document.getElementById('chk_dotacao').checked,
         chk_valor_mes: document.getElementById('chk_valor_mes').checked,
         chk_valor_mes_23: document.getElementById('chk_valor_mes_23').checked,
-        chk_valor_mes_24: document.getElementById('chk_valor_mes_24').checked
+        chk_valor_mes_24: document.getElementById('chk_valor_mes_24').checked,
+        chk_objeto: document.getElementById('chk_objeto').checked
       }));
     }
 
@@ -855,6 +868,7 @@
         if (prefs.chk_valor_mes)   { document.getElementById('chk_valor_mes').checked   = true; toggleColunaValorMes(); }
         if (prefs.chk_valor_mes_23){ document.getElementById('chk_valor_mes_23').checked = true; toggleColunaValorMes23(); }
         if (prefs.chk_valor_mes_24){ document.getElementById('chk_valor_mes_24').checked = true; toggleColunaValorMes24(); }
+        if (prefs.chk_objeto)      { document.getElementById('chk_objeto').checked       = true; toggleColunaObjeto(); }
       } catch (e) {}
     }
 
@@ -871,6 +885,7 @@
       if (document.getElementById('chk_valor_mes').checked) params.set('incluir_valor_mes', 'true');
       if (document.getElementById('chk_valor_mes_23').checked) params.set('incluir_valor_mes_23', 'true');
       if (document.getElementById('chk_valor_mes_24').checked) params.set('incluir_valor_mes_24', 'true');
+      if (document.getElementById('chk_objeto').checked) params.set('incluir_objeto', 'true');
       window.location.href = '{{ url_for("parcerias.exportar_csv") }}?' + params.toString();
       setTimeout(() => { btnExportar.disabled = false; btnExportar.innerHTML = textoOriginal; }, 2000);
     }

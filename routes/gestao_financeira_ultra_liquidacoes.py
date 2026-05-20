@@ -392,6 +392,7 @@ def api_listar_parcelas():
         mostrar_projeto = request.args.get('mostrar_projeto', 'false') == 'true'
         mostrar_sei_celeb = request.args.get('mostrar_sei_celeb', 'false') == 'true'
         mostrar_sei_pc = request.args.get('mostrar_sei_pc', 'false') == 'true'
+        mostrar_objeto = request.args.get('mostrar_objeto', 'false') == 'true'
         
         # Inicializar lista de parâmetros
         params = []
@@ -551,6 +552,7 @@ def api_listar_parcelas():
                     p.projeto,
                     p.sei_celeb,
                     p.sei_pc,
+                    pia.parceria_objeto,
                     -- Calcular se tem inconsistência (REGRA 1: elementos vs previsto OU REGRA 2: soma parcelas vs total termo)
                     CASE 
                         WHEN (
@@ -634,9 +636,11 @@ def api_listar_parcelas():
                 p.cnpj,
                 p.projeto,
                 p.sei_celeb,
-                p.sei_pc
+                p.sei_pc,
+                pia.parceria_objeto
             FROM gestao_financeira.ultra_liquidacoes ul
             LEFT JOIN public.parcerias p ON p.numero_termo = ul.numero_termo
+            LEFT JOIN public.parcerias_infos_adicionais pia ON pia.numero_termo = ul.numero_termo
             WHERE {where_clause}
             ORDER BY 
                 -- Ano atual primeiro
@@ -871,6 +875,7 @@ def api_listar_parcelas():
                 'projeto': p['projeto'] or '' if mostrar_projeto else None,
                 'sei_celeb': p['sei_celeb'] or '' if mostrar_sei_celeb else None,
                 'sei_pc': p['sei_pc'] or '' if mostrar_sei_pc else None,
+                'parcela_objeto': p['parceria_objeto'] or '' if mostrar_objeto else None,
                 'pendencias': pendencias,
                 'pendencias_descricao': ' | '.join(pendencias) if pendencias else '',
                 'tem_pendencia': len(pendencias) > 0,
@@ -1554,9 +1559,11 @@ def api_exportar_csv():
                 p.cnpj,
                 p.projeto,
                 p.sei_celeb,
-                p.sei_pc
+                p.sei_pc,
+                pia.parceria_objeto
             FROM gestao_financeira.ultra_liquidacoes ul
             LEFT JOIN public.parcerias p ON p.numero_termo = ul.numero_termo
+            LEFT JOIN public.parcerias_infos_adicionais pia ON pia.numero_termo = ul.numero_termo
             WHERE {where_clause}
             ORDER BY ul.vigencia_inicial ASC
         """
@@ -1575,7 +1582,7 @@ def api_exportar_csv():
             'Valor Elemento 53/23', 'Valor Elemento 53/24', 'Valor Previsto',
             'Valor Subtraído', 'Valor Encaminhado', 'Valor Pago',
             'Status', 'Status Secundário', 'Andamento', 'Data Pagamento', 'Observações',
-            'OSC', 'CNPJ', 'Projeto', 'Processo Celebração', 'Processo PGTO/PC'
+            'OSC', 'CNPJ', 'Projeto', 'Processo Celebração', 'Processo PGTO/PC', 'Objeto'
         ])
         
         # Dados
@@ -1601,7 +1608,8 @@ def api_exportar_csv():
                 p['cnpj'] or '',
                 p['projeto'] or '',
                 p['sei_celeb'] or '',
-                p['sei_pc'] or ''
+                p['sei_pc'] or '',
+                p['parceria_objeto'] or ''
             ])
         
         output.seek(0)

@@ -836,7 +836,7 @@
         if (dl) nomes.forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
       } catch(e) { console.error('Erro ao carregar responsáveis', e); }
       // Após opções carregadas, restaurar estado salvo se houver
-      restaurarEstadoFiltros();
+      restaurarEstadoFisicoFiltros();
     }
 
     async function aplicarFiltrosFisico() {
@@ -877,7 +877,7 @@
         document.getElementById('contadorResultados').style.display = 'block';
 
         renderizarTabelaFisica(dados, colsAdicionais);
-        salvarEstadoFiltros();
+        salvarEstadoFisicoFiltros();
         document.getElementById('mensagemInicial').style.display = 'none';
         document.getElementById('areaTabelaFisica').style.display = 'block';
 
@@ -954,7 +954,7 @@
       });
     }
 
-    function salvarEstadoFiltros() {
+    function salvarEstadoFisicoFiltros() {
       const estado = {
         filtroLimiteFisico: document.getElementById('filtroLimiteFisico')?.value || '50',
         filtroTipoFisico: document.getElementById('filtroTipoFisico')?.value || '',
@@ -980,7 +980,7 @@
       localStorage.setItem('faf_analises_fisico', JSON.stringify(estado));
     }
 
-    function restaurarEstadoFiltros() {
+    function restaurarEstadoFisicoFiltros() {
       const estado = JSON.parse(localStorage.getItem('faf_analises_fisico') || 'null');
       if (!estado) return;
       ['filtroLimiteFisico','filtroTipoFisico','filtroTermoFisico','filtroOSCFisico',

@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escala de Teletrabalho - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f4f3f8; padding: 20px; }
+
+    .page-header {
+      background: linear-gradient(135deg, #0369a1 0%, #0ea5e9 100%);
+      color: #fff;
+      padding: 22px 28px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 18px rgba(14, 165, 233, .28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+    .btn-parc {
+      background: linear-gradient(135deg, #0369a1, #0ea5e9);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 7px 16px; font-weight: 600; transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; cursor: pointer; font-size: .875rem;
+    }
+    .btn-parc:hover { opacity: .88; color: #fff; }
+    .btn-parc.outline {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+    }
+    .btn-parc.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+    .btn-parc.success { background: linear-gradient(135deg, #065f46, #059669); }
+    .btn-parc.secondary { background: linear-gradient(135deg, #374151, #6b7280); }
+
+    .content-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .content-card-header {
+      background: linear-gradient(135deg, #0369a1, #0ea5e9);
+      color: #fff; padding: 14px 20px;
+      display: flex; justify-content: space-between;
+      align-items: center; flex-wrap: wrap; gap: 8px;
+    }
+    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+    .content-card-body { padding: 0; overflow-x: auto; }
+
+    /* Navegação de semana */
+    .week-nav {
+      display: flex; align-items: center; gap: 12px;
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      padding: 14px 20px; margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .week-label {
+      font-weight: 700; font-size: 1rem; color: #0369a1;
+      flex: 1; text-align: center; min-width: 180px;
+    }
+
+    /* Grade de escala */
+    .escala-table { width: 100%; border-collapse: collapse; min-width: 700px; }
+    .escala-table thead th {
+      background: linear-gradient(135deg, #0369a1, #0ea5e9);
+      color: #fff; padding: 10px 12px;
+      text-align: center; font-size: .85rem; white-space: nowrap;
+      position: sticky; top: 0; z-index: 2;
+    }
+    .escala-table thead th.col-nome {
+      text-align: left; min-width: 180px;
+      position: sticky; left: 0; z-index: 3;
+    }
+    .escala-table tbody tr:hover { background-color: #f0f9ff; }
+    .escala-table tbody td {
+      padding: 8px 10px; border-bottom: 1px solid #e5e7eb;
+      text-align: center; vertical-align: middle;
+    }
+    .escala-table tbody td.col-nome {
+      text-align: left; background: #fff;
+      position: sticky; left: 0; z-index: 1;
+      border-right: 2px solid #e0f2fe;
+    }
+    .escala-table tbody tr:hover td.col-nome { background: #f0f9ff; }
+
+    /* Separador de departamento */
+    .dep-row td {
+      background: #e0f2fe !important;
+      color: #0369a1; font-weight: 700; font-size: .78rem;
+      text-transform: uppercase; letter-spacing: .06em;
+      padding: 6px 12px; border-bottom: none;
+    }
+
+    /* Célula de seleção de dia */
+    .day-cell { position: relative; }
+    .day-radio {
+      position: absolute; opacity: 0; width: 0; height: 0;
+    }
+    .day-label {
+      display: block; width: 36px; height: 36px; line-height: 36px;
+      border-radius: 50%; border: 2px solid #d1d5db;
+      cursor: pointer; transition: all .15s; margin: 0 auto;
+      font-size: .8rem; font-weight: 600; color: #6b7280;
+      text-align: center; background: #fff;
+    }
+    .day-radio:checked + .day-label {
+      background: linear-gradient(135deg, #0369a1, #0ea5e9);
+      border-color: #0ea5e9; color: #fff;
+      box-shadow: 0 2px 8px rgba(14, 165, 233, .4);
+    }
+    /* Nenhum = X button */
+    .none-label {
+      display: block; width: 36px; height: 36px; line-height: 36px;
+      border-radius: 50%; border: 2px solid #d1d5db;
+      cursor: pointer; transition: all .15s; margin: 0 auto;
+      font-size: .85rem; font-weight: 600; color: #9ca3af;
+      text-align: center; background: #fff;
+    }
+    .none-radio:checked + .none-label {
+      background: #f3f4f6; border-color: #9ca3af; color: #374151;
+    }
+    /* Conflito */
+    .conflito-badge {
+      display: block; font-size: .65rem;
+      color: #b91c1c; margin-top: 2px;
+    }
+    .day-cell.has-conflito .day-label,
+    .day-cell.has-conflito .none-label {
+      border-color: #fca5a5;
+    }
+    /* Dia bloqueado por conflito: fundo vermelho-claro, cursor bloqueado */
+    .day-cell.has-conflito .day-radio:disabled + .day-label {
+      background: #fee2e2; border-color: #fca5a5;
+      color: #dc2626; cursor: not-allowed; opacity: 1;
+    }
+    .conflito-lock {
+      display: block; font-size: .6rem; color: #dc2626; margin-top: 1px;
+    }
+
+    /* Readonly (sem permissão) */
+    .day-radio:disabled + .day-label,
+    .none-radio:disabled + .none-label {
+      cursor: not-allowed; opacity: .65;
+    }
+
+    /* Legenda */
+    .legenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: .82rem; }
+    .legenda-item { display: flex; align-items: center; gap: 6px; }
+    .legenda-dot { width: 14px; height: 14px; border-radius: 50%; }
+
+    /* Sem permissão banner */
+    .readonly-banner {
+      background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px;
+      padding: 10px 16px; margin-bottom: 16px; font-size: .875rem; color: #78350f;
+    }
+
+    /* Abas de equipe */
+    .equipe-tabs-tt { border-bottom: 2px solid #bae6fd; background: #f0f9ff; }
+    .equipe-tabs-tt .nav-link { color: #0369a1; border-color: transparent; font-size: .88rem; padding: 8px 16px; }
+    .equipe-tabs-tt .nav-link:hover { border-color: #7dd3fc #7dd3fc transparent; background: #e0f2fe; }
+    .equipe-tabs-tt .nav-link.active {
+      color: #0369a1; font-weight: 700;
+      border-color: #7dd3fc #7dd3fc #fff;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+
+  <!-- Cabeçalho -->
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2><i class="bi bi-laptop me-2"></i>Escala de Teletrabalho</h2>
+        <p>Grade semanal — um dia de teletrabalho por servidor</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('escalas.almoco') }}" class="btn-parc outline">
+          <i class="bi bi-egg-fried"></i> Escala de Almoço
+        </a>
+        <a href="{{ url_for('ferias.calendario') }}" class="btn-parc outline">
+          <i class="bi bi-calendar3"></i> Calendário Geral
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message|safe }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if not pode_editar %}
+  <div class="readonly-banner">
+    <i class="bi bi-eye me-2"></i>
+    Você está em <strong>modo leitura</strong>. Apenas gestores com permissão podem editar a escala.
+  </div>
+  {% endif %}
+
+  <!-- Navegação de semana -->
+  <div class="week-nav">
+    <a href="{{ url_for('escalas.teletrabalho', semana=semana_anterior.isoformat()) }}"
+       class="btn-parc secondary">
+      <i class="bi bi-chevron-left"></i> Semana anterior
+    </a>
+    <div class="week-label">
+      <i class="bi bi-calendar-week me-2"></i>
+      Semana de {{ semana_inicio.strftime('%d/%m/%Y') }}
+      a {{ dias_semana[-1].strftime('%d/%m/%Y') }}
+    </div>
+    <a href="{{ url_for('escalas.teletrabalho', semana=semana_seguinte.isoformat()) }}"
+       class="btn-parc secondary">
+      Próxima semana <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="{{ url_for('escalas.teletrabalho') }}" class="btn-parc outline"
+       style="background:linear-gradient(135deg,#0369a1,#0ea5e9);border:none;">
+      <i class="bi bi-calendar-check"></i> Hoje
+    </a>
+  </div>
+
+  <!-- Grade -->
+  <form method="POST" action="{{ url_for('escalas.teletrabalho_salvar') }}">
+    <input type="hidden" name="semana_inicio" value="{{ semana_inicio.isoformat() }}">
+
+    <div class="content-card">
+      <div class="content-card-header">
+        <h5><i class="bi bi-table me-2"></i>Grade da Semana</h5>
+        {% if pode_editar %}
+        <button type="submit" class="btn-parc success">
+          <i class="bi bi-save"></i> Salvar Escala
+        </button>
+        {% endif %}
+      </div>
+      </div>
+
+      <!-- Nav-tabs de equipe -->
+      <ul class="nav nav-tabs equipe-tabs-tt px-3 pt-2" id="ttEquipeTabs" role="tablist">
+        {% set ns_btn = namespace(first=true) %}
+        {% for dep in equipes %}
+          {% if pode_ver_todas or dep == user_unidade %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link{% if ns_btn.first %} active{% endif %}"
+                    id="tt-tab-btn-{{ loop.index }}"
+                    data-bs-toggle="tab"
+                    data-bs-target="#tt-tab-{{ loop.index }}"
+                    type="button" role="tab">
+              <i class="bi bi-people me-1"></i>{{ dep }}
+              <span class="badge rounded-pill ms-1" style="background:#0369a1;color:#fff;font-size:.72rem;">
+                {{ servidores_por_equipe[dep]|length }}
+              </span>
+            </button>
+          </li>
+          {% set ns_btn.first = false %}
+          {% endif %}
+        {% endfor %}
+      </ul>
+
+      <!-- Conteúdo das abas -->
+      <div class="tab-content" id="ttEquipeTabsContent">
+        {% set ns_pane = namespace(first=true) %}
+        {% for dep in equipes %}
+          {% if pode_ver_todas or dep == user_unidade %}
+          <div class="tab-pane fade{% if ns_pane.first %} show active{% endif %}"
+               id="tt-tab-{{ loop.index }}"
+               role="tabpanel">
+            <div class="content-card-body">
+              <table class="escala-table">
+                <thead>
+                  <tr>
+                    <th class="col-nome"><i class="bi bi-person me-1"></i>Servidor</th>
+                    {% for dia in dias_semana %}
+                    <th>
+                      {{ ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][loop.index0] }}<br>
+                      <small style="opacity:.8;font-weight:400;">{{ dia.strftime('%d/%m') }}</small>
+                    </th>
+                    {% endfor %}
+                    <th>Nenhum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for srv in servidores_por_equipe[dep] %}
+                  {% set escala = escala_map.get(srv.email) %}
+                  {% set data_tt = escala.data_teletrabalho if escala else None %}
+                  {% set srv_conflitos = conflitos.get(srv.email, {}) %}
+                  <tr>
+                    <td class="col-nome">
+                      <input type="hidden" name="usuario_email[]" value="{{ srv.email }}">
+                      <strong>{{ srv.usuario_nome }}</strong>
+                      {% if srv.d_usuario %}
+                      <br><small class="text-muted"><code>{{ srv.d_usuario }}</code></small>
+                      {% endif %}
+                    </td>
+                    {% for dia in dias_semana %}
+                    {% set dia_iso = dia.isoformat() %}
+                    {% set tem_conflito = dia_iso in srv_conflitos %}
+                    <td class="day-cell {% if tem_conflito %}has-conflito{% endif %}">
+                      <input type="radio"
+                             class="day-radio"
+                             name="data_teletrabalho[{{ srv.email }}]"
+                             id="tt_{{ srv.email }}_{{ dia_iso }}"
+                             value="{{ dia_iso }}"
+                             {% if data_tt and data_tt.isoformat() == dia_iso %}checked{% endif %}
+                             {% if not pode_editar or tem_conflito %}disabled{% endif %}>
+                      <label class="day-label" for="tt_{{ srv.email }}_{{ dia_iso }}"
+                             title="{{ dia.strftime('%A, %d/%m/%Y') }}{% if tem_conflito %} — conflito: {{ srv_conflitos[dia_iso] }}{% endif %}">
+                        {{ ['S', 'T', 'Q', 'Q', 'S'][loop.index0] }}
+                      </label>
+                      {% if tem_conflito %}
+                      <span class="conflito-badge" title="{{ srv_conflitos[dia_iso] }}">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                      </span>
+                      <span class="conflito-lock" title="Bloqueado: {{ srv_conflitos[dia_iso] }}">
+                        <i class="bi bi-lock-fill"></i>
+                      </span>
+                      {% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="day-cell">
+                      <input type="radio"
+                             class="none-radio day-radio"
+                             name="data_teletrabalho[{{ srv.email }}]"
+                             id="tt_{{ srv.email }}_none"
+                             value=""
+                             {% if not data_tt %}checked{% endif %}
+                             {% if not pode_editar %}disabled{% endif %}>
+                      <label class="none-label" for="tt_{{ srv.email }}_none" title="Sem teletrabalho">
+                        <i class="bi bi-x"></i>
+                      </label>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="{{ dias_semana|length + 2 }}" class="text-center text-muted p-4">
+                      <i class="bi bi-people me-2"></i>Nenhum servidor nesta equipe.
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% set ns_pane.first = false %}
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if pode_editar %}
+    <div class="d-flex justify-content-end mb-4">
+      <button type="submit" class="btn-parc success">
+        <i class="bi bi-save"></i> Salvar Escala da Semana
+      </button>
+    </div>
+    {% endif %}
+  </form>
+
+  <!-- Legenda -->
+  <div class="content-card">
+    <div class="content-card-body p-3">
+      <div class="legenda">
+        <div class="legenda-item">
+          <div class="legenda-dot" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);"></div>
+          <span>Dia selecionado (teletrabalho)</span>
+        </div>
+        <div class="legenda-item">
+          <div class="legenda-dot" style="background:#f3f4f6;border:2px solid #9ca3af;"></div>
+          <span>Sem teletrabalho</span>
+        </div>
+        <div class="legenda-item">
+          <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+          <span>Conflito com férias ou folga</span>
+        </div>
+      </div>
+      <div class="mt-2 text-muted" style="font-size:.8rem;">
+        <i class="bi bi-info-circle me-1"></i>
+        Conflitos são apenas avisos — a escala é salva mesmo assim.
+        Semanas anteriores são preservadas automaticamente.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Sincronizar os radio inputs com o form (os radios usam name por e-mail,
+  // mas o backend espera listas paralelas usuario_email[] e data_teletrabalho[])
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('form');
+    if (!form) return;
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // Remover campos antigos de data_teletrabalho[]
+      form.querySelectorAll('input[name="data_teletrabalho[]"]').forEach(el => el.remove());
+
+      // Para cada grupo de radio (por servidor)
+      const emailInputs = form.querySelectorAll('input[name="usuario_email[]"]');
+      emailInputs.forEach(emailInput => {
+        const emailVal = emailInput.value;
+        const selected = form.querySelector(
+          `input[name="data_teletrabalho[${CSS.escape(emailVal)}]"]:checked`
+        );
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'data_teletrabalho[]';
+        hidden.value = selected ? selected.value : '';
+        emailInput.insertAdjacentElement('afterend', hidden);
+      });
+
+      form.submit();
+    });
+
+    // Navegação por teclado ← →
+    const linkAnterior = document.querySelector('a[href*="semana={{ semana_anterior.isoformat() }}"]');
+    const linkSeguinte = document.querySelector('a[href*="semana={{ semana_seguinte.isoformat() }}"]');
+    document.addEventListener('keydown', function(e) {
+      // Ignorar quando o foco está em um campo de formulário
+      if (['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (e.key === 'ArrowLeft'  && linkAnterior) window.location.href = linkAnterior.href;
+      if (e.key === 'ArrowRight' && linkSeguinte) window.location.href = linkSeguinte.href;
+    });
+  });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

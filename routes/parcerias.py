@@ -161,7 +161,8 @@ def listar():
                 numero_termo,
                 parceria_abrangencia_projeto AS abrangencia,
                 parceria_data_suspensao      AS data_suspensao,
-                parceria_data_retomada       AS data_retomada
+                parceria_data_retomada       AS data_retomada,
+                parceria_objeto
             FROM public.parcerias_infos_adicionais
             ORDER BY numero_termo
         )
@@ -192,6 +193,7 @@ def listar():
             inf.abrangencia,
             inf.data_suspensao,
             inf.data_retomada,
+            inf.parceria_objeto,
             d.dotacao_orcamentaria
         FROM public.Parcerias p
         LEFT JOIN last_pg   lpg  ON lpg.numero_termo  = p.numero_termo
@@ -1637,6 +1639,7 @@ def exportar_csv():
         incluir_valor_mes_24 = request.args.get('incluir_valor_mes_24', 'false') == 'true'
         incluir_edital = request.args.get('incluir_edital', 'false') == 'true'
         incluir_dotacao = request.args.get('incluir_dotacao', 'false') == 'true'
+        incluir_objeto = request.args.get('incluir_objeto', 'false') == 'true'
         
         cur = get_cursor()
         
@@ -1690,7 +1693,11 @@ def exportar_csv():
              WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_23,
             (SELECT COALESCE(SUM(ulc.valor_mes_24), 0)
              FROM gestao_financeira.ultra_liquidacoes_cronograma ulc
-             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_24
+             WHERE ulc.numero_termo = p.numero_termo) AS valor_mes_24,
+            (SELECT pia.parceria_objeto
+             FROM public.parcerias_infos_adicionais pia
+             WHERE pia.numero_termo = p.numero_termo
+             LIMIT 1) AS parceria_objeto
             FROM Parcerias p
             WHERE 1=1
         """
@@ -1948,6 +1955,9 @@ def exportar_csv():
         if incluir_valor_mes_24:
             cabecalho.append('Valor Mês 24')
 
+        if incluir_objeto:
+            cabecalho.append('Objeto')
+
         cabecalho.extend([
             'SEI Plano',
             'SEI Orçamento',
@@ -1996,6 +2006,9 @@ def exportar_csv():
             if incluir_valor_mes_24:
                 v = float(parceria.get('valor_mes_24') or 0)
                 linha.append(f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
+            if incluir_objeto:
+                linha.append(parceria.get('parceria_objeto') or '-')
 
             linha.extend([
                 parceria['sei_plano'] or '-',

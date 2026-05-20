@@ -48,6 +48,7 @@ from routes.manuais import manuais_bp
 from routes.admin import admin_bp
 from routes.datas_importantes import datas_importantes_bp
 from routes.relatos import relatos_bp
+from routes.escalas import escalas_bp
 
 
 # ============================================================================
@@ -294,6 +295,7 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(datas_importantes_bp)
     app.register_blueprint(relatos_bp)
+    app.register_blueprint(escalas_bp)
     
     # ========================================================================
     # HOOKS GLOBAIS PARA LOGGING AUTOMÁTICO

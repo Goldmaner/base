@@ -302,34 +302,84 @@ def atualizar_usuario(user_id):
         # Construir query dinâmica baseado nos campos fornecidos
         updates = []
         params = []
-        
+
+        # Ler d_usuario antigo para cascade (antes de alterar)
+        d_usuario_antigo = None
+        if "d_usuario" in data:
+            cur.execute("SELECT d_usuario FROM gestao_pessoas.usuarios WHERE id = %s", (user_id,))
+            row_old = cur.fetchone()
+            d_usuario_antigo = row_old['d_usuario'] if row_old else None
+
         if tipo_usuario:
             updates.append("tipo_usuario = %s")
             params.append(tipo_usuario)
-        
+
         if "d_usuario" in data:  # Permite enviar vazio para limpar
             updates.append("d_usuario = %s")
             params.append(d_usuario if d_usuario else None)
-        
+
         if "acessos" in data:  # Permite enviar vazio para limpar
             updates.append("acessos = %s")
             params.append(acessos if acessos else None)
-        
+
         if not updates:
             return jsonify({"erro": "Nenhum campo para atualizar"}), 400
-        
+
         params.append(user_id)
-        
+
         cur.execute(f"""
             UPDATE gestao_pessoas.usuarios 
             SET {', '.join(updates)}
             WHERE id = %s
         """, params)
-        
+
         if cur.rowcount == 0:
             cur.close()
             return jsonify({"erro": "Usuário não encontrado"}), 404
-        
+
+        # Cascade: se d_usuario mudou, atualizar todas as tabelas relacionadas
+        novo_d_usuario = d_usuario if d_usuario else None
+        if "d_usuario" in data and d_usuario_antigo and d_usuario_antigo != novo_d_usuario:
+            _tabelas_cascade = [
+                "calendario.datas_ferias",
+                "calendario.datas_importantes",
+                "calendario.datas_eventos",
+            ]
+            for tabela in _tabelas_cascade:
+                cur.execute(
+                    f"UPDATE {tabela} SET d_usuario = %s WHERE d_usuario = %s",
+                    (novo_d_usuario, d_usuario_antigo)
+                )
+
+        # Se tipo_usuario foi alterado, atualizar unidade alocada automaticamente
+        _UNIDADE_POR_TIPO = {
+            'Agente DAC': 'Divisão de Análise de Contas',
+            'Agente DGP': 'Divisão de Gestão de Parcerias',
+            'Agente DP':  'Departamento de Parcerias',
+        }
+        if tipo_usuario and tipo_usuario in _UNIDADE_POR_TIPO:
+            nova_unidade = _UNIDADE_POR_TIPO[tipo_usuario]
+            cur.execute("SELECT email FROM gestao_pessoas.usuarios WHERE id = %s", (user_id,))
+            u_row = cur.fetchone()
+            if u_row:
+                cur.execute(
+                    "SELECT id FROM gestao_pessoas.usuarios_infos WHERE usuario_email = %s",
+                    (u_row['email'],)
+                )
+                info_existente = cur.fetchone()
+                if info_existente:
+                    cur.execute("""
+                        UPDATE gestao_pessoas.usuarios_infos
+                        SET usuario_unidade_alocada = %s
+                        WHERE usuario_email = %s
+                    """, (nova_unidade, u_row['email']))
+                else:
+                    cur.execute("""
+                        INSERT INTO gestao_pessoas.usuarios_infos
+                            (usuario_email, usuario_unidade_alocada)
+                        VALUES (%s, %s)
+                    """, (u_row['email'], nova_unidade))
+
         get_db().commit()
         cur.close()
         
@@ -373,7 +423,8 @@ def obter_usuario_infos(user_id):
             return jsonify({"erro": "Usuário não encontrado"}), 404
 
         cur.execute("""
-            SELECT usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo
+            SELECT usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo,
+                   usuario_escala_permissao, usuario_unidade_alocada
             FROM gestao_pessoas.usuarios_infos
             WHERE usuario_email = %s
             ORDER BY id DESC
@@ -387,14 +438,18 @@ def obter_usuario_infos(user_id):
                 "usuario_status": infos["usuario_status"] or "",
                 "usuario_nome": infos["usuario_nome"] or "",
                 "usuario_aniversario": infos["usuario_aniversario"].isoformat() if infos["usuario_aniversario"] else "",
-                "usuario_vinculo": infos["usuario_vinculo"] or ""
+                "usuario_vinculo": infos["usuario_vinculo"] or "",
+                "usuario_escala_permissao": bool(infos["usuario_escala_permissao"]),
+                "usuario_unidade_alocada": infos["usuario_unidade_alocada"] or "",
             }), 200
         else:
             return jsonify({
                 "usuario_status": "",
                 "usuario_nome": "",
                 "usuario_aniversario": "",
-                "usuario_vinculo": ""
+                "usuario_vinculo": "",
+                "usuario_escala_permissao": False,
+                "usuario_unidade_alocada": "",
             }), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
@@ -424,6 +479,8 @@ def salvar_usuario_infos(user_id):
         usuario_nome = data.get("usuario_nome", "").strip() or None
         usuario_aniversario = data.get("usuario_aniversario", "").strip() or None
         usuario_vinculo = data.get("usuario_vinculo", "").strip() or None
+        usuario_escala_permissao = bool(data.get("usuario_escala_permissao", False))
+        usuario_unidade_alocada = data.get("usuario_unidade_alocada", "").strip() or None
         criado_por = session.get("email")
 
         # Verificar se já existe registro
@@ -439,15 +496,20 @@ def salvar_usuario_infos(user_id):
                 SET usuario_status = %s,
                     usuario_nome = %s,
                     usuario_aniversario = %s,
-                    usuario_vinculo = %s
+                    usuario_vinculo = %s,
+                    usuario_escala_permissao = %s,
+                    usuario_unidade_alocada = %s
                 WHERE usuario_email = %s
-            """, (usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo, email))
+            """, (usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo,
+                   usuario_escala_permissao, usuario_unidade_alocada, email))
         else:
             cur.execute("""
                 INSERT INTO gestao_pessoas.usuarios_infos
-                    (usuario_email, usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo, criado_por)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (email, usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo, criado_por))
+                    (usuario_email, usuario_status, usuario_nome, usuario_aniversario,
+                     usuario_vinculo, usuario_escala_permissao, usuario_unidade_alocada, criado_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (email, usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo,
+                   usuario_escala_permissao, usuario_unidade_alocada, criado_por))
 
         get_db().commit()
         cur.close()

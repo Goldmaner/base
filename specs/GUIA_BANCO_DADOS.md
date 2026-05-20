@@ -93,7 +93,7 @@ Get-Content .env | Where-Object { $_ -match '^DB_HOST|^DB_PORT|^DB_DATABASE|^DB_
 | `categoricas` | 41 | Listas suspensas e catálogos editáveis |
 | `celebracao` | 8 | Processo de celebração de novos termos e Quadro de Metas |
 | `auditoria_memoria` | 1 | Auditoria de encaminhamentos de pagamento |
-| `calendario` | 5 | Férias, registros pessoais, eventos e documentos |
+| `calendario` | 8 | Férias, registros pessoais, eventos, documentos, escalas e feriados |
 
 **Chave primária universal**: `numero_termo` (text/varchar) identifica cada parceria em todas as tabelas relacionadas.
 
@@ -1400,7 +1400,63 @@ Documentos e links vinculados a cada evento.
 
 ---
 
-## �🟫 Schema `auditoria_memoria`
+### `calendario.escala_teletrabalho`
+Registro semanal de dias de teletrabalho por servidor.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | SERIAL PK | |
+| `usuario_email` | text NOT NULL | E-mail do servidor |
+| `semana_inicio` | date NOT NULL | Segunda-feira da semana (UNIQUE com email) |
+| `data_teletrabalho` | date | Dia efetivo escolhido (NULL = nenhum) |
+| `criado_por` | text | E-mail de quem registrou |
+| `criado_em` | timestamp DEFAULT NOW() | |
+| `atualizado_por` | text | |
+| `atualizado_em` | timestamp | |
+
+> **Constraint:** `UNIQUE (usuario_email, semana_inicio)` — 1 linha por servidor por semana.
+
+---
+
+### `calendario.escala_almoco`
+Horário fixo de almoço de cada servidor.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | SERIAL PK | |
+| `usuario_email` | text NOT NULL UNIQUE | E-mail do servidor |
+| `d_usuario` | varchar(20) | Código funcional |
+| `horario_inicio` | time | Início do almoço |
+| `horario_fim` | time | Fim do almoço |
+| `almoco_obs` | text | Observações |
+| `criado_por` | text | |
+| `criado_em` | timestamp DEFAULT NOW() | |
+| `atualizado_por` | text | |
+| `atualizado_em` | timestamp | |
+
+---
+
+### `calendario.data_feriados`
+Feriados nacionais, estaduais e municipais (SP) por ano.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | SERIAL PK | |
+| `data_feriado` | date NOT NULL | Data do feriado |
+| `nome_feriado` | text NOT NULL | Nome oficial |
+| `tipo_feriado` | text NOT NULL DEFAULT `'municipal'` | `nacional` / `estadual` / `municipal` |
+| `ativo` | boolean NOT NULL DEFAULT TRUE | Permite desativar sem excluir |
+| `created_at` | timestamp NOT NULL DEFAULT NOW() | |
+
+> **Uso no calendário:** exibido como filtro independente. Não conflita com teletrabalho/abonos — são camadas distintas no FullCalendar. RLS `authenticated_acesso_total` habilitado.
+>
+> **Feriados 2026 pré-carregados:** 14 datas (nacionais + estadual SP + municipal SP).
+>
+> **Para adicionar anos futuros:** `INSERT INTO calendario.data_feriados (data_feriado, nome_feriado, tipo_feriado) VALUES (...)`.
+
+---
+
+## 🟫 Schema `auditoria_memoria`
 
 ### `auditoria_memoria.auditoria_enc_pagamento`
 Snapshot de encaminhamentos de pagamento para auditoria.
@@ -1577,6 +1633,12 @@ CREATE INDEX idx_conc_extrato_termo_indice ON analises_pc.conc_extrato(numero_te
 -- Cobre: WHERE cod_cta_desp = '33503900' AND cod_nro_pcss_sof IS NOT NULL  (~3.1s → <500ms esperado)
 CREATE INDEX idx_back_empenhos_cta_desp ON gestao_financeira.back_empenhos(cod_cta_desp);
 
+-- Escalas (calendario)
+CREATE INDEX idx_escala_tt_semana ON calendario.escala_teletrabalho (semana_inicio);
+CREATE INDEX idx_escala_tt_email  ON calendario.escala_teletrabalho (usuario_email);
+CREATE INDEX idx_datas_imp_email_nome ON calendario.datas_importantes (usuario_email, nome_data);
+CREATE INDEX idx_feriados_data ON calendario.data_feriados (data_feriado);
+
 -- Quadro de Metas (celebracao)
 CREATE INDEX idx_celebracao_objetivos_sei      ON celebracao.celebracao_objetivos (sei_numero);
 CREATE INDEX idx_celebracao_metas_objetivo_id  ON celebracao.celebracao_metas (objetivo_id);
@@ -1637,7 +1699,7 @@ WITH CHECK (true);
 |--------|---------|--------|------|--------|
 | `analises_pc` | 14 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
 | `auditoria_memoria` | 1 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
-| `calendario` | 5 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
+| `calendario` | 8 | ✅ Migrado | 19/05/2026 | `authenticated_acesso_total` |
 | `categoricas` | 41 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
 | `celebracao` | 8 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |
 | `gestao_financeira` | 9 | ✅ Migrado | 18/05/2026 | `authenticated_acesso_total` |

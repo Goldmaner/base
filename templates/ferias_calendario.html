@@ -58,6 +58,19 @@
       background: linear-gradient(135deg, #312e81, #4f46e5); color: #fff;
     }
     .modal .modal-header .btn-close { filter: invert(1); }
+
+    /* ── Linhas do calendário mais expressivas ───── */
+    .fc .fc-scrollgrid { border-color: #c5c1d800; }
+    .fc td, .fc th { border-color: #c5c1d8; border-width: 2px; }
+
+    /* ── Finais de semana ─────────────────────────── */
+    .fc .fc-col-header-cell.fc-day-sat,
+    .fc .fc-col-header-cell.fc-day-sun { background: rgba(100,100,120,.07); }
+    .fc .fc-day-sat, .fc .fc-day-sun   { background: rgba(100,100,120,.05); }
+
+    /* ── Feriados ─────────────────────────────────── */
+    .fc .fc-day-feriado { background: rgba(190,24,93,.07); }
+    .fc .fc-day-feriado .fc-daygrid-day-number { color: #be185d; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -75,6 +88,12 @@
           </a>
           <a href="{{ url_for('datas_importantes.index') }}" class="btn-parc outline">
             <i class="bi bi-calendar-event"></i> Datas Importantes
+          </a>
+          <a href="{{ url_for('escalas.teletrabalho') }}" class="btn-parc outline">
+            <i class="bi bi-laptop"></i> Teletrabalho
+          </a>
+          <a href="{{ url_for('escalas.almoco') }}" class="btn-parc outline">
+            <i class="bi bi-egg-fried"></i> Almoço
           </a>
           <a href="{{ url_for('main.index') }}" class="btn-parc outline">
             <i class="bi bi-arrow-left"></i> Início
@@ -138,6 +157,16 @@
                         onclick="filtrarTipo('consulta',this)">
                   <i class="bi bi-heart-pulse"></i> Consultas
                 </button>
+                <button class="btn-filtro" data-tipo="atestado"
+                        style="background:#0f766e;color:#fff;border-color:#0f766e;"
+                        onclick="filtrarTipo('atestado',this)">
+                  <i class="bi bi-file-medical"></i> Atestados
+                </button>
+                <button class="btn-filtro" data-tipo="compromisso"
+                        style="background:#c026d3;color:#fff;border-color:#c026d3;"
+                        onclick="filtrarTipo('compromisso',this)">
+                  <i class="bi bi-calendar-check"></i> Compromissos
+                </button>
                 <button class="btn-filtro" data-tipo="evento"
                         style="background:#ca8a04;color:#fff;border-color:#ca8a04;"
                         onclick="filtrarTipo('evento',this)">
@@ -147,6 +176,21 @@
                         style="background:#dc3545;color:#fff;border-color:#dc3545;"
                         onclick="filtrarTipo('aniversario',this)">
                   <i class="bi bi-gift"></i> Aniversários
+                </button>
+                <button class="btn-filtro" data-tipo="teletrabalho"
+                        style="background:#0369a1;color:#fff;border-color:#0369a1;"
+                        onclick="filtrarTipo('teletrabalho',this)">
+                  <i class="bi bi-laptop"></i> Teletrabalho
+                </button>
+                <button class="btn-filtro" data-tipo="evento_institucional"
+                        style="background:#b45309;color:#fff;border-color:#b45309;"
+                        onclick="filtrarTipo('evento_institucional',this)">
+                  <i class="bi bi-calendar-event"></i> Eventos Inst.
+                </button>
+                <button class="btn-filtro" data-tipo="feriado"
+                        style="background:#be185d;color:#fff;border-color:#be185d;"
+                        onclick="filtrarTipo('feriado',this)">
+                  <i class="bi bi-calendar-heart"></i> Feriados
                 </button>
               </div>
             </div>
@@ -170,8 +214,13 @@
             <span class="small"><span class="badge" style="background:#0891b2">&#9632;</span> Abono</span>
             <span class="small"><span class="badge" style="background:#ea580c">&#9632;</span> Folga</span>
             <span class="small"><span class="badge" style="background:#7c3aed">&#9632;</span> Consulta Médica</span>
+            <span class="small"><span class="badge" style="background:#0f766e">&#9632;</span> Atestado Médico</span>
+            <span class="small"><span class="badge" style="background:#c026d3">&#9632;</span> Compromisso</span>
             <span class="small"><span class="badge" style="background:#ca8a04">&#9632;</span> Evento</span>
             <span class="small"><span class="badge" style="background:#dc3545">&#9632;</span> Aniversário 🎂</span>
+            <span class="small"><span class="badge" style="background:#0369a1">&#9632;</span> Teletrabalho 💻</span>
+            <span class="small"><span class="badge" style="background:#b45309">&#9632;</span> Evento Institucional 📋</span>
+            <span class="small"><span class="badge" style="background:#be185d">&#9632;</span> Feriado 🇧🇷</span>
           </div>
         </div>
       </div>
@@ -206,17 +255,23 @@
       const calendarEl = document.getElementById('calendar');
 
       // Dados do backend
-      const eventos          = {{ eventos|tojson }};
-      const ANIVERSARIOS     = {{ aniversarios|tojson }};
-      const DATAS_IMPORTANTES = {{ datas_importantes|tojson }};
-      const ANO_ATUAL        = {{ ano_atual }};
+      const eventos             = {{ eventos|tojson }};
+      const ANIVERSARIOS        = {{ aniversarios|tojson }};
+      const DATAS_IMPORTANTES   = {{ datas_importantes|tojson }};
+      const ESCALA_TELETRABALHO = {{ escala_teletrabalho|tojson }};
+      const DATAS_EVENTOS       = {{ datas_eventos_cal|tojson }};
+      const FERIADOS            = {{ feriados|tojson }};
+      const ANO_ATUAL           = {{ ano_atual }};
 
       // ── Cores por tipo de data ─────────────────────────────────────────────
       const COR_TIPO = {
-        'Abono':          { bg: '#0891b2', fg: '#fff' },
-        'Folga':          { bg: '#ea580c', fg: '#fff' },
-        'Consulta Médica':{ bg: '#7c3aed', fg: '#fff' },
-        'Evento':         { bg: '#ca8a04', fg: '#fff' },
+        'Abono':           { bg: '#0891b2', fg: '#fff' },
+        'Folga':           { bg: '#ea580c', fg: '#fff' },
+        'Consulta Médica': { bg: '#7c3aed', fg: '#fff' },
+        'Atestado Médico': { bg: '#0f766e', fg: '#fff' },
+        'Compromisso':     { bg: '#c026d3', fg: '#fff' },
+        'Evento':          { bg: '#ca8a04', fg: '#fff' },
+        'Teletrabalho':    { bg: '#0369a1', fg: '#fff' },
       };
 
       // Férias: gradiente verde por duração
@@ -286,6 +341,67 @@
         });
       });
 
+      // Escala de Teletrabalho
+      ESCALA_TELETRABALHO.forEach(d => {
+        if (!d.data_teletrabalho) return;
+        const nome = d.usuario_nome || d.d_usuario || d.usuario_email;
+        todosEventos.push({
+          title: `💻 TT — ${nome}`,
+          start: d.data_teletrabalho,
+          allDay: true,
+          backgroundColor: '#0369a1',
+          borderColor: '#0369a1',
+          textColor: '#fff',
+          extendedProps: {
+            tipo: 'teletrabalho',
+            usuario_nome: d.usuario_nome,
+            d_usuario: d.d_usuario,
+            usuario_email: d.usuario_email,
+          }
+        });
+      });
+
+      // Eventos institucionais (datas_eventos)
+      DATAS_EVENTOS.forEach(ev => {
+        todosEventos.push({
+          title: `📋 ${ev.nome_atividade}`,
+          start: ev.data_inicio,
+          allDay: true,
+          backgroundColor: '#b45309',
+          borderColor: '#92400e',
+          textColor: '#fff',
+          extendedProps: {
+            tipo: 'evento_institucional',
+            nome_atividade: ev.nome_atividade,
+            descritivo: ev.descritivo,
+            datas_adicionais: ev.datas_adicionais,
+            participacao: ev.participacao,
+            local: ev.local,
+            observacoes: ev.observacoes,
+            usuario_nome: ev.usuario_nome,
+          }
+        });
+      });
+
+      // Feriados
+      FERIADOS.forEach(f => {
+        if (!f.data_feriado) return;
+        const icone = f.tipo_feriado === 'nacional' ? '🇧🇷' : f.tipo_feriado === 'estadual' ? '🏛️' : '🏙️';
+        todosEventos.push({
+          title: `${icone} ${f.nome_feriado}`,
+          start: f.data_feriado,
+          allDay: true,
+          backgroundColor: '#be185d',
+          borderColor: '#9d174d',
+          textColor: '#fff',
+          extendedProps: {
+            tipo: 'feriado',
+            nome_feriado: f.nome_feriado,
+            tipo_feriado: f.tipo_feriado,
+          }
+        });
+      });
+
       // ── Instanciar calendário ─────────────────────────────────────────────
       const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
@@ -297,6 +413,15 @@
           right: 'dayGridMonth,timeGridWeek,listMonth'
         },
         buttonText: { today: 'Hoje', month: 'Mês', week: 'Semana', list: 'Lista' },
+        dayCellDidMount: function(info) {
+          const d = info.date;
+          const dateStr = d.getFullYear() + '-'
+            + String(d.getMonth() + 1).padStart(2, '0') + '-'
+            + String(d.getDate()).padStart(2, '0');
+          if (FERIADOS.some(f => f.data_feriado === dateStr)) {
+            info.el.classList.add('fc-day-feriado');
+          }
+        },
         events: todosEventos,
         eventClick: function(info) {
           const ev    = info.event;
@@ -310,6 +435,47 @@
                 <h5 class="mt-2">${props.nomeCompleto}</h5>
                 <span class="badge bg-danger">${String(props.dia).padStart(2,'0')}/${String(props.mes).padStart(2,'0')}</span>
               </div>`;
+          } else if (props.tipo === 'teletrabalho') {
+            html = `
+              <div class="mb-2">
+                <span class="badge fs-6 px-3 py-2" style="background:#0369a1">
+                  <i class="bi bi-laptop me-1"></i>Teletrabalho
+                </span>
+              </div>
+              ${props.usuario_nome ? `<div class="mb-2"><strong>Servidor(a):</strong> ${props.usuario_nome}</div>` : (props.d_usuario ? `<div class="mb-2"><strong>Registro:</strong> <code>${props.d_usuario}</code></div>` : '')}
+              <div class="mb-2"><strong><i class="bi bi-calendar2 me-1"></i>Data:</strong> ${formatarData(ev.start)}</div>
+              <div><a href="{{ url_for('escalas.teletrabalho') }}" class="btn btn-sm btn-outline-primary mt-2">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Ver Escala Completa
+              </a></div>`;
+          } else if (props.tipo === 'evento_institucional') {
+            html = `
+              <div class="mb-2">
+                <span class="badge fs-6 px-3 py-2" style="background:#b45309">
+                  <i class="bi bi-calendar-event me-1"></i>Evento Institucional
+                </span>
+              </div>
+              <div class="mb-2"><strong>${props.nome_atividade}</strong></div>
+              <div class="mb-2"><strong><i class="bi bi-calendar2 me-1"></i>Data:</strong> ${formatarData(ev.start)}</div>
+              ${props.participacao ? `<div class="mb-2"><strong>Participação:</strong> <span class="badge bg-secondary">${props.participacao}</span></div>` : ''}
+              ${props.local ? `<div class="mb-2"><strong><i class="bi bi-geo-alt me-1"></i>Local:</strong> ${props.local}</div>` : ''}
+              ${props.datas_adicionais ? `<div class="mb-2"><strong>Outras datas:</strong> <span class="text-muted">${props.datas_adicionais}</span></div>` : ''}
+              ${props.descritivo ? `<div class="mb-2"><strong>Descritivo:</strong><br><span class="text-muted small">${props.descritivo}</span></div>` : ''}
+              ${props.observacoes ? `<div class="mb-2"><strong>Obs:</strong><br><span class="text-muted small">${props.observacoes}</span></div>` : ''}
+              ${props.usuario_nome ? `<div class="mt-2 text-muted small"><i class="bi bi-person me-1"></i>Registrado por: ${props.usuario_nome}</div>` : ''}
+              <div class="mt-2"><a href="{{ url_for('datas_importantes.index') }}" class="btn btn-sm btn-outline-warning">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Ver Eventos
+              </a></div>`;
+          } else if (props.tipo === 'feriado') {
+            const tipoLabel = { nacional: 'Nacional 🇧🇷', estadual: 'Estadual 🏛️', municipal: 'Municipal 🏙️' }[props.tipo_feriado] || props.tipo_feriado;
+            html = `
+              <div class="mb-2">
+                <span class="badge fs-6 px-3 py-2" style="background:#be185d">
+                  <i class="bi bi-calendar-heart me-1"></i>Feriado
+                </span>
+              </div>
+              <div class="mb-2"><strong>${props.nome_feriado}</strong></div>
+              <div class="mb-2"><strong><i class="bi bi-calendar2 me-1"></i>Data:</strong> ${formatarData(ev.start)}</div>
+              <div><strong>Abrangência:</strong> <span class="badge bg-secondary">${tipoLabel}</span></div>`;
           } else if (props.tipo === 'ferias') {
             html = `
               <div class="mb-3"><strong><i class="bi bi-person-fill me-1"></i>Nome:</strong><br>${ev.title}</div>
@@ -375,8 +541,18 @@
             visivel = t === 'folga';
           } else if (tipo === 'consulta') {
             visivel = t === 'consulta_médica';
+          } else if (tipo === 'atestado') {
+            visivel = t === 'atestado_médico';
+          } else if (tipo === 'compromisso') {
+            visivel = t === 'compromisso';
           } else if (tipo === 'evento') {
             visivel = t === 'evento';
+          } else if (tipo === 'teletrabalho') {
+            visivel = t === 'teletrabalho';
+          } else if (tipo === 'evento_institucional') {
+            visivel = t === 'evento_institucional';
+          } else if (tipo === 'feriado') {
+            visivel = t === 'feriado';
           }
 
           ev.setProp('display', visivel ? 'auto' : 'none');

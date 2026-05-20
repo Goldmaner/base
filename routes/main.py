@@ -103,8 +103,41 @@ def index():
     except Exception:
         pass
 
+    # Lembrete de sexta-feira: escala de teletrabalho pendente para próxima semana
+    alerta_escala_tt = False
+    next_monday_iso = ''
+    try:
+        if hoje.weekday() == 4:  # Sexta-feira = 4
+            _email = session.get('email', '')
+            _tipo = user['tipo_usuario']
+            _pode_tt = _tipo in ('Agente Público', 'admin')
+            if not _pode_tt:
+                cur_p = get_cursor()
+                cur_p.execute(
+                    "SELECT usuario_escala_permissao FROM gestao_pessoas.usuarios_infos WHERE usuario_email = %s",
+                    (_email,)
+                )
+                row_p = cur_p.fetchone()
+                cur_p.close()
+                _pode_tt = bool(row_p and row_p['usuario_escala_permissao'])
+            if _pode_tt:
+                _next_monday = hoje + timedelta(days=3)
+                cur_tt = get_cursor()
+                cur_tt.execute(
+                    "SELECT COUNT(*) AS cnt FROM calendario.escala_teletrabalho WHERE semana_inicio = %s",
+                    (_next_monday,)
+                )
+                row_tt = cur_tt.fetchone()
+                cur_tt.close()
+                if not (row_tt and row_tt['cnt'] > 0):
+                    alerta_escala_tt = True
+                    next_monday_iso = _next_monday.isoformat()
+    except Exception:
+        pass
+
     return render_template("tela_inicial.html", user=user, is_admin=is_admin, user_acessos=user_acessos,
-                           lembretes_hoje=lembretes_hoje, lembretes_amanha=lembretes_amanha)
+                           lembretes_hoje=lembretes_hoje, lembretes_amanha=lembretes_amanha,
+                           alerta_escala_tt=alerta_escala_tt, next_monday_iso=next_monday_iso)
 
 
 

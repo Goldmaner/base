@@ -155,6 +155,7 @@ def index():
 
         # Checklist de acesso (apenas para gerentes)
         usuarios_acesso_lista = []
+        feriados = []
         if eh_gerente:
             cur.execute("""
                 SELECT u.id, u.email, u.tipo_usuario, u.d_usuario,
@@ -166,6 +167,13 @@ def index():
                 ORDER BY nome_exibicao
             """)
             usuarios_acesso_lista = cur.fetchall()
+
+            cur.execute("""
+                SELECT id, data_feriado, nome_feriado, tipo_feriado, ativo
+                FROM calendario.data_feriados
+                ORDER BY data_feriado
+            """)
+            feriados = cur.fetchall()
 
         # Lista de usuários para campo "Registrar para" (visível ao ver_tudo)
         usuarios_para_registro = []
@@ -236,6 +244,7 @@ def index():
             usuarios_nomes=nomes_lista,
             usuarios_acesso_lista=usuarios_acesso_lista,
             usuarios_para_registro=usuarios_para_registro,
+            feriados=feriados,
             eh_gerente=eh_gerente,
             ver_tudo=ver_tudo,
             ano_atual=ano_atual,
@@ -766,3 +775,100 @@ def deletar_documento_evento(id):
     finally:
         cur.close()
     return redirect(url_for('datas_importantes.index'))
+
+
+# ─────────────────────────────────────────────────────────── Feriados ──────
+
+@datas_importantes_bp.route("/feriados/criar", methods=["POST"])
+@login_required
+@requires_access('ferias')
+def feriados_criar():
+    """Cria um novo feriado. Exclusivo para gerentes."""
+    _, email, tipo_usuario = _get_user_info()
+    if tipo_usuario not in ('Agente Público', 'admin'):
+        flash('Sem permissão.', 'danger')
+        return redirect(url_for('datas_importantes.index'))
+
+    data = request.form.get('data_feriado', '').strip()
+    nome = request.form.get('nome_feriado', '').strip()
+    tipo = request.form.get('tipo_feriado', 'municipal').strip()
+    ativo = request.form.get('ativo', '1') == '1'
+
+    if not data or not nome:
+        flash('Data e nome são obrigatórios.', 'warning')
+        return redirect(url_for('datas_importantes.index') + '#tab-feriados')
+
+    cur = get_cursor()
+    try:
+        cur.execute("""
+            INSERT INTO calendario.data_feriados (data_feriado, nome_feriado, tipo_feriado, ativo)
+            VALUES (%s, %s, %s, %s)
+        """, (data, nome, tipo, ativo))
+        get_db().commit()
+        flash('Feriado criado com sucesso.', 'success')
+    except Exception as e:
+        get_db().rollback()
+        flash(f'Erro: {str(e)}', 'danger')
+    finally:
+        cur.close()
+    return redirect(url_for('datas_importantes.index') + '#tab-feriados')
+
+
+@datas_importantes_bp.route("/feriados/editar/<int:id>", methods=["POST"])
+@login_required
+@requires_access('ferias')
+def feriados_editar(id):
+    """Edita um feriado existente. Exclusivo para gerentes."""
+    _, email, tipo_usuario = _get_user_info()
+    if tipo_usuario not in ('Agente Público', 'admin'):
+        flash('Sem permissão.', 'danger')
+        return redirect(url_for('datas_importantes.index'))
+
+    data = request.form.get('data_feriado', '').strip()
+    nome = request.form.get('nome_feriado', '').strip()
+    tipo = request.form.get('tipo_feriado', 'municipal').strip()
+    ativo = request.form.get('ativo', '1') == '1'
+
+    if not data or not nome:
+        flash('Data e nome são obrigatórios.', 'warning')
+        return redirect(url_for('datas_importantes.index') + '#tab-feriados')
+
+    cur = get_cursor()
+    try:
+        cur.execute("""
+            UPDATE calendario.data_feriados
+            SET data_feriado = %s, nome_feriado = %s, tipo_feriado = %s, ativo = %s
+            WHERE id = %s
+        """, (data, nome, tipo, ativo, id))
+        get_db().commit()
+        flash('Feriado atualizado.', 'success')
+    except Exception as e:
+        get_db().rollback()
+        flash(f'Erro: {str(e)}', 'danger')
+    finally:
+        cur.close()
+    return redirect(url_for('datas_importantes.index') + '#tab-feriados')
+
+
+@datas_importantes_bp.route("/feriados/deletar/<int:id>", methods=["POST"])
+@login_required
+@requires_access('ferias')
+def feriados_deletar(id):
+    """Remove um feriado. Exclusivo para gerentes."""
+    _, email, tipo_usuario = _get_user_info()
+    if tipo_usuario not in ('Agente Público', 'admin'):
+        flash('Sem permissão.', 'danger')
+        return redirect(url_for('datas_importantes.index'))
+
+    cur = get_cursor()
+    try:
+        cur.execute("DELETE FROM calendario.data_feriados WHERE id = %s", (id,))
+        get_db().commit()
+        flash('Feriado removido.', 'success')
+    except Exception as e:
+        get_db().rollback()
+        flash(f'Erro: {str(e)}', 'danger')
+    finally:
+        cur.close()
+    return redirect(url_for('datas_importantes.index') + '#tab-feriados')
+

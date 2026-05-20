@@ -164,6 +164,15 @@
         Controle de Acesso
       </button>
     </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-feriados-btn"
+              data-bs-toggle="tab" data-bs-target="#tab-feriados"
+              type="button" role="tab">
+        <i class="bi bi-calendar-x me-1"></i>
+        Feriados
+        <span class="badge ms-1" style="background:#be185d">{{ feriados|length }}</span>
+      </button>
+    </li>
     {% endif %}
   </ul>
 
@@ -672,6 +681,119 @@
     </div>
     {% endif %}
 
+    <!-- ─────────────────────────────────────────────── TAB 4: Feriados ── -->
+    {% if eh_gerente %}
+    <div class="tab-pane fade" id="tab-feriados" role="tabpanel">
+      <div class="content-card" style="border-radius: 0 10px 10px 10px;">
+        <div class="content-card-header" style="background:linear-gradient(135deg,#9d174d,#be185d)">
+          <h5><i class="bi bi-calendar-x me-2"></i>Feriados</h5>
+        </div>
+        <div class="content-card-body">
+
+          <!-- Formulário de adição -->
+          <div class="mb-4">
+            <button class="btn-parc outline mb-2" data-bs-toggle="collapse" data-bs-target="#formFeriado">
+              <i class="bi bi-plus-circle me-1"></i> Adicionar Feriado
+            </button>
+            <div class="collapse" id="formFeriado">
+              <form method="POST" action="{{ url_for('datas_importantes.feriados_criar') }}"
+                    class="row g-3 mt-1 p-3 border rounded" style="background:#fff5f7">
+                <div class="col-md-3">
+                  <label class="form-label fw-semibold">Data <span class="text-danger">*</span></label>
+                  <input type="date" name="data_feriado" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                  <input type="text" name="nome_feriado" class="form-control" required
+                         placeholder="Ex: Aniversário de São Paulo">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-semibold">Tipo</label>
+                  <select name="tipo_feriado" class="form-select">
+                    <option value="municipal">Municipal</option>
+                    <option value="estadual">Estadual</option>
+                    <option value="nacional">Nacional</option>
+                    <option value="facultativo">Facultativo</option>
+                  </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="ativo" value="1" id="feriadoAtivoNovo" checked>
+                    <label class="form-check-label" for="feriadoAtivoNovo">Ativo</label>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <button type="submit" class="btn-parc success">
+                    <i class="bi bi-check-circle me-1"></i> Salvar
+                  </button>
+                  <button type="button" class="btn btn-sm btn-secondary ms-2"
+                          data-bs-toggle="collapse" data-bs-target="#formFeriado">
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Tabela de feriados -->
+          {% if feriados %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr style="background:linear-gradient(135deg,#9d174d,#be185d);color:#fff">
+                  <th>Data</th>
+                  <th>Nome</th>
+                  <th>Tipo</th>
+                  <th class="text-center">Ativo</th>
+                  <th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for f in feriados %}
+                <tr>
+                  <td class="fw-semibold text-nowrap">{{ f.data_feriado.strftime('%d/%m/%Y') }}</td>
+                  <td>{{ f.nome_feriado }}</td>
+                  <td>
+                    <span class="badge"
+                      style="background:{% if f.tipo_feriado == 'nacional' %}#1e40af{% elif f.tipo_feriado == 'estadual' %}#065f46{% elif f.tipo_feriado == 'facultativo' %}#92400e{% else %}#be185d{% endif %}">
+                      {{ f.tipo_feriado|capitalize }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    {% if f.ativo %}
+                    <span class="badge bg-success">Sim</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Não</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <button class="btn btn-sm btn-outline-secondary"
+                            onclick="abrirEdicaoFeriado({{ f.id }}, '{{ f.data_feriado.strftime('%Y-%m-%d') }}', {{ f.nome_feriado|tojson }}, '{{ f.tipo_feriado }}', {{ f.ativo|lower }})"
+                            title="Editar">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <form method="POST"
+                          action="{{ url_for('datas_importantes.feriados_deletar', id=f.id) }}"
+                          style="display:inline"
+                          onsubmit="return confirm('Remover o feriado {{ f.nome_feriado }}?')">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted text-center py-4">Nenhum feriado cadastrado.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
   </div><!-- /tab-content -->
 </div><!-- /container -->
 
@@ -1126,6 +1248,9 @@
     if (params.get('aba') === 'acesso') {
       const btn = document.querySelector('[data-bs-target="#tab-acesso"]');
       if (btn) btn.click();
+    } else if (location.hash === '#tab-feriados') {
+      const btn = document.querySelector('[data-bs-target="#tab-feriados"]');
+      if (btn) btn.click();
     } else {
       const saved = localStorage.getItem(TABS_KEY);
       if (saved) {
@@ -1139,6 +1264,65 @@
       });
     });
   });
+
+  // ─── Edição de feriado ────────────────────────────────────────────────────
+  function abrirEdicaoFeriado(id, data, nome, tipo, ativo) {
+    const form = document.getElementById('formEdicaoFeriado');
+    form.action = `/datas-importantes/feriados/editar/${id}`;
+    document.getElementById('ferEditData').value  = data  || '';
+    document.getElementById('ferEditNome').value  = nome  || '';
+    document.getElementById('ferEditTipo').value  = tipo  || 'municipal';
+    document.getElementById('ferEditAtivo').checked = ativo;
+    new bootstrap.Modal(document.getElementById('modalEdicaoFeriado')).show();
+  }
 </script>
+
+<!-- Modal de Edição — Feriados -->
+<div class="modal fade" id="modalEdicaoFeriado" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#9d174d,#be185d);color:#fff">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Feriado</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="formEdicaoFeriado">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">Data <span class="text-danger">*</span></label>
+              <input type="date" name="data_feriado" class="form-control" id="ferEditData" required>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+              <input type="text" name="nome_feriado" class="form-control" id="ferEditNome" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tipo</label>
+              <select name="tipo_feriado" class="form-select" id="ferEditTipo">
+                <option value="municipal">Municipal</option>
+                <option value="estadual">Estadual</option>
+                <option value="nacional">Nacional</option>
+                <option value="facultativo">Facultativo</option>
+              </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="ativo" value="1" id="ferEditAtivo">
+                <label class="form-check-label" for="ferEditAtivo">Ativo</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn-parc success">
+            <i class="bi bi-check-circle"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
