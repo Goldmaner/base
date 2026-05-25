@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatórios de Desempenho – Visão Gerencial – FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background: #f1f5f9; font-family: 'Segoe UI', sans-serif; }
+
+    .page-header {
+      background: linear-gradient(135deg, #78350f 0%, #d97706 100%);
+      color: #fff; padding: 22px 32px; margin-bottom: 28px;
+      box-shadow: 0 4px 18px rgba(217,119,6,.28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.45rem; font-weight: 800; }
+    .page-header p  { margin: 4px 0 0; opacity: .82; font-size: .88rem; }
+
+    .btn-amber {
+      background: linear-gradient(135deg, #78350f, #d97706);
+      color: #fff; border: none; border-radius: 8px; padding: 7px 16px;
+      font-weight: 600; font-size: .875rem; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; transition: opacity .15s;
+    }
+    .btn-amber:hover { opacity: .88; color: #fff; }
+    .btn-amber.outline {
+      background: transparent; border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+    }
+    .btn-amber.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+
+    .faf-content { max-width: 1200px; margin: 0 auto; padding: 0 28px 36px; }
+
+    /* Navegação de semana */
+    .week-nav {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      padding: 16px 22px; margin-bottom: 22px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .week-label {
+      font-weight: 700; font-size: 1rem; color: #78350f;
+      flex: 1; text-align: center; min-width: 200px;
+    }
+    .btn-nav {
+      background: #fff; border: 1.5px solid #d97706; color: #d97706;
+      border-radius: 8px; padding: 6px 14px; font-weight: 600;
+      cursor: pointer; font-size: .85rem; transition: all .15s;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .btn-nav:hover { background: #d97706; color: #fff; }
+
+    /* Card principal */
+    .content-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07); overflow: hidden; margin-bottom: 24px;
+    }
+    .content-card-header {
+      background: linear-gradient(135deg, #78350f, #d97706);
+      color: #fff; padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+
+    /* Abas de departamento */
+    .dep-tabs { border-bottom: 2px solid #fde68a; background: #fffbf0; }
+    .dep-tabs .nav-link {
+      color: #78350f; border-color: transparent;
+      font-size: .88rem; padding: 9px 18px; font-weight: 500;
+    }
+    .dep-tabs .nav-link:hover { background: #fef3c7; border-color: #fde68a #fde68a transparent; }
+    .dep-tabs .nav-link.active {
+      color: #78350f; font-weight: 700;
+      border-color: #fde68a #fde68a #fff;
+      background: #fff;
+    }
+    .dep-tabs .nav-link .badge {
+      font-size: .72rem; margin-left: 5px;
+    }
+
+    /* Tabela gerencial */
+    .tabela-dep thead th {
+      background: linear-gradient(135deg, #78350f, #d97706);
+      color: #fff; border: none; font-size: .85rem; white-space: nowrap;
+    }
+    .tabela-dep tbody tr:hover { background: #fef9ee; }
+
+    /* Badges de status */
+    .badge-ok {
+      background: #dcfce7; color: #166534;
+      border: 1px solid #86efac; border-radius: 20px;
+      padding: 3px 10px; font-size: .8rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .badge-nok {
+      background: #fee2e2; color: #991b1b;
+      border: 1px solid #fca5a5; border-radius: 20px;
+      padding: 3px 10px; font-size: .8rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .badge-futuro {
+      background: #f3f4f6; color: #6b7280;
+      border: 1px solid #d1d5db; border-radius: 20px;
+      padding: 3px 10px; font-size: .8rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+
+    /* Dia da semana chip */
+    .dia-chip {
+      display: inline-block; border-radius: 6px;
+      padding: 2px 8px; font-size: .78rem; font-weight: 600;
+      background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+    }
+
+    /* Resumo cards */
+    .resumo-card {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      padding: 16px 20px; text-align: center;
+    }
+    .resumo-num { font-size: 2rem; font-weight: 800; line-height: 1; }
+    .resumo-label { font-size: .8rem; color: #6b7280; margin-top: 4px; }
+
+    /* Legenda */
+    .legenda { display: flex; gap: 20px; flex-wrap: wrap; font-size: .82rem; }
+    .legenda-item { display: flex; align-items: center; gap: 6px; }
+    .legenda-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<div class="page-header">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h2><i class="bi bi-people-fill me-2"></i>Visão Gerencial – Relatórios de Desempenho</h2>
+      <p>Acompanhamento do preenchimento por dia de teletrabalho</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('relatorios_desempenho.index') }}" class="btn-amber outline">
+        <i class="bi bi-arrow-left"></i> Voltar aos Relatórios
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="faf-content">
+
+  <!-- ===== NAVEGAÇÃO DE SEMANA ===== -->
+  <div class="week-nav">
+    <button class="btn-nav" onclick="mudarSemana(-7)">
+      <i class="bi bi-chevron-left"></i> Semana anterior
+    </button>
+    <div class="week-label" id="weekLabel">Carregando...</div>
+    <button class="btn-nav" onclick="mudarSemana(7)">
+      Próxima semana <i class="bi bi-chevron-right"></i>
+    </button>
+    <button class="btn-nav" onclick="irParaHoje()" title="Ir para semana atual">
+      <i class="bi bi-calendar-check"></i> Hoje
+    </button>
+  </div>
+
+  <!-- ===== RESUMO ===== -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="resumo-card">
+        <div class="resumo-num text-warning" id="resumoTotal">—</div>
+        <div class="resumo-label">Com teletrabalho</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="resumo-card">
+        <div class="resumo-num" style="color:#166534;" id="resumoOk">—</div>
+        <div class="resumo-label">Relatórios preenchidos</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="resumo-card">
+        <div class="resumo-num" style="color:#991b1b;" id="resumoNok">—</div>
+        <div class="resumo-label">Sem relatório (passados)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="resumo-card">
+        <div class="resumo-num" style="color:#6b7280;" id="resumoFuturo">—</div>
+        <div class="resumo-label">Pendentes / futuros</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CARD COM ABAS ===== -->
+  <div class="content-card">
+    <div class="content-card-header">
+      <h5><i class="bi bi-table me-2"></i>Escala e preenchimento por departamento</h5>
+      <button class="btn-amber outline" onclick="carregarSemana()" title="Atualizar">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+    </div>
+
+    <!-- Abas de departamento (geradas por JS) -->
+    <div id="depTabsContainer">
+      <ul class="nav nav-tabs dep-tabs px-3 pt-2" id="depTabsList" role="tablist"></ul>
+      <div class="tab-content p-0" id="depTabsContent"></div>
+    </div>
+  </div>
+
+  <!-- ===== LEGENDA ===== -->
+  <div class="legenda px-2">
+    <div class="legenda-item">
+      <span class="legenda-dot" style="background:#166534;"></span>
+      <span>Relatório preenchido</span>
+    </div>
+    <div class="legenda-item">
+      <span class="legenda-dot" style="background:#991b1b;"></span>
+      <span>Dia passado sem relatório</span>
+    </div>
+    <div class="legenda-item">
+      <span class="legenda-dot" style="background:#9ca3af;"></span>
+      <span>Dia futuro ou pendente</span>
+    </div>
+  </div>
+
+</div><!-- /faf-content -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let _semanaInicio = null;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    _semanaInicio = semanaInicioAtual();
+    carregarSemana();
+  });
+
+  // ── Helpers de data ───────────────────────────────────────────────────────
+  function semanaInicioAtual() {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    const dia = d.getDay();
+    d.setDate(d.getDate() + (dia === 0 ? -6 : 1 - dia));
+    return d;
+  }
+
+  function toIso(d) { return d.toISOString().slice(0, 10); }
+
+  function addDias(d, n) {
+    const r = new Date(d);
+    r.setDate(r.getDate() + n);
+    return r;
+  }
+
+  function mudarSemana(delta) {
+    _semanaInicio = addDias(_semanaInicio, delta);
+    carregarSemana();
+  }
+
+  function irParaHoje() {
+    _semanaInicio = semanaInicioAtual();
+    carregarSemana();
+  }
+
+  // ── Carregar semana ───────────────────────────────────────────────────────
+  async function carregarSemana() {
+    document.getElementById('weekLabel').textContent = 'Carregando...';
+    document.getElementById('depTabsList').innerHTML =
+      '<li class="nav-item"><span class="nav-link disabled"><span class="spinner-border spinner-border-sm text-warning"></span></span></li>';
+    document.getElementById('depTabsContent').innerHTML = '';
+
+    try {
+      const r = await fetch('/relatorios_desempenho/api/gerencial_semana?semana_inicio=' + toIso(_semanaInicio));
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro || 'Erro');
+
+      document.getElementById('weekLabel').textContent =
+        `Semana: ${d.semana_inicio_fmt} a ${d.semana_fim_fmt}`;
+
+      const hoje = new Date().toISOString().slice(0, 10);
+      const pessoas = d.pessoas || [];
+
+      // Resumo global
+      let ok = 0, nok = 0, fut = 0;
+      pessoas.forEach(p => {
+        if (p.relatorio_preenchido) ok++;
+        else if (p.data_teletrabalho && p.data_teletrabalho < hoje) nok++;
+        else fut++;
+      });
+      document.getElementById('resumoTotal').textContent  = pessoas.length;
+      document.getElementById('resumoOk').textContent     = ok;
+      document.getElementById('resumoNok').textContent    = nok;
+      document.getElementById('resumoFuturo').textContent = fut;
+
+      if (pessoas.length === 0) {
+        document.getElementById('depTabsList').innerHTML = '';
+        document.getElementById('depTabsContent').innerHTML =
+          `<div class="text-center text-muted py-5">
+             <i class="bi bi-calendar-x" style="font-size:2rem;opacity:.4;"></i>
+             <p class="mt-2">Nenhuma escala de teletrabalho cadastrada para esta semana.</p>
+           </div>`;
+        return;
+      }
+
+      // Agrupar por unidade
+      const grupos = {};
+      pessoas.forEach(p => {
+        const dep = p.unidade || 'Sem departamento';
+        if (!grupos[dep]) grupos[dep] = [];
+        grupos[dep].push(p);
+      });
+
+      // Ordenar alfabeticamente por departamento
+      const deps = Object.keys(grupos).sort();
+
+      const tabsList    = document.getElementById('depTabsList');
+      const tabsContent = document.getElementById('depTabsContent');
+      tabsList.innerHTML    = '';
+      tabsContent.innerHTML = '';
+
+      deps.forEach((dep, idx) => {
+        const lista = grupos[dep];
+        const tabId   = 'tab-dep-' + idx;
+        const paneId  = 'pane-dep-' + idx;
+        const isFirst = idx === 0;
+
+        // Contadores por aba
+        let aOk = 0, aNok = 0;
+        lista.forEach(p => {
+          if (p.relatorio_preenchido) aOk++;
+          else if (p.data_teletrabalho && p.data_teletrabalho < hoje) aNok++;
+        });
+
+        // Badge colorido
+        let badgeHtml = '';
+        if (aOk > 0)  badgeHtml += `<span class="badge" style="background:#166534;color:#fff;">${aOk}</span>`;
+        if (aNok > 0) badgeHtml += `<span class="badge" style="background:#991b1b;color:#fff;margin-left:2px;">${aNok}</span>`;
+
+        // Tab item
+        tabsList.insertAdjacentHTML('beforeend', `
+          <li class="nav-item" role="presentation">
+            <button class="nav-link ${isFirst ? 'active' : ''}" id="${tabId}"
+                    data-bs-toggle="tab" data-bs-target="#${paneId}"
+                    type="button" role="tab">
+              ${escHtml(dep)} ${badgeHtml}
+            </button>
+          </li>`);
+
+        // Tab pane
+        const linhas = lista.map(p => {
+          let statusBadge;
+          if (p.relatorio_preenchido) {
+            statusBadge = `<span class="badge-ok"><i class="bi bi-check-circle-fill"></i> Preenchido (${p.total_registros})</span>`;
+          } else if (p.data_teletrabalho && p.data_teletrabalho < hoje) {
+            statusBadge = `<span class="badge-nok"><i class="bi bi-x-circle-fill"></i> Não preenchido</span>`;
+          } else {
+            statusBadge = `<span class="badge-futuro"><i class="bi bi-clock"></i> Pendente</span>`;
+          }
+
+          return `<tr>
+            <td>
+              <div class="fw-semibold" style="font-size:.9rem;">${escHtml(p.nome)}</div>
+              <small class="text-muted">${escHtml(p.email)}</small>
+            </td>
+            <td>
+              ${p.data_teletrabalho
+                ? `<span class="dia-chip">${escHtml(p.dia_semana)}</span>
+                   <br><small class="text-muted">${escHtml(p.data_fmt)}</small>`
+                : '<span class="text-muted">—</span>'}
+            </td>
+            <td class="text-center">${statusBadge}</td>
+            <td class="text-center">
+              ${p.relatorio_preenchido
+                ? `<span class="badge bg-warning text-dark">${p.total_registros}</span>`
+                : '<span class="text-muted">0</span>'}
+            </td>
+          </tr>`;
+        }).join('');
+
+        tabsContent.insertAdjacentHTML('beforeend', `
+          <div class="tab-pane fade ${isFirst ? 'show active' : ''}" id="${paneId}" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 tabela-dep">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Dia de Teletrabalho</th>
+                    <th class="text-center">Status do Relatório</th>
+                    <th class="text-center">Qtd.</th>
+                  </tr>
+                </thead>
+                <tbody>${linhas || `<tr><td colspan="4" class="text-center text-muted py-4">Nenhuma pessoa neste departamento.</td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>`);
+      });
+
+    } catch (e) {
+      document.getElementById('depTabsList').innerHTML = '';
+      document.getElementById('depTabsContent').innerHTML =
+        `<div class="alert alert-danger m-3">Erro ao carregar: ${escHtml(e.message)}</div>`;
+      document.getElementById('weekLabel').textContent = 'Erro';
+    }
+  }
+
+  function escHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+</script>
+</body>
+</html>

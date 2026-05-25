@@ -1,14 +1,15 @@
 """
-Rotas para Conciliação Bancária - Análise de Prestação de Contas
+Rotas para Conciliação Bancária v2 - Análise de Prestação de Contas
+Refatoração de performance: datalists globais, bulk delete, atualizarLinhaDOM
 """
 
-from flask import Blueprint, render_template, request, jsonify, session, redirect
+from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db
 from functools import wraps
 from datetime import datetime, date
 from decorators import requires_access
 
-bp = Blueprint('conc_bancaria', __name__, url_prefix='/conc_bancaria')
+bp = Blueprint('conc_bancaria_2', __name__, url_prefix='/conc_bancaria_2')
 
 def login_required(f):
     @wraps(f)
@@ -23,12 +24,8 @@ def login_required(f):
 @login_required
 @requires_access('conc_bancaria')
 def index():
-    """Redireciona permanentemente para a versão otimizada conc_banc"""
-    termo = request.args.get('termo', '')
-    destino = '/conc_banc/'
-    if termo:
-        destino += f'?termo={termo}'
-    return redirect(destino, code=301)
+    """Página principal de conciliação bancária"""
+    return render_template('analises_pc/conc_bancaria_2.html')
 
 
 @bp.route('/api/extrato', methods=['GET'])
@@ -380,6 +377,46 @@ def api_excluir_extrato(extrato_id):
         
     except Exception as e:
         print(f"[ERRO] ao excluir linha {extrato_id}: {e}")
+        if get_db():
+            get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@bp.route('/api/extrato/bulk', methods=['DELETE'])
+@login_required
+@requires_access('conc_bancaria')
+def api_excluir_extrato_bulk():
+    """
+    API v2: Exclui múltiplas linhas do extrato em 1 query (em vez de N chamadas DELETE).
+    Body JSON: {"ids": [1, 2, 3, ...]}
+    """
+    try:
+        dados = request.get_json()
+        ids = dados.get('ids', []) if dados else []
+
+        if not ids:
+            return jsonify({'mensagem': '0 linhas excluídas'}), 200
+
+        # Validar que todos são inteiros
+        ids_int = [int(i) for i in ids if str(i).isdigit()]
+        if not ids_int:
+            return jsonify({'erro': 'Nenhum ID válido fornecido'}), 400
+
+        cur = get_cursor()
+        db = get_db()
+
+        cur.execute(
+            "DELETE FROM analises_pc.conc_extrato WHERE id = ANY(%s)",
+            (ids_int,)
+        )
+        deletados = cur.rowcount
+        db.commit()
+
+        print(f"[BULK DELETE] {deletados} linhas excluídas: {ids_int}")
+        return jsonify({'mensagem': f'{deletados} linhas excluídas com sucesso', 'deletados': deletados}), 200
+
+    except Exception as e:
+        print(f"[ERRO] ao excluir linhas em bulk: {e}")
         if get_db():
             get_db().rollback()
         return jsonify({'erro': str(e)}), 500

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -359,30 +359,26 @@
 <body>
 
 <div class="container-fluid mt-4">
-    <!-- Indicador de Performance -->
-    <div id="perfIndicator" style="position: fixed; top: 10px; right: 10px; z-index: 2000; background: #2c3e50; color: white; padding: 10px 15px; border-radius: 5px; font-family: monospace; font-size: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: none;">
-        <div style="font-weight: bold; margin-bottom: 5px;">⚡ Performance Monitor</div>
-        <div id="perfStats"></div>
-        <div style="margin-top: 8px; font-size: 10px; opacity: 0.7;">
-            Console: perfSummary() | perfClear() | perfToggle()
-        </div>
-    </div>
-
-    <!-- Painel de Benchmark (comparação v1 vs v2) -->
-    <div id="benchmarkPanel" style="display:none; position:fixed; bottom:16px; right:16px; z-index:3000; background:#1a1a2e; color:#eee; padding:14px 16px; border-radius:8px; font-family:monospace; font-size:12px; box-shadow:0 4px 20px rgba(0,0,0,0.5); min-width:280px; max-width:320px;">
+    <!-- Painel de Benchmark unificado (DOM stats + tempos + histórico) -->
+    <div id="benchmarkPanel" style="display:none; position:fixed; bottom:16px; right:16px; z-index:3000; background:#0d1b2a; color:#eee; padding:14px 16px; border-radius:8px; font-family:monospace; font-size:12px; box-shadow:0 4px 20px rgba(0,0,0,0.5); min-width:280px; max-width:320px; border:1px solid #2ecc71;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-weight:bold; font-size:13px;">🏁 Benchmark
-                <span style="background:#e74c3c; color:white; border-radius:4px; padding:1px 6px; font-size:11px; margin-left:4px;">v1</span>
+                <span style="background:#2ecc71; color:#111; border-radius:4px; padding:1px 6px; font-size:11px; margin-left:4px;">v2</span>
             </span>
             <button onclick="document.getElementById('benchmarkPanel').style.display='none'" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:16px;line-height:1;">×</button>
         </div>
 
-        <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #333;">
+        <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #1e3a2f;">
             <div style="color:#aaa; font-size:10px; margin-bottom:4px;">📊 DOM Stats (agora)</div>
             <div id="benchDOMStats" style="line-height:1.7;">—</div>
         </div>
 
-        <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #333;">
+        <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #1e3a2f;">
+            <div style="color:#aaa; font-size:10px; margin-bottom:4px;">⚡ Tempos de operação (últimos)</div>
+            <div id="benchOpsStats" style="line-height:1.5; max-height:140px; overflow-y:auto; font-size:11px;">Aguardando métricas...</div>
+        </div>
+
+        <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #1e3a2f;">
             <div style="color:#aaa; font-size:10px; margin-bottom:4px;">⏱ renderizarTabela (histórico)</div>
             <div id="benchRenderStats" style="line-height:1.7;">—</div>
         </div>
@@ -400,11 +396,30 @@
                 🔄 Atualizar
             </button>
         </div>
-        <div style="margin-top:8px; font-size:10px; color:#666; text-align:center;">
-            Console: benchSummary() | Compare com v2 em /conc_bancaria_2
+        <div style="margin-top:8px; font-size:10px; color:#555; text-align:center;">
+            Console: benchSummary() | Compare com v1 em /conc_bancaria
         </div>
     </div>
-    
+
+    <!-- Modal de diálogo reutilizável (substitui alert/confirm/prompt nativos) -->
+    <div class="modal fade" id="modalDialogo" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header py-2 px-3">
+                    <h6 class="modal-title fw-semibold" id="modalDialogoTitulo"></h6>
+                </div>
+                <div class="modal-body py-2 px-3" id="modalDialogoCorpo" style="font-size:0.9rem; white-space:pre-wrap;"></div>
+                <div id="modalDialogoInputWrap" style="display:none; padding:0 1rem 0.75rem;">
+                    <input type="text" class="form-control form-control-sm" id="modalDialogoInput" autocomplete="off">
+                </div>
+                <div class="modal-footer py-2 px-3 gap-2">
+                    <button type="button" class="btn btn-sm btn-secondary" id="modalDialogoBtnCancelar">Cancelar</button>
+                    <button type="button" class="btn btn-sm btn-danger"    id="modalDialogoBtnConfirmar">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center gap-3">
             <h2 class="mb-0"><i class="bi bi-bank me-2"></i>Conciliação Bancária</h2>
@@ -559,29 +574,11 @@
                                     </div>
                                 </a>
                             </div>
-
-                            <!-- Relação de Glosas -->
-                            <div class="col-6">
-                                <a href="#" id="btnGlosas" onmousedown="atualizarHrefGlosas()" onclick="abrirGlosas(event)" class="text-decoration-none">
-                                    <div class="card border-danger h-100 hover-shadow">
-                                        <div class="card-body p-3">
-                                            <div class="d-flex align-items-center mb-2">
-                                                <i class="bi bi-x-circle-fill fs-4 text-danger me-2"></i>
-                                                <h6 class="mb-0 text-danger">Relação de Glosas</h6>
-                                            </div>
-                                            <small class="text-muted">Despesas marcadas como Glosar, organizadas por mês</small>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <button class="btn btn-outline-secondary btn-sm me-2" onclick="togglePerfMonitor()" title="Toggle Performance Monitor">
-                <i class="bi bi-speedometer2"></i>
-            </button>
             <button class="btn btn-outline-primary me-2" id="btnMenuSecoes" onclick="toggleMenuSecoes()">
                 <i class="bi bi-list-check me-2"></i>Seções
             </button>
@@ -657,7 +654,7 @@
                        id="numeroTermo" 
                        list="datalistTermos"
                        placeholder="Digite para buscar..."
-                       onchange="carregarExtrato(); atualizarLinkV2(this.value)"
+                       onchange="carregarExtrato()"
                        oninput="filtrarTermos(this.value)">
                 <datalist id="datalistTermos">
                 </datalist>
@@ -724,16 +721,7 @@
                 </button>
             </div>
             <div class="col-md-1">
-                <a id="btnV2"
-                   href="/conc_bancaria_2"
-                   class="btn btn-outline-success w-100"
-                   title="Abrir versão v2 (performance aprimorada)"
-                   target="_blank">
-                    <i class="bi bi-lightning-charge-fill me-1"></i>v2
-                </a>
-            </div>
-            <div class="col-md-1">
-                <button class="btn btn-outline-warning w-100" onclick="toggleBenchmarkPanel()" title="Painel de benchmark e diagnóstico">
+                <button class="btn btn-outline-secondary w-100" onclick="toggleBenchmarkPanel()" title="Diagnóstico de performance (DOM + tempos)">
                     <i class="bi bi-speedometer2"></i>
                 </button>
             </div>
@@ -865,6 +853,11 @@
     <!-- Fim Container de Configurações -->
 
     <!-- Tabela de Conciliação -->
+    <!-- v2: Datalists globais de categoria (1 vez, não 1 por linha) -->
+    <datalist id="datalistCategoriasCredito"></datalist>
+    <datalist id="datalistCategoriasDebito"></datalist>
+    <datalist id="datalistCategoriasAmbos"></datalist>
+
     <div class="conc-card">
         <div class="table-container">
             <table class="table table-conc table-sm" id="tabelaConciliacao">
@@ -1267,7 +1260,7 @@
     };
 
     // =========================================================================
-    // BENCHMARK PANEL — comparação v1 vs v2
+    // BENCHMARK PANEL v2 — comparação com v1
     // =========================================================================
     function toggleBenchmarkPanel() {
         const p = document.getElementById('benchmarkPanel');
@@ -1281,16 +1274,21 @@
 
     function coletarDOMStats() {
         const tbody = document.getElementById('tbodyConciliacao');
-        const rows       = tbody ? tbody.querySelectorAll('tr').length : 0;
-        const allOptions = document.querySelectorAll('option').length;
-        // Datalists por linha (v1 tem um por linha; v2 tem globais)
-        const datalistsLinha = document.querySelectorAll('datalist[id^="datalist-cat-"]').length;
+        const rows          = tbody ? tbody.querySelectorAll('tr').length : 0;
+        const allOptions    = document.querySelectorAll('option').length;
+        // v1 tem datalists por linha; v2 tem globais
+        const datalistsLinha  = document.querySelectorAll('datalist[id^="datalist-cat-"]').length;
         const datalistsGlobal = document.querySelectorAll('datalist[id^="datalistCategorias"]').length;
-        const totalElements  = tbody ? tbody.querySelectorAll('*').length : 0;
+        const totalElements   = tbody ? tbody.querySelectorAll('*').length : 0;
         const mem = (performance.memory)
             ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + ' MB'
             : 'N/D';
-        return { rows, allOptions, datalistsLinha, datalistsGlobal, totalElements, mem };
+        // Lazy dropdown stats
+        const menusLazy      = tbody ? tbody.querySelectorAll('ul[data-lazy-index]').length : 0;
+        const menusPopulados = tbody ? tbody.querySelectorAll('ul[data-lazy-index]:not(:empty)').length : 0;
+        const menuItems      = tbody ? tbody.querySelectorAll('ul[data-lazy-index] li').length : 0;
+        return { rows, allOptions, datalistsLinha, datalistsGlobal, totalElements, mem,
+                 menusLazy, menusPopulados, menuItems };
     }
 
     function atualizarBenchStats() {
@@ -1301,14 +1299,19 @@
             <div>Linhas no DOM: <b style="color:${cor(s.rows,500,1500)}">${s.rows}</b></div>
             <div>Total &lt;option&gt;: <b style="color:${cor(s.allOptions,500,5000)}">${s.allOptions.toLocaleString()}</b></div>
             <div>Datalists por linha: <b style="color:${s.datalistsLinha>0?'#e74c3c':'#2ecc71'}">${s.datalistsLinha}</b>
-                ${s.datalistsLinha > 0 ? '⚠ v1 (alto custo)' : ''}</div>
+                ${s.datalistsLinha > 0 ? '⚠ padrão v1 detectado!' : '✓ nenhum (v2 ok)'}</div>
             <div>Datalists globais: <b style="color:${s.datalistsGlobal>0?'#2ecc71':'#aaa'}">${s.datalistsGlobal}</b>
-                ${s.datalistsGlobal > 0 ? '✓ v2 (otimizado)' : ''}</div>
+                ${s.datalistsGlobal > 0 ? '✓ otimização ativa' : ''}</div>
+            <div>Dropdowns lazy: <b style="color:${s.menusLazy>0?'#2ecc71':'#aaa'}">${s.menusLazy}</b>
+                menus | <b>${s.menusPopulados}</b> abertos | <b style="color:${cor(s.menuItems,0,500)}">${s.menuItems}</b> &lt;li&gt; no DOM</div>
             <div>Elementos no tbody: <b style="color:${cor(s.totalElements,5000,20000)}">${s.totalElements.toLocaleString()}</b></div>
             <div>Heap JS: <b>${s.mem}</b></div>
         `;
 
-        // Histórico de renders do performanceMetrics
+        // Tempos de operação recentes (substitui o antigo perfIndicator)
+        document.getElementById('benchOpsStats').innerHTML = gerarHTMLOperacoesRecentes();
+
+        // Histórico de renders
         const renders = performanceMetrics.logs
             .filter(l => l.label === 'renderizarTabela - TOTAL')
             .slice(-5)
@@ -1331,18 +1334,16 @@
     }
 
     async function runBenchmark() {
-        const btn = document.querySelector('#benchmarkPanel button');
         const result = document.getElementById('benchRunResult');
         result.innerHTML = '<span style="color:#f39c12">⏳ Executando 3 renders...</span>';
 
-        // Aguardar 1 frame para o DOM atualizar
         await new Promise(r => requestAnimationFrame(r));
 
         const tempos = [];
         for (let i = 0; i < 3; i++) {
             const t0 = performance.now();
             renderizarTabela();
-            await new Promise(r => requestAnimationFrame(r)); // aguardar paint
+            await new Promise(r => requestAnimationFrame(r));
             tempos.push(performance.now() - t0);
         }
 
@@ -1359,62 +1360,41 @@
 
         atualizarBenchStats();
 
-        console.log(`[BENCHMARK v1] 3 runs: ${tempos.map(t=>t.toFixed(0)+'ms').join(', ')} | Avg: ${avg}ms`);
+        console.log(`[BENCHMARK v2] 3 runs: ${tempos.map(t=>t.toFixed(0)+'ms').join(', ')} | Avg: ${avg}ms`);
     }
 
     // Expor no console
     window.benchSummary = () => {
         const s = coletarDOMStats();
         console.table(s);
-        console.log('[BENCHMARK] Cole este resultado e compare com o v2 em /conc_bancaria_2');
+        console.log('[BENCHMARK] Cole este resultado e compare com o v1 em /conc_bancaria');
     };
     
-    // Função para toggle do monitor visual
-    function togglePerfMonitor() {
-        const monitor = document.getElementById('perfIndicator');
-        if (monitor.style.display === 'none') {
-            monitor.style.display = 'block';
-            updatePerfMonitor();
-        } else {
-            monitor.style.display = 'none';
+    // Função utilitária — produz HTML resumindo últimas operações (top 10 mais recentes)
+    function gerarHTMLOperacoesRecentes() {
+        if (!performanceMetrics.logs.length) {
+            return '<div style="opacity:0.5;">Aguardando métricas...</div>';
         }
-    }
-    
-    // Atualizar estatísticas no monitor visual
-    function updatePerfMonitor() {
-        const stats = document.getElementById('perfStats');
-        if (!stats || !performanceMetrics.enabled) return;
-        
         const grouped = {};
-        performanceMetrics.logs.slice(-10).forEach(log => {
-            if (!grouped[log.label]) {
-                grouped[log.label] = { count: 0, total: 0, last: 0 };
-            }
-            const dur = parseFloat(log.duration);
+        performanceMetrics.logs.slice(-15).forEach(log => {
+            if (!grouped[log.label]) grouped[log.label] = { count: 0, last: 0 };
             grouped[log.label].count++;
-            grouped[log.label].total += dur;
-            grouped[log.label].last = dur;
+            grouped[log.label].last = parseFloat(log.duration);
         });
-        
         let html = '';
         Object.entries(grouped).forEach(([label, data]) => {
             const color = data.last > 1000 ? '#e74c3c' : data.last > 500 ? '#f39c12' : data.last > 100 ? '#3498db' : '#2ecc71';
-            html += `<div style="margin: 3px 0; font-size: 11px;">
-                <span style="color: ${color};">●</span> ${label.replace('renderizarTabela - ', '').replace('carregarExtrato - ', '')}: 
-                <strong style="color: ${color};">${data.last.toFixed(0)}ms</strong>
-            </div>`;
+            const labelClean = label.replace('renderizarTabela - ', '').replace('carregarExtrato - ', '');
+            html += `<div style="margin:2px 0;"><span style="color:${color}">●</span> ${labelClean}: <strong style="color:${color}">${data.last.toFixed(0)}ms</strong></div>`;
         });
-        
-        stats.innerHTML = html || '<div style="opacity: 0.5;">Aguardando métricas...</div>';
+        return html;
     }
-    
-    // Atualizar monitor a cada segundo quando visível
+
+    // Re-renderizar painel de benchmark se estiver aberto (auto-refresh quando há nova métrica)
     setInterval(() => {
-        const monitor = document.getElementById('perfIndicator');
-        if (monitor && monitor.style.display !== 'none') {
-            updatePerfMonitor();
-        }
-    }, 1000);
+        const p = document.getElementById('benchmarkPanel');
+        if (p && p.style.display !== 'none') atualizarBenchStats();
+    }, 1500);
     
     // Textos informativos
     const infos = {
@@ -1502,6 +1482,91 @@
     }
     
     // ============================================================
+    // DIÁLOGOS NÃO BLOQUEANTES (substitui alert/confirm/prompt)
+    // ============================================================
+
+    /**
+     * Substitui confirm() — retorna Promise<boolean>
+     * btnClasse: 'btn-danger' | 'btn-warning' | 'btn-primary'
+     */
+    function confirmarAsync(titulo, mensagem, btnConfirmar = 'Confirmar', btnCancelar = 'Cancelar', btnClasse = 'btn-danger') {
+        return new Promise((resolve) => {
+            document.getElementById('modalDialogoTitulo').textContent = titulo;
+            document.getElementById('modalDialogoCorpo').textContent = mensagem;
+            document.getElementById('modalDialogoInputWrap').style.display = 'none';
+
+            const btnConf = document.getElementById('modalDialogoBtnConfirmar');
+            const btnCanc = document.getElementById('modalDialogoBtnCancelar');
+            btnConf.className = `btn btn-sm ${btnClasse}`;
+            btnConf.textContent = btnConfirmar;
+            btnCanc.textContent = btnCancelar;
+            btnCanc.style.display = '';
+
+            // Trocar nós para limpar listeners anteriores
+            const bc = btnConf.cloneNode(true);
+            const bk = btnCanc.cloneNode(true);
+            btnConf.replaceWith(bc);
+            btnCanc.replaceWith(bk);
+
+            const modalEl = document.getElementById('modalDialogo');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            let resolvido = false;
+            const fechar = (val) => { if (!resolvido) { resolvido = true; modal.hide(); resolve(val); } };
+
+            bc.addEventListener('click', () => fechar(true),  { once: true });
+            bk.addEventListener('click', () => fechar(false), { once: true });
+            modalEl.addEventListener('hidden.bs.modal', () => fechar(false), { once: true });
+
+            modal.show();
+        });
+    }
+
+    /**
+     * Substitui prompt() — retorna Promise<string|null>
+     * null = cancelado, string vazia = confirmado sem digitar
+     */
+    function promptAsync(titulo, mensagem, valorPadrao = '', placeholder = '') {
+        return new Promise((resolve) => {
+            document.getElementById('modalDialogoTitulo').textContent = titulo;
+            document.getElementById('modalDialogoCorpo').textContent = mensagem;
+
+            const inputWrap = document.getElementById('modalDialogoInputWrap');
+            const input     = document.getElementById('modalDialogoInput');
+            inputWrap.style.display = 'block';
+            input.value = valorPadrao;
+            input.placeholder = placeholder;
+
+            const btnConf = document.getElementById('modalDialogoBtnConfirmar');
+            const btnCanc = document.getElementById('modalDialogoBtnCancelar');
+            btnConf.className = 'btn btn-sm btn-primary';
+            btnConf.textContent = 'OK';
+            btnCanc.textContent = 'Cancelar';
+            btnCanc.style.display = '';
+
+            const bc = btnConf.cloneNode(true);
+            const bk = btnCanc.cloneNode(true);
+            btnConf.replaceWith(bc);
+            btnCanc.replaceWith(bk);
+
+            const modalEl = document.getElementById('modalDialogo');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            let resolvido = false;
+            const fechar = (val) => { if (!resolvido) { resolvido = true; modal.hide(); resolve(val); } };
+
+            bc.addEventListener('click', () => fechar(input.value), { once: true });
+            bk.addEventListener('click', () => fechar(null), { once: true });
+            modalEl.addEventListener('hidden.bs.modal', () => fechar(null), { once: true });
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') fechar(input.value); }, { once: true });
+
+            modal.show();
+            // Focar no input após animação
+            modalEl.addEventListener('shown.bs.modal', () => input.focus(), { once: true });
+        });
+    }
+
+    // ============================================================
     // DETECÇÃO DE FILTROS ATIVOS
     // ============================================================
     function detectarFiltrosAtivos() {
@@ -1571,14 +1636,18 @@
     // INSERÇÃO FLEXÍVEL DE N LINHAS ACIMA (ANTI-REGRESSÃO)
     // ============================================================
     async function inserirLinhasAcimaFlexivel(index) {
-        // Pedir quantidade ao usuário via prompt
-        const quantidadeStr = prompt('Quantas linhas deseja inserir acima da linha ' + (index + 1) + '?', '1');
-        
+        // Pedir quantidade ao usuário via modal não-bloqueante
+        const quantidadeStr = await promptAsync(
+            'Inserir linhas',
+            `Quantas linhas deseja inserir acima da linha ${index + 1}?`,
+            '1', 'Ex: 5'
+        );
+
         // Se cancelar ou não digitar nada, abortar
         if (quantidadeStr === null || quantidadeStr.trim() === '') {
             return;
         }
-        
+
         const quantidade = parseInt(quantidadeStr);
         
         // Validação de quantidade
@@ -1971,8 +2040,19 @@
         console.log('%c  Ctrl+Shift+↓  %c- Ir para próxima linha alterada', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
         console.log('');
         
-        carregarTermos();
-        
+        carregarTermos().then(() => {
+            // v2: pré-selecionar termo se vier via ?termo= na URL (link do v1)
+            const params = new URLSearchParams(window.location.search);
+            const termoParam = params.get('termo');
+            if (termoParam) {
+                const input = document.getElementById('numeroTermo');
+                if (input) {
+                    input.value = termoParam;
+                    carregarExtrato();
+                }
+            }
+        });
+
         // Restaurar estado do cabeçalho de configurações
         restaurarEstadoHeaderConfigs();
         
@@ -1996,7 +2076,7 @@
     async function carregarTermos() {
         try {
             console.log('Carregando termos...');
-            const response = await fetch('/conc_bancaria/api/termos');
+            const response = await fetch('/conc_bancaria_2/api/termos');
             if (!response.ok) throw new Error('Erro ao carregar termos');
             
             todosOsTermos = await response.json();
@@ -2026,7 +2106,7 @@
             
         } catch (error) {
             console.error('Erro ao carregar termos:', error);
-            alert('Erro ao carregar lista de termos');
+            showToast('Erro ao carregar lista de termos', 'error');
         }
     }
     
@@ -2041,18 +2121,6 @@
         });
     }
     
-    function atualizarLinkV2(termo) {
-        const btn = document.getElementById('btnV2');
-        if (!btn) return;
-        if (termo && termo.trim()) {
-            btn.href = '/conc_bancaria_2?termo=' + encodeURIComponent(termo.trim());
-            btn.title = 'Abrir v2 com o termo ' + termo.trim();
-        } else {
-            btn.href = '/conc_bancaria_2';
-            btn.title = 'Abrir versão v2 (performance aprimorada)';
-        }
-    }
-
     function filtrarTermos(busca) {
         if (!busca || busca.length < 2) {
             // Se busca muito curta, mostrar todos
@@ -2070,13 +2138,11 @@
     }
 
     async function validarCamposObrigatorios(numeroTermo) {
-        // Verifica se há dados em conc_extrato para o termo
+        // v2: OTIMIZAÇÃO — usar array `linhas` em memória em vez de fetch HTTP
+        // (economiza 1500-1700ms por chamada, eliminando round-trip de rede inútil)
         try {
-            const response = await fetch(`/conc_bancaria/api/extrato?numero_termo=${encodeURIComponent(numeroTermo)}&limite=1`);
-            const data = await response.json();
-            
-            const temDados = data.dados && data.dados.length > 0;
-            
+            const temDados = Array.isArray(linhas) && linhas.length > 0;
+
             if (!temDados) {
                 // Sem dados salvos, não precisa validar
                 limparDestaquesCamposObrigatorios();
@@ -2179,6 +2245,8 @@
                 carregarCategoriasAplicabilidade().then(() => performanceMetrics.end(timer4)),
                 carregarCategoriasRubricas(numeroTermo).then(() => performanceMetrics.end(timer5))
             ]);
+            // v2: Popular datalists globais após categorias carregadas
+            atualizarDatalistsCategorias();
             performanceMetrics.end(timerParallel);
             
             // Carregar banco do termo
@@ -2192,7 +2260,7 @@
             });
             
             const timerFetch = performanceMetrics.start('carregarExtrato - Fetch API extrato');
-            const response = await fetch('/conc_bancaria/api/extrato?' + params.toString());
+            const response = await fetch('/conc_bancaria_2/api/extrato?' + params.toString());
             if (!response.ok) throw new Error('Erro ao carregar extrato');
             performanceMetrics.end(timerFetch);
             
@@ -2239,8 +2307,12 @@
                 console.groupEnd();
                 
                 if (minutosPassados < 60) { // Cache válido por 1 hora
-                    usarAutosave = confirm(`Há alterações não salvas de ${Math.round(minutosPassados)} minutos atrás. Deseja recuperá-las?`);
-                    
+                    usarAutosave = await confirmarAsync(
+                        'Alterações não salvas',
+                        `Há alterações não salvas de ${Math.round(minutosPassados)} minutos atrás. Deseja recuperá-las?`,
+                        'Recuperar', 'Descartar', 'btn-primary'
+                    );
+
                     if (usarAutosave) {
                         linhas = linhasCache;
                         if (nfCache) notasFiscais = nfCache;
@@ -2356,10 +2428,13 @@
             performanceMetrics.end(timerValidacao);
             
             performanceMetrics.end(timerTotal);
-            
+
+            // v2: Atualizar URL com ?termo= para persistir ao recarregar
+            history.replaceState(null, '', '?termo=' + encodeURIComponent(numeroTermo));
+
         } catch (error) {
             console.error('Erro ao carregar extrato:', error);
-            alert('Erro ao carregar extrato');
+            showToast('Erro ao carregar extrato: ' + error.message, 'error');
         } finally {
             document.getElementById('loadingIndicator').style.display = 'none';
         }
@@ -2379,7 +2454,11 @@
         if (modoVisualizacao === 'paginas') {
             // No modo páginas, carregar TODAS as linhas para ter todos os meses disponíveis
             if (limiteAtual !== 'todas') {
-                const confirmar = confirm('Para usar a paginação por mês, é necessário carregar todas as linhas.\n\nDeseja continuar?');
+                const confirmar = await confirmarAsync(
+                    'Paginação por mês',
+                    'Para usar a paginação por mês, é necessário carregar todas as linhas.\n\nDeseja continuar?',
+                    'Continuar', 'Cancelar', 'btn-primary'
+                );
                 if (!confirmar) {
                     select.value = 'todas';
                     modoVisualizacao = 'todas';
@@ -2542,7 +2621,7 @@
     
     async function carregarCategoriasDespesas(numeroTermo) {
         try {
-            const response = await fetch(`/conc_bancaria/api/categorias-despesas?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            const response = await fetch(`/conc_bancaria_2/api/categorias-despesas?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar categorias de despesas');
             categoriasDespesas = await response.json();
         } catch (error) {
@@ -2553,7 +2632,7 @@
     
     async function carregarCategoriasAnalise() {
         try {
-            const response = await fetch('/conc_bancaria/api/categorias-analise');
+            const response = await fetch('/conc_bancaria_2/api/categorias-analise');
             if (!response.ok) throw new Error('Erro ao carregar categorias de análise');
             categoriasAnalise = await response.json();
         } catch (error) {
@@ -2562,9 +2641,56 @@
         }
     }
     
+    /**
+     * v2: Popula os 3 datalists globais de categoria (Crédito, Débito, Ambos).
+     * Chamado após carregarCategoriasDespesas() e carregarCategoriasAnalise().
+     * Substitui a criação de N datalists por linha em renderizarTabela().
+     */
+    function atualizarDatalistsCategorias() {
+        const dlCredito = document.getElementById('datalistCategoriasCredito');
+        const dlDebito  = document.getElementById('datalistCategoriasDebito');
+        const dlAmbos   = document.getElementById('datalistCategoriasAmbos');
+        if (!dlCredito || !dlDebito || !dlAmbos) return;
+
+        const fragCredito = document.createDocumentFragment();
+        const fragDebito  = document.createDocumentFragment();
+        const fragAmbos   = document.createDocumentFragment();
+
+        // Categorias de despesa do termo: aparecem em todos os datalists
+        categoriasDespesas.forEach(cat => {
+            const val = cat.categoria_despesa;
+            ['Credito', 'Debito', 'Ambos'].forEach(tipo => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                (tipo === 'Credito' ? fragCredito : tipo === 'Debito' ? fragDebito : fragAmbos).appendChild(opt);
+            });
+        });
+
+        // Categorias de análise: filtradas por tipo_transacao
+        const vistos = new Set(categoriasDespesas.map(c => c.categoria_despesa));
+        categoriasAnalise.forEach(cat => {
+            const val = cat.categoria_extra;
+            if (vistos.has(val)) return; // evitar duplicatas com despesas
+            const tipo = (cat.tipo_transacao || '').toLowerCase();
+            const ambos = tipo.includes('débito') && tipo.includes('crédito');
+            const soCred = !ambos && tipo.includes('crédito');
+            const soDebit = !ambos && tipo.includes('débito');
+
+            const addTo = (frag) => { const o = document.createElement('option'); o.value = val; frag.appendChild(o); };
+            if (ambos)   { addTo(fragCredito); addTo(fragDebito); addTo(fragAmbos); }
+            else if (soCred)  { addTo(fragCredito); addTo(fragAmbos); }
+            else if (soDebit) { addTo(fragDebito);  addTo(fragAmbos); }
+            else              { addTo(fragCredito); addTo(fragDebito); addTo(fragAmbos); }
+        });
+
+        dlCredito.replaceChildren(fragCredito);
+        dlDebito.replaceChildren(fragDebito);
+        dlAmbos.replaceChildren(fragAmbos);
+    }
+
     async function carregarCategoriasAplicabilidade() {
         try {
-            const response = await fetch('/conc_bancaria/api/categorias-aplicabilidade');
+            const response = await fetch('/conc_bancaria_2/api/categorias-aplicabilidade');
             if (!response.ok) throw new Error('Erro ao carregar aplicabilidade');
             categoriasAplicabilidade = await response.json();
             console.log('Aplicabilidade carregada:', categoriasAplicabilidade);
@@ -2576,7 +2702,7 @@
     
     async function carregarCategoriasRubricas(numeroTermo) {
         try {
-            const response = await fetch(`/conc_bancaria/api/categorias-rubricas?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            const response = await fetch(`/conc_bancaria_2/api/categorias-rubricas?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar rubricas');
             categoriasRubricas = await response.json();
             console.log('Rubricas carregadas:', categoriasRubricas);
@@ -2591,7 +2717,7 @@
         if (!numeroTermo) return;
         
         try {
-            const response = await fetch(`/conc_bancaria/api/notas-fiscais?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            const response = await fetch(`/conc_bancaria_2/api/notas-fiscais?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar notas fiscais');
             
             const notas = await response.json();
@@ -2636,7 +2762,7 @@
         console.log('Carregando documentos do backend para termo:', numeroTermo);
         
         try {
-            const response = await fetch(`/conc_bancaria/api/documentos-analise?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            const response = await fetch(`/conc_bancaria_2/api/documentos-analise?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar documentos de análise');
             
             const documentos = await response.json();
@@ -2742,7 +2868,7 @@
     
     async function carregarPeriodoTermo(numeroTermo) {
         try {
-            const response = await fetch(`/conc_bancaria/api/periodo-termo?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            const response = await fetch(`/conc_bancaria_2/api/periodo-termo?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar período do termo');
             const dados = await response.json();
             periodoTermo = dados;
@@ -2754,7 +2880,7 @@
     
     async function carregarBancoTermo(numeroTermo) {
         try {
-            const response = await fetch(`/conc_bancaria/api/banco?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            const response = await fetch(`/conc_bancaria_2/api/banco?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar banco');
             const dados = await response.json();
             
@@ -3047,14 +3173,17 @@
         const quantidade = parseInt(input.value);
         
         if (isNaN(quantidade) || quantidade < 1) {
-            alert('Digite uma quantidade válida (mínimo 1)');
+            showToast('Digite uma quantidade válida (mínimo 1)', 'warning');
             return;
         }
-        
+
         if (quantidade > 100) {
-            if (!confirm(`Você está adicionando ${quantidade} linhas. Isso pode deixar a página lenta. Continuar?`)) {
-                return;
-            }
+            const ok = await confirmarAsync(
+                'Muitas linhas',
+                `Você está adicionando ${quantidade} linhas. Isso pode deixar a página lenta. Continuar?`,
+                'Continuar', 'Cancelar', 'btn-warning'
+            );
+            if (!ok) return;
         }
         
         // Salvar estado antes de adicionar
@@ -3202,6 +3331,47 @@
                 linha.discriminacao = linha.credito || linha.debito;
             }
         });
+    }
+
+    // =========================================================================
+    // OTIMIZAÇÃO v2: Lazy dropdown — gera HTML do menu Ações apenas ao abrir
+    // Evita criar ~14 <li>/<a> por linha no DOM durante renderizarTabela()
+    // =========================================================================
+    function gerarMenuAcoesHTML(index) {
+        return `
+            <li><h6 class="dropdown-header"><i class="bi bi-plus-circle"></i> Adicionar</h6></li>
+            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); inserirLinhasAcimaFlexivel(${index})" title="Insere N linhas acima (quantidade do input)">
+                <i class="bi bi-plus-square me-2"></i><strong>Inserir N linhas acima</strong>
+            </a></li>
+            <li><hr class="dropdown-divider" style="margin: 0.25rem 0;"></li>
+            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); adicionarLinhaAcima(${index})">
+                <i class="bi bi-arrow-up-circle me-2"></i>Adicionar 1 linha acima
+            </a></li>
+            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); adicionarLinhaAbaixo(${index})">
+                <i class="bi bi-arrow-down-circle me-2"></i>Adicionar 1 linha abaixo
+            </a></li>
+            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); duplicarLinha(${index}, 'acima')">
+                <i class="bi bi-files me-2"></i>Duplicar linha acima
+            </a></li>
+            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); duplicarLinha(${index}, 'abaixo')">
+                <i class="bi bi-files me-2"></i>Duplicar linha abaixo
+            </a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header"><i class="bi bi-arrows-move"></i> Movimentação</h6></li>
+            <li><a class="dropdown-item ${index === 0 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); moverLinha(${index}, -1)">
+                <i class="bi bi-arrow-up me-2"></i>Mover para cima
+            </a></li>
+            <li><a class="dropdown-item ${index === linhas.length - 1 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); moverLinha(${index}, 1)">
+                <i class="bi bi-arrow-down me-2"></i>Mover para baixo
+            </a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header"><i class="bi bi-gear"></i> Outras Ações</h6></li>
+            <li><a class="dropdown-item ${index === 0 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); copiarDataAcima(${index})">
+                <i class="bi bi-calendar-plus me-2"></i>Copiar data acima
+            </a></li>
+            <li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); excluirLinha(${index})">
+                <i class="bi bi-trash me-2"></i>Excluir linha
+            </a></li>`;
     }
 
     function renderizarTabela(skipFilters = false) {
@@ -3416,25 +3586,21 @@
                 `);
             }
             
-            // Renderizar input com datalist de categoria (busca sugestiva)
-            const categoriasFiltradas = obterCategoriasFiltradas(linha);
-            const datalistId = `datalist-cat-${index}`;
-            let htmlCategoria = `
-                <input type="text" 
-                       class="form-control form-control-sm cell-input" 
-                       list="${datalistId}"
-                       value="${linha.cat_transacao || ''}" 
+            // v2: Usar datalist global em vez de um datalist por linha
+            // (elimina 250.000+ <option> elements com 5.000 linhas)
+            const _listIdCat = linha.credito ? 'datalistCategoriasCredito'
+                             : linha.debito  ? 'datalistCategoriasDebito'
+                             : 'datalistCategoriasAmbos';
+            const htmlCategoria = `
+                <input type="text"
+                       class="form-control form-control-sm cell-input"
+                       list="${_listIdCat}"
+                       value="${linha.cat_transacao || ''}"
                        onchange="atualizarCampo(${index}, 'cat_transacao', this.value)"
                        onblur="blurCondicionalCategoria(${index})"
                        onkeydown="navegarCelula(event, ${index}, 4)"
                        placeholder="Digite para buscar..."
-                       autocomplete="off">
-                <datalist id="${datalistId}">
-            `;
-            categoriasFiltradas.forEach(cat => {
-                htmlCategoria += `<option value="${cat.valor}">${cat.label}</option>`;
-            });
-            htmlCategoria += '</datalist>';
+                       autocomplete="off">`;
             
             //  Continuar construindo htmlParts com as células restantes
             htmlParts.push(`
@@ -3494,44 +3660,7 @@
                         <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-three-dots-vertical"></i> Ações
                         </button>
-                        <ul class="dropdown-menu">
-                            <!-- Adicionar Linhas -->
-                            <li><h6 class="dropdown-header"><i class="bi bi-plus-circle"></i> Adicionar</h6></li>
-                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); inserirLinhasAcimaFlexivel(${index})" title="Insere N linhas acima (quantidade do input)">
-                                <i class="bi bi-plus-square me-2"></i><strong>Inserir N linhas acima</strong>
-                            </a></li>
-                            <li><hr class="dropdown-divider" style="margin: 0.25rem 0;"></li>
-                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); adicionarLinhaAcima(${index})">
-                                <i class="bi bi-arrow-up-circle me-2"></i>Adicionar 1 linha acima
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); adicionarLinhaAbaixo(${index})">
-                                <i class="bi bi-arrow-down-circle me-2"></i>Adicionar 1 linha abaixo
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); duplicarLinha(${index}, 'acima')">
-                                <i class="bi bi-files me-2"></i>Duplicar linha acima
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); duplicarLinha(${index}, 'abaixo')">
-                                <i class="bi bi-files me-2"></i>Duplicar linha abaixo
-                            </a></li>
-                            
-                            <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header"><i class="bi bi-arrows-move"></i> Movimentação</h6></li>
-                            <li><a class="dropdown-item ${index === 0 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); moverLinha(${index}, -1)">
-                                <i class="bi bi-arrow-up me-2"></i>Mover para cima
-                            </a></li>
-                            <li><a class="dropdown-item ${index === linhas.length - 1 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); moverLinha(${index}, 1)">
-                                <i class="bi bi-arrow-down me-2"></i>Mover para baixo
-                            </a></li>
-                            
-                            <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header"><i class="bi bi-gear"></i> Outras Ações</h6></li>
-                            <li><a class="dropdown-item ${index === 0 ? 'disabled' : ''}" href="#" onclick="event.preventDefault(); copiarDataAcima(${index})">
-                                <i class="bi bi-calendar-plus me-2"></i>Copiar data acima
-                            </a></li>
-                            <li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); excluirLinha(${index})">
-                                <i class="bi bi-trash me-2"></i>Excluir linha
-                            </a></li>
-                        </ul>
+                        <ul class="dropdown-menu" data-lazy-index="${index}"></ul>
                     </div>
                 </td>
             `);
@@ -3723,7 +3852,22 @@
         
         console.log(`%c[RENDER] ${linhasFiltradas.length} linhas renderizadas`, 'color: purple; font-weight: bold');
     }
-    
+
+    // =========================================================================
+    // OTIMIZAÇÃO v2: Lazy dropdown — popula menu Ações apenas na 1ª abertura
+    // Bootstrap dispara 'show.bs.dropdown' no <button> antes de abrir o <ul>
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('tbodyConciliacao').addEventListener('show.bs.dropdown', function(e) {
+            // e.target é o <button class="dropdown-toggle">
+            const ul = e.target.nextElementSibling;
+            if (!ul || ul.dataset.lazyIndex === undefined) return; // Não é um menu lazy
+            if (ul.children.length > 0) return; // Já foi populado (reabertura)
+            const idx = parseInt(ul.dataset.lazyIndex);
+            ul.innerHTML = gerarMenuAcoesHTML(idx);
+        });
+    });
+
     // Adicionar listener para colar do Excel
     document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('tabelaConciliacao').addEventListener('paste', function(e) {
@@ -3804,7 +3948,7 @@
                 
                 renderizarTabela();
                 agendarAutosave();
-                alert(`✓ ${linhasPaste.length} linha(s) de NF coladas!`);
+                showToast(`${linhasPaste.length} linha(s) de NF coladas!`, 'success');
                 return;
             }
             
@@ -3912,8 +4056,7 @@
             renderizarTabela();
             document.getElementById('btnSalvar').style.display = 'block';
             agendarAutosave();
-            
-            alert(`✓ ${linhasPaste.length} linha(s) e ${linhasPaste[0].length} coluna(s) coladas com sucesso!`);
+            showToast(`${linhasPaste.length} linha(s) e ${linhasPaste[0].length} coluna(s) coladas!`, 'success');
         });
     });
 
@@ -4642,8 +4785,10 @@
         // Usar requestAnimationFrame para garantir que o DOM esteja pronto
         requestAnimationFrame(() => {
             const tbody = document.getElementById('tbodyConciliacao');
-            const linhaElement = tbody.children[linhaIndex];
-            
+            // v2: usar querySelector por data-index em vez de children[index]
+            // (children[index] falha quando filtros estão ativos)
+            const linhaElement = tbody.querySelector(`tr[data-index="${linhaIndex}"]`);
+
             if (!linhaElement) return;
             
             // Encontrar o input correspondente
@@ -4670,11 +4815,11 @@
                     }
                     return;
                 case 'categoria':
-                    // Categoria usa datalist dinâmico, pegar o input que não é de avaliações nem origem/destino
+                    // v2: datalists globais — o input aponta para datalistCategoriasCredito/Debito/Ambos
                     const catInputs = linhaElement.querySelectorAll('input[type="text"][list]');
                     for (let inp of catInputs) {
                         const listId = inp.getAttribute('list');
-                        if (listId && listId.startsWith('datalist-cat-')) {
+                        if (listId && listId.startsWith('datalistCategorias')) {
                             if (!inp.disabled) {
                                 inp.focus();
                                 inp.select();
@@ -4707,21 +4852,24 @@
         });
     }
 
-    function desmesclarLinha(index) {
+    async function desmesclarLinha(index) {
         const linha = linhas[index];
-        
+
         if (!linha.mesclado_com || linha.mesclado_com.length === 0) {
-            alert('Esta linha não está mesclada.');
+            showToast('Esta linha não está mesclada.', 'warning');
             return;
         }
-        
-        if (!confirm(`Desmesclar linha ${index + 1}?`)) {
-            return;
-        }
-        
+
+        const ok = await confirmarAsync(
+            'Desmesclar linha',
+            `Desmesclar linha ${index + 1}?`,
+            'Desmesclar', 'Cancelar', 'btn-warning'
+        );
+        if (!ok) return;
+
         // Limpar array de mesclagem
         linha.mesclado_com = [];
-        
+
         renderizarTabela();
         document.getElementById('btnSalvar').style.display = 'block';
         agendarAutosave();
@@ -4729,10 +4877,10 @@
 
     function copiarDataAcima(index) {
         if (index === 0) {
-            alert('Esta é a primeira linha, não há data acima para copiar.');
+            showToast('Esta é a primeira linha, não há data acima para copiar.', 'warning');
             return;
         }
-        
+
         // Encontrar a última linha com data preenchida (de trás para frente a partir da linha anterior)
         let linhaReferencia = -1;
         for (let i = index - 1; i >= 0; i--) {
@@ -4741,9 +4889,9 @@
                 break;
             }
         }
-        
+
         if (linhaReferencia === -1) {
-            alert('Não há nenhuma data preenchida nas linhas acima.');
+            showToast('Não há nenhuma data preenchida nas linhas acima.', 'warning');
             return;
         }
         
@@ -5137,100 +5285,79 @@
         performanceMetrics.end(timerDatalist);
     }
     
-    function excluirLinhasPorIntervalo() {
+    async function excluirLinhasPorIntervalo() {
         const input = document.getElementById('inputExcluirLinhas').value.trim();
-        
+
         if (!input) {
-            alert('Digite o intervalo ou índices para excluir.\nExemplos:\n- Intervalo: 114-120\n- Múltiplos: 5,10,15,20\n- Combinado: 1-5,10,15-20');
+            showToast('Digite o intervalo. Ex: 114-120 ou 5,10,15', 'warning');
             return;
         }
-        
+
         const indicesParaExcluir = new Set();
-        
-        // Parse do input (aceita intervalos e valores individuais)
         const partes = input.split(',').map(p => p.trim());
-        
+
         for (const parte of partes) {
             if (parte.includes('-')) {
-                // Intervalo: 114-120
                 const [inicio, fim] = parte.split('-').map(n => parseInt(n.trim()));
-                
                 if (isNaN(inicio) || isNaN(fim)) {
-                    alert(`Intervalo inválido: ${parte}`);
-                    return;
+                    showToast(`Intervalo inválido: ${parte}`, 'warning'); return;
                 }
-                
                 if (inicio > fim) {
-                    alert(`Intervalo inválido: ${parte} (início maior que fim)`);
-                    return;
+                    showToast(`Intervalo inválido: ${parte} (início maior que fim)`, 'warning'); return;
                 }
-                
-                for (let i = inicio; i <= fim; i++) {
-                    indicesParaExcluir.add(i);
-                }
+                for (let i = inicio; i <= fim; i++) indicesParaExcluir.add(i);
             } else {
-                // Valor individual: 5
                 const indice = parseInt(parte);
-                
                 if (isNaN(indice)) {
-                    alert(`Valor inválido: ${parte}`);
-                    return;
+                    showToast(`Valor inválido: ${parte}`, 'warning'); return;
                 }
-                
                 indicesParaExcluir.add(indice);
             }
         }
-        
-        // Verificar se há índices para excluir
+
         if (indicesParaExcluir.size === 0) {
-            alert('Nenhum índice válido para excluir');
+            showToast('Nenhum índice válido para excluir', 'warning');
             return;
         }
-        
+
         // Salvar estado antes de modificar
         salvarEstadoNoHistorico();
-        
+
         // Capturar IDs das linhas a excluir antes de filtrar (para persistir no banco)
         const idsLoteParaExcluir = linhas
             .filter(l => indicesParaExcluir.has(l.indice) && l.id)
             .map(l => l.id);
-        
-        // Filtrar linhas pelo índice
+
         const linhasOriginais = linhas.length;
         linhas = linhas.filter(linha => !indicesParaExcluir.has(linha.indice));
-        
         const linhasExcluidas = linhasOriginais - linhas.length;
-        
+
         if (linhasExcluidas === 0) {
-            alert('Nenhuma linha foi excluída. Verifique se os índices existem.');
+            showToast('Nenhuma linha foi excluída. Verifique os índices.', 'warning');
+            desfazerAlteracao(); // restaura estado salvo
             return;
         }
-        
-        // Perguntar confirmação
-        if (!confirm(`${linhasExcluidas} linha(s) serão excluídas. Confirmar?`)) {
-            // Desfazer via histórico
+
+        // Confirmação não-bloqueante
+        const ok = await confirmarAsync(
+            'Excluir linhas',
+            `${linhasExcluidas} linha(s) serão excluídas. Confirmar?`,
+            'Excluir', 'Cancelar', 'btn-danger'
+        );
+        if (!ok) {
             desfazerAlteracao();
             return;
         }
-        
+
         // Confirmado: registrar IDs para exclusão no banco no próximo save
-        for (const id of idsLoteParaExcluir) {
-            linhasExcluidasIds.add(id);
-        }
-        
-        // Recalcular índices
+        for (const id of idsLoteParaExcluir) linhasExcluidasIds.add(id);
+
         recalcularIndices();
-        
-        // Re-renderizar
         renderizarTabela();
-        
-        // Limpar input
         document.getElementById('inputExcluirLinhas').value = '';
-        
         document.getElementById('btnSalvar').style.display = 'block';
         agendarAutosave();
-        
-        alert(`✓ ${linhasExcluidas} linha(s) excluída(s) com sucesso!`);
+        showToast(`${linhasExcluidas} linha(s) excluída(s)`, 'success');
     }
     
     function salvarEstadoNoHistorico() {
@@ -5258,7 +5385,7 @@
     
     function desfazerAlteracao() {
         if (historicoAlteracoes.length === 0) {
-            alert('Nenhuma alteração para desfazer');
+            showToast('Nenhuma alteração para desfazer', 'warning');
             return;
         }
         
@@ -5283,14 +5410,18 @@
         document.getElementById('btnSalvar').style.display = 'block';
     }
 
-    function filtrarPorData() {
-        const dataFiltro = prompt('Digite a data para filtrar (dd/mm/aaaa) ou deixe vazio para ver todas:');
-        
+    async function filtrarPorData() {
+        const dataFiltro = await promptAsync(
+            'Filtrar por data',
+            'Digite a data (dd/mm/aaaa) ou deixe vazio para ver todas:',
+            '', 'dd/mm/aaaa'
+        );
+
         if (dataFiltro === null) return; // Cancelou
-        
+
         const tbody = document.getElementById('tbodyConciliacao');
         const rows = tbody.getElementsByTagName('tr');
-        
+
         if (!dataFiltro || dataFiltro.trim() === '') {
             // Mostrar todas
             for (let row of rows) {
@@ -5298,16 +5429,16 @@
             }
             return;
         }
-        
+
         // Converter dd/mm/aaaa para aaaa-mm-dd
         const partes = dataFiltro.split('/');
         if (partes.length !== 3) {
-            alert('Formato inválido! Use dd/mm/aaaa');
+            showToast('Formato inválido! Use dd/mm/aaaa', 'warning');
             return;
         }
-        
+
         const dataFormatada = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
-        
+
         // Filtrar linhas
         linhas.forEach((linha, index) => {
             const row = rows[index];
@@ -5316,10 +5447,14 @@
             }
         });
     }
-    
-    function filtrarPorCategoria() {
-        const categoriaFiltro = prompt('Digite a categoria para filtrar (ou parte dela) ou deixe vazio para ver todas:');
-        
+
+    async function filtrarPorCategoria() {
+        const categoriaFiltro = await promptAsync(
+            'Filtrar por categoria',
+            'Digite a categoria (ou parte) ou deixe vazio para ver todas:',
+            '', 'Ex: Folha de Pagamento'
+        );
+
         if (categoriaFiltro === null) return; // Cancelou
         
         const tbody = document.getElementById('tbodyConciliacao');
@@ -5432,26 +5567,34 @@
         proximoIndice = linhas.length + 1;
     }
 
-    function limparTabela() {
+    async function limparTabela() {
         const numeroTermo = document.getElementById('numeroTermo').value;
-        
+
         if (!numeroTermo) {
-            alert('Selecione um termo antes de limpar.');
+            showToast('Selecione um termo antes de limpar.', 'warning');
             return;
         }
-        
-        if (!confirm(`⚠️ ATENÇÃO!\n\nEsta ação irá DELETAR PERMANENTEMENTE todos os dados do termo:\n${numeroTermo}\n\nSerão removidos:\n• Extrato bancário\n• Rendimentos\n• Notas fiscais\n• Contrapartida\n\nEsta ação NÃO PODE ser desfeita!\n\nDeseja realmente continuar?`)) {
+
+        const ok = await confirmarAsync(
+            '⚠️ Limpar todos os dados do termo',
+            `Esta ação irá DELETAR PERMANENTEMENTE todos os dados de:\n\n${numeroTermo}\n\nSerão removidos: Extrato, Rendimentos, Notas Fiscais e Contrapartida.\n\nEsta ação NÃO PODE ser desfeita!`,
+            'Continuar', 'Cancelar', 'btn-danger'
+        );
+        if (!ok) return;
+
+        // Confirmação de segurança: digitar o número do termo
+        const confirmaNumero = await promptAsync(
+            'Confirmar exclusão',
+            `Para confirmar, digite o número do termo:\n${numeroTermo}`,
+            '', 'Cole o número aqui...'
+        );
+
+        if (confirmaNumero === null) return; // Cancelou
+        if (confirmaNumero.trim() !== numeroTermo.trim()) {
+            showToast('Número do termo não confere. Operação cancelada.', 'error', 4000);
             return;
         }
-        
-        // Confirmação adicional
-        const confirmaNumero = prompt(`Para confirmar, digite o número do termo que será limpo:\n${numeroTermo}`);
-        
-        if (confirmaNumero !== numeroTermo) {
-            alert('Número do termo não confere. Operação cancelada.');
-            return;
-        }
-        
+
         // Exibir loading
         const btnLimpar = event?.target?.closest('button');
         const textoOriginal = btnLimpar ? btnLimpar.innerHTML : '';
@@ -5459,37 +5602,33 @@
             btnLimpar.disabled = true;
             btnLimpar.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Limpando...';
         }
-        
+
         // Chamar API de limpeza
-        fetch(`/conc_bancaria/api/limpar-termo?numero_termo=${encodeURIComponent(numeroTermo)}`, {
+        fetch(`/conc_bancaria_2/api/limpar-termo?numero_termo=${encodeURIComponent(numeroTermo)}`, {
             method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Content-Type': 'application/json' }
         })
         .then(response => response.json())
         .then(data => {
-            if (data.erro) {
-                throw new Error(data.erro);
-            }
-            
+            if (data.erro) throw new Error(data.erro);
+
             // Limpar frontend
             linhas = [];
             renderizarTabela();
             document.getElementById('btnSalvar').style.display = 'none';
-            
-            // Exibir resultado
-            const total = data.registros_deletados?.total || 0;
-            alert(`✅ Dados limpos com sucesso!\n\nRegistros deletados:\n• Extrato: ${data.registros_deletados?.extrato || 0}\n• Rendimentos: ${data.registros_deletados?.rendimentos || 0}\n• Notas Fiscais: ${data.registros_deletados?.notas_fiscais || 0}\n• Contrapartida: ${data.registros_deletados?.contrapartida || 0}\n\nTotal: ${total} registros`);
-            
+
+            const d = data.registros_deletados || {};
+            showToast(
+                `Dados limpos! Extrato: ${d.extrato||0} | Rendimentos: ${d.rendimentos||0} | NF: ${d.notas_fiscais||0} | Total: ${d.total||0} registros`,
+                'success', 6000
+            );
             console.log('[LIMPAR TERMO] Sucesso:', data);
         })
         .catch(error => {
             console.error('[ERRO] ao limpar termo:', error);
-            alert(`❌ Erro ao limpar dados:\n${error.message}`);
+            showToast(`Erro ao limpar dados: ${error.message}`, 'error', 5000);
         })
         .finally(() => {
-            // Restaurar botão
             if (btnLimpar) {
                 btnLimpar.disabled = false;
                 btnLimpar.innerHTML = textoOriginal;
@@ -5500,17 +5639,16 @@
     function exportarCSV() {
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
-            alert('Selecione um termo antes de exportar.');
+            showToast('Selecione um termo antes de exportar.', 'warning');
             return;
         }
-        
         if (linhas.length === 0) {
-            alert('Não há dados para exportar.');
+            showToast('Não há dados para exportar.', 'warning');
             return;
         }
         
         // Redirecionar para a rota de exportação
-        window.location.href = `/conc_bancaria/api/exportar-csv?numero_termo=${encodeURIComponent(numeroTermo)}`;
+        window.location.href = `/conc_bancaria_2/api/exportar-csv?numero_termo=${encodeURIComponent(numeroTermo)}`;
     }
     
     function selecionarTodasColunas() {
@@ -5593,15 +5731,14 @@
     function exportarPDF() {
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
-            alert('Selecione um termo antes de exportar.');
+            showToast('Selecione um termo antes de exportar.', 'warning');
             return;
         }
-        
         if (linhas.length === 0) {
-            alert('Não há dados para exportar.');
+            showToast('Não há dados para exportar.', 'warning');
             return;
         }
-        
+
         // Coletar colunas selecionadas
         const colunasSelecionadas = [];
         document.querySelectorAll('#modalExportarPDF input[type="checkbox"]:checked').forEach(cb => {
@@ -5609,7 +5746,7 @@
         });
         
         if (colunasSelecionadas.length === 0) {
-            alert('Selecione pelo menos uma coluna para exportar.');
+            showToast('Selecione pelo menos uma coluna para exportar.', 'warning');
             return;
         }
         
@@ -5621,7 +5758,7 @@
         modal.hide();
         
         // Redirecionar para a rota de exportação PDF
-        window.location.href = `/conc_bancaria/api/exportar-pdf?numero_termo=${encodeURIComponent(numeroTermo)}&colunas=${encodeURIComponent(colunasParam)}`;
+        window.location.href = `/conc_bancaria_2/api/exportar-pdf?numero_termo=${encodeURIComponent(numeroTermo)}&colunas=${encodeURIComponent(colunasParam)}`;
     }
     
     // DESABILITADO: processarMesclagensAutomaticas
@@ -5633,7 +5770,7 @@
     */
     
     function baixarModelo() {
-        window.location.href = '/conc_bancaria/api/modelo-importacao';
+        window.location.href = '/conc_bancaria_2/api/modelo-importacao';
     }
 
     function voltarParaAnalises(event) {
@@ -5642,30 +5779,6 @@
             event.preventDefault();
             window.location.href = `/analises_pc/?termo=${encodeURIComponent(numeroTermo)}&meses=1-7&autoload=true`;
         }
-    }
-
-    function atualizarHrefGlosas() {
-        const numeroTermo = document.getElementById('numeroTermo').value;
-        if (numeroTermo) {
-            document.getElementById('btnGlosas').href = `/conc_glosas/?termo=${encodeURIComponent(numeroTermo)}`;
-        }
-    }
-
-    function abrirGlosas(event) {
-        const numeroTermo = document.getElementById('numeroTermo').value;
-        if (!numeroTermo) {
-            event.preventDefault();
-            alert('Selecione um termo primeiro!');
-            return false;
-        }
-        const url = `/conc_glosas/?termo=${encodeURIComponent(numeroTermo)}`;
-        document.getElementById('btnGlosas').href = url;
-
-        if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-            event.preventDefault();
-            window.open(url, '_blank');
-        }
-        return true;
     }
 
     function atualizarHrefRendimentos() {
@@ -5698,7 +5811,7 @@
         // Salvar termo na session antes de atualizar href
         if (numeroTermo) {
             try {
-                await fetch('/conc_bancaria/api/salvar-termo-session', {
+                await fetch('/conc_bancaria_2/api/salvar-termo-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ numero_termo: numeroTermo })
@@ -5721,7 +5834,7 @@
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
             event.preventDefault();
-            alert('Selecione um termo primeiro!');
+            showToast('Selecione um termo primeiro!', 'warning');
             return false;
         }
         // Atualizar href antes de navegar
@@ -5741,7 +5854,7 @@
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
             event.preventDefault();
-            alert('Selecione um termo primeiro!');
+            showToast('Selecione um termo primeiro!', 'warning');
             return false;
         }
         // Atualizar href antes de navegar
@@ -5761,7 +5874,7 @@
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
             event.preventDefault();
-            alert('Selecione um termo primeiro!');
+            showToast('Selecione um termo primeiro!', 'warning');
             return false;
         }
         // Atualizar href antes de navegar
@@ -5784,7 +5897,7 @@
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
             event.preventDefault();
-            alert('Selecione um termo primeiro!');
+            showToast('Selecione um termo primeiro!', 'warning');
             return false;
         }
         // Atualizar href antes de navegar
@@ -5806,7 +5919,7 @@
         // Salvar termo na session antes de ir para OCR
         if (numeroTermo) {
             try {
-                await fetch('/conc_bancaria/api/salvar-termo-session', {
+                await fetch('/conc_bancaria_2/api/salvar-termo-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ numero_termo: numeroTermo })
@@ -5864,7 +5977,7 @@
         const bancoExtrato = document.getElementById('bancoExtrato').value;
         
         if (!numeroTermo) {
-            alert('Selecione um número de termo');
+            showToast('Selecione um número de termo', 'warning');
             console.groupEnd();
             return;
         }
@@ -5984,9 +6097,12 @@
         });
 
         if (linhasParaSalvar.length === 0 && modoCompleto) {
-            if (!confirm('Não há dados para salvar. Deseja salvar mesmo assim (limpar todos os dados existentes)?')) {
-                return;
-            }
+            const ok = await confirmarAsync(
+                'Nenhum dado para salvar',
+                'Não há dados para salvar. Deseja salvar mesmo assim (limpar todos os dados existentes)?',
+                'Salvar assim mesmo', 'Cancelar', 'btn-warning'
+            );
+            if (!ok) return;
         }
 
         try {
@@ -5994,7 +6110,7 @@
             document.getElementById('btnSalvar').innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Salvando...';
 
             // Salvar extrato
-            const response = await fetch('/conc_bancaria/api/extrato', {
+            const response = await fetch('/conc_bancaria_2/api/extrato', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -6017,7 +6133,7 @@
             const contaExecucao = document.getElementById('contaExecucao').value.trim();
 
             if (bancoExtrato || contaEspecifica || contaExecucao || bancoDirty) {
-                const bancResponse = await fetch('/conc_bancaria/api/banco', {
+                const bancResponse = await fetch('/conc_bancaria_2/api/banco', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -6050,7 +6166,7 @@
                     }));
                 
                 if (notasParaSalvar.length > 0) {
-                    const nfResponse = await fetch('/conc_bancaria/api/notas-fiscais', {
+                    const nfResponse = await fetch('/conc_bancaria_2/api/notas-fiscais', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -6101,7 +6217,7 @@
                 
                 console.log(`[DOC SAVE] ${documentosParaSalvar.length} docs (modo: ${modoCompleto ? 'completo' : 'dirty'})`);
                 
-                const docResponse = await fetch('/conc_bancaria/api/documentos-analise', {
+                const docResponse = await fetch('/conc_bancaria_2/api/documentos-analise', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -6132,12 +6248,13 @@
                 });
             }
             
-            // Excluir do banco as linhas removidas do array (save sujo não usa modo_completo)
+            // v2: Bulk delete — 1 request em vez de N (DELETE /api/extrato/bulk)
             if (linhasExcluidasIds.size > 0) {
-                await Promise.all([...linhasExcluidasIds].map(id =>
-                    fetch(`/conc_bancaria/api/extrato/${id}`, { method: 'DELETE' })
-                        .catch(e => console.warn(`Falha ao excluir id=${id}:`, e))
-                ));
+                await fetch('/conc_bancaria_2/api/extrato/bulk', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: [...linhasExcluidasIds] })
+                }).catch(e => console.warn('Falha ao excluir linhas em bulk:', e));
                 linhasExcluidasIds.clear();
             }
 
@@ -6165,7 +6282,7 @@
                 filtrosAtivos: detectarFiltrosAtivos()
             });
             console.groupEnd(); // Fim do DEBUG SALVAMENTO
-            alert('Erro ao salvar conciliação: ' + error.message);
+            showToast('Erro ao salvar: ' + error.message, 'error', 5000);
         } finally {
             document.getElementById('btnSalvar').disabled = false;
             document.getElementById('btnSalvar').innerHTML = '<i class="bi bi-save me-2"></i>Salvar Conciliação';
@@ -6394,7 +6511,7 @@
         
         // PASSO 2: Mostrar preview e solicitar confirmação
         if (contadorGuias === 0) {
-            alert('❌ Nenhuma alteração será realizada.\n\nMotivos possíveis:\n• Guias já estão preenchidas\n• Linhas não possuem Origem/Destino, Categoria e Composição preenchidos simultaneamente\n• Categoria está marcada como "Não aplicável"\n• Linhas não foram salvas ainda (sem ID)');
+            showToast('Nenhuma alteração a realizar. Verifique se as linhas têm Origem/Destino, Categoria e Composição preenchidos e estão salvas.', 'warning', 6000);
             return;
         }
         
@@ -6436,8 +6553,13 @@
         mensagemPreview += 'Clique OK para CONFIRMAR ou CANCELAR para abortar.';
         
         // Solicitar confirmação
-        if (!confirm(mensagemPreview)) {
-            alert('❌ Operação cancelada. Nenhuma alteração foi realizada.');
+        const okGuias = await confirmarAsync(
+            'Confirmar auto-preenchimento',
+            mensagemPreview,
+            'Aplicar', 'Cancelar', 'btn-primary'
+        );
+        if (!okGuias) {
+            showToast('Operação cancelada.', 'info');
             return;
         }
         
@@ -6507,22 +6629,17 @@
         });
         
         if (contadorGuiasAplicadas === 0) {
-            alert('❌ Nenhuma alteração foi aplicada (possível erro interno).');
+            showToast('Nenhuma alteração foi aplicada (possível erro interno).', 'error');
             return;
         }
-        
+
         // Re-renderizar tabela
         renderizarTabela();
-        
-        // Construir mensagem de conclusão
-        let mensagemFinal = '✅ ALTERAÇÕES APLICADAS COM SUCESSO!\n';
-        mensagemFinal += '═'.repeat(60) + '\n\n';
-        mensagemFinal += `🎫 ${contadorGuiasAplicadas} guia(s) atualizada(s) para "Guia apresentada"\n`;
-        mensagemFinal += '\n═'.repeat(60) + '\n';
-        mensagemFinal += '⚠️ ATENÇÃO: As alterações NÃO foram salvas ainda!\n';
-        mensagemFinal += 'Revise a tabela e clique em SALVAR para confirmar.';
-        
-        alert(mensagemFinal);
+
+        showToast(
+            `${contadorGuiasAplicadas} guia(s) atualizada(s). Revise e clique em SALVAR para confirmar.`,
+            'success', 6000
+        );
     }
 </script>
 

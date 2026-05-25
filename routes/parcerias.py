@@ -5393,7 +5393,7 @@ def dgp_kanban():
     cur = get_cursor()
     try:
         cur.execute("""
-            SELECT alt_status, COALESCE(alt_status_descricao, alt_status) AS alt_status_label, alt_ordem
+            SELECT alt_status, COALESCE(alt_status_nome, alt_status_descricao, alt_status) AS alt_status_label, alt_ordem
             FROM categoricas.c_alt_status_alteracao
             ORDER BY alt_ordem
         """)
@@ -5443,6 +5443,7 @@ def dgp_kanban():
                 BOOL_OR(COALESCE(t.alt_oculto, FALSE)) AS alt_oculto,
                 MAX(t.alt_marcadores) AS alt_marcadores,
                 MAX(t.alt_data_cadastro_inicio) AS alt_data_cadastro_inicio,
+                MAX(t.alt_observacao) AS alt_observacao,
                 p.osc AS osc,
                 MAX(p.sei_celeb) AS sei_celeb
             FROM public.termos_alteracoes t

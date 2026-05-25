@@ -99,7 +99,7 @@
                         <i class="bi bi-file-earmark-text me-2"></i>
                         Relatório de Inconsistências
                     </h3>
-                    <a href="{{ url_for('conc_bancaria.index') }}" id="btnVoltar" class="btn btn-voltar btn-lg">
+                    <a href="{{ url_for('conc_banc.index') }}" id="btnVoltar" class="btn btn-voltar btn-lg">
                         <i class="bi bi-arrow-left me-2"></i>Voltar
                     </a>
                 </div>
@@ -305,7 +305,7 @@
             console.log('[DEBUG] Página de origem (referrer):', referrer);
             
             let termoOrigem = null;
-            if (referrer && referrer.includes('/conc_bancaria/')) {
+            if (referrer && (referrer.includes('/conc_banc/') || referrer.includes('/conc_bancaria/'))) {
                 // Extrair parâmetro 'termo' da URL de origem
                 try {
                     const urlReferrer = new URL(referrer);
@@ -323,7 +323,7 @@
                 
                 // Se há termo de origem, configurar botão para voltar com o termo
                 if (termoOrigem) {
-                    btnVoltar.href = `/conc_bancaria/?termo=${encodeURIComponent(termoOrigem)}`;
+                    btnVoltar.href = `/conc_banc/?termo=${encodeURIComponent(termoOrigem)}`;
                     console.log('[DEBUG] 🎯 Botão Voltar configurado com termo de origem!');
                     console.log('[DEBUG] URL de retorno:', btnVoltar.href);
                 } else {
@@ -408,7 +408,7 @@
                     // Atualizar botão Voltar para retornar ao termo específico em conc_bancaria
                     const btnVoltar = document.getElementById('btnVoltar');
                     const termoParam = selectedOption.dataset.numeroTermo;
-                    const urlVoltar = `/conc_bancaria/?termo=${encodeURIComponent(termoParam)}`;
+                    const urlVoltar = `/conc_banc/?termo=${encodeURIComponent(termoParam)}`;
                     btnVoltar.href = urlVoltar;
                     console.log('[DEBUG IMPORTANTE] Botão Voltar atualizado!');
                     console.log('[DEBUG IMPORTANTE] Termo:', termoParam);
@@ -429,7 +429,7 @@
                     
                     // Restaurar link padrão do botão Voltar
                     const btnVoltar = document.getElementById('btnVoltar');
-                    btnVoltar.href = '/conc_bancaria/';
+                    btnVoltar.href = '/conc_banc/';
                     console.log('[DEBUG] Botão Voltar restaurado para:', btnVoltar.href);
                 }
             });

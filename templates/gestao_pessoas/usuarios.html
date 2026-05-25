@@ -630,7 +630,8 @@
   // ── Editar Usuário ────────────────────
   async function editarUsuario(id, email, tipo, d_usuario) {
     let infos = { usuario_status: '', usuario_nome: '', usuario_aniversario: '', usuario_vinculo: '',
-                   usuario_escala_permissao: false, usuario_unidade_alocada: '' };
+                   usuario_escala_permissao: false, usuario_unidade_alocada: '',
+                   usuario_relatorios_permissao: false };
     try {
       const r = await fetch(`/api/usuarios/${id}/infos`);
       if (r.ok) infos = await r.json();
@@ -732,9 +733,27 @@
                   <label class="form-label">Unidade Alocada</label>
                   <input type="text" class="form-control" id="editUnidade"
                          value="${infos.usuario_unidade_alocada}"
-                         ${['Agente DAC','Agente DGP','Agente DP'].includes(tipo) ? 'disabled' : ''}
                          placeholder="Ex: Divisão de Análise de Contas">
-                  ${['Agente DAC','Agente DGP','Agente DP'].includes(tipo) ? '<small class="text-muted">Preenchido automaticamente pelo tipo de usuário</small>' : ''}
+                  <small class="text-muted">
+                    ${['Agente DAC','Agente DGP','Agente DP'].includes(tipo)
+                      ? 'Auto-preenchido pelo tipo — pode ser alterado'
+                      : 'Departamento ou unidade onde o usuário está alocado'}
+                  </small>
+                </div>
+              </div>
+
+              <hr class="my-3">
+              <p class="text-muted small fw-bold text-uppercase mb-3">
+                <i class="bi bi-bar-chart-line me-1"></i>Relatórios de Desempenho
+              </p>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="editRelatoriosPermissao"
+                           ${infos.usuario_relatorios_permissao ? 'checked' : ''}>
+                    <label class="form-check-label" for="editRelatoriosPermissao">Pode ver relatórios de todos</label>
+                  </div>
+                  <small class="text-muted">Permite visualizar e filtrar os registros de todos os usuários</small>
                 </div>
               </div>
 
@@ -764,6 +783,7 @@
     const novoVinculo  = document.getElementById('editVinculo').value.trim();
     const novoEscalaPermissao = document.getElementById('editEscalaPermissao')?.checked ?? false;
     const novaUnidade  = document.getElementById('editUnidade')?.value.trim() ?? '';
+    const novoRelatoriosPermissao = document.getElementById('editRelatoriosPermissao')?.checked ?? false;
 
     try {
       const r1 = await fetch(`/api/usuarios/${id}`, {
@@ -779,7 +799,8 @@
         body: JSON.stringify({ usuario_nome: novoNome, usuario_status: novoStatus,
                                usuario_aniversario: novoAniv, usuario_vinculo: novoVinculo,
                                usuario_escala_permissao: novoEscalaPermissao,
-                               usuario_unidade_alocada: novaUnidade })
+                               usuario_unidade_alocada: novaUnidade,
+                               usuario_relatorios_permissao: novoRelatoriosPermissao })
       });
       if (!r2.ok) { alert('Erro ao salvar infos: ' + (await r2.json()).erro); return; }
 
@@ -841,6 +862,7 @@
     { id: 'usuarios',               nome: 'Gerenciar Usuários',                 grupo: 'Gestão de Pessoas e Usuários' },
     { id: 'ferias',                 nome: 'Calendário Geral',                   grupo: 'Gestão de Pessoas e Usuários' },
     { id: 'gestao_pessoas',         nome: 'Nomeações CDA',                      grupo: 'Gestão de Pessoas e Usuários' },
+    { id: 'relatorios_desempenho',  nome: 'Relatórios de Desempenho',           grupo: 'Gestão de Pessoas e Usuários' },
     { id: 'portarias',              nome: 'Gerenciar Portarias/Legislações',    grupo: 'Opções de Administrador' },
     { id: 'conc_bancaria',          nome: 'Conciliação Bancária',               grupo: 'Módulos Técnicos' },
     { id: 'conc_rendimentos',       nome: 'Rendimentos',                        grupo: 'Módulos Técnicos' },

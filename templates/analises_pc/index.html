@@ -6,14 +6,40 @@
     <title>Check-list de Análise de Prestação de Contas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <!-- Select2 removido: usando <select multiple> nativo (mais rápido, sem dependência) -->
     <style>
         body {
-            background-color: #f8f9fa;
-            padding-top: 30px;
+            background-color: #f0fdf4;
+            padding-top: 20px;
             padding-bottom: 50px;
         }
+        /* Toast de auto-save */
+        .autosave-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            min-width: 220px;
+            font-size: 0.85rem;
+            animation: fadeInUp 0.25s ease;
+        }
+        @keyframes fadeInUp {
+            from { transform: translateY(12px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+        /* Compact config bar */
+        .config-bar {
+            background: linear-gradient(135deg, #065f46 0%, #059669 100%);
+            border-radius: 10px;
+            padding: 14px 20px;
+            margin-bottom: 16px;
+            color: #fff;
+        }
+        .config-bar label { color: rgba(255,255,255,.85); font-size: 0.78rem; font-weight: 600; margin-bottom: 3px; }
+        .config-bar .form-control,
+        .config-bar .form-select { font-size: 0.85rem; }
+        /* Native multiselect — small comfortable height */
+        #analistas { height: 80px; }
         .main-container {
             max-width: 1200px;
             margin: 0 auto;
@@ -197,61 +223,57 @@
             </div>
         </div>
 
-        <!-- Seção de Configuração Inicial -->
-        <div id="configSection" class="form-section">
-            <h4 class="section-title">Dados Iniciais</h4>
-            
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <label for="numeroTermo" class="form-label">Número do Termo *</label>
-                    <select id="numeroTermo" class="form-select" required>
-                        <option value="">Selecione...</option>
+        <!-- Barra de Configuração Compacta (sempre visível) -->
+        <div class="config-bar">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label for="numeroTermo">Termo de Parceria</label>
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           id="numeroTermo"
+                           list="datalistTermos"
+                           placeholder="Digite para buscar..."
+                           autocomplete="off">
+                    <datalist id="datalistTermos">
                         {% for termo in termos %}
                         <option value="{{ termo.numero_termo }}">{{ termo.numero_termo }}</option>
                         {% endfor %}
-                    </select>
+                    </datalist>
                 </div>
-                
-                <div class="col-md-4 mb-3">
-                    <label for="mesesAnalisados" class="form-label">Meses em Análise *</label>
-                    <select id="mesesAnalisados" class="form-select" required disabled>
-                        <option value="">Selecione um termo primeiro...</option>
-                    </select>
-                    <div class="form-check mt-2">
-                        <input class="form-check-input" type="checkbox" id="novoMes" onchange="toggleNovoMes()">
-                        <label class="form-check-label" for="novoMes">
-                            Adicionar novo período
-                        </label>
-                    </div>
-                    <input type="text" class="form-control mt-2" id="mesesAnalisadosNovo" 
-                           placeholder="Ex: 01/2024" style="display: none;">
-                    <small class="text-muted">Formato: MM/AAAA</small>
+                <div class="col-md-3">
+                    <label for="mesesAnalisados">
+                        Período <small class="opacity-75">(opcional)</small>
+                    </label>
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           id="mesesAnalisados"
+                           placeholder="Ex: 03/2025"
+                           title="Período de referência desta análise. Deixe em branco para usar o padrão.">
                 </div>
-                
-                <div class="col-md-4 mb-3">
-                    <label for="analistas" class="form-label">Analista(s) Responsável(is) *</label>
-                    <select id="analistas" class="form-select" multiple required>
+                <div class="col-md-4">
+                    <label for="analistas">
+                        Analista(s) <small class="opacity-75">(Ctrl+clique para múltiplos)</small>
+                    </label>
+                    <select id="analistas" class="form-select form-select-sm" multiple>
                         {% for analista in analistas %}
                         <option value="{{ analista.nome_analista }}">{{ analista.nome_analista }}</option>
                         {% endfor %}
                     </select>
                 </div>
-            </div>
-            
-            <div class="text-center mt-3">
-                <button class="btn btn-primary btn-lg" onclick="carregarChecklist()">
-                    Prosseguir
-                </button>
+                <div class="col-md-1 d-flex align-items-end">
+                    <div id="badgeStatusSave" class="text-white opacity-75" style="font-size:0.75rem; line-height:1.2;"></div>
+                </div>
             </div>
         </div>
 
-        <!-- Seção do Checklist (inicialmente oculta) -->
-        <div id="checklistArea">
-            <div class="info-box">
-                <strong>Termo:</strong> <span id="infoTermo"></span> | 
-                <strong>Meses:</strong> <span id="infoMeses"></span> | 
-                <strong>Analista(s):</strong> <span id="infoAnalistas"></span>
-            </div>
+        <!-- Área do Checklist (oculta até carregar um termo) -->
+        <div id="semTermoMsg" class="text-center text-muted py-5" style="display:block;">
+            <i class="bi bi-arrow-up-circle fs-2 d-block mb-2"></i>
+            Digite ou selecione um termo acima para carregar o checklist.
+        </div>
+
+        <!-- Seção do Checklist -->
+        <div id="checklistArea" style="display:none;">
 
             <h4 class="section-title">Checklist de Etapas</h4>
             
@@ -363,13 +385,13 @@
             </div>
 
             <!-- Botões de Ação -->
-            <div class="d-flex justify-content-center mt-4">
+            <div class="d-flex justify-content-center align-items-center gap-3 mt-4">
                 <button class="btn btn-success btn-lg btn-action" onclick="salvarChecklist()">
-                    💾 Salvar Avanços
+                    <i class="bi bi-floppy me-2"></i>Salvar Avanços
                 </button>
-                <button class="btn btn-secondary btn-action" onclick="voltarConfig()">
-                    ← Voltar para Configuração
-                </button>
+                <span id="msgSalvo" class="text-success fw-semibold" style="display:none;">
+                    <i class="bi bi-check-circle me-1"></i>Salvo!
+                </span>
             </div>
         </div>
     </div>
@@ -439,7 +461,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="{{ url_for('conc_bancaria.index') }}" class="btn btn-primary" target="_blank">
+                    <a href="{{ url_for('conc_banc.index') }}" class="btn btn-primary" target="_blank">
                         <i class="bi bi-box-arrow-up-right me-2"></i>Acessar Conciliação Bancária
                     </a>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
@@ -858,10 +880,11 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <!-- Select2 removido -->
     
     <script>
         let recursosCount = 0;
+        let periodoCarregado = '';  // período que veio do banco na última carga
         let checklistOrdem = [
             'avaliacao_celebracao',
             'avaliacao_prestacao_contas',
@@ -877,197 +900,146 @@
             'encaminhamento_encerramento'
         ];
 
-        // Inicializar Select2
+        // ── Substituir alert() nativo por toasts (sem modal bloqueante) ─────────
+        // Executado após DOMContentLoaded para garantir que _mostrarToast está definido
+        document.addEventListener('DOMContentLoaded', () => {
+            window._alertOriginal = window.alert;
+            window.alert = function(msg) {
+                const s = String(msg);
+                const tipo = (s.includes('❌') || s.includes('Erro') || s.includes('erro')) ? 'danger'
+                           : (s.includes('✅') || s.includes('✓') || s.includes('sucesso'))  ? 'success'
+                           : (s.includes('⚠') || s.includes('Atenção'))                       ? 'warning'
+                           : 'info';
+                _mostrarToast(s, tipo);
+            };
+        });
+
+        // ── Auto-save ────────────────────────────────────────────────────────────
+        let _autoSaveTimer = null;
+        function agendarAutoSaveChecklist() {
+            clearTimeout(_autoSaveTimer);
+            setBadgeSave('salvando');
+            _autoSaveTimer = setTimeout(() => salvarChecklist(true), 1500);
+        }
+        function setBadgeSave(estado) {
+            const el = document.getElementById('badgeStatusSave');
+            if (!el) return;
+            if (estado === 'salvando')   el.textContent = '⏳ salvando...';
+            else if (estado === 'ok')    el.textContent = '✓ salvo';
+            else if (estado === 'erro')  el.textContent = '⚠ erro ao salvar';
+            else                         el.textContent = '';
+        }
+
+        // ── Helpers de datalist de termos ─────────────────────────────────────
+        const _termosDisponiveis = Array.from(
+            document.querySelectorAll('#datalistTermos option')
+        ).map(o => o.value);
+
+        function _termoValido(v) {
+            return _termosDisponiveis.includes(v.trim());
+        }
+
+        // ── Mês padrão ───────────────────────────────────────────────────────
+        function _mesAtual() {
+            const now = new Date();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            return `${m}/${now.getFullYear()}`;
+        }
+
+        // ── Inicialização ────────────────────────────────────────────────────
         $(document).ready(function() {
-            $('#numeroTermo').select2({
-                theme: 'bootstrap-5',
-                placeholder: 'Selecione um termo...',
-                allowClear: true
+            // Pré-preencher campo de período com mês atual
+            const inputMeses = document.getElementById('mesesAnalisados');
+            if (inputMeses && !inputMeses.value) inputMeses.value = _mesAtual();
+
+            // Auto-load a partir de URL ?termo=
+            const urlParams = new URLSearchParams(window.location.search);
+            const termoParam  = urlParams.get('termo');
+            const _mesesParam = urlParams.get('meses');
+            const _autoLoad   = urlParams.get('autoload') === 'true';
+            if (termoParam) {
+                document.getElementById('numeroTermo').value = termoParam;
+                // Só auto-carrega aqui se não houver autoload via meses (evita duplo load)
+                if (!(_mesesParam && _autoLoad)) {
+                    setTimeout(() => carregarChecklist(), 200);
+                }
+            }
+
+            // Carregar checklist ao sair do campo termo
+            document.getElementById('numeroTermo').addEventListener('change', function() {
+                const v = this.value.trim();
+                if (_termoValido(v)) carregarChecklist();
             });
-            
-            // Quando selecionar um termo, buscar meses disponíveis
-            $('#numeroTermo').on('change', function() {
-                const numeroTermo = $(this).val();
-                if (numeroTermo) {
-                    buscarMesesDisponiveis(numeroTermo);
-                } else {
-                    $('#mesesAnalisados').prop('disabled', true).html('<option value="">Selecione um termo primeiro...</option>');
-                    $('#novoMes').prop('checked', false);
-                    $('#mesesAnalisadosNovo').hide();
+            // Também carregar ao pressionar Enter no campo de termo
+            document.getElementById('numeroTermo').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const v = this.value.trim();
+                    if (_termoValido(v)) carregarChecklist();
                 }
             });
 
-            $('#analistas').select2({
-                theme: 'bootstrap-5',
-                placeholder: 'Selecione um ou mais analistas...',
-                allowClear: true
+            // Lazy-load de instruções: carregar apenas ao abrir o modal (Sugestão C)
+            document.getElementById('modalInstrucao').addEventListener('show.bs.modal', function() {
+                const numeroTermo = document.getElementById('numeroTermo').value;
+                if (numeroTermo && !dadosInstrucao.instrucao && !dadosInstrucao._carregando) {
+                    dadosInstrucao._carregando = true;
+                    carregarInfoAdicional(numeroTermo).then(() => {
+                        dadosInstrucao._carregando = false;
+                        _preencherModalInstrucao();
+                    });
+                } else {
+                    _preencherModalInstrucao();
+                }
             });
-            
-            $('#mesesAnalisados').select2({
-                theme: 'bootstrap-5',
-                placeholder: 'Selecione o período...',
-                allowClear: true
+            document.getElementById('modalInstrucaoPC').addEventListener('show.bs.modal', function() {
+                const numeroTermo = document.getElementById('numeroTermo').value;
+                if (numeroTermo && !dadosInstrucao.instrucao_pc && !dadosInstrucao._carregando) {
+                    dadosInstrucao._carregando = true;
+                    carregarInfoAdicional(numeroTermo).then(() => {
+                        dadosInstrucao._carregando = false;
+                        _preencherModalInstrucaoPC();
+                    });
+                } else {
+                    _preencherModalInstrucaoPC();
+                }
             });
-            
-            // Verificar se há parâmetros de URL (vindos de "Meus Processos")
-            const urlParams = new URLSearchParams(window.location.search);
-            const termoParam = urlParams.get('termo');
-            const mesesParam = urlParams.get('meses');
-            const autoLoad = urlParams.get('autoload') === 'true'; // Flag para carregar automaticamente
-            
-            if (termoParam && mesesParam) {
-                // Aguardar um pouco para garantir que o Select2 foi inicializado
-                setTimeout(async () => {
-                    // Selecionar o termo
-                    $('#numeroTermo').val(termoParam).trigger('change');
-                    
-                    // Aguardar carregar os meses
-                    await buscarMesesDisponiveis(termoParam);
-                    
-                    // Selecionar o mês
-                    setTimeout(async () => {
-                        $('#mesesAnalisados').val(mesesParam).trigger('change');
-                        
-                        if (autoLoad) {
-                            // Carregar analistas do checklist existente e depois carregar automaticamente
-                            setTimeout(async () => {
-                                await carregarChecklistAutomatico(termoParam, mesesParam);
-                            }, 800);
-                        } else {
-                            // Apenas rolar para o formulário
-                            $('html, body').animate({
-                                scrollTop: $('#configSection').offset().top - 20
-                            }, 500);
-                        }
-                    }, 500);
-                }, 300);
+
+            // Compatibilidade: ?meses=X&autoload=true vindo de "Meus Processos"
+            if (termoParam && _mesesParam) {
+                document.getElementById('mesesAnalisados').value = _mesesParam;
+                if (_autoLoad) {
+                    setTimeout(() => carregarChecklistAutomatico(termoParam, _mesesParam), 300);
+                }
             }
         });
-        
+
+        // Stubs mantidos caso outros módulos chamem essas funções
+        async function buscarMesesDisponiveis() { return; }
+        function toggleNovoMes() { /* sem uso na nova UI */ }
+
         async function carregarChecklistAutomatico(numeroTermo, mesesAnalisados) {
             try {
-                // Primeiro, buscar os analistas do checklist
-                const response = await fetch('/analises_pc/api/carregar_checklist', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        numero_termo: numeroTermo,
-                        meses_analisados: mesesAnalisados
-                    })
-                });
-
-                const data = await response.json();
-                
-                if (data.analistas && data.analistas.length > 0) {
-                    // Selecionar os analistas
-                    $('#analistas').val(data.analistas).trigger('change');
-                    
-                    // Aguardar um pouco e depois carregar o checklist
-                    setTimeout(() => {
-                        carregarChecklist();
-                    }, 300);
-                } else {
-                    // Se não houver analistas, apenas rolar para o formulário
-                    $('html, body').animate({
-                        scrollTop: $('#configSection').offset().top - 20
-                    }, 500);
-                }
+                if (mesesAnalisados) document.getElementById('mesesAnalisados').value = mesesAnalisados;
+                document.getElementById('numeroTermo').value = numeroTermo;
+                await carregarChecklist();
             } catch (error) {
                 console.error('Erro ao carregar checklist automaticamente:', error);
-                // Em caso de erro, apenas rolar para o formulário
-                $('html, body').animate({
-                    scrollTop: $('#configSection').offset().top - 20
-                }, 500);
-            }
-        }
-        
-        async function buscarMesesDisponiveis(numeroTermo) {
-            try {
-                const response = await fetch('/analises_pc/api/buscar_meses', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        numero_termo: numeroTermo
-                    })
-                });
-                const data = await response.json();
-                
-                const selectMeses = $('#mesesAnalisados');
-                selectMeses.html('');
-                
-                if (data.meses && data.meses.length > 0) {
-                    selectMeses.append('<option value="">Selecione o período...</option>');
-                    data.meses.forEach(mes => {
-                        selectMeses.append(`<option value="${mes}">${mes} (existente)</option>`);
-                    });
-                    selectMeses.prop('disabled', false);
-                } else {
-                    selectMeses.append('<option value="">Nenhum período encontrado</option>');
-                    selectMeses.prop('disabled', true);
-                    // Marcar automaticamente "novo período"
-                    $('#novoMes').prop('checked', true);
-                    toggleNovoMes();
-                }
-                
-                // Reinicializar Select2
-                selectMeses.select2({
-                    theme: 'bootstrap-5',
-                    placeholder: 'Selecione o período...',
-                    allowClear: true
-                });
-                
-            } catch (error) {
-                console.error('Erro ao buscar meses:', error);
-                alert('Erro ao buscar períodos disponíveis');
-            }
-        }
-        
-        function toggleNovoMes() {
-            const checkbox = $('#novoMes');
-            const inputNovo = $('#mesesAnalisadosNovo');
-            const selectExistente = $('#mesesAnalisados');
-            
-            if (checkbox.is(':checked')) {
-                inputNovo.show();
-                selectExistente.prop('disabled', true);
-                selectExistente.val('').trigger('change');
-            } else {
-                inputNovo.hide();
-                inputNovo.val('');
-                if ($('#numeroTermo').val()) {
-                    selectExistente.prop('disabled', false);
-                }
             }
         }
 
         async function carregarChecklist() {
-            const numeroTermo = $('#numeroTermo').val();
-            let mesesAnalisados;
-            
-            // Verificar se está usando novo período ou existente
-            if ($('#novoMes').is(':checked')) {
-                mesesAnalisados = $('#mesesAnalisadosNovo').val();
-            } else {
-                mesesAnalisados = $('#mesesAnalisados').val();
-            }
-            
-            const analistas = $('#analistas').val();
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
+            const mesesAnalisados = (document.getElementById('mesesAnalisados').value.trim()) || _mesAtual();
+            const analistas = Array.from(document.getElementById('analistas').selectedOptions).map(o => o.value);
 
-            if (!numeroTermo || !mesesAnalisados || !analistas || analistas.length === 0) {
-                alert('Por favor, preencha todos os campos obrigatórios!');
-                return;
-            }
+            if (!numeroTermo) return;
+            // meses e analistas são opcionais para carregar — apenas necessários ao salvar
 
             try {
                 const response = await fetch('/analises_pc/api/carregar_checklist', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         numero_termo: numeroTermo,
                         meses_analisados: mesesAnalisados
@@ -1076,10 +1048,22 @@
 
                 const data = await response.json();
 
-                // Atualizar informações
-                $('#infoTermo').text(numeroTermo);
-                $('#infoMeses').text(mesesAnalisados);
-                $('#infoAnalistas').text(analistas.join(', '));
+                // Restaurar analistas salvos anteriormente (se nenhum estiver selecionado)
+                if (data.analistas && data.analistas.length > 0 && analistas.length === 0) {
+                    const sel = document.getElementById('analistas');
+                    Array.from(sel.options).forEach(o => {
+                        o.selected = data.analistas.includes(o.value);
+                    });
+                }
+
+                // Registrar período efetivamente carregado (para detectar renomeação ao salvar)
+                periodoCarregado = mesesAnalisados;
+
+                // Persistir termo na URL (Sugestão D)
+                history.replaceState(null, '', `?termo=${encodeURIComponent(numeroTermo)}`);
+
+                // Resetar dados de instrução para o novo termo (lazy reload)
+                dadosInstrucao = { instrucao: null, sei_celeb: null, instrucao_pc: null, sei_pc: null, _carregando: false };
 
                 // Limpar checkboxes
                 $('input[type="checkbox"]').prop('checked', false);
@@ -1105,26 +1089,53 @@
                     });
                 }
 
-                // Mostrar checklist
-                $('#configSection').hide();
-                $('#checklistArea').show();
-                
-                // Buscar e armazenar informações adicionais (instrução + SEI)
-                await carregarInfoAdicional(numeroTermo);
+                // Mostrar checklist, ocultar placeholder
+                document.getElementById('semTermoMsg').style.display = 'none';
+                document.getElementById('checklistArea').style.display = 'block';
+
+                setBadgeSave('');
 
             } catch (error) {
                 console.error('Erro:', error);
-                alert('Erro ao carregar checklist!');
+                _mostrarToast('Erro ao carregar checklist!', 'danger');
             }
         }
-        
-        // Variáveis globais para armazenar dados da instrução
+
+        // ── Helpers de toast e status ────────────────────────────────────────
+        function _mostrarToast(msg, tipo = 'success') {
+            const t = document.createElement('div');
+            t.className = `alert alert-${tipo} alert-dismissible autosave-toast`;
+            t.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 4000);
+        }
+
+        // ── Dados de instrução (lazy) ─────────────────────────────────────────
         let dadosInstrucao = {
-            instrucao: null,
-            sei_celeb: null,
-            instrucao_pc: null,
-            sei_pc: null
+            instrucao: null, sei_celeb: null,
+            instrucao_pc: null, sei_pc: null,
+            _carregando: false
         };
+
+        // Funções usadas pelos show.bs.modal listeners (criados no DOMContentLoaded acima)
+        function _preencherModalInstrucao() {
+            const seiEl = document.getElementById('seiCelebInfo');
+            seiEl.innerHTML = dadosInstrucao.sei_celeb
+                ? `<strong class="text-primary fs-4">${dadosInstrucao.sei_celeb}</strong>`
+                : `<em class="text-muted">Processo SEI não informado no cadastro do termo</em>`;
+            const instEl = document.getElementById('instrucaoTexto');
+            instEl.innerHTML = dadosInstrucao.instrucao
+                || `<em class="text-muted">Instrução não cadastrada no sistema</em>`;
+        }
+        function _preencherModalInstrucaoPC() {
+            const seiEl = document.getElementById('seiPCInfo');
+            seiEl.innerHTML = dadosInstrucao.sei_pc
+                ? `<strong class="text-success fs-4">${dadosInstrucao.sei_pc}</strong>`
+                : `<em class="text-muted">Processo SEI não informado no cadastro do termo</em>`;
+            const instEl = document.getElementById('instrucaoPCTexto');
+            instEl.innerHTML = dadosInstrucao.instrucao_pc
+                || `<em class="text-muted">Instrução não cadastrada no sistema</em>`;
+        }
         
         async function carregarInfoAdicional(numeroTermo) {
             try {
@@ -1156,47 +1167,13 @@
         }
         
         function abrirModalInstrucao() {
-            // Preencher SEI de Celebração
-            const seiElement = document.getElementById('seiCelebInfo');
-            if (dadosInstrucao.sei_celeb) {
-                seiElement.innerHTML = `<strong class="text-primary fs-4">${dadosInstrucao.sei_celeb}</strong>`;
-            } else {
-                seiElement.innerHTML = `<em class="text-muted">Processo SEI não informado no cadastro do termo</em>`;
-            }
-            
-            // Preencher Instrução
-            const instrucaoElement = document.getElementById('instrucaoTexto');
-            if (dadosInstrucao.instrucao) {
-                instrucaoElement.innerHTML = dadosInstrucao.instrucao;
-            } else {
-                instrucaoElement.innerHTML = `<em class="text-muted">Instrução não cadastrada no sistema</em>`;
-            }
-            
-            // Abrir modal
-            const modal = new bootstrap.Modal(document.getElementById('modalInstrucao'));
-            modal.show();
+            // A instrução é carregada lazily pelo listener show.bs.modal
+            // (registrado no DOMContentLoaded); aqui só abrimos o modal.
+            new bootstrap.Modal(document.getElementById('modalInstrucao')).show();
         }
-        
+
         function abrirModalInstrucaoPC() {
-            // Preencher SEI de Prestação de Contas
-            const seiElement = document.getElementById('seiPCInfo');
-            if (dadosInstrucao.sei_pc) {
-                seiElement.innerHTML = `<strong class="text-success fs-4">${dadosInstrucao.sei_pc}</strong>`;
-            } else {
-                seiElement.innerHTML = `<em class="text-muted">Processo SEI não informado no cadastro do termo</em>`;
-            }
-            
-            // Preencher Instrução
-            const instrucaoElement = document.getElementById('instrucaoPCTexto');
-            if (dadosInstrucao.instrucao_pc) {
-                instrucaoElement.innerHTML = dadosInstrucao.instrucao_pc;
-            } else {
-                instrucaoElement.innerHTML = `<em class="text-muted">Instrução não cadastrada no sistema</em>`;
-            }
-            
-            // Abrir modal
-            const modal = new bootstrap.Modal(document.getElementById('modalInstrucaoPC'));
-            modal.show();
+            new bootstrap.Modal(document.getElementById('modalInstrucaoPC')).show();
         }
         
         // Função para abrir modal de instrução de preenchimento de conciliação
@@ -1441,9 +1418,9 @@
         async function abrirModalDadosBase() {
             console.log('[DEBUG] abrirModalDadosBase chamada');
             
-            const numeroTermo = document.getElementById('numeroTermo').value;
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
             console.log('[DEBUG] Número do termo:', numeroTermo);
-            
+
             if (!numeroTermo) {
                 alert('Selecione um termo primeiro!');
                 return;
@@ -1734,17 +1711,8 @@
                 if (!data.tem_orcamento) {
                     // Não tem orçamento - badge vermelha
                     badge.classList.add('warning');
-                    
-                    // Mostrar alerta
-                    const confirmacao = confirm(
-                        '⚠️ O orçamento anual dessa parceria deve ser preenchido.\n\n' +
-                        'Deseja abrir a página de orçamento para preencher agora?'
-                    );
-                    
-                    if (confirmacao) {
-                        // Abrir em nova aba
-                        window.open(data.url_orcamento, '_blank');
-                    }
+                    // Abrir diretamente para preencher
+                    window.open(data.url_orcamento, '_blank');
                 } else {
                     // Tem orçamento - badge azul
                     badge.classList.remove('warning');
@@ -1768,7 +1736,7 @@
             }
             
             // Abrir página de conciliação bancária em nova aba com o termo pré-selecionado
-            const url = `/conc_bancaria/?termo=${encodeURIComponent(numeroTermo)}`;
+            const url = `/conc_banc/?termo=${encodeURIComponent(numeroTermo)}`;
             window.open(url, '_blank');
         }
 
@@ -1815,17 +1783,15 @@
         }
 
         function removerRecurso(btn) {
-            if (confirm('Tem certeza que deseja remover esta fase recursal?')) {
-                $(btn).closest('.recurso-section').remove();
-            }
+            $(btn).closest('.recurso-section').remove();
         }
 
         function handleCheckboxChange(checkbox) {
             const item = $(checkbox).closest('.checklist-item');
-            
+
             if (checkbox.checked) {
                 item.addClass('checked');
-                
+
                 // Marcar todas as anteriores automaticamente
                 const order = parseInt(item.data('order'));
                 if (order) {
@@ -1840,12 +1806,21 @@
             } else {
                 item.removeClass('checked');
             }
+
+            // Auto-save com debounce (Sugestão D)
+            const termoCarregado = document.getElementById('numeroTermo').value.trim();
+            if (termoCarregado) agendarAutoSaveChecklist();
         }
 
-        async function salvarChecklist() {
-            const numeroTermo = $('#infoTermo').text();
-            const mesesAnalisados = $('#infoMeses').text();
-            const analistas = $('#analistas').val();
+        async function salvarChecklist(silencioso = false) {
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
+            const mesesAnalisados = (document.getElementById('mesesAnalisados').value.trim()) || _mesAtual();
+            const analistas = Array.from(document.getElementById('analistas').selectedOptions).map(o => o.value);
+
+            if (!numeroTermo) {
+                if (!silencioso) _mostrarToast('Selecione um termo antes de salvar.', 'warning');
+                return;
+            }
 
             // Coletar dados do checklist principal
             const checklistData = {};
@@ -1875,6 +1850,8 @@
                     body: JSON.stringify({
                         numero_termo: numeroTermo,
                         meses_analisados: mesesAnalisados,
+                        // Se o período foi renomeado pelo usuário, informar o período anterior
+                        periodo_anterior: (periodoCarregado && periodoCarregado !== mesesAnalisados) ? periodoCarregado : null,
                         nome_analista: analistas[0], // Para compatibilidade
                         analistas: analistas,
                         checklist: checklistData,
@@ -1885,25 +1862,30 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    alert('✓ Checklist salvo com sucesso!');
+                    setBadgeSave('ok');
+                    periodoCarregado = mesesAnalisados; // sincronizar após renomeação
+                    if (!silencioso) {
+                        const msgEl = document.getElementById('msgSalvo');
+                        if (msgEl) { msgEl.style.display = 'inline'; setTimeout(() => msgEl.style.display = 'none', 3000); }
+                        _mostrarToast('✓ Checklist salvo com sucesso!', 'success');
+                    }
                 } else {
-                    alert('Erro ao salvar: ' + (data.error || 'Erro desconhecido'));
+                    setBadgeSave('erro');
+                    if (!silencioso) _mostrarToast('Erro ao salvar: ' + (data.error || 'Erro desconhecido'), 'danger');
                 }
             } catch (error) {
                 console.error('Erro:', error);
-                alert('Erro ao salvar checklist!');
+                setBadgeSave('erro');
+                if (!silencioso) _mostrarToast('Erro ao salvar checklist!', 'danger');
             }
         }
 
         function voltarConfig() {
-            if (confirm('Deseja voltar para a configuração? Certifique-se de salvar seus avanços antes.')) {
-                $('#checklistArea').hide();
-                $('#configSection').show();
-            }
+            // Na nova UI não existe mais a seção de config separada — sem-op
         }
 
         async function criarPastaModelo() {
-            const numeroTermo = $('#numeroTermo').val();
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
             
             if (!numeroTermo) {
                 alert('❌ Por favor, selecione um termo primeiro!');

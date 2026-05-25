@@ -181,7 +181,7 @@
     
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('numeroTermoDisplay').textContent = numeroTermo;
-        document.getElementById('btnVoltar').href = `/conc_bancaria/?termo=${encodeURIComponent(numeroTermo)}`;
+        document.getElementById('btnVoltar').href = `/conc_banc/?termo=${encodeURIComponent(numeroTermo)}`;
         
         // Adicionar suporte para colar do Excel
         const tbody = document.getElementById('tbodyContrapartida');

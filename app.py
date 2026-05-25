@@ -26,11 +26,13 @@ from routes.pesquisa_parcerias import pesquisa_parcerias_bp
 from routes.analises_pc import analises_pc_bp
 from routes.parcerias_notificacoes import bp as parcerias_notificacoes_bp
 from routes.conc_bancaria import bp as conc_bancaria_bp
+from routes.conc_banc import bp as conc_banc_bp
 from routes.conc_rendimentos import bp as conc_rendimentos_bp
 from routes.conc_contrapartida import bp as conc_contrapartida_bp
 from routes.conc_exportacao import bp as conc_exportacao_bp
 from routes.conc_relatorio import bp as conc_relatorio_bp
 from routes.conc_demonstrativo import bp as conc_demonstrativo_bp
+from routes.conc_glosas import bp as conc_glosas_bp
 from routes.ocr_testes import bp as ocr_testes_bp
 from routes.gestao_financeira import gestao_financeira_bp
 from routes.gestao_financeira_ultra_liquidacoes import ultra_liquidacoes_bp
@@ -49,6 +51,7 @@ from routes.admin import admin_bp
 from routes.datas_importantes import datas_importantes_bp
 from routes.relatos import relatos_bp
 from routes.escalas import escalas_bp
+from routes.gestao_pessoas.relatorios_desempenho import relatorios_desempenho_bp
 
 
 # ============================================================================
@@ -232,6 +235,7 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = SECRET_KEY
     app.config["DEBUG"] = DEBUG
+    app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB — uploads R2
     app.json.sort_keys = False  # preservar ordem de inserção das chaves JSON
     
     # Registrar função de limpeza do banco de dados
@@ -273,11 +277,13 @@ def create_app():
     app.register_blueprint(analises_pc_bp)
     app.register_blueprint(parcerias_notificacoes_bp)
     app.register_blueprint(conc_bancaria_bp)
+    app.register_blueprint(conc_banc_bp)
     app.register_blueprint(conc_rendimentos_bp)
     app.register_blueprint(conc_contrapartida_bp)
     app.register_blueprint(conc_exportacao_bp)
     app.register_blueprint(conc_relatorio_bp)
     app.register_blueprint(conc_demonstrativo_bp)
+    app.register_blueprint(conc_glosas_bp)
     app.register_blueprint(ocr_testes_bp)
     app.register_blueprint(gestao_financeira_bp)
     app.register_blueprint(ultra_liquidacoes_bp)
@@ -296,6 +302,7 @@ def create_app():
     app.register_blueprint(datas_importantes_bp)
     app.register_blueprint(relatos_bp)
     app.register_blueprint(escalas_bp)
+    app.register_blueprint(relatorios_desempenho_bp)
     
     # ========================================================================
     # HOOKS GLOBAIS PARA LOGGING AUTOMÁTICO

@@ -9,9 +9,16 @@ import logging
 import sys
 
 os.environ['FLASK_ENV'] = 'production'
+os.environ['FLASK_DEBUG'] = '0'
+os.environ['DEBUG'] = 'False'
 os.environ['PORT'] = '5000'
 
 from app import app
+
+# Garantir que debug/reloader nunca ficam ativos em produção,
+# independente do que estiver no .env
+app.config['DEBUG'] = False
+app.config['TESTING'] = False
 
 if __name__ == '__main__':
     try:

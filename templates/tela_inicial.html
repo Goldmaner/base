@@ -323,13 +323,13 @@
       {% endif %}
 
       <!-- ── GESTÃO DE DADOS (Âmbar) ── -->
-      {% if is_admin or 'listas' in user_acessos or 'modelos_textos' in user_acessos %}
+      {% if is_admin or 'listas' in user_acessos or 'modelos_textos' in user_acessos or True %}
       <div class="faf-acc-item s-dados">
         <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDados">
           <i class="bi bi-database-fill s-icon" style="font-size:1.05rem;"></i>
           <span>Gestão de Dados</span>
           <span class="s-spacer"></span>
-          <span class="s-count">2</span>
+          <span class="s-count">3</span>
           <i class="bi bi-chevron-down s-chev"></i>
         </button>
         <div id="collapseDados" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
@@ -344,6 +344,9 @@
               <i class="bi bi-file-text"></i> Modelos de Texto
             </a>
             {% endif %}
+            <a href="{{ url_for('relatorios_desempenho.index') }}" class="faf-btn">
+              <i class="bi bi-bar-chart-line-fill"></i> Relatórios de Desempenho
+            </a>
           </div>
         </div>
       </div>

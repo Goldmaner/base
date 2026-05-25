@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatórios de Desempenho – FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background: #f1f5f9; font-family: 'Segoe UI', sans-serif; }
+
+    .page-header {
+      background: linear-gradient(135deg, #78350f 0%, #d97706 100%);
+      color: #fff; padding: 22px 32px; margin-bottom: 28px;
+      box-shadow: 0 4px 18px rgba(217,119,6,.28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.45rem; font-weight: 800; }
+    .page-header p  { margin: 4px 0 0; opacity: .82; font-size: .88rem; }
+
+    .btn-amber {
+      background: linear-gradient(135deg, #78350f, #d97706);
+      color: #fff; border: none; border-radius: 8px; padding: 7px 16px;
+      font-weight: 600; font-size: .875rem; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; transition: opacity .15s;
+    }
+    .btn-amber:hover { opacity: .88; color: #fff; }
+    .btn-amber.outline {
+      background: transparent; border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+    }
+    .btn-amber.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+    .btn-amber:disabled, .btn-amber[disabled] {
+      opacity: .45; cursor: not-allowed; pointer-events: none;
+    }
+
+    .content-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07); overflow: hidden; margin-bottom: 24px;
+    }
+    .content-card-header {
+      background: linear-gradient(135deg, #78350f, #d97706);
+      color: #fff; padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+    .content-card-body { padding: 20px; }
+
+    .filter-bar {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      border-left: 4px solid #d97706; padding: 18px 20px; margin-bottom: 20px;
+    }
+
+    #tabelaRegistros thead th {
+      background: linear-gradient(135deg, #78350f, #d97706);
+      color: #fff; border: none; white-space: nowrap; font-size: .85rem;
+    }
+    #tabelaRegistros tbody tr:hover { background: #fef9ee; }
+    .row-expandida { background: #fffbf0 !important; }
+
+    .afericoes-inline { background: #fef3c7; border-radius: 6px; padding: 10px 14px; font-size: .82rem; }
+    .afericao-item { border-bottom: 1px solid #fde68a; padding: 5px 0; }
+    .afericao-item:last-child { border-bottom: none; }
+
+    .modal-header.amber { background: linear-gradient(135deg, #78350f, #d97706); color: #fff; }
+    .modal-header.amber .btn-close { filter: invert(1); }
+
+    .aux-bloco {
+      background: #fef9ee; border: 1px solid #fde68a; border-radius: 8px;
+      padding: 14px; margin-bottom: 10px; position: relative;
+    }
+    .aux-bloco .btn-remove-aux {
+      position: absolute; top: 8px; right: 10px;
+      background: none; border: none; color: #dc2626; cursor: pointer; font-size: .9rem;
+    }
+
+    .faf-content { max-width: 1400px; margin: 0 auto; padding: 0 28px 36px; }
+
+    /* Alerta de restrição teletrabalho */
+    .tt-aviso {
+      background: #fef3c7; border: 1.5px solid #f59e0b; border-radius: 10px;
+      padding: 14px 18px; margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-start;
+    }
+    .tt-aviso .tt-icon { font-size: 1.4rem; color: #d97706; flex-shrink: 0; margin-top: 2px; }
+    .tt-aviso .tt-title { font-weight: 700; font-size: .9rem; color: #78350f; }
+    .tt-aviso .tt-sub   { font-size: .82rem; color: #92400e; margin-top: 2px; }
+
+    /* Floating reminder */
+    #relFloatPanel {
+      position: fixed; bottom: 22px; right: 22px; z-index: 1055; width: 320px;
+    }
+    #relFloatCard {
+      border-radius: 12px; overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,.18);
+      border-top: 3px solid #d97706 !important;
+    }
+    #relFloatCard .rel-float-header {
+      background: linear-gradient(135deg, #78350f, #d97706);
+      color: #fff; padding: 10px 14px; font-size: .85rem; font-weight: 700;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<div class="page-header">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h2><i class="bi bi-bar-chart-line-fill me-2"></i>Relatórios de Desempenho</h2>
+      <p>Registro e acompanhamento das atividades realizadas</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if permissao_total %}
+      <a href="{{ url_for('relatorios_desempenho.gerencial') }}" class="btn-amber outline">
+        <i class="bi bi-people-fill"></i> Visão Gerencial
+      </a>
+      {% endif %}
+      <a href="{{ url_for('main.index') }}" class="btn-amber outline">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="faf-content">
+
+  <!-- Alerta de restrição (injetado por JS) -->
+  <div id="ttAviso" style="display:none;" class="tt-aviso">
+    <div class="tt-icon"><i class="bi bi-calendar-week"></i></div>
+    <div>
+      <div class="tt-title" id="ttAvisoTitle">Registros vinculados ao teletrabalho</div>
+      <div class="tt-sub" id="ttAvisoSub"></div>
+    </div>
+  </div>
+
+  <!-- ===== FILTROS ===== -->
+  <div class="filter-bar">
+    <h6 class="mb-3"><i class="bi bi-funnel me-1" style="color:#d97706;"></i>Filtros</h6>
+    <div class="row g-3 align-items-end">
+      {% if permissao_total %}
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Usuário</label>
+        <select class="form-select" id="filtroUsuario" onchange="carregarRegistros()">
+          <option value="">Todos os usuários</option>
+        </select>
+      </div>
+      {% endif %}
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Busca (tipo, nome, subtipo)</label>
+        <input type="text" class="form-control" id="filtroQ"
+               placeholder="Pesquisar..." oninput="debounceCarregar()">
+      </div>
+      <div class="col-md-auto d-flex gap-2">
+        <button class="btn-amber" id="btnNovoRegistro" onclick="abrirModalNovo()" disabled title="Verificando dia de teletrabalho...">
+          <i class="bi bi-plus-circle"></i> Novo Registro
+        </button>
+        <button class="btn btn-outline-secondary" onclick="limparFiltros()">
+          <i class="bi bi-x-circle"></i> Limpar
+        </button>
+      </div>
+    </div>
+    <div class="mt-2">
+      <small class="text-muted" id="contadorRegistros">Carregando...</small>
+    </div>
+  </div>
+
+  <!-- ===== TABELA ===== -->
+  <div class="content-card">
+    <div class="content-card-header">
+      <h5><i class="bi bi-table me-2"></i>Registros de Atividades</h5>
+      <button class="btn-amber outline" onclick="carregarRegistros()" title="Atualizar">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+    </div>
+    <div class="content-card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="tabelaRegistros">
+          <thead>
+            <tr>
+              <th style="width:32px;"></th>
+              {% if permissao_total %}<th>Usuário</th>{% endif %}
+              <th>Tipo de Operação</th>
+              <th>Nome da Operação</th>
+              <th>Subtipo</th>
+              <th class="text-center">Aferições</th>
+              <th>Registrado em</th>
+              <th class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpoTabela">
+            <tr>
+              <td colspan="8" class="text-center py-4">
+                <div class="spinner-border text-warning" role="status"></div>
+                <p class="mt-2 text-muted small">Carregando...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /faf-content -->
+
+<!-- ===== MODAL CRIAR / EDITAR ===== -->
+<div class="modal fade" id="modalRegistro" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header amber">
+        <h5 class="modal-title" id="modalTitulo">
+          <i class="bi bi-plus-circle me-2"></i>Novo Registro
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="regId">
+
+        <!-- Dados principais -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Tipo de Operação <span class="text-danger">*</span></label>
+            <select class="form-select" id="regTipo" onchange="carregarNomes()">
+              <option value="">Carregando...</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Nome da Operação <span class="text-danger">*</span></label>
+            <select class="form-select" id="regNome">
+              <option value="">Selecione o tipo primeiro</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Subtipo <small class="text-muted fw-normal">(opcional)</small></label>
+            <input type="text" class="form-control" id="regSubtipo"
+                   placeholder="Ex: Produção, Revisão...">
+          </div>
+        </div>
+
+        <hr>
+
+        <!-- Aferições -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0"><i class="bi bi-clipboard-check me-2" style="color:#d97706;"></i>Aferições</h6>
+          <button type="button" class="btn btn-sm btn-outline-warning" onclick="adicionarAux()">
+            <i class="bi bi-plus"></i> Adicionar Aferição
+          </button>
+        </div>
+        <div id="listaAux">
+          <!-- blocos de aferição inseridos dinamicamente -->
+        </div>
+        <div id="semAux" class="text-muted small text-center py-3">
+          <i class="bi bi-info-circle me-1"></i>Nenhuma aferição adicionada ainda.
+        </div>
+
+        <div id="regMsg" class="alert d-none mt-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn-amber" onclick="salvarRegistro()">
+          <i class="bi bi-check-circle"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FLOATING REMINDER TELETRABALHO ===== -->
+<div id="relFloatPanel" style="display:none;">
+  <div class="text-end mb-1">
+    <button id="relFloatToggle" onclick="toggleRelFloat()"
+            class="btn btn-sm shadow-sm"
+            style="border-radius:30px;padding:6px 14px;font-size:0.82rem;background:linear-gradient(135deg,#78350f,#d97706);color:#fff;border:none;">
+      <i class="bi bi-bell-fill"></i>
+      <span class="badge bg-danger ms-1">1</span>
+      <span class="ms-1">Lembrete</span>
+    </button>
+  </div>
+  <div id="relFloatCard" class="card shadow border-0">
+    <div class="rel-float-header">
+      <span><i class="bi bi-bell-fill me-1"></i> Lembrete de Teletrabalho</span>
+      <button onclick="dispensarRelFloat()" style="background:none;border:none;color:#fff;font-size:1rem;cursor:pointer;" title="Dispensar">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="card-body py-3 px-3" style="font-size:.85rem;">
+      <p class="mb-2">
+        <i class="bi bi-bar-chart-line-fill me-2" style="color:#d97706;"></i>
+        Hoje é seu dia de <strong>teletrabalho</strong>. Não se esqueça de preencher seu
+        <strong>Relatório de Desempenho</strong>.
+      </p>
+      <button class="btn-amber w-100 justify-content-center mt-1" style="font-size:.82rem;"
+              onclick="dispensarRelFloat(); abrirModalNovo();">
+        <i class="bi bi-plus-circle"></i> Preencher agora
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const PERMISSAO_TOTAL = {{ 'true' if permissao_total else 'false' }};
+  const TIPOS_AFERICAO  = {{ tipos_afericao | tojson }};
+  let _debounceTimer = null;
+  let _ehDiaTeletrabalho = false;
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', async () => {
+    await Promise.all([
+      carregarTipos(),
+      carregarUsuariosLista(),
+      verificarTeletrabalho(),
+    ]);
+    carregarRegistros();
+  });
+
+  // ── Teletrabalho — verificação ────────────────────────────────────────────
+  async function verificarTeletrabalho() {
+    const btn = document.getElementById('btnNovoRegistro');
+    const aviso = document.getElementById('ttAviso');
+    const avisoTitle = document.getElementById('ttAvisoTitle');
+    const avisoSub = document.getElementById('ttAvisoSub');
+
+    // Botão sempre habilitado — preenchimento retroativo é permitido
+    btn.disabled = false;
+    btn.title = '';
+
+    try {
+      const r = await fetch('/relatorios_desempenho/api/meu_dia_teletrabalho');
+      const d = await r.json();
+
+      _ehDiaTeletrabalho = d.eh_hoje === true;
+
+      if (_ehDiaTeletrabalho) {
+        avisoTitle.textContent = 'Hoje é seu dia de teletrabalho';
+        avisoSub.textContent = 'Não se esqueça de registrar as atividades realizadas hoje.';
+        aviso.style.display = 'flex';
+        agendarLembrete();
+      } else if (d.tem_teletrabalho && d.data_teletrabalho) {
+        const dt = new Date(d.data_teletrabalho + 'T12:00:00');
+        const fmt = dt.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+        avisoTitle.textContent = 'Teletrabalho desta semana';
+        avisoSub.textContent = `Seu dia de teletrabalho está agendado para ${fmt}. Você pode preencher o relatório a qualquer momento.`;
+        aviso.style.display = 'flex';
+      }
+      // Se não tem teletrabalho cadastrado, não exibe aviso
+    } catch (e) { /* silencioso */ }
+  }
+
+  // ── Lembrete floating 16:00h ──────────────────────────────────────────────
+  const DISMISS_KEY = 'rel_desempenho_lembrete_dispensado';
+
+  function agendarLembrete() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem(DISMISS_KEY) === hoje) return;
+
+    const agora = new Date();
+    const hora16 = new Date(agora);
+    hora16.setHours(16, 0, 0, 0);
+
+    if (agora >= hora16) {
+      mostrarRelFloat();
+    } else {
+      const ms = hora16 - agora;
+      setTimeout(mostrarRelFloat, ms);
+    }
+  }
+
+  function mostrarRelFloat() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem(DISMISS_KEY) === hoje) return;
+    document.getElementById('relFloatPanel').style.display = 'block';
+  }
+
+  function toggleRelFloat() {
+    const card = document.getElementById('relFloatCard');
+    card.style.display = card.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function dispensarRelFloat() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(DISMISS_KEY, hoje);
+    document.getElementById('relFloatPanel').style.display = 'none';
+  }
+
+  // ── Usuários para filtro ──────────────────────────────────────────────────
+  async function carregarUsuariosLista() {
+    if (!PERMISSAO_TOTAL) return;
+    try {
+      const r = await fetch('/relatorios_desempenho/api/usuarios_lista');
+      const d = await r.json();
+      const sel = document.getElementById('filtroUsuario');
+      if (!sel) return;
+      (d.usuarios || []).forEach(u => {
+        const o = document.createElement('option');
+        o.value = u.email; o.textContent = u.nome; sel.appendChild(o);
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  // ── Tipos de operação ─────────────────────────────────────────────────────
+  async function carregarTipos() {
+    try {
+      const r = await fetch('/relatorios_desempenho/api/tipos');
+      const d = await r.json();
+      const sel = document.getElementById('regTipo');
+      sel.innerHTML = '<option value="">Selecione...</option>';
+      (d.tipos || []).forEach(t => {
+        const o = document.createElement('option');
+        o.value = t; o.textContent = t; sel.appendChild(o);
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  async function carregarNomes(nomeParaSelecionar) {
+    const tipo = document.getElementById('regTipo').value;
+    const sel  = document.getElementById('regNome');
+    sel.innerHTML = '<option value="">Carregando...</option>';
+    if (!tipo) { sel.innerHTML = '<option value="">Selecione o tipo primeiro</option>'; return; }
+    try {
+      const r = await fetch('/relatorios_desempenho/api/nomes?tipo=' + encodeURIComponent(tipo));
+      const d = await r.json();
+      sel.innerHTML = '<option value="">Selecione...</option>';
+      (d.nomes || []).forEach(n => {
+        const o = document.createElement('option');
+        o.value = n.manual_nome; o.textContent = n.manual_nome;
+        if (nomeParaSelecionar && n.manual_nome === nomeParaSelecionar) o.selected = true;
+        sel.appendChild(o);
+      });
+    } catch (e) { sel.innerHTML = '<option value="">Erro ao carregar</option>'; }
+  }
+
+  // ── Registros — tabela ────────────────────────────────────────────────────
+  async function carregarRegistros() {
+    const corpo = document.getElementById('corpoTabela');
+    const cols  = PERMISSAO_TOTAL ? 8 : 7;
+    corpo.innerHTML = `<tr><td colspan="${cols}" class="text-center py-4">
+      <div class="spinner-border text-warning" role="status"></div></td></tr>`;
+
+    const params = new URLSearchParams();
+    const fu = document.getElementById('filtroUsuario');
+    if (fu && fu.value) params.set('usuario_email', fu.value);
+    const q = document.getElementById('filtroQ').value.trim();
+    if (q) params.set('q', q);
+
+    try {
+      const r = await fetch('/relatorios_desempenho/api/registros?' + params);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro || 'Erro');
+      const lista = d.registros || [];
+      document.getElementById('contadorRegistros').textContent =
+        `${lista.length} registro(s) encontrado(s)`;
+
+      if (lista.length === 0) {
+        corpo.innerHTML = `<tr><td colspan="${cols}" class="text-center text-muted py-4">
+          <i class="bi bi-inbox" style="font-size:2rem;opacity:.4;"></i>
+          <p class="mt-2">Nenhum registro encontrado.</p></td></tr>`;
+        return;
+      }
+
+      corpo.innerHTML = lista.map(reg => `
+        <tr id="row-${reg.id}">
+          <td class="text-center">
+            <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                    onclick="toggleAfericoes(${reg.id})" title="Ver aferições"
+                    id="btn-expand-${reg.id}">
+              <i class="bi bi-chevron-right" id="chev-${reg.id}"></i>
+            </button>
+          </td>
+          ${PERMISSAO_TOTAL ? `<td><small class="text-muted">${escHtml(reg.nome_usuario)}</small></td>` : ''}
+          <td>${escHtml(reg.operacao_tipo)}</td>
+          <td>${escHtml(reg.operacao_nome)}</td>
+          <td>${reg.operacao_subtipo ? escHtml(reg.operacao_subtipo) : '<span class="text-muted">—</span>'}</td>
+          <td class="text-center">
+            <span class="badge bg-warning text-dark">${reg.total_afericoes}</span>
+          </td>
+          <td><small>${reg.criado_em_fmt}</small></td>
+          <td class="text-center" style="white-space:nowrap;">
+            <button class="btn btn-sm btn-outline-warning me-1"
+                    onclick='editarRegistro(${reg.id})' title="Editar">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger"
+                    onclick="excluirRegistro(${reg.id})" title="Excluir">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        <tr id="expand-${reg.id}" style="display:none;">
+          <td colspan="${cols}" class="p-0">
+            <div class="afericoes-inline mx-3 my-2" id="afericoes-content-${reg.id}">
+              <div class="text-center text-muted small py-2">
+                <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
+              </div>
+            </div>
+          </td>
+        </tr>`).join('');
+    } catch (e) {
+      corpo.innerHTML = `<tr><td colspan="${cols}" class="text-center">
+        <div class="alert alert-danger m-3">Erro: ${e.message}</div></td></tr>`;
+    }
+  }
+
+  function debounceCarregar() {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = setTimeout(carregarRegistros, 350);
+  }
+
+  function limparFiltros() {
+    document.getElementById('filtroQ').value = '';
+    const fu = document.getElementById('filtroUsuario');
+    if (fu) fu.value = '';
+    carregarRegistros();
+  }
+
+  // ── Expandir aferições ─────────────────────────────────────────────────────
+  async function toggleAfericoes(id) {
+    const row   = document.getElementById(`expand-${id}`);
+    const chev  = document.getElementById(`chev-${id}`);
+    if (row.style.display !== 'none') {
+      row.style.display = 'none';
+      chev.className = 'bi bi-chevron-right';
+      return;
+    }
+    row.style.display = '';
+    chev.className = 'bi bi-chevron-down';
+    const cont = document.getElementById(`afericoes-content-${id}`);
+    try {
+      const r = await fetch(`/relatorios_desempenho/api/registros/${id}/auxiliares`);
+      const d = await r.json();
+      const list = d.auxiliares || [];
+      if (list.length === 0) {
+        cont.innerHTML = '<span class="text-muted">Nenhuma aferição registrada.</span>';
+        return;
+      }
+      cont.innerHTML = list.map((a, i) => `
+        <div class="afericao-item">
+          <span class="badge bg-warning text-dark me-2">${i + 1}</span>
+          <strong>${escHtml(a.operacao_tipo_afericao || '—')}</strong>
+          ${a.operacao_afericao ? ` — <span>${escHtml(a.operacao_afericao)}</span>` : ''}
+          ${a.operacao_descricao ? `<br><small class="text-muted ms-4" style="white-space:pre-wrap;">${escHtml(a.operacao_descricao)}</small>` : ''}
+        </div>`).join('');
+    } catch (e) {
+      cont.innerHTML = `<span class="text-danger">Erro ao carregar aferições.</span>`;
+    }
+  }
+
+  // ── Modal Novo ─────────────────────────────────────────────────────────────
+  function abrirModalNovo() {
+    document.getElementById('regId').value = '';
+    document.getElementById('regTipo').value = '';
+    document.getElementById('regNome').innerHTML = '<option value="">Selecione o tipo primeiro</option>';
+    document.getElementById('regSubtipo').value = '';
+    document.getElementById('listaAux').innerHTML = '';
+    document.getElementById('semAux').style.display = '';
+    document.getElementById('regMsg').className = 'alert d-none';
+    document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Novo Registro';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRegistro')).show();
+  }
+
+  // ── Modal Editar ───────────────────────────────────────────────────────────
+  async function editarRegistro(id) {
+    document.getElementById('regId').value = id;
+    document.getElementById('regMsg').className = 'alert d-none';
+    document.getElementById('listaAux').innerHTML = '';
+    document.getElementById('semAux').style.display = 'none';
+    document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-pencil me-2"></i>Editar Registro';
+
+    try {
+      const rRegs = await fetch(`/relatorios_desempenho/api/registros`);
+      const dRegs = await rRegs.json();
+      const reg = (dRegs.registros || []).find(r => r.id === id);
+      if (reg) {
+        document.getElementById('regTipo').value = reg.operacao_tipo;
+        await carregarNomes(reg.operacao_nome);
+        document.getElementById('regSubtipo').value = reg.operacao_subtipo || '';
+      }
+
+      const rAux = await fetch(`/relatorios_desempenho/api/registros/${id}/auxiliares`);
+      const dAux = await rAux.json();
+      (dAux.auxiliares || []).forEach(a => adicionarAux(a));
+      if ((dAux.auxiliares || []).length === 0) document.getElementById('semAux').style.display = '';
+    } catch (e) { console.error(e); }
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRegistro')).show();
+  }
+
+  // ── Bloco de aferição dinâmico ─────────────────────────────────────────────
+  let _auxCount = 0;
+  function adicionarAux(dados) {
+    _auxCount++;
+    const idx = _auxCount;
+    document.getElementById('semAux').style.display = 'none';
+
+    const tipoOpts = TIPOS_AFERICAO.map(t =>
+      `<option value="${t}" ${dados && dados.operacao_tipo_afericao === t ? 'selected' : ''}>${t}</option>`
+    ).join('');
+
+    const bloco = document.createElement('div');
+    bloco.className = 'aux-bloco';
+    bloco.id = `aux-${idx}`;
+    bloco.innerHTML = `
+      <button class="btn-remove-aux" type="button" onclick="removerAux(${idx})"
+              title="Remover"><i class="bi bi-x-lg"></i></button>
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold">Tipo de Aferição</label>
+          <select class="form-select form-select-sm" id="aux-tipo-${idx}">
+            <option value="">Selecione...</option>
+            ${tipoOpts}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold">Aferição</label>
+          <input type="text" class="form-control form-control-sm" id="aux-afericao-${idx}"
+                 value="${escAtr(dados ? dados.operacao_afericao : '')}"
+                 placeholder="Nº do processo, referência...">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label small fw-semibold">Descrição</label>
+          <textarea class="form-control form-control-sm" id="aux-descricao-${idx}"
+                    rows="5" placeholder="Descreva detalhadamente a atividade realizada, resultados obtidos, observações relevantes..."
+                    style="resize:vertical;">${escHtml(dados ? dados.operacao_descricao : '')}</textarea>
+        </div>
+      </div>`;
+    document.getElementById('listaAux').appendChild(bloco);
+  }
+
+  function removerAux(idx) {
+    const bloco = document.getElementById(`aux-${idx}`);
+    if (bloco) bloco.remove();
+    if (document.getElementById('listaAux').children.length === 0) {
+      document.getElementById('semAux').style.display = '';
+    }
+  }
+
+  function coletarAux() {
+    const blocos = document.querySelectorAll('#listaAux .aux-bloco');
+    const result = [];
+    blocos.forEach(b => {
+      const idx = b.id.replace('aux-', '');
+      result.push({
+        operacao_tipo_afericao: document.getElementById(`aux-tipo-${idx}`)?.value || '',
+        operacao_afericao:      document.getElementById(`aux-afericao-${idx}`)?.value.trim() || '',
+        operacao_descricao:     document.getElementById(`aux-descricao-${idx}`)?.value.trim() || '',
+      });
+    });
+    return result;
+  }
+
+  // ── Salvar ─────────────────────────────────────────────────────────────────
+  async function salvarRegistro() {
+    const msg   = document.getElementById('regMsg');
+    const id    = document.getElementById('regId').value;
+    const tipo  = document.getElementById('regTipo').value;
+    const nome  = document.getElementById('regNome').value;
+
+    if (!tipo || !nome) {
+      msg.className = 'alert alert-warning';
+      msg.textContent = 'Selecione o Tipo e o Nome da Operação.';
+      msg.classList.remove('d-none');
+      return;
+    }
+
+    const payload = {
+      operacao_tipo:    tipo,
+      operacao_nome:    nome,
+      operacao_subtipo: document.getElementById('regSubtipo').value.trim(),
+      auxiliares:       coletarAux(),
+    };
+
+    const url    = id ? `/relatorios_desempenho/api/registros/${id}` : '/relatorios_desempenho/api/registros';
+    const method = id ? 'PUT' : 'POST';
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      if (r.ok && d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modalRegistro')).hide();
+        _auxCount = 0;
+        carregarRegistros();
+      } else {
+        msg.className = 'alert alert-danger';
+        msg.textContent = d.erro || 'Erro ao salvar.';
+        msg.classList.remove('d-none');
+      }
+    } catch (e) {
+      msg.className = 'alert alert-danger';
+      msg.textContent = 'Erro de conexão.';
+      msg.classList.remove('d-none');
+    }
+  }
+
+  // ── Excluir ────────────────────────────────────────────────────────────────
+  async function excluirRegistro(id) {
+    if (!confirm('Excluir este registro e todas as suas aferições?\n\nEsta ação não pode ser desfeita.')) return;
+    try {
+      const r = await fetch(`/relatorios_desempenho/api/registros/${id}`, { method: 'DELETE' });
+      const d = await r.json();
+      if (r.ok && d.success) { carregarRegistros(); }
+      else { alert('Erro: ' + (d.erro || 'Não foi possível excluir.')); }
+    } catch (e) { alert('Erro de conexão.'); }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function escAtr(str) {
+    return str ? String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
+  }
+</script>
+</body>
+</html>

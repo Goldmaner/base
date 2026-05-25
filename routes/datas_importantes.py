@@ -4,11 +4,18 @@ Gerencia abonos, folgas, consultas médicas e eventos por usuário.
 """
 
 import re
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+import os
+import io
+import uuid
+import zipfile
+import boto3
+from botocore.client import Config
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from db import get_cursor, get_db
 from utils import login_required
 from decorators import requires_access
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 
 def sanitizar_nome_doc(nome):
@@ -18,6 +25,64 @@ def sanitizar_nome_doc(nome):
     nome = re.sub(r'\s+', '_', nome)
     nome = re.sub(r'_+', '_', nome)
     return nome.strip('_') or 'documento'
+
+
+# ─────────────────────────────────────────────────────── R2 helpers ──────────
+
+_R2_ALLOWED_EXTS = {
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg',
+    '.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v',
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.zip', '.rar', '.7z', '.txt', '.csv',
+}
+
+
+def _r2_client():
+    return boto3.client(
+        's3',
+        endpoint_url=os.environ.get('R2_ENDPOINT_URL'),
+        aws_access_key_id=os.environ.get('R2_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.environ.get('R2_SECRET_ACCESS_KEY'),
+        config=Config(signature_version='s3v4'),
+        region_name='auto',
+    )
+
+
+def _upload_r2(file_storage, evento_id):
+    """Envia um FileStorage para R2. Retorna (nome_original, url_publica) ou (None, None)."""
+    original = secure_filename(file_storage.filename or '')
+    if not original:
+        return None, None
+    ext = os.path.splitext(original)[1].lower()
+    if ext not in _R2_ALLOWED_EXTS:
+        return None, None
+    key = f"{evento_id}/{uuid.uuid4().hex}{ext}"
+    _r2_client().upload_fileobj(
+        file_storage,
+        os.environ.get('R2_BUCKET_NAME', 'eventos'),
+        key,
+        ExtraArgs={'ContentType': file_storage.content_type or 'application/octet-stream'},
+    )
+    base = os.environ.get('R2_PUBLIC_BASE_URL', '').rstrip('/')
+    return original, f"{base}/{key}"
+
+
+def _delete_r2(url):
+    """Remove um arquivo do R2 pela URL pública. Falha silenciosa se não for R2."""
+    base = os.environ.get('R2_PUBLIC_BASE_URL', '').rstrip('/')
+    if not url or not base or not url.startswith(base):
+        return
+    key = url[len(base):].lstrip('/')
+    if not key:
+        return
+    try:
+        _r2_client().delete_object(
+            Bucket=os.environ.get('R2_BUCKET_NAME', 'eventos'),
+            Key=key,
+        )
+    except Exception:
+        pass
+
 
 datas_importantes_bp = Blueprint('datas_importantes', __name__, url_prefix='/datas-importantes')
 
@@ -495,7 +560,7 @@ def criar_evento():
                     VALUES (%s, %s, %s, %s, NOW(), %s)
                 """, (evento_id, nome_atividade, nome_r, tipo_r or None, email))
 
-        # Inserir documentos
+        # Inserir links manuais
         doc_nomes = request.form.getlist('doc_nome[]')
         doc_links = request.form.getlist('doc_link[]')
         for nome_d, link_d in zip(doc_nomes, doc_links):
@@ -508,8 +573,26 @@ def criar_evento():
                     VALUES (%s, %s, %s, %s, NOW(), %s)
                 """, (evento_id, nome_atividade, nome_d, link_d.strip() or None, email))
 
+        # Upload de arquivos para R2
+        arquivos_enviados = 0
+        for f in request.files.getlist('arquivos[]'):
+            if not f or not f.filename:
+                continue
+            nome_arq, url_arq = _upload_r2(f, evento_id)
+            if nome_arq:
+                cur.execute("""
+                    INSERT INTO calendario.datas_eventos_documentos
+                        (datas_evento_id, nome_atividade, nome_doc, nome_doc_link,
+                         created_at, created_por)
+                    VALUES (%s, %s, %s, %s, NOW(), %s)
+                """, (evento_id, nome_atividade, nome_arq, url_arq, email))
+                arquivos_enviados += 1
+
         get_db().commit()
-        flash(f'Atividade "{nome_atividade}" registrada com sucesso!', 'success')
+        msg = f'Atividade "{nome_atividade}" registrada com sucesso!'
+        if arquivos_enviados:
+            msg += f' ({arquivos_enviados} arquivo(s) enviado(s) ao R2)'
+        flash(msg, 'success')
 
     except Exception as e:
         get_db().rollback()
@@ -529,6 +612,7 @@ def editar_evento(id):
     """Edita um registro de datas_eventos do usuário logado."""
     _, email, tipo_usuario = _get_user_info()
     eh_gerente = tipo_usuario in ('Agente Público', 'admin')
+    ver_tudo = _pode_ver_tudo(email, tipo_usuario)
 
     nome_atividade          = request.form.get('nome_atividade', '').strip()
     descritivo              = request.form.get('descritivo', '').strip() or None
@@ -551,15 +635,15 @@ def editar_evento(id):
 
     cur = get_cursor()
     try:
-        # Agente Público pode editar qualquer evento
-        where_extra = "" if eh_gerente else " AND usuario_email = %s"
+        # Gerente ou ver_tudo pode editar qualquer evento
+        where_extra = "" if ver_tudo else " AND usuario_email = %s"
         params_update = [
             nome_atividade, descritivo, data_inicio, datas_adicionais,
             participacao, local, necessita_infraestrutura,
             valor_alimentacao, alinhamento_aev, observacoes, cancelado,
             email, id
         ]
-        if not eh_gerente:
+        if not ver_tudo:
             params_update.append(email)
 
         cur.execute(f"""
@@ -596,7 +680,7 @@ def editar_evento(id):
                         VALUES (%s, %s, %s, %s, NOW(), %s)
                     """, (id, nome_atividade, nome_r, tipo_r or None, email))
 
-            # Substituir documentos
+            # Substituir links manuais (mantém R2 re-submetidos via doc_link)
             cur.execute("DELETE FROM calendario.datas_eventos_documentos WHERE datas_evento_id = %s", (id,))
             doc_nomes = request.form.getlist('doc_nome[]')
             doc_links = request.form.getlist('doc_link[]')
@@ -609,6 +693,19 @@ def editar_evento(id):
                              created_at, created_por)
                         VALUES (%s, %s, %s, %s, NOW(), %s)
                     """, (id, nome_atividade, nome_d, link_d.strip() or None, email))
+
+            # Novos uploads para R2
+            for f in request.files.getlist('arquivos[]'):
+                if not f or not f.filename:
+                    continue
+                nome_arq, url_arq = _upload_r2(f, id)
+                if nome_arq:
+                    cur.execute("""
+                        INSERT INTO calendario.datas_eventos_documentos
+                            (datas_evento_id, nome_atividade, nome_doc, nome_doc_link,
+                             created_at, created_por)
+                        VALUES (%s, %s, %s, %s, NOW(), %s)
+                    """, (id, nome_atividade, nome_arq, url_arq, email))
 
             get_db().commit()
             flash('Atividade atualizada com sucesso!', 'success')
@@ -630,11 +727,11 @@ def editar_evento(id):
 def deletar_evento(id):
     """Remove um registro de datas_eventos."""
     _, email, tipo_usuario = _get_user_info()
-    eh_gerente = tipo_usuario in ('Agente Público', 'admin')
+    ver_tudo = _pode_ver_tudo(email, tipo_usuario)
 
     cur = get_cursor()
     try:
-        if eh_gerente:
+        if ver_tudo:
             cur.execute("SELECT nome_atividade FROM calendario.datas_eventos WHERE id = %s", (id,))
         else:
             cur.execute(
@@ -648,7 +745,7 @@ def deletar_evento(id):
             cur.close()
             return redirect(url_for('datas_importantes.index'))
 
-        if eh_gerente:
+        if ver_tudo:
             cur.execute("DELETE FROM calendario.datas_eventos WHERE id = %s", (id,))
         else:
             cur.execute(
@@ -755,7 +852,7 @@ def deletar_documento_evento(id):
     cur = get_cursor()
     try:
         cur.execute("""
-            SELECT ded.id, de.usuario_email
+            SELECT ded.id, ded.nome_doc_link, de.usuario_email
             FROM calendario.datas_eventos_documentos ded
             JOIN calendario.datas_eventos de ON de.id = ded.datas_evento_id
             WHERE ded.id = %s
@@ -766,6 +863,7 @@ def deletar_documento_evento(id):
         elif row['usuario_email'] != email and not eh_gerente:
             flash('Sem permissão para remover este documento.', 'danger')
         else:
+            _delete_r2(row.get('nome_doc_link'))
             cur.execute("DELETE FROM calendario.datas_eventos_documentos WHERE id = %s", (id,))
             get_db().commit()
             flash('Documento removido.', 'success')
@@ -775,6 +873,164 @@ def deletar_documento_evento(id):
     finally:
         cur.close()
     return redirect(url_for('datas_importantes.index'))
+
+
+# ─────────────────────────────────────────────────────── Download ZIP ───────
+
+_ZIP_MAX_BYTES = 50 * 1024 * 1024  # 50 MB por parte
+
+
+def _pasta_por_tipo(nome_doc):
+    """Retorna a subpasta do ZIP com base na extensão do arquivo."""
+    ext = os.path.splitext(nome_doc)[1].lower()
+    if ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'):
+        return 'Fotos'
+    if ext in ('.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'):
+        return 'Videos'
+    if ext in ('.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv'):
+        return 'Documentos'
+    return 'Outros'
+
+
+def _nome_unico_zip(nome, pasta, vistos):
+    """Evita colisão de nomes dentro de uma pasta do ZIP."""
+    chave = f"{pasta}/{nome}"
+    if chave not in vistos:
+        vistos.add(chave)
+        return chave
+    stem, ext = os.path.splitext(nome)
+    i = 1
+    while True:
+        candidato = f"{pasta}/{stem}_{i}{ext}"
+        if candidato not in vistos:
+            vistos.add(candidato)
+            return candidato
+        i += 1
+
+
+def _construir_zip(itens):
+    """Recebe lista de {'arcname': str, 'content': bytes}. Retorna BytesIO do ZIP."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for item in itens:
+            zf.writestr(item['arcname'], item['content'])
+    buf.seek(0)
+    return buf
+
+
+@datas_importantes_bp.route("/eventos/<int:id>/download-zip", methods=["GET"])
+@login_required
+@requires_access('ferias')
+def download_zip_evento(id):
+    """
+    Baixa todos os arquivos R2 de um evento como ZIP.
+    - ≤ 50 MB  → NomeEvento.zip
+    - > 50 MB  → NomeEvento_partes.zip (contém parte1.zip, parte2.zip …)
+    """
+    _, email, tipo_usuario = _get_user_info()
+    ver_tudo = _pode_ver_tudo(email, tipo_usuario)
+
+    cur = get_cursor()
+    try:
+        if ver_tudo:
+            cur.execute(
+                "SELECT nome_atividade FROM calendario.datas_eventos WHERE id = %s", (id,)
+            )
+        else:
+            cur.execute(
+                "SELECT nome_atividade FROM calendario.datas_eventos "
+                "WHERE id = %s AND usuario_email = %s", (id, email)
+            )
+        evento = cur.fetchone()
+        if not evento:
+            flash('Evento não encontrado ou sem permissão.', 'danger')
+            return redirect(url_for('datas_importantes.index'))
+
+        nome_atividade = evento['nome_atividade']
+
+        cur.execute("""
+            SELECT nome_doc, nome_doc_link
+            FROM calendario.datas_eventos_documentos
+            WHERE datas_evento_id = %s
+            ORDER BY id
+        """, (id,))
+        docs = cur.fetchall()
+    finally:
+        cur.close()
+
+    if not docs:
+        flash('Este evento não possui documentos para download.', 'warning')
+        return redirect(url_for('datas_importantes.index'))
+
+    # ── Baixar arquivos do R2 ──────────────────────────────────────────────
+    r2     = _r2_client()
+    base   = os.environ.get('R2_PUBLIC_BASE_URL', '').rstrip('/')
+    bucket = os.environ.get('R2_BUCKET_NAME', 'eventos')
+
+    partes   = []          # lista de partes; cada parte é lista de {arcname, content}
+    parte_atual = []
+    tamanho_atual = 0
+
+    for doc in docs:
+        nome = doc['nome_doc'] or 'arquivo'
+        url  = doc['nome_doc_link'] or ''
+
+        # Somente arquivos R2
+        if not (url and base and url.startswith(base)):
+            continue
+        key = url[len(base):].lstrip('/')
+        try:
+            resp    = r2.get_object(Bucket=bucket, Key=key)
+            content = resp['Body'].read()
+        except Exception:
+            continue  # arquivo inacessível — pula
+
+        pasta   = _pasta_por_tipo(nome)
+        tamanho = len(content)
+
+        # Nova parte se ultrapassar o limite (e já houver algo na parte atual)
+        if parte_atual and (tamanho_atual + tamanho) > _ZIP_MAX_BYTES:
+            partes.append(parte_atual)
+            parte_atual   = []
+            tamanho_atual = 0
+
+        vistos_nesta_parte = {item['arcname'] for item in parte_atual}
+        arcname = _nome_unico_zip(nome, pasta, vistos_nesta_parte)
+        parte_atual.append({'arcname': arcname, 'content': content})
+        tamanho_atual += tamanho
+
+    if parte_atual:
+        partes.append(parte_atual)
+
+    if not partes:
+        flash('Nenhum arquivo R2 encontrado para este evento.', 'warning')
+        return redirect(url_for('datas_importantes.index'))
+
+    nome_base = sanitizar_nome_doc(nome_atividade)
+
+    # ── Gerar resposta ─────────────────────────────────────────────────────
+    if len(partes) == 1:
+        buf = _construir_zip(partes[0])
+        return send_file(
+            buf,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f"{nome_base}.zip",
+        )
+
+    # Múltiplas partes → ZIP externo contendo os ZIPs internos
+    outer_buf = io.BytesIO()
+    with zipfile.ZipFile(outer_buf, 'w', zipfile.ZIP_STORED) as outer_zf:
+        for i, parte in enumerate(partes, 1):
+            inner_buf = _construir_zip(parte)
+            outer_zf.writestr(f"{nome_base}_parte{i}.zip", inner_buf.read())
+    outer_buf.seek(0)
+    return send_file(
+        outer_buf,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f"{nome_base}_partes.zip",
+    )
 
 
 # ─────────────────────────────────────────────────────────── Feriados ──────

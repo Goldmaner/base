@@ -103,6 +103,59 @@
     /* Filtros */
     .filtro-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
     .filtro-bar .form-select, .filtro-bar .form-control { max-width:200px; font-size:.82rem; }
+
+    /* Cards de documentos */
+    .doc-cards-grid { display:flex; flex-wrap:wrap; gap:10px; padding:6px 0; }
+    .doc-card {
+      width:110px; border:1px solid #e2e8f0; border-radius:8px;
+      overflow:hidden; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.07);
+      transition:box-shadow .15s; position:relative;
+    }
+    .doc-card:hover { box-shadow:0 3px 12px rgba(0,0,0,.14); }
+    .doc-card-preview {
+      height:78px; display:flex; align-items:center; justify-content:center;
+      background:#f8fafc; border-bottom:1px solid #f1f5f9; overflow:hidden;
+    }
+    .doc-card-img { width:100%; height:100%; object-fit:cover; }
+    .doc-card-footer { padding:5px 6px; }
+    .doc-card-nome {
+      display:block; font-size:.67rem; color:#374151;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px;
+    }
+    .doc-card-actions { display:flex; justify-content:flex-end; gap:4px; }
+    .doc-card-actions .btn { font-size:.75rem; line-height:1; padding:1px 3px; }
+    .doc-tabs-wrap .nav-link {
+      font-size:.8rem; padding:.3rem .75rem; color:#4f46e5; font-weight:500;
+    }
+    .doc-tabs-wrap .nav-link.active {
+      background:linear-gradient(135deg,#312e81,#4f46e5);
+      color:#fff; border-color:transparent; border-radius:6px 6px 0 0;
+    }
+    .doc-tabs-wrap .nav-tabs { border-bottom:2px solid #4f46e5; }
+
+    /* Upload R2 */
+    .upload-zone {
+      border: 2px dashed #a5b4fc; border-radius: 8px;
+      padding: 18px; text-align: center; cursor: pointer;
+      background: #fafafe; transition: background .15s, border-color .15s;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      background: #eef2ff; border-color: #6366f1;
+    }
+    .upload-zone .bi { font-size: 2rem; color: #6366f1; opacity: .75; }
+    .arquivo-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #f0f4ff; border: 1px solid #c7d2fe;
+      border-radius: 20px; padding: 3px 10px; font-size: .78rem;
+      color: #3730a3; margin: 2px;
+    }
+    .doc-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: .68rem; border-radius: 20px; padding: 2px 8px;
+      text-decoration: none; border: 1px solid #bbf7d0;
+      background: #f0fdf4; color: #166534; margin: 2px;
+    }
+    .doc-badge:hover { background: #dcfce7; color: #14532d; }
   </style>
 </head>
 <body>
@@ -386,7 +439,7 @@
           <div class="collapse mb-4" id="formEvento">
             <div class="form-card">
               <h6><i class="bi bi-pencil-square me-1"></i>Nova Atividade / Evento Institucional</h6>
-              <form method="POST" action="{{ url_for('datas_importantes.criar_evento') }}" id="formCriarEvento">
+              <form method="POST" action="{{ url_for('datas_importantes.criar_evento') }}" id="formCriarEvento" enctype="multipart/form-data">
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label fw-semibold">Nome da Atividade <span class="text-danger">*</span></label>
@@ -462,17 +515,39 @@
                     <div id="respContainerCriar"></div>
                   </div>
 
-                  <!-- Documentos / Links -->
+                  <!-- Documentos / Links externos -->
                   <div class="col-12">
                     <label class="form-label fw-semibold">
-                      <i class="bi bi-paperclip me-1"></i>Documentos / Links
+                      <i class="bi bi-link-45deg me-1"></i>Links Externos
                       <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
                               onclick="adicionarDocRow('docContainerCriar')">
                         <i class="bi bi-plus"></i> Adicionar
                       </button>
                     </label>
-                    <div class="text-muted small mb-1">Espaços no nome serão convertidos em <code>_</code></div>
+                    <div class="text-muted small mb-1">SharePoint, OneDrive, SEI, etc. — espaços no nome viram <code>_</code></div>
                     <div id="docContainerCriar"></div>
+                  </div>
+
+                  <!-- Upload de arquivos → R2 -->
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">
+                      <i class="bi bi-cloud-upload me-1"></i>Upload de Arquivos
+                      <span class="text-muted fw-normal small ms-1">fotos, vídeos, PDFs, planilhas</span>
+                    </label>
+                    <div class="upload-zone" id="uploadZoneCriar"
+                         onclick="document.getElementById('inputArquivosCriar').click()"
+                         ondragover="zoneDragOver(event,'uploadZoneCriar')"
+                         ondragleave="zoneDragLeave('uploadZoneCriar')"
+                         ondrop="zoneDrop(event,'uploadZoneCriar','inputArquivosCriar','previewCriar')">
+                      <i class="bi bi-cloud-arrow-up"></i>
+                      <div class="mt-1 small text-muted">Arraste ou <strong>clique para selecionar</strong></div>
+                      <div style="font-size:.73rem;color:#9ca3af">Imagens · Vídeos · PDF · Office · ZIP</div>
+                      <input type="file" id="inputArquivosCriar" name="arquivos[]" multiple
+                             accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt,.csv"
+                             style="display:none"
+                             onchange="mostrarPreview(this,'previewCriar')">
+                    </div>
+                    <div id="previewCriar" class="mt-2"></div>
                   </div>
                 </div>
                 <div class="mt-3 d-flex gap-2">
@@ -554,6 +629,15 @@
                       {% endfor %}
                     </div>
                     {% endif %}
+                    {% set docs = documentos_por_evento.get(r.id, []) %}
+                    {% if docs %}
+                    <div class="mt-1">
+                      <span class="badge rounded-pill"
+                            style="font-size:.67rem;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">
+                        <i class="bi bi-paperclip me-1"></i>{{ docs|length }} arquivo(s)
+                      </span>
+                    </div>
+                    {% endif %}
                   </td>
                   <td class="text-nowrap fw-semibold">{{ r.data_inicio.strftime('%d/%m/%Y') if r.data_inicio else '—' }}</td>
                   <td>
@@ -570,6 +654,14 @@
                     {% if r.alinhamento_aev %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-dash text-muted"></i>{% endif %}
                   </td>
                   <td class="text-center text-nowrap">
+                    {% set docs_evt = documentos_por_evento.get(r.id, []) %}
+                    {% if docs_evt %}
+                    <a href="{{ url_for('datas_importantes.download_zip_evento', id=r.id) }}"
+                       class="btn btn-sm btn-outline-success me-1"
+                       title="Baixar {{ docs_evt|length }} arquivo(s) como ZIP">
+                      <i class="bi bi-file-zip"></i>
+                    </a>
+                    {% endif %}
                     {% if ver_tudo or r.usuario_email == session.get('email') %}
                     <button class="btn btn-sm btn-outline-primary me-1"
                             onclick='abrirEdicaoEvento(
@@ -859,7 +951,7 @@
         <h5 class="modal-title"><i class="bi bi-calendar-star me-2"></i>Editar Atividade</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form method="POST" id="formEdicaoEvento">
+      <form method="POST" id="formEdicaoEvento" enctype="multipart/form-data">
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-md-6">
@@ -931,17 +1023,86 @@
               <div id="respContainerEditar"></div>
             </div>
 
-            <!-- Documentos / Links -->
+            <!-- Arquivos vinculados — cards por aba -->
+            <div class="col-12" id="secaoDocsExistentes" style="display:none">
+              <label class="form-label fw-semibold mb-2">
+                <i class="bi bi-folder2-open me-1"></i>Arquivos Vinculados
+              </label>
+              <div class="doc-tabs-wrap">
+                <ul class="nav nav-tabs" id="navTabsDocsEditar" role="tablist">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="btnTabFotos"
+                            data-bs-toggle="tab" data-bs-target="#tabFotosEditar" type="button">
+                      <i class="bi bi-image me-1"></i>Fotos/Vídeos
+                      <span class="badge bg-secondary ms-1" id="cntFotosEditar">0</span>
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="btnTabDocs"
+                            data-bs-toggle="tab" data-bs-target="#tabDocsEditar" type="button">
+                      <i class="bi bi-file-earmark me-1"></i>Documentos
+                      <span class="badge bg-secondary ms-1" id="cntDocsEditar">0</span>
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="btnTabOutros"
+                            data-bs-toggle="tab" data-bs-target="#tabOutrosEditar" type="button">
+                      <i class="bi bi-link-45deg me-1"></i>Links/Outros
+                      <span class="badge bg-secondary ms-1" id="cntOutrosEditar">0</span>
+                    </button>
+                  </li>
+                </ul>
+                <div class="tab-content border border-top-0 rounded-bottom p-2 mb-3"
+                     style="border-color:#4f46e5!important;min-height:72px">
+                  <div class="tab-pane fade show active" id="tabFotosEditar" role="tabpanel">
+                    <div class="doc-cards-grid" id="gridFotosEditar"></div>
+                    <p class="text-muted small text-center py-2 m-0 d-none" id="emptyFotos">Nenhuma foto ou vídeo</p>
+                  </div>
+                  <div class="tab-pane fade" id="tabDocsEditar" role="tabpanel">
+                    <div class="doc-cards-grid" id="gridDocsEditar"></div>
+                    <p class="text-muted small text-center py-2 m-0 d-none" id="emptyDocs">Nenhum documento</p>
+                  </div>
+                  <div class="tab-pane fade" id="tabOutrosEditar" role="tabpanel">
+                    <div class="doc-cards-grid" id="gridOutrosEditar"></div>
+                    <p class="text-muted small text-center py-2 m-0 d-none" id="emptyOutros">Nenhum link externo</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Novos links manuais -->
             <div class="col-12">
               <label class="form-label fw-semibold">
-                <i class="bi bi-paperclip me-1"></i>Documentos / Links
+                <i class="bi bi-link-45deg me-1"></i>Novos Links Externos
                 <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
                         onclick="adicionarDocRow('docContainerEditar')">
                   <i class="bi bi-plus"></i> Adicionar
                 </button>
               </label>
-              <div class="text-muted small mb-1">Espaços no nome serão convertidos em <code>_</code></div>
+              <div class="text-muted small mb-1">SharePoint, OneDrive, SEI, etc. — espaços viram <code>_</code></div>
               <div id="docContainerEditar"></div>
+            </div>
+
+            <!-- Upload de novos arquivos → R2 -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-cloud-upload me-1"></i>Adicionar Arquivos
+                <span class="text-muted fw-normal small ms-1">fotos, vídeos, PDFs, planilhas</span>
+              </label>
+              <div class="upload-zone" id="uploadZoneEditar"
+                   onclick="document.getElementById('inputArquivosEditar').click()"
+                   ondragover="zoneDragOver(event,'uploadZoneEditar')"
+                   ondragleave="zoneDragLeave('uploadZoneEditar')"
+                   ondrop="zoneDrop(event,'uploadZoneEditar','inputArquivosEditar','previewEditar')">
+                <i class="bi bi-cloud-arrow-up"></i>
+                <div class="mt-1 small text-muted">Arraste ou <strong>clique para selecionar</strong></div>
+                <div style="font-size:.73rem;color:#9ca3af">Arquivos existentes são preservados — novos são adicionados</div>
+                <input type="file" id="inputArquivosEditar" name="arquivos[]" multiple
+                       accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt,.csv"
+                       style="display:none"
+                       onchange="mostrarPreview(this,'previewEditar')">
+              </div>
+              <div id="previewEditar" class="mt-2"></div>
             </div>
           </div>
         </div>
@@ -1164,11 +1325,14 @@
       });
     }
 
-    const docContainer = document.getElementById('docContainerEditar');
-    docContainer.innerHTML = '';
-    if (documentos && documentos.length) {
-      documentos.forEach(d => adicionarDocRow('docContainerEditar', d.nome_doc || '', d.nome_doc_link || ''));
-    }
+    document.getElementById('docContainerEditar').innerHTML = '';
+    renderizarDocCards(documentos);
+
+    // Limpar zona de upload
+    const fi = document.getElementById('inputArquivosEditar');
+    if (fi) fi.value = '';
+    const pv = document.getElementById('previewEditar');
+    if (pv) pv.innerHTML = '';
 
     new bootstrap.Modal(document.getElementById('modalEdicaoEvento')).show();
   }
@@ -1264,6 +1428,185 @@
       });
     });
   });
+
+  // ─── Cards de documentos existentes no modal de edição ───────────────────
+  const _EXTS_MEDIA = new Set(['jpg','jpeg','png','gif','webp','bmp','svg','mp4','mov','avi','mkv','webm','m4v']);
+  const _EXTS_DOC   = new Set(['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv']);
+  const _ICON_MAP   = {
+    pdf:'bi-file-pdf text-danger',
+    doc:'bi-file-word text-primary', docx:'bi-file-word text-primary',
+    xls:'bi-file-excel text-success', xlsx:'bi-file-excel text-success',
+    ppt:'bi-file-slides text-warning', pptx:'bi-file-slides text-warning',
+    txt:'bi-file-text text-muted',    csv:'bi-filetype-csv text-success',
+    zip:'bi-file-zip text-secondary', rar:'bi-file-zip text-secondary',
+  };
+
+  function _extDoc(nome) { return (nome || '').split('.').pop().toLowerCase(); }
+  function _tipoDoc(nome) {
+    const e = _extDoc(nome);
+    if (_EXTS_MEDIA.has(e)) return 'media';
+    if (_EXTS_DOC.has(e))   return 'doc';
+    return 'outro';
+  }
+
+  function renderizarDocCards(documentos) {
+    ['gridFotosEditar','gridDocsEditar','gridOutrosEditar'].forEach(id => {
+      document.getElementById(id).innerHTML = '';
+    });
+    const secao = document.getElementById('secaoDocsExistentes');
+    if (!documentos || !documentos.length) { secao.style.display = 'none'; return; }
+    secao.style.display = '';
+
+    let cnt = {media:0, doc:0, outro:0};
+    documentos.forEach((d, i) => {
+      const tipo = _tipoDoc(d.nome_doc);
+      const gridId = tipo === 'media' ? 'gridFotosEditar' : tipo === 'doc' ? 'gridDocsEditar' : 'gridOutrosEditar';
+      cnt[tipo]++;
+      document.getElementById(gridId).appendChild(_criarDocCard(d, i));
+    });
+
+    document.getElementById('cntFotosEditar').textContent = cnt.media;
+    document.getElementById('cntDocsEditar').textContent  = cnt.doc;
+    document.getElementById('cntOutrosEditar').textContent = cnt.outro;
+
+    ['gridFotosEditar','gridDocsEditar','gridOutrosEditar'].forEach(_aplicarVerMais);
+
+    // Activar a aba com mais itens automaticamente
+    const pares = [['btnTabFotos', cnt.media], ['btnTabDocs', cnt.doc], ['btnTabOutros', cnt.outro]];
+    const melhor = pares.filter(p => p[1] > 0).sort((a,b) => b[1]-a[1])[0];
+    if (melhor) bootstrap.Tab.getOrCreateInstance(document.getElementById(melhor[0])).show();
+  }
+
+  function _criarDocCard(d, idx) {
+    const nome = d.nome_doc  || 'arquivo';
+    const url  = d.nome_doc_link || '';
+    const ext  = _extDoc(nome);
+    const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+    const isVid = ['mp4','mov','avi','mkv','webm','m4v'].includes(ext);
+    const cardId = `doc-card-${idx}`;
+
+    let preview;
+    if (isImg && url) {
+      preview = `<img src="${url}" class="doc-card-img" loading="lazy"
+                      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                 <i class="bi bi-image text-muted" style="font-size:2rem;display:none"></i>`;
+    } else if (isVid) {
+      preview = `<i class="bi bi-camera-video" style="font-size:2rem;color:#6366f1"></i>`;
+    } else {
+      const cls = _ICON_MAP[ext] || 'bi-file-earmark text-muted';
+      preview = `<i class="bi ${cls}" style="font-size:2rem"></i>`;
+    }
+
+    const nomeExib = nome.length > 18 ? nome.slice(0,16)+'…' : nome;
+    const linkBtn  = url
+      ? `<a href="${url.replace(/"/g,'&quot;')}" target="_blank" rel="noopener"
+            class="btn btn-sm text-primary" title="Abrir arquivo">
+           <i class="bi bi-box-arrow-up-right"></i>
+         </a>` : '';
+
+    const card = document.createElement('div');
+    card.className = 'doc-card';
+    card.id = cardId;
+    card.innerHTML = `
+      <input type="hidden" name="doc_nome[]" value="${nome.replace(/"/g,'&quot;')}">
+      <input type="hidden" name="doc_link[]" value="${url.replace(/"/g,'&quot;')}">
+      <div class="doc-card-preview">${preview}</div>
+      <div class="doc-card-footer">
+        <span class="doc-card-nome" title="${nome}">${nomeExib}</span>
+        <div class="doc-card-actions">
+          ${linkBtn}
+          <button type="button" class="btn btn-sm text-danger" title="Remover"
+                  onclick="removerDocCard('${cardId}')">
+            <i class="bi bi-x-circle"></i>
+          </button>
+        </div>
+      </div>`;
+    return card;
+  }
+
+  function removerDocCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const grid = card.closest('.doc-cards-grid');
+    card.remove();
+    // Ocultar seção inteira se não sobrou nenhum card
+    const totalCards = document.querySelectorAll(
+      '#gridFotosEditar .doc-card, #gridDocsEditar .doc-card, #gridOutrosEditar .doc-card'
+    ).length;
+    if (totalCards === 0) document.getElementById('secaoDocsExistentes').style.display = 'none';
+    // Atualizar contador da aba correspondente
+    if (grid) {
+      const idMap = {gridFotosEditar:'cntFotosEditar', gridDocsEditar:'cntDocsEditar', gridOutrosEditar:'cntOutrosEditar'};
+      const cnt = document.getElementById(idMap[grid.id]);
+      if (cnt) cnt.textContent = grid.querySelectorAll('.doc-card').length;
+    }
+  }
+
+  function _aplicarVerMais(gridId) {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    const cards = [...grid.querySelectorAll('.doc-card')];
+    const LIMIT = 6;
+    if (cards.length <= LIMIT) return;
+    cards.slice(LIMIT).forEach(c => c.style.display = 'none');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-outline-primary mt-2';
+    btn.style.width = '100%';
+    btn.innerHTML = `<i class="bi bi-chevron-down me-1"></i>Ver mais ${cards.length - LIMIT} arquivo(s)`;
+    btn.onclick = () => { cards.slice(LIMIT).forEach(c => c.style.display = ''); btn.remove(); };
+    grid.appendChild(btn);
+  }
+
+  // ─── Upload R2: preview de arquivos selecionados ─────────────────────────
+  const _EXT_ICON = {
+    jpg:'image', jpeg:'image', png:'image', gif:'image', webp:'image', bmp:'image', svg:'image',
+    mp4:'camera-video', mov:'camera-video', avi:'camera-video', mkv:'camera-video', webm:'camera-video',
+    pdf:'file-pdf', doc:'file-word', docx:'file-word',
+    xls:'file-excel', xlsx:'file-excel',
+    ppt:'file-slides', pptx:'file-slides',
+    zip:'file-zip', rar:'file-zip', '7z':'file-zip',
+  };
+  function _iconeArquivo(nome) {
+    const ext = nome.split('.').pop().toLowerCase();
+    return 'bi-' + (_EXT_ICON[ext] || 'file-earmark');
+  }
+  function mostrarPreview(input, previewId) {
+    const el = document.getElementById(previewId);
+    el.innerHTML = '';
+    if (!input.files.length) return;
+    [...input.files].forEach(f => {
+      const chip = document.createElement('span');
+      chip.className = 'arquivo-chip';
+      chip.innerHTML = `<i class="bi ${_iconeArquivo(f.name)}"></i>${f.name}
+        <span style="color:#6366f1;font-size:.72rem">${(f.size/1048576).toFixed(1)} MB</span>`;
+      el.appendChild(chip);
+    });
+    const tot = document.createElement('div');
+    tot.className = 'text-muted small mt-1';
+    tot.textContent = `${input.files.length} arquivo(s) prontos para envio`;
+    el.appendChild(tot);
+  }
+
+  // ─── Drag-and-drop na zona de upload ─────────────────────────────────────
+  function zoneDragOver(e, zoneId) {
+    e.preventDefault();
+    document.getElementById(zoneId).classList.add('dragover');
+  }
+  function zoneDragLeave(zoneId) {
+    document.getElementById(zoneId).classList.remove('dragover');
+  }
+  function zoneDrop(e, zoneId, inputId, previewId) {
+    e.preventDefault();
+    document.getElementById(zoneId).classList.remove('dragover');
+    const input = document.getElementById(inputId);
+    const dt = new DataTransfer();
+    // Mesclar arquivos já selecionados + novos arrastados
+    if (input.files) [...input.files].forEach(f => dt.items.add(f));
+    [...e.dataTransfer.files].forEach(f => dt.items.add(f));
+    input.files = dt.files;
+    mostrarPreview(input, previewId);
+  }
 
   // ─── Edição de feriado ────────────────────────────────────────────────────
   function abrirEdicaoFeriado(id, data, nome, tipo, ativo) {

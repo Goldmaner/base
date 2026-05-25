@@ -129,7 +129,7 @@ def teletrabalho():
                    ui.usuario_status
             FROM gestao_pessoas.usuarios u
             LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = u.email
-            WHERE u.tipo_usuario != 'Externo'
+            WHERE (u.tipo_usuario != 'Externo' OR ui.usuario_unidade_alocada IS NOT NULL)
               AND COALESCE(ui.usuario_status, 'Ativo') = 'Ativo'
               AND COALESCE(ui.usuario_vinculo, '') != 'Estagiário(a)'
             ORDER BY ui.usuario_unidade_alocada NULLS LAST, ui.usuario_nome
@@ -350,7 +350,7 @@ def almoco():
             FROM gestao_pessoas.usuarios u
             LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = u.email
             LEFT JOIN calendario.escala_almoco ea ON ea.usuario_email = u.email
-            WHERE u.tipo_usuario != 'Externo'
+            WHERE (u.tipo_usuario != 'Externo' OR ui.usuario_unidade_alocada IS NOT NULL)
               AND COALESCE(ui.usuario_status, 'Ativo') = 'Ativo'
             ORDER BY ui.usuario_unidade_alocada NULLS LAST, ui.usuario_nome
         """)

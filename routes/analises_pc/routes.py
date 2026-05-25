@@ -894,18 +894,29 @@ def salvar_checklist():
     data = request.get_json()
     numero_termo = data.get('numero_termo')
     meses_analisados = data.get('meses_analisados')
+    periodo_anterior = data.get('periodo_anterior')  # presente quando usuário renomeou o período
     nome_analista = data.get('nome_analista')
     analistas = data.get('analistas', [])
     checklist_data = data.get('checklist', {})
     recursos = data.get('recursos', [])
-    
+
     if not numero_termo or not meses_analisados:
         return jsonify({'error': 'Dados incompletos'}), 400
-    
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    
+
     try:
+        # 🔄 RENOMEAÇÃO DE PERÍODO: se o usuário mudou o campo período, atualizar meses_analisados
+        # nas 3 tabelas antes de prosseguir com o save normal.
+        if periodo_anterior and periodo_anterior != meses_analisados:
+            for tabela in ('checklist_termo', 'checklist_analista', 'checklist_recursos'):
+                cur.execute(
+                    f"UPDATE analises_pc.{tabela} SET meses_analisados = %s "
+                    f"WHERE numero_termo = %s AND meses_analisados = %s",
+                    (meses_analisados, numero_termo, periodo_anterior)
+                )
+
         # 🔍 BUSCAR DADOS ANTIGOS PARA AUDITORIA
         cur.execute("""
             SELECT * FROM analises_pc.checklist_termo 

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp *)",
+      "Bash(cat \"C:\\\\Users\\\\d843702\\\\.claude\\\\settings.json\" 2>/dev/null || echo \"NOT_FOUND\")",
+      "Bash(ls \"C:\\\\Users\\\\d843702\\\\.claude\\\\\" 2>/dev/null || echo \"PASTA_NAO_EXISTE\")",
+      "PowerShell(if \\(Test-Path \"$env:USERPROFILE\\\\.claude\"\\) { Get-ChildItem \"$env:USERPROFILE\\\\.claude\" } else { \"PASTA_NAO_EXISTE\" })",
+      "mcp__mcp-registry__list_connectors",
+      "Bash(python -c ' *)",
+      "PowerShell(if \\(Test-Path \"$env:USERPROFILE\\\\.claude\\\\settings.json\"\\) { Get-Content \"$env:USERPROFILE\\\\.claude\\\\settings.json\" } else { \"Arquivo nao encontrado\" })",
+      "Bash(xargs grep -l \"por.pagina\\\\|Controle.*Acesso\\\\|controle.*acesso\")",
+      "Bash(grep -v \"^\\\\[relatorios\\\\|Traceback\\\\|File \\\\|^$\")",
+      "Read(//c/Users/d843702/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/2cf7a759-72ca-4f4f-8b39-fb7e5ce0f12a/ea76330b-4ad1-49a4-881c-4d26befdc228/skills/xlsx/**)",
+      "Bash(pip install *)"
+    ]
+  }
+}

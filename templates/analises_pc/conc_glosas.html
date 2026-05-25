@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relação de Despesas Glosadas - FAF</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .glosa-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* ===== CABEÇALHO DE MÊS ===== */
+    .mes-header {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        padding: 10px 16px;
+        border-radius: 6px 6px 0 0;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+    }
+
+    .mes-header:hover {
+        filter: brightness(1.08);
+    }
+
+    .mes-header .mes-label {
+        font-weight: 700;
+        font-size: 0.95rem;
+        letter-spacing: 0.3px;
+    }
+
+    .mes-header .mes-total {
+        font-weight: 700;
+        font-size: 1rem;
+        font-family: 'Courier New', monospace;
+    }
+
+    .mes-header .toggle-icon {
+        font-size: 0.85rem;
+        opacity: 0.85;
+        margin-left: 12px;
+        transition: transform 0.2s;
+    }
+
+    .mes-header.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+    }
+
+    /* ===== TABELA DE GLOSAS ===== */
+    .table-glosa {
+        font-size: 0.88rem;
+        border-collapse: collapse;
+        margin-bottom: 0;
+        width: 100%;
+    }
+
+    .table-glosa thead th {
+        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+        color: white;
+        font-weight: 600;
+        padding: 9px 10px;
+        border: none;
+        text-align: center;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .table-glosa tbody td {
+        padding: 7px 10px;
+        vertical-align: middle;
+        border: 1px solid #dee2e6;
+    }
+
+    .table-glosa tbody tr:nth-child(odd) {
+        background-color: #fff5f5;
+    }
+
+    .table-glosa tbody tr:hover {
+        background-color: #ffe0e0 !important;
+    }
+
+    .table-glosa tfoot td {
+        background-color: #f8d7da;
+        font-weight: bold;
+        padding: 9px 10px;
+        border-top: 2px solid #dc3545;
+    }
+
+    .cell-money {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .cell-motivo {
+        max-width: 320px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* ===== TOTAL GERAL ===== */
+    .total-geral-row {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .total-geral-row td {
+        padding: 14px 16px;
+        border: none !important;
+    }
+
+    .total-geral-row .valor-total {
+        font-family: 'Courier New', monospace;
+        font-size: 1.15rem;
+    }
+
+    /* ===== BADGES ===== */
+    .badge-termo {
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+    }
+
+    /* ===== ESTADO VAZIO ===== */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 3.5rem;
+        margin-bottom: 16px;
+        color: #adb5bd;
+    }
+
+    /* ===== SPINNER ===== */
+    #loadingState {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+        .btn, .no-print { display: none !important; }
+        .glosa-card { box-shadow: none; border: 1px solid #dee2e6; }
+        .mes-body { display: block !important; }
+        body { background: white; }
+    }
+</style>
+</head>
+<body>
+
+<div class="container-fluid mt-4 mb-5">
+
+    <!-- ===== CABEÇALHO ===== -->
+    <div class="d-flex justify-content-between align-items-start mb-4 no-print">
+        <div>
+            <h3 class="mb-1">
+                <i class="bi bi-x-circle-fill text-danger me-2"></i>
+                Relação de Despesas Glosadas
+            </h3>
+            <div id="subtituloTermo" class="text-muted small"></div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="#" id="btnVoltar" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Voltar
+            </a>
+            <button class="btn btn-outline-dark" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i>Imprimir
+            </button>
+            <button class="btn btn-outline-success" onclick="exportarCSV()" id="btnExportarCSV" style="display:none;">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== LOADING ===== -->
+    <div id="loadingState" class="glosa-card">
+        <div class="spinner-border text-danger" role="status"></div>
+        <p class="mt-3 text-muted">Carregando dados de glosas...</p>
+    </div>
+
+    <!-- ===== ESTADO VAZIO ===== -->
+    <div id="emptyState" class="glosa-card" style="display:none;">
+        <div class="empty-state">
+            <i class="bi bi-check-circle-fill text-success d-block"></i>
+            <h5 class="mt-2">Nenhuma despesa glosada encontrada</h5>
+            <p class="text-muted">Não há entradas marcadas como "Glosar" para este termo.</p>
+        </div>
+    </div>
+
+    <!-- ===== CONTEÚDO PRINCIPAL ===== -->
+    <div id="conteudoPrincipal" style="display:none;">
+
+        <!-- Painel de resumo -->
+        <div class="glosa-card no-print">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-5">
+                    <small class="text-muted text-uppercase fw-semibold">Termo</small>
+                    <div class="fw-bold" id="infoTermo"></div>
+                    <div class="text-muted small" id="infoEntidade"></div>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted text-uppercase fw-semibold">Período</small>
+                    <div id="infoPeriodo" class="fw-semibold"></div>
+                </div>
+                <div class="col-md-2 text-center">
+                    <small class="text-muted text-uppercase fw-semibold">Meses com glosas</small>
+                    <div class="fs-4 fw-bold text-danger" id="infoMeses">-</div>
+                </div>
+                <div class="col-md-2 text-end">
+                    <small class="text-muted text-uppercase fw-semibold">Total Glosado</small>
+                    <div class="fs-5 fw-bold text-danger" id="infoTotalGeral">R$ -</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabelas por mês -->
+        <div id="containerMeses"></div>
+
+        <!-- Linha de total geral -->
+        <div class="glosa-card p-0 overflow-hidden mt-2">
+            <table class="table mb-0">
+                <tbody>
+                    <tr class="total-geral-row">
+                        <td style="width:60%">
+                            <i class="bi bi-calculator-fill me-2"></i>
+                            TOTAL GLOSADO — <span id="totalLinhasTexto"></span>
+                        </td>
+                        <td class="text-end valor-total" id="totalGeralValor">R$ 0,00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div><!-- /conteudoPrincipal -->
+
+</div><!-- /container-fluid -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let dadosGlosas = null;
+
+    // =========================================================
+    // INICIALIZAÇÃO
+    // =========================================================
+    document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
+        const termo = params.get('termo');
+
+        if (!termo) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'block';
+            document.getElementById('emptyState').querySelector('h5').textContent = 'Nenhum termo especificado';
+            document.getElementById('emptyState').querySelector('p').textContent = 'Acesse esta página a partir do botão Ações na Conciliação Bancária.';
+            return;
+        }
+
+        document.getElementById('subtituloTermo').textContent = termo;
+        document.getElementById('btnVoltar').href = `/conc_banc/?termo=${encodeURIComponent(termo)}`;
+
+        carregarDados(termo);
+    });
+
+    // =========================================================
+    // CARREGAR DADOS DA API
+    // =========================================================
+    async function carregarDados(termo) {
+        try {
+            const resp = await fetch(`/conc_glosas/api/dados?termo=${encodeURIComponent(termo)}`);
+            const dados = await resp.json();
+
+            if (!resp.ok) {
+                throw new Error(dados.erro || 'Erro ao carregar dados');
+            }
+
+            dadosGlosas = dados;
+            document.getElementById('loadingState').style.display = 'none';
+
+            if (!dados.meses || dados.meses.length === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+                return;
+            }
+
+            renderizarDados(dados);
+
+        } catch (err) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'block';
+            document.getElementById('emptyState').querySelector('h5').textContent = 'Erro ao carregar dados';
+            document.getElementById('emptyState').querySelector('p').textContent = err.message;
+            console.error('[GLOSAS] Erro:', err);
+        }
+    }
+
+    // =========================================================
+    // RENDERIZAR DADOS
+    // =========================================================
+    function renderizarDados(dados) {
+        // Painel de resumo
+        document.getElementById('infoTermo').textContent = dados.numero_termo;
+        document.getElementById('infoEntidade').textContent = dados.entidade || '';
+        document.getElementById('infoMeses').textContent = dados.meses.length;
+        document.getElementById('infoTotalGeral').textContent = formatarMoeda(dados.total_glosado);
+
+        if (dados.inicio && dados.final) {
+            const di = formatarData(dados.inicio);
+            const df = formatarData(dados.final);
+            document.getElementById('infoPeriodo').textContent = `${di} a ${df}`;
+        }
+
+        // Total geral
+        document.getElementById('totalGeralValor').textContent = formatarMoeda(dados.total_glosado);
+        document.getElementById('totalLinhasTexto').textContent =
+            `${dados.total_linhas} despesa${dados.total_linhas !== 1 ? 's' : ''}`;
+
+        // Mostrar botão CSV
+        document.getElementById('btnExportarCSV').style.display = '';
+        document.getElementById('conteudoPrincipal').style.display = '';
+
+        // Renderizar cada mês
+        const container = document.getElementById('containerMeses');
+        container.innerHTML = '';
+
+        dados.meses.forEach((mes, idx) => {
+            const bloco = criarBlocoMes(mes, idx + 1, dados.inicio);
+            container.appendChild(bloco);
+        });
+    }
+
+    // =========================================================
+    // CRIAR BLOCO DE UM MÊS
+    // =========================================================
+    function criarBlocoMes(mes, numMes, dataInicioTermo) {
+        const wrapper = document.createElement('div');
+
+        const labelMes = formatarLabelMes(mes.competencia, numMes, dataInicioTermo);
+
+        // Header clicável
+        const header = document.createElement('div');
+        header.className = 'mes-header';
+        header.innerHTML = `
+            <span class="mes-label"><i class="bi bi-calendar3 me-2"></i>${labelMes}</span>
+            <div class="d-flex align-items-center gap-3">
+                <span class="mes-total">${formatarMoeda(mes.total)}</span>
+                <span class="badge bg-white text-danger">${mes.linhas.length} item${mes.linhas.length !== 1 ? 's' : ''}</span>
+                <i class="bi bi-chevron-down toggle-icon"></i>
+            </div>
+        `;
+
+        // Corpo colapsável
+        const corpo = document.createElement('div');
+        corpo.className = 'mes-body';
+        corpo.style.borderRadius = '0 0 6px 6px';
+        corpo.style.overflow = 'hidden';
+        corpo.style.border = '1px solid #dee2e6';
+        corpo.style.borderTop = 'none';
+
+        // Tabela
+        const tabela = document.createElement('table');
+        tabela.className = 'table-glosa';
+
+        // Thead
+        tabela.innerHTML = `
+            <thead>
+                <tr>
+                    <th style="width:55px;">Índice</th>
+                    <th style="width:100px;">Data</th>
+                    <th style="width:30%;">Categoria</th>
+                    <th style="width:25%;">Origem / Destino</th>
+                    <th style="width:110px;">Valor Glosado</th>
+                    <th>Motivo</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-${mes.competencia}"></tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" class="text-end">Subtotal ${labelMes}</td>
+                    <td class="cell-money">${formatarMoeda(mes.total)}</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        `;
+
+        const tbody = tabela.querySelector('tbody');
+        mes.linhas.forEach(linha => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-center">${linha.indice ?? '-'}</td>
+                <td class="text-center">${linha.data ? formatarDataCurta(linha.data) : '-'}</td>
+                <td title="${escapeHtml(linha.cat_transacao)}">${escapeHtml(linha.cat_transacao) || '<span class="text-muted">—</span>'}</td>
+                <td title="${escapeHtml(linha.origem_destino)}">${escapeHtml(linha.origem_destino) || '<span class="text-muted">—</span>'}</td>
+                <td class="cell-money text-danger">${formatarMoeda(linha.valor_glosado)}</td>
+                <td class="cell-motivo" title="${escapeHtml(linha.avaliacao_analista)}">${escapeHtml(linha.avaliacao_analista) || '<span class="text-muted fst-italic">sem motivo</span>'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        corpo.appendChild(tabela);
+        wrapper.appendChild(header);
+        wrapper.appendChild(corpo);
+
+        // Toggle collapse
+        header.addEventListener('click', () => {
+            const collapsed = corpo.style.display === 'none';
+            corpo.style.display = collapsed ? '' : 'none';
+            header.classList.toggle('collapsed', !collapsed);
+        });
+
+        return wrapper;
+    }
+
+    // =========================================================
+    // EXPORTAR CSV
+    // =========================================================
+    function exportarCSV() {
+        if (!dadosGlosas) return;
+
+        const linhas = [
+            ['Índice', 'Competência', 'Data', 'Categoria', 'Origem/Destino', 'Valor Glosado (R$)', 'Motivo']
+        ];
+
+        dadosGlosas.meses.forEach(mes => {
+            mes.linhas.forEach(linha => {
+                linhas.push([
+                    linha.indice ?? '',
+                    mes.competencia,
+                    linha.data ?? '',
+                    linha.cat_transacao,
+                    linha.origem_destino,
+                    linha.valor_glosado.toFixed(2).replace('.', ','),
+                    linha.avaliacao_analista
+                ]);
+            });
+            // Subtotal do mês
+            linhas.push(['', mes.competencia, '', 'SUBTOTAL', '', mes.total.toFixed(2).replace('.', ','), '']);
+        });
+
+        linhas.push(['', '', '', 'TOTAL GLOSADO', '', dadosGlosas.total_glosado.toFixed(2).replace('.', ','), '']);
+
+        const csvContent = linhas.map(row =>
+            row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';')
+        ).join('\n');
+
+        const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const termoSafe = dadosGlosas.numero_termo.replace(/[/\\]/g, '-');
+        link.download = `glosas_${termoSafe}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // =========================================================
+    // HELPERS
+    // =========================================================
+    function formatarMoeda(valor) {
+        if (valor === null || valor === undefined) return 'R$ -';
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2
+        }).format(valor);
+    }
+
+    function formatarData(isoStr) {
+        if (!isoStr) return '';
+        const d = new Date(isoStr + 'T00:00:00');
+        return d.toLocaleDateString('pt-BR');
+    }
+
+    function formatarDataCurta(isoStr) {
+        if (!isoStr) return '-';
+        const d = new Date(isoStr + 'T00:00:00');
+        return d.toLocaleDateString('pt-BR');
+    }
+
+    const MESES_PT = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+
+    function formatarLabelMes(competenciaIso, numMes, dataInicioTermo) {
+        if (!competenciaIso || competenciaIso === 'sem_competencia') {
+            return `Mês ${numMes} — Competência não definida`;
+        }
+        const d = new Date(competenciaIso + 'T00:00:00');
+        const nomeMes = MESES_PT[d.getMonth()];
+        const ano = d.getFullYear();
+        return `Mês ${String(numMes).padStart(2, '0')} — ${nomeMes}/${ano}`;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+</script>
+</body>
+</html>

@@ -424,7 +424,8 @@ def obter_usuario_infos(user_id):
 
         cur.execute("""
             SELECT usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo,
-                   usuario_escala_permissao, usuario_unidade_alocada
+                   usuario_escala_permissao, usuario_unidade_alocada,
+                   usuario_relatorios_permissao
             FROM gestao_pessoas.usuarios_infos
             WHERE usuario_email = %s
             ORDER BY id DESC
@@ -441,6 +442,7 @@ def obter_usuario_infos(user_id):
                 "usuario_vinculo": infos["usuario_vinculo"] or "",
                 "usuario_escala_permissao": bool(infos["usuario_escala_permissao"]),
                 "usuario_unidade_alocada": infos["usuario_unidade_alocada"] or "",
+                "usuario_relatorios_permissao": bool(infos["usuario_relatorios_permissao"]),
             }), 200
         else:
             return jsonify({
@@ -450,6 +452,7 @@ def obter_usuario_infos(user_id):
                 "usuario_vinculo": "",
                 "usuario_escala_permissao": False,
                 "usuario_unidade_alocada": "",
+                "usuario_relatorios_permissao": False,
             }), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
@@ -481,6 +484,7 @@ def salvar_usuario_infos(user_id):
         usuario_vinculo = data.get("usuario_vinculo", "").strip() or None
         usuario_escala_permissao = bool(data.get("usuario_escala_permissao", False))
         usuario_unidade_alocada = data.get("usuario_unidade_alocada", "").strip() or None
+        usuario_relatorios_permissao = bool(data.get("usuario_relatorios_permissao", False))
         criado_por = session.get("email")
 
         # Verificar se já existe registro
@@ -498,18 +502,22 @@ def salvar_usuario_infos(user_id):
                     usuario_aniversario = %s,
                     usuario_vinculo = %s,
                     usuario_escala_permissao = %s,
-                    usuario_unidade_alocada = %s
+                    usuario_unidade_alocada = %s,
+                    usuario_relatorios_permissao = %s
                 WHERE usuario_email = %s
             """, (usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo,
-                   usuario_escala_permissao, usuario_unidade_alocada, email))
+                   usuario_escala_permissao, usuario_unidade_alocada,
+                   usuario_relatorios_permissao, email))
         else:
             cur.execute("""
                 INSERT INTO gestao_pessoas.usuarios_infos
                     (usuario_email, usuario_status, usuario_nome, usuario_aniversario,
-                     usuario_vinculo, usuario_escala_permissao, usuario_unidade_alocada, criado_por)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                     usuario_vinculo, usuario_escala_permissao, usuario_unidade_alocada,
+                     usuario_relatorios_permissao, criado_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (email, usuario_status, usuario_nome, usuario_aniversario, usuario_vinculo,
-                   usuario_escala_permissao, usuario_unidade_alocada, criado_por))
+                   usuario_escala_permissao, usuario_unidade_alocada,
+                   usuario_relatorios_permissao, criado_por))
 
         get_db().commit()
         cur.close()

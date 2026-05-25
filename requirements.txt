@@ -27,6 +27,9 @@ beautifulsoup4==4.12.3
 # Supabase Storage
 supabase>=2.0
 
+# Cloudflare R2 / S3-compatible storage
+boto3>=1.26.0
+
 # Utilitarios de data e texto
 python-dateutil==2.9.0.post0
 num2words==0.5.13

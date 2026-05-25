@@ -10,6 +10,40 @@
   <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
   <style>
     body { background:#f0f2f5; }
+    /* ====== DARK MODE ====== */
+    body.dark-mode { background:#1a1d23 !important; color:#e2e8f0; }
+    body.dark-mode .header-section { background:linear-gradient(135deg,#1e3a5f 0%,#1e2d45 100%) !important; }
+    body.dark-mode .kanban-column { background:#252932; box-shadow:0 2px 6px rgba(0,0,0,.3); }
+    body.dark-mode .kanban-column-header { border-bottom-color:rgba(255,255,255,.07); }
+    body.dark-mode .col-h-1, body.dark-mode .col-h-2 { background:#1e3a5f; color:#93c5fd; }
+    body.dark-mode .col-h-3, body.dark-mode .col-h-4 { background:#3b2c00; color:#fde68a; }
+    body.dark-mode .col-h-5 { background:#2e1f5e; color:#c4b5fd; }
+    body.dark-mode .col-h-6 { background:#052e16; color:#6ee7b7; }
+    body.dark-mode .col-h-7, body.dark-mode .col-h-8 { background:#0c2540; color:#7dd3fc; }
+    body.dark-mode .col-h-9, body.dark-mode .col-h-13 { background:#431407; color:#fed7aa; }
+    body.dark-mode .col-h-10, body.dark-mode .col-h-11 { background:#500724; color:#fbcfe8; }
+    body.dark-mode .col-h-12 { background:#042f2e; color:#5eead4; }
+    body.dark-mode .col-h-14 { background:#052e16; color:#86efac; }
+    body.dark-mode .kanban-card { background:#2d3748; border-color:#3d4a5c; box-shadow:0 1px 3px rgba(0,0,0,.3); color:#e2e8f0; }
+    body.dark-mode .kanban-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.4); }
+    body.dark-mode .filter-bar { background:#252932; box-shadow:0 1px 4px rgba(0,0,0,.2); }
+    body.dark-mode .filter-bar .form-control,
+    body.dark-mode .filter-bar .form-select { background:#1a1d23; color:#e2e8f0; border-color:#3d4a5c; }
+    body.dark-mode .kanban-column-footer { border-top-color:#3d4a5c; }
+    body.dark-mode .btn-add-card { color:#94a3b8; border-color:#3d4a5c; }
+    body.dark-mode .btn-add-card:hover { background:#1a1d23; color:#60a5fa; border-color:#60a5fa; }
+    body.dark-mode .text-muted { color:#94a3b8 !important; }
+    body.dark-mode #painel-ocultos { background:#252932; }
+    body.dark-mode .table { color:#e2e8f0; }
+    body.dark-mode .table-striped>tbody>tr:nth-of-type(odd)>* { background:#2d3748; color:#e2e8f0; }
+    body.dark-mode #table-view>div { background:#252932; }
+    body.dark-mode .modal-content { background:#252932; color:#e2e8f0; }
+    body.dark-mode .modal-body .form-control,
+    body.dark-mode .modal-body .form-select { background:#1a1d23; color:#e2e8f0; border-color:#3d4a5c; }
+    body.dark-mode .tipo-alteracao-secao { background:#1a1d23; border-color:#3d4a5c; }
+    body.dark-mode .tipo-alteracao-secao.active { background:#0f1e38; border-color:#3b82f6; }
+    body.dark-mode .alert-info-custom { background:#0f1e38; border-left-color:#3b82f6; color:#93c5fd; }
+    body.dark-mode .card-obs-preview { color:#94a3b8 !important; }
     .header-section {
       background: linear-gradient(135deg,#0d6efd 0%,#0b5ed7 100%);
       color:#fff; padding:20px 30px; border-radius:8px; margin-bottom:16px;
@@ -179,6 +213,9 @@
         <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm">
           <i class="bi bi-house"></i> Início
         </a>
+        <button type="button" id="btnDarkMode" class="btn btn-outline-light btn-sm" onclick="toggleDarkMode()" title="Alternar tema escuro">
+          <i class="bi bi-moon-stars-fill"></i>
+        </button>
         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCadastroAlteracao">
           <i class="bi bi-plus-circle"></i> Nova Alteração
         </button>
@@ -328,6 +365,9 @@
               {% endfor %}
             {% endif %}
           </div>
+          {% if card.alt_observacao %}
+          <div class="card-obs-preview mt-1" style="font-size:.7rem; color:#6c757d; line-height:1.35; border-top:1px dashed #dee2e6; padding-top:4px; word-break:break-word; white-space:pre-line;">{{ card.alt_observacao[:120] }}{% if card.alt_observacao|length > 120 %}…{% endif %}</div>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
@@ -723,6 +763,23 @@ let tiposSelecionados = new Set();
 let contadorLote = 0;
 
 // ====================================================
+// DARK MODE
+// ====================================================
+function toggleDarkMode() {
+  const isDark = document.body.classList.toggle('dark-mode');
+  localStorage.setItem('faf_dark_mode', isDark ? '1' : '0');
+  const btn = document.getElementById('btnDarkMode');
+  if (btn) btn.innerHTML = isDark ? '<i class="bi bi-sun-fill"></i>' : '<i class="bi bi-moon-stars-fill"></i>';
+}
+(function() {
+  if (localStorage.getItem('faf_dark_mode') === '1') {
+    document.body.classList.add('dark-mode');
+    const btn = document.getElementById('btnDarkMode');
+    if (btn) btn.innerHTML = '<i class="bi bi-sun-fill"></i>';
+  }
+})();
+
+// ====================================================
 // VIEW TOGGLE
 // ====================================================
 function setView(view) {
@@ -811,8 +868,13 @@ $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
   $('#alt_sei_documento').closest('.col-md-6').show();
 });
 
-// Status → show/hide SEI fields
+// Status → show/hide SEI fields + re-render required on info fields
 $(document).on('change', '#alt_status', function() {
+  // Re-render all dynamic info campos so required updates correctly
+  $('.tipo-alteracao-secao').each(function() {
+    const idx = $(this).data('index');
+    if (idx) atualizarCampoDinamico(idx);
+  });
   const isLote = $('#modo_lote').is(':checked');
   if ($(this).val() === 'Concluído') {
     $('#campo-sei-documento-container').show();
@@ -1169,41 +1231,48 @@ $('#numero_termo').on('select2:select', function() {
   buscarProximoNumero();
 });
 
+function _infoRequerida() {
+  return $('#alt_status').val() === 'Concluído';
+}
+
 function atualizarCampoDinamico(index) {
   const tipo = $(`#alt_tipo_${index}`).val();
   const campoContainer = $(`#campo_info_${index}`);
   if (!tipo || !tiposCampos[tipo]) { campoContainer.hide(); return; }
   const config = tiposCampos[tipo];
-  let html = `<label class="form-label"><i class="bi bi-pencil-square"></i> Nova Informação *</label>`;
+  const req = _infoRequerida();
+  const reqAttr = req ? ' required' : '';
+  const labelSuffix = req ? ' *' : '';
+  let html = `<label class="form-label"><i class="bi bi-pencil-square"></i> Nova Informação${labelSuffix}</label>`;
   switch(config.tipo) {
     case 'text':
-      html += `<input type="text" class="form-control" name="alt_info[]" placeholder="${config.placeholder}" ${config.maxlength ? `maxlength="${config.maxlength}"` : ''} required>`;
+      html += `<input type="text" class="form-control" name="alt_info[]" placeholder="${config.placeholder}" ${config.maxlength ? `maxlength="${config.maxlength}"` : ''}${reqAttr}>`;
       break;
     case 'textarea':
-      html += `<textarea class="form-control" name="alt_info[]" rows="3" placeholder="${config.placeholder}" required></textarea>`;
+      html += `<textarea class="form-control" name="alt_info[]" rows="3" placeholder="${config.placeholder}"${reqAttr}></textarea>`;
       break;
     case 'number':
-      html += `<input type="number" class="form-control" name="alt_info[]" placeholder="${config.placeholder}" min="${config.min || 0}" required>`;
+      html += `<input type="number" class="form-control" name="alt_info[]" placeholder="${config.placeholder}" min="${config.min || 0}"${reqAttr}>`;
       break;
     case 'money':
-      html += `<input type="text" class="form-control money-input" name="alt_info[]" placeholder="${config.placeholder}" required>`;
+      html += `<input type="text" class="form-control money-input" name="alt_info[]" placeholder="${config.placeholder}"${reqAttr}>`;
       break;
     case 'date':
-      html += `<input type="date" class="form-control" name="alt_info[]" required>`;
+      html += `<input type="date" class="form-control" name="alt_info[]"${reqAttr}>`;
       break;
     case 'date_range':
-      html += `<div class="row g-2"><div class="col-md-6"><label class="form-label small">Data de Início</label><input type="date" class="form-control" name="alt_info_inicio[]" required></div><div class="col-md-6"><label class="form-label small">Data de Término</label><input type="date" class="form-control" name="alt_info_fim[]" required></div></div>`;
+      html += `<div class="row g-2"><div class="col-md-6"><label class="form-label small">Data de Início</label><input type="date" class="form-control" name="alt_info_inicio[]"${reqAttr}></div><div class="col-md-6"><label class="form-label small">Data de Término</label><input type="date" class="form-control" name="alt_info_fim[]"${reqAttr}></div></div>`;
       break;
     case 'select_osc':
-      html += `<select class="form-select" name="alt_info[]" required><option value="">-- Selecione a OSC --</option></select>`;
+      html += `<select class="form-select" name="alt_info[]"${reqAttr}><option value="">-- Selecione a OSC --</option></select>`;
       setTimeout(() => { $.get('/parcerias/api/lista_oscs', d => { const s = $(`#campo_info_${index} select[name="alt_info[]"]`); d.forEach(v => s.append(`<option value="${v}">${v}</option>`)); }); }, 100);
       break;
     case 'select_pg':
-      html += `<select class="form-select" name="alt_info[]" required><option value="">-- Selecione a Pessoa Gestora --</option></select>`;
+      html += `<select class="form-select" name="alt_info[]"${reqAttr}><option value="">-- Selecione a Pessoa Gestora --</option></select>`;
       setTimeout(() => { $.get('/parcerias/api/lista_pgs', d => { const s = $(`#campo_info_${index} select[name="alt_info[]"]`); d.forEach(v => s.append(`<option value="${v}">${v}</option>`)); }); }, 100);
       break;
     default:
-      html += `<input type="text" class="form-control" name="alt_info[]" placeholder="Nova informação" required>`;
+      html += `<input type="text" class="form-control" name="alt_info[]" placeholder="Nova informação"${reqAttr}>`;
   }
   html += `<small class="text-muted">Preencha a nova informação para este tipo de alteração</small>`;
   campoContainer.html(html).show();
