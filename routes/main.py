@@ -145,55 +145,84 @@ def index():
 @login_required
 @requires_access('portarias')
 def gerenciar_portarias():
-    """
-    Gerenciar portarias/legislações
-    """
     conn = get_db()
-    cur = conn.cursor()
-    
+    cur  = conn.cursor()
+
     if request.method == "POST":
+        action   = request.form.get('action', 'save')
+        lei_id   = request.form.get('lei_id') or None
+
+        if action == 'delete' and lei_id:
+            try:
+                cur.execute("DELETE FROM categoricas.c_geral_legislacao WHERE id = %s", (lei_id,))
+                conn.commit()
+                flash("Legislação excluída com sucesso.", "success")
+            except Exception as e:
+                conn.rollback()
+                flash(f"Erro ao excluir: {str(e)}", "danger")
+            return redirect(url_for('main.gerenciar_portarias'))
+
         try:
-            lei = request.form.get('lei')
-            inicio = request.form.get('inicio') or None
-            termino = request.form.get('termino') or None
-            
-            # Verificar se já existe
-            cur.execute("SELECT lei FROM categoricas.c_geral_legislacao WHERE lei = %s", (lei,))
-            existe = cur.fetchone()
-            
-            if existe:
-                # Atualizar
+            lei              = (request.form.get('lei') or '').strip()
+            tipo_doc         = (request.form.get('tipo_doc') or 'Portaria').strip()
+            inicio           = request.form.get('inicio') or None
+            sem_termino      = request.form.get('sem_termino') == '1'
+            termino          = None if sem_termino else (request.form.get('termino') or None)
+            descricao        = (request.form.get('descricao') or '').strip() or None
+            link             = (request.form.get('link') or '').strip() or None
+            status_vigencia  = (request.form.get('status_vigencia') or 'vigente').strip()
+
+            if not lei:
+                flash("O nome da legislação é obrigatório.", "warning")
+                return redirect(url_for('main.gerenciar_portarias'))
+
+            if lei_id:
                 cur.execute("""
-                    UPDATE categoricas.c_geral_legislacao 
-                    SET inicio = %s, termino = %s
-                    WHERE lei = %s
-                """, (inicio, termino, lei))
+                    UPDATE categoricas.c_geral_legislacao
+                       SET lei = %s, tipo_doc = %s, inicio = %s, termino = %s,
+                           descricao = %s, link = %s, status_vigencia = %s
+                     WHERE id = %s
+                """, (lei, tipo_doc, inicio, termino, descricao, link, status_vigencia, lei_id))
                 flash(f"Legislação '{lei}' atualizada com sucesso!", "success")
             else:
-                # Inserir
                 cur.execute("""
-                    INSERT INTO categoricas.c_geral_legislacao (lei, inicio, termino)
-                    VALUES (%s, %s, %s)
-                """, (lei, inicio, termino))
+                    INSERT INTO categoricas.c_geral_legislacao
+                        (lei, tipo_doc, inicio, termino, descricao, link, status_vigencia)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (lei, tipo_doc, inicio, termino, descricao, link, status_vigencia))
                 flash(f"Legislação '{lei}' criada com sucesso!", "success")
-            
+
             conn.commit()
-            return redirect(url_for('main.gerenciar_portarias'))
-            
         except Exception as e:
             conn.rollback()
             flash(f"Erro ao salvar legislação: {str(e)}", "danger")
-    
-    # GET - Buscar todas as legislações
+
+        return redirect(url_for('main.gerenciar_portarias'))
+
+    # GET — busca agrupada por tipo_doc
     cur.execute("""
-        SELECT lei, inicio, termino
-        FROM categoricas.c_geral_legislacao 
-        ORDER BY inicio DESC NULLS LAST, lei
+        SELECT id, lei, tipo_doc, inicio, termino, descricao, link, status_vigencia
+          FROM categoricas.c_geral_legislacao
+         ORDER BY tipo_doc, inicio DESC NULLS LAST, lei
     """)
-    legislacoes = cur.fetchall()
+    rows = cur.fetchall()
     cur.close()
-    
-    return render_template("portarias_analise.html", legislacoes=legislacoes)
+
+    # Agrupar por tipo_doc mantendo ordem de exibição desejada
+    ORDEM_TIPOS = ['Lei', 'Decreto', 'Portaria', 'Orientação Normativa', 'Resolução', 'Manual', 'Guia']
+    grupos = {}
+    for row in rows:
+        t = row[2] or 'Outros'
+        grupos.setdefault(t, []).append(row)
+
+    tipos_ordenados = [t for t in ORDEM_TIPOS if t in grupos]
+    for t in grupos:
+        if t not in tipos_ordenados:
+            tipos_ordenados.append(t)
+
+    return render_template("portarias_analise.html",
+                           grupos=grupos,
+                           tipos_ordenados=tipos_ordenados)
 
 
 @main_bp.route("/api/portaria-automatica", methods=["POST"])

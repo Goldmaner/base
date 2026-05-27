@@ -875,6 +875,217 @@ def deletar_documento_evento(id):
     return redirect(url_for('datas_importantes.index'))
 
 
+# ──────────────────────────────────────────────────── Exportar PDF ──────────
+
+@datas_importantes_bp.route("/eventos/<int:id>/exportar-pdf", methods=["GET"])
+@login_required
+@requires_access('ferias')
+def exportar_pdf_evento(id):
+    """Gera uma folha de rosto em PDF com os dados do evento."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.colors import HexColor, white, black, Color
+    from reportlab.lib.units import cm
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        HRFlowable, KeepTogether,
+    )
+
+    _, email, tipo_usuario = _get_user_info()
+    ver_tudo = _pode_ver_tudo(email, tipo_usuario)
+
+    cur = get_cursor()
+    try:
+        if ver_tudo:
+            cur.execute("""
+                SELECT de.*, ui.usuario_nome AS criador_nome
+                FROM calendario.datas_eventos de
+                LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = de.created_por
+                WHERE de.id = %s
+            """, (id,))
+        else:
+            cur.execute("""
+                SELECT de.*, ui.usuario_nome AS criador_nome
+                FROM calendario.datas_eventos de
+                LEFT JOIN gestao_pessoas.usuarios_infos ui ON ui.usuario_email = de.created_por
+                WHERE de.id = %s AND de.usuario_email = %s
+            """, (id, email))
+        evento = cur.fetchone()
+        if not evento:
+            flash('Evento não encontrado ou sem permissão.', 'danger')
+            return redirect(url_for('datas_importantes.index'))
+
+        cur.execute("""
+            SELECT responsavel_atividade, responsavel_tipo
+            FROM calendario.datas_eventos_responsaveis
+            WHERE datas_evento_id = %s
+            ORDER BY id
+        """, (id,))
+        responsaveis = cur.fetchall()
+    finally:
+        cur.close()
+
+    # ── Cores ──────────────────────────────────────────────────────────────
+    COR_PRIMARIA  = HexColor('#312e81')
+    COR_SECUNDARIA = HexColor('#4f46e5')
+    COR_CLARO     = HexColor('#eef2ff')
+    COR_BORDA     = HexColor('#c7d2fe')
+    COR_TEXTO     = HexColor('#1e1b4b')
+    COR_MUTED     = HexColor('#6b7280')
+    COR_CANCELADO = HexColor('#dc2626')
+
+    # ── Estilos ────────────────────────────────────────────────────────────
+    estilos = getSampleStyleSheet()
+
+    def estilo(nome, **kw):
+        return ParagraphStyle(nome, **kw)
+
+    st_titulo = estilo('titulo',
+        fontSize=18, fontName='Helvetica-Bold',
+        textColor=COR_PRIMARIA, spaceAfter=4, leading=22)
+    st_subtitulo = estilo('subtitulo',
+        fontSize=10, fontName='Helvetica',
+        textColor=COR_MUTED, spaceAfter=12)
+    st_secao = estilo('secao',
+        fontSize=9, fontName='Helvetica-Bold',
+        textColor=COR_SECUNDARIA, spaceBefore=12, spaceAfter=4,
+        borderPadding=(0, 0, 2, 0))
+    st_normal = estilo('normal_ev',
+        fontSize=9, fontName='Helvetica',
+        textColor=COR_TEXTO, leading=13)
+    st_label = estilo('label',
+        fontSize=8, fontName='Helvetica-Bold',
+        textColor=COR_MUTED)
+    st_valor = estilo('valor',
+        fontSize=9, fontName='Helvetica',
+        textColor=COR_TEXTO)
+    st_rodape = estilo('rodape',
+        fontSize=7.5, fontName='Helvetica',
+        textColor=COR_MUTED, alignment=TA_CENTER)
+
+    # ── Helpers ────────────────────────────────────────────────────────────
+    def _fmt_data(d):
+        return d.strftime('%d/%m/%Y') if d else '—'
+
+    def _fmt_bool(v):
+        return 'Sim' if v else 'Não'
+
+    def _fmt_moeda(v):
+        return f'R$ {float(v):,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.') if v else '—'
+
+    def _p(texto, st):
+        return Paragraph(str(texto or ''), st)
+
+    # ── Montar elementos ──────────────────────────────────────────────────
+    elementos = []
+    W = A4[0] - 3 * cm   # largura útil
+
+    # Cabeçalho colorido
+    cab_dados = [[
+        Paragraph('<b><font color="white" size="13">FOLHA DE ROSTO — EVENTO INSTITUCIONAL</font></b>', estilos['Normal']),
+        Paragraph(f'<font color="white" size="8">FAF · Gestão de Eventos<br/>{datetime.now().strftime("%d/%m/%Y %H:%M")}</font>', estilos['Normal']),
+    ]]
+    cab_tabela = Table(cab_dados, colWidths=[W * 0.65, W * 0.35])
+    cab_tabela.setStyle(TableStyle([
+        ('BACKGROUND',  (0, 0), (-1, -1), COR_PRIMARIA),
+        ('TEXTCOLOR',   (0, 0), (-1, -1), white),
+        ('TOPPADDING',  (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (0, -1), 14),
+        ('RIGHTPADDING', (1, 0), (1, -1), 14),
+        ('ALIGN',       (1, 0), (1, -1), 'RIGHT'),
+        ('VALIGN',      (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROUNDEDCORNERS', [4, 4, 4, 4]),
+    ]))
+    elementos.append(cab_tabela)
+    elementos.append(Spacer(1, 14))
+
+    # Nome da atividade
+    cancelado_txt = ' <font color="#dc2626" size="9">[CANCELADO]</font>' if evento['cancelado'] else ''
+    elementos.append(_p(f"{evento['nome_atividade']}{cancelado_txt}", st_titulo))
+
+    # Descritivo curto abaixo do título
+    if evento.get('descritivo'):
+        elementos.append(_p(evento['descritivo'], st_subtitulo))
+
+    elementos.append(HRFlowable(width=W, thickness=1.5, color=COR_SECUNDARIA, spaceAfter=10))
+
+    # ── Tabela de dados principais ─────────────────────────────────────────
+    def linha(label, valor):
+        return [_p(label, st_label), _p(str(valor), st_valor)]
+
+    linhas_dados = [linha('PARTICIPAÇÃO', evento['participacao'] or '—')]
+    linhas_dados.append(linha('DATA PRINCIPAL', _fmt_data(evento['data_inicio'])))
+    if evento.get('datas_adicionais'):
+        linhas_dados.append(linha('DATAS ADICIONAIS', evento['datas_adicionais']))
+    linhas_dados.append(linha('LOCAL', evento['local'] or '—'))
+    linhas_dados.append(linha('NECESSITA INFRAESTRUTURA', _fmt_bool(evento['necessita_infraestrutura'])))
+    linhas_dados.append(linha('VALOR DE ALIMENTAÇÃO', _fmt_moeda(evento['valor_alimentacao'])))
+    linhas_dados.append(linha('ALINHAMENTO C/ AEV', _fmt_bool(evento['alinhamento_aev'])))
+
+    tbl_dados = Table(linhas_dados, colWidths=[W * 0.30, W * 0.70])
+    tbl_dados.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (0, -1), COR_CLARO),
+        ('TEXTCOLOR',     (0, 0), (0, -1), COR_MUTED),
+        ('FONTNAME',      (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE',      (0, 0), (-1, -1), 8.5),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+        ('GRID',          (0, 0), (-1, -1), 0.4, COR_BORDA),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [COR_CLARO, white]),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elementos.append(tbl_dados)
+
+    # ── Observações ────────────────────────────────────────────────────────
+    if evento.get('observacoes'):
+        elementos.append(_p('OBSERVAÇÕES', st_secao))
+        elementos.append(_p(evento['observacoes'], st_normal))
+
+    # ── Responsáveis ───────────────────────────────────────────────────────
+    if responsaveis:
+        elementos.append(_p('RESPONSÁVEIS', st_secao))
+        for resp in responsaveis:
+            tipo_txt = f'  ·  <font color="#6b7280">{resp["responsavel_tipo"]}</font>' if resp.get('responsavel_tipo') else ''
+            elementos.append(_p(f'▸  {resp["responsavel_atividade"]}{tipo_txt}', st_normal))
+            elementos.append(Spacer(1, 2))
+
+    # ── Rodapé ─────────────────────────────────────────────────────────────
+    elementos.append(Spacer(1, 20))
+    elementos.append(HRFlowable(width=W, thickness=0.5, color=COR_BORDA))
+    elementos.append(Spacer(1, 4))
+
+    criador = evento.get('criador_nome') or evento.get('created_por') or '—'
+    criado_em = _fmt_data(evento.get('created_at'))
+    atualizado = _fmt_data(evento.get('updated_at')) if evento.get('updated_at') else '—'
+    rodape_txt = (
+        f'Registrado por: {criador}  |  Criado em: {criado_em}  |  '
+        f'Atualizado em: {atualizado}  |  Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+    )
+    elementos.append(_p(rodape_txt, st_rodape))
+
+    # ── Gerar PDF ──────────────────────────────────────────────────────────
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=1.5 * cm, rightMargin=1.5 * cm,
+        topMargin=1.5 * cm,  bottomMargin=1.5 * cm,
+    )
+    doc.build(elementos)
+    buf.seek(0)
+
+    nome_arquivo = f"{sanitizar_nome_doc(evento['nome_atividade'])}_folha_rosto.pdf"
+    return send_file(
+        buf,
+        mimetype='application/pdf',
+        as_attachment=False,   # abre no navegador (não força download)
+        download_name=nome_arquivo,
+    )
+
+
 # ─────────────────────────────────────────────────────── Download ZIP ───────
 
 _ZIP_MAX_BYTES = 50 * 1024 * 1024  # 50 MB por parte

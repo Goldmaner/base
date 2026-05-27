@@ -108,10 +108,10 @@
     }
 
     .cell-motivo {
-        max-width: 320px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        max-width: 360px;
+        white-space: pre-line;
+        font-size: 0.83rem;
+        line-height: 1.4;
     }
 
     /* ===== TOTAL GERAL ===== */
@@ -410,7 +410,7 @@
                 <td title="${escapeHtml(linha.cat_transacao)}">${escapeHtml(linha.cat_transacao) || '<span class="text-muted">—</span>'}</td>
                 <td title="${escapeHtml(linha.origem_destino)}">${escapeHtml(linha.origem_destino) || '<span class="text-muted">—</span>'}</td>
                 <td class="cell-money text-danger">${formatarMoeda(linha.valor_glosado)}</td>
-                <td class="cell-motivo" title="${escapeHtml(linha.avaliacao_analista)}">${escapeHtml(linha.avaliacao_analista) || '<span class="text-muted fst-italic">sem motivo</span>'}</td>
+                <td class="cell-motivo" title="${escapeHtml(linha.motivo_automatico)}">${renderMotivo(linha.motivo_automatico)}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -448,7 +448,7 @@
                     linha.cat_transacao,
                     linha.origem_destino,
                     linha.valor_glosado.toFixed(2).replace('.', ','),
-                    linha.avaliacao_analista
+                    linha.motivo_automatico || linha.avaliacao_analista || ''
                 ]);
             });
             // Subtotal do mês
@@ -517,6 +517,16 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    /**
+     * Renderiza o campo Motivo respeitando quebras de linha (\n).
+     * Múltiplos motivos ficam numerados em linhas separadas.
+     */
+    function renderMotivo(motivo) {
+        if (!motivo) return '<span class="text-muted fst-italic">sem motivo</span>';
+        // Escapar HTML e converter \n em <br>
+        return escapeHtml(motivo).replace(/\n/g, '<br>');
     }
 </script>
 </body>

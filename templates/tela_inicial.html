@@ -353,30 +353,20 @@
       {% endif %}
 
       <!-- ── GESTÃO DE PESSOAS E USUÁRIOS (Índigo) ── -->
-      {% if is_admin or 'usuarios' in user_acessos or 'ferias' in user_acessos or 'gestao_pessoas' in user_acessos %}
+      {% if is_admin or 'ferias' in user_acessos or 'gestao_pessoas' in user_acessos %}
       <div class="faf-acc-item s-pessoas">
         <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePessoas">
           <i class="bi bi-person-badge-fill s-icon" style="font-size:1.05rem;"></i>
-          <span>Gestão de Pessoas e Usuários</span>
+          <span>Gestão de Pessoas</span>
           <span class="s-spacer"></span>
-          <span class="s-count">4</span>
+          <span class="s-count">1</span>
           <i class="bi bi-chevron-down s-chev"></i>
         </button>
         <div id="collapsePessoas" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
           <div class="faf-acc-body s-pessoas">
-            {% if is_admin or 'usuarios' in user_acessos %}
-            <a href="{{ url_for('gestao_pessoas.usuarios') }}" class="faf-btn">
-              <i class="bi bi-people"></i> Gerenciar Usuários
-            </a>
-            {% endif %}
             {% if is_admin or 'ferias' in user_acessos %}
             <a href="{{ url_for('ferias.calendario') }}" class="faf-btn">
               <i class="bi bi-calendar3"></i> Calendário Geral
-            </a>
-            {% endif %}
-            {% if is_admin or 'gestao_pessoas' in user_acessos %}
-            <a href="{{ url_for('gestao_pessoas.nomeacoes') }}" class="faf-btn">
-              <i class="bi bi-person-badge"></i> Nomeações CDA
             </a>
             {% endif %}
           </div>
@@ -385,7 +375,7 @@
       {% endif %}
 
       <!-- ── OPÇÕES DE ADMINISTRADOR (Vermelho) ── -->
-      {% if is_admin or 'portarias' in user_acessos %}
+      {% if is_admin or 'usuarios' in user_acessos %}
       <div class="faf-acc-item s-admin">
         <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdmin">
           <i class="bi bi-gear-fill s-icon" style="font-size:1.05rem;"></i>
@@ -396,12 +386,11 @@
         </button>
         <div id="collapseAdmin" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
           <div class="faf-acc-body s-admin" style="grid-template-columns: 1fr;">
-            {% if is_admin or 'portarias' in user_acessos %}
-            <a href="{{ url_for('main.gerenciar_portarias') }}" class="faf-btn">
-              <i class="bi bi-file-earmark-text"></i> Gerenciar Portarias/Legislações
+            {% if is_admin or 'usuarios' in user_acessos %}
+            <a href="{{ url_for('gestao_pessoas.usuarios') }}" class="faf-btn">
+              <i class="bi bi-people"></i> Gerenciar Usuários
             </a>
             {% endif %}
-
           </div>
         </div>
       </div>

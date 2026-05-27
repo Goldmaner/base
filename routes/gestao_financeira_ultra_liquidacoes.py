@@ -1109,10 +1109,11 @@ def api_obter_parcela(parcela_id):
         
         # Buscar opções de andamento
         cur.execute("""
-            SELECT status_parcela
-            FROM categoricas.c_dac_parcela_andamento_status
-            WHERE LOWER(status_status) = 'ativo'
-            ORDER BY status_parcela
+            SELECT status AS status_parcela
+            FROM categoricas.c_geral_status
+            WHERE schema_table_coluna_r = 'gestao_financeira.ultra_liquidacoes.parcela_andamento'
+              AND ativo = TRUE
+            ORDER BY id
         """)
         opcoes_andamento = [r['status_parcela'] for r in cur.fetchall()]
         

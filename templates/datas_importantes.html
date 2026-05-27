@@ -1106,11 +1106,18 @@
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn-parc success">
-            <i class="bi bi-check-circle"></i> Salvar Alterações
-          </button>
+        <div class="modal-footer justify-content-between">
+          <a id="btnExportarPdfEvento" href="#" target="_blank" rel="noopener"
+             class="btn btn-outline-danger btn-sm"
+             title="Exportar folha de rosto em PDF">
+            <i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF
+          </a>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn-parc success">
+              <i class="bi bi-check-circle"></i> Salvar Alterações
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -1304,6 +1311,9 @@
                               local, infra, valor, aev, obs, cancelado, responsaveis, documentos) {
     const form = document.getElementById('formEdicaoEvento');
     form.action = `/datas-importantes/eventos/editar/${id}`;
+    // Atualiza link de exportação PDF
+    const btnPdf = document.getElementById('btnExportarPdfEvento');
+    if (btnPdf) btnPdf.href = `/datas-importantes/eventos/${id}/exportar-pdf`;
     document.getElementById('evEditNome').value            = nome || '';
     document.getElementById('evEditDescritivo').value      = descritivo || '';
     document.getElementById('evEditData').value            = data || '';

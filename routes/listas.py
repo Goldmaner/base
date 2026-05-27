@@ -109,22 +109,6 @@ TABELAS_CONFIG = {
             'correspondente': 'text'
         }
     },
-    'c_dac_despesas_provisao': {
-        'nome': 'DAC: Despesas de Provisão',
-        'schema': 'categoricas',
-        'colunas_editaveis': ['despesa_provisao', 'descricao'],
-        'colunas_obrigatorias': ['despesa_provisao'],
-        'labels': {
-            'despesa_provisao': 'Despesa de Provisão',
-            'descricao': 'Descrição'
-        },
-        'colunas_filtro': ['despesa_provisao'],
-        'ordem': 'despesa_provisao',
-        'tipos_campo': {
-            'despesa_provisao': 'text',
-            'descricao': 'textarea'
-        }
-    },
     'c_dac_modelo_textos_inconsistencias': {
         'nome': 'DAC: Modelos de Textos de Inconsistências',
         'schema': 'categoricas',
@@ -187,28 +171,6 @@ TABELAS_CONFIG = {
         'colunas_editaveis': ['nome_setor'],
         'labels': {'nome_setor': 'Nome do Setor'},
         'ordem': 'nome_setor'
-    },
-    'c_dac_parcela_andamento_status': {
-        'nome': 'DAC: Status de Parcela em Andamento',
-        'schema': 'categoricas',
-        'colunas_editaveis': ['status_parcela', 'descricao', 'status_status'],
-        'colunas_obrigatorias': ['status_parcela'],
-        'labels': {
-            'status_parcela': 'Status da Parcela',
-            'descricao': 'Descrição',
-            'status_status': 'Status do Status'
-        },
-        'colunas_filtro': ['status_parcela', 'status_status'],
-        'ordem': 'status_parcela',
-        'tipos_campo': {
-            'status_parcela': 'text',
-            'descricao': 'textarea',
-            'rows_descricao': 3,
-            'status_status': 'select',
-            'opcoes_status_status': ['ativo', 'inativo']
-        },
-        'inline_edit': True,
-        'inline_columns': ['status_status']
     },
     'c_dgp_analistas': {
         'nome': 'DGP: Agentes DGP',
@@ -481,7 +443,7 @@ TABELAS_CONFIG = {
             'alt_fonte_recursos': 'checkbox_multiple',
             'query_alt_fonte_recursos': 'SELECT DISTINCT descricao FROM categoricas.c_geral_origem_recurso WHERE descricao IS NOT NULL ORDER BY descricao',
             'alt_instrumento': 'checkbox_multiple',
-            'query_alt_instrumento': 'SELECT DISTINCT instrumento_alteracao FROM categoricas.c_alt_instrumento WHERE instrumento_alteracao IS NOT NULL ORDER BY instrumento_alteracao',
+            'query_alt_instrumento': "SELECT status AS instrumento_alteracao FROM categoricas.c_geral_status WHERE schema_table_coluna_r = 'public.termos_alteracoes.instrumento_alteracao' AND ativo = TRUE ORDER BY id",
             'alt_principios': 'checkbox_multiple',
             'query_alt_principios': 'SELECT nome_principio FROM categoricas.c_alt_principios WHERE status = \'ativo\' ORDER BY nome_principio',
             'status': 'select',
@@ -709,22 +671,6 @@ TABELAS_CONFIG = {
             'correspondente': 'text'
         }
     },
-    'c_dac_despesas_provisao': {
-        'nome': 'DAC: Despesas de Provisão',
-        'schema': 'categoricas',
-        'colunas_editaveis': ['despesa_provisao', 'descricao'],
-        'colunas_obrigatorias': ['despesa_provisao'],
-        'labels': {
-            'despesa_provisao': 'Despesa de Provisão',
-            'descricao': 'Descrição'
-        },
-        'colunas_filtro': ['despesa_provisao'],
-        'ordem': 'despesa_provisao',
-        'tipos_campo': {
-            'despesa_provisao': 'text',
-            'descricao': 'textarea'
-        }
-    },
     'c_dac_modelo_textos_inconsistencias': {
         'nome': 'DAC: Modelos de Textos de Inconsistências',
         'schema': 'categoricas',
@@ -853,7 +799,7 @@ TABELAS_CONFIG = {
             'alt_fonte_recursos': 'checkbox_multiple',
             'query_alt_fonte_recursos': 'SELECT DISTINCT descricao FROM categoricas.c_geral_origem_recurso WHERE descricao IS NOT NULL ORDER BY descricao',
             'alt_instrumento': 'checkbox_multiple',
-            'query_alt_instrumento': 'SELECT DISTINCT instrumento_alteracao FROM categoricas.c_alt_instrumento WHERE instrumento_alteracao IS NOT NULL ORDER BY instrumento_alteracao',
+            'query_alt_instrumento': "SELECT status AS instrumento_alteracao FROM categoricas.c_geral_status WHERE schema_table_coluna_r = 'public.termos_alteracoes.instrumento_alteracao' AND ativo = TRUE ORDER BY id",
             'alt_principios': 'checkbox_multiple',
             'query_alt_principios': 'SELECT nome_principio FROM categoricas.c_alt_principios WHERE status = \'ativo\' ORDER BY nome_principio',
             'status': 'select',
@@ -1140,6 +1086,28 @@ TABELAS_CONFIG = {
             'observacoes': 'textarea',
             'rows_observacoes': 4
         }
+    },
+    'c_dac_glosas': {
+        'nome': 'DAC: Tipos de Glosa',
+        'schema': 'categoricas',
+        'colunas_editaveis': ['glosa_nome', 'glosa_texto', 'glosa_inconsistencia'],
+        'colunas_obrigatorias': ['glosa_nome'],
+        'colunas_calculadas': ['total_fundamentacoes'],
+        'labels': {
+            'glosa_nome': 'Nome da Glosa',
+            'glosa_texto': 'Modelo de Texto',
+            'glosa_inconsistencia': 'Inconsistência(s) Correspondente',
+            'total_fundamentacoes': 'Fundamentações'
+        },
+        'colunas_filtro': ['glosa_nome', 'glosa_inconsistencia'],
+        'ordem': 'glosa_nome',
+        'tipos_campo': {
+            'glosa_nome': 'text',
+            'glosa_texto': 'textarea',
+            'rows_glosa_texto': 6,
+            'glosa_inconsistencia': 'textarea',
+            'rows_glosa_inconsistencia': 3
+        }
     }
 }
 
@@ -1218,6 +1186,19 @@ def obter_dados(tabela):
                         item[col] = valor.strftime('%d/%m/%Y')
             resultado.append(item)
         
+        # Se for c_dac_glosas, adicionar contagem de fundamentações
+        if tabela == 'c_dac_glosas':
+            cur2 = get_cursor()
+            for item in resultado:
+                cur2.execute("""
+                    SELECT COUNT(*) as total
+                    FROM categoricas.c_dac_glosas_fundamento
+                    WHERE glosa_id = %s
+                """, (item['id'],))
+                contagem = cur2.fetchone()
+                item['total_fundamentacoes'] = contagem['total'] if contagem else 0
+            cur2.close()
+
         # Se for pessoa_gestora, adicionar contagem de pareceres e parcerias
         if tabela == 'c_geral_pessoa_gestora':
             cur = get_cursor()
@@ -1396,6 +1377,17 @@ def criar_registro(tabela):
             dados['criado_em'] = _now
             dados['atualizado_por'] = _user
             dados['atualizado_em'] = _now
+
+        # Auto-popular colunas de auditoria para c_dac_glosas
+        if tabela == 'c_dac_glosas':
+            from flask import session as _sess
+            from datetime import datetime as _dt
+            _now = _dt.now()
+            _user = _sess.get('email', 'sistema')
+            dados['criado_por'] = _user
+            dados['criado_em'] = _now
+            dados['atualizado_por'] = _user
+            dados['atualizado_em'] = _now
         
         # Montar query de inserção apenas com campos enviados
         colunas_a_inserir = [col for col in config['colunas_editaveis'] if col in dados]
@@ -1414,6 +1406,10 @@ def criar_registro(tabela):
                 if _ac in dados and _ac not in colunas_a_inserir:
                     colunas_a_inserir.append(_ac)
         if tabela == 'c_geral_tipos_documentos_manuais':
+            for _ac in ['criado_por', 'criado_em', 'atualizado_por', 'atualizado_em']:
+                if _ac in dados and _ac not in colunas_a_inserir:
+                    colunas_a_inserir.append(_ac)
+        if tabela == 'c_dac_glosas':
             for _ac in ['criado_por', 'criado_em', 'atualizado_por', 'atualizado_em']:
                 if _ac in dados and _ac not in colunas_a_inserir:
                     colunas_a_inserir.append(_ac)
@@ -1522,6 +1518,15 @@ def atualizar_registro(tabela, id):
 
         # Adicionar campos de auditoria para c_geral_tipos_documentos_manuais
         if tabela == 'c_geral_tipos_documentos_manuais':
+            from flask import session as _sess
+            from datetime import datetime as _dt
+            colunas_validas.append('atualizado_por')
+            valores.append(_sess.get('email', 'sistema'))
+            colunas_validas.append('atualizado_em')
+            valores.append(_dt.now())
+
+        # Adicionar campos de auditoria para c_dac_glosas
+        if tabela == 'c_dac_glosas':
             from flask import session as _sess
             from datetime import datetime as _dt
             colunas_validas.append('atualizado_por')
@@ -1928,6 +1933,138 @@ def deletar_contato_vereador(id):
 
 
 # =============================================================================
+# FUNDAMENTAÇÕES DE GLOSAS (c_dac_glosas_fundamento)
+# =============================================================================
+
+@listas_bp.route("/glosas/fundamentos/<int:glosa_id>", methods=["GET"])
+@login_required
+@requires_access('listas')
+def listar_fundamentos(glosa_id):
+    """Retorna todos os fundamentos de uma glosa"""
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT id, glosa_lei, glosa_artigo, criado_por, criado_em
+            FROM categoricas.c_dac_glosas_fundamento
+            WHERE glosa_id = %s
+            ORDER BY id ASC
+        """, (glosa_id,))
+        rows = cur.fetchall()
+        cur.close()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d['criado_em'] = d['criado_em'].strftime('%d/%m/%Y %H:%M') if d.get('criado_em') else '-'
+            result.append(d)
+        return jsonify({'fundamentos': result}), 200
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/glosas/fundamentos/criar", methods=["POST"])
+@login_required
+@requires_access('listas')
+def criar_fundamento():
+    """Cria um novo fundamento legal para uma glosa"""
+    try:
+        data = request.get_json()
+        glosa_id  = data.get('glosa_id')
+        glosa_lei = (data.get('glosa_lei') or '').strip() or None
+        artigo    = (data.get('glosa_artigo') or '').strip() or None
+
+        if not glosa_id:
+            return jsonify({'erro': 'glosa_id é obrigatório'}), 400
+        if not glosa_lei and not artigo:
+            return jsonify({'erro': 'Informe ao menos a lei ou o artigo'}), 400
+
+        cur = get_cursor()
+        cur.execute("""
+            INSERT INTO categoricas.c_dac_glosas_fundamento
+                (glosa_id, glosa_lei, glosa_artigo, criado_por, criado_em)
+            VALUES (%s, %s, %s, %s, NOW())
+            RETURNING id
+        """, (glosa_id, glosa_lei, artigo, session.get('email', 'sistema')))
+        novo_id = cur.fetchone()['id']
+        get_db().commit()
+        cur.close()
+        return jsonify({'id': novo_id, 'mensagem': 'Fundamento adicionado com sucesso'}), 201
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/glosas/fundamentos/editar/<int:fund_id>", methods=["POST"])
+@login_required
+@requires_access('listas')
+def editar_fundamento(fund_id):
+    """Edita um fundamento legal"""
+    try:
+        data = request.get_json()
+        glosa_lei = (data.get('glosa_lei') or '').strip() or None
+        artigo    = (data.get('glosa_artigo') or '').strip() or None
+
+        if not glosa_lei and not artigo:
+            return jsonify({'erro': 'Informe ao menos a lei ou o artigo'}), 400
+
+        cur = get_cursor()
+        cur.execute("""
+            UPDATE categoricas.c_dac_glosas_fundamento
+            SET glosa_lei = %s, glosa_artigo = %s,
+                atualizado_por = %s, atualizado_em = NOW()
+            WHERE id = %s
+        """, (glosa_lei, artigo, session.get('email', 'sistema'), fund_id))
+        if cur.rowcount == 0:
+            get_db().rollback()
+            return jsonify({'erro': 'Fundamento não encontrado'}), 404
+        get_db().commit()
+        cur.close()
+        return jsonify({'mensagem': 'Fundamento atualizado com sucesso'}), 200
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/glosas/fundamentos/deletar/<int:fund_id>", methods=["POST"])
+@login_required
+@requires_access('listas')
+def deletar_fundamento(fund_id):
+    """Exclui um fundamento legal"""
+    try:
+        cur = get_cursor()
+        cur.execute("DELETE FROM categoricas.c_dac_glosas_fundamento WHERE id = %s", (fund_id,))
+        if cur.rowcount == 0:
+            return jsonify({'erro': 'Fundamento não encontrado'}), 404
+        get_db().commit()
+        cur.close()
+        return jsonify({'mensagem': 'Fundamento excluído com sucesso'}), 200
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/glosas/leis-opcoes", methods=["GET"])
+@login_required
+@requires_access('listas')
+def glosas_leis_opcoes():
+    """Retorna lista de leis/normas disponíveis em categoricas.c_geral_legislacao para datalist sugestivo"""
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT lei
+            FROM categoricas.c_geral_legislacao
+            WHERE lei IS NOT NULL
+              AND TRIM(lei) != ''
+            ORDER BY lei
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        leis = [r['lei'] for r in rows]
+        return jsonify({'leis': leis}), 200
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
+# =============================================================================
 # STATUS CATEGÓRICOS (c_geral_status)
 # =============================================================================
 
@@ -1947,14 +2084,16 @@ def status_cat_listar_grupos():
     try:
         cur = get_cursor()
         cur.execute("""
-            SELECT schema_table_coluna_r AS lista, COUNT(*) AS total
+            SELECT schema_table_coluna_r AS lista,
+                   COUNT(*) AS total,
+                   MAX(nome_item_fantasia) AS nome_item_fantasia
             FROM categoricas.c_geral_status
             GROUP BY schema_table_coluna_r
-            ORDER BY schema_table_coluna_r
+            ORDER BY COALESCE(MAX(nome_item_fantasia), schema_table_coluna_r)
         """)
         rows = cur.fetchall()
         cur.close()
-        return jsonify([{'lista': r['lista'], 'total': r['total']} for r in rows])
+        return jsonify([{'lista': r['lista'], 'total': r['total'], 'nome': r['nome_item_fantasia'] or ''} for r in rows])
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
@@ -1996,9 +2135,12 @@ def status_cat_criar_item():
             return jsonify({'erro': 'Campos "lista" e "status" são obrigatórios'}), 400
         cur = get_cursor()
         cur.execute("""
-            INSERT INTO categoricas.c_geral_status (schema_table_coluna_r, status, descricao)
-            VALUES (%s, %s, %s) RETURNING id
-        """, (lista, status, descricao))
+            INSERT INTO categoricas.c_geral_status
+                (schema_table_coluna_r, status, descricao, nome_item_fantasia)
+            VALUES (%s, %s, %s,
+                (SELECT MAX(nome_item_fantasia) FROM categoricas.c_geral_status WHERE schema_table_coluna_r = %s))
+            RETURNING id
+        """, (lista, status, descricao, lista))
         novo_id = cur.fetchone()['id']
         get_db().commit()
         cur.close()
@@ -2080,9 +2222,10 @@ def status_cat_criar_lista():
     """Cria uma nova lista (schema_table_coluna_r) com o primeiro item."""
     try:
         data = request.get_json(force=True)
-        lista   = (data.get('lista')   or '').strip()
-        status  = (data.get('status')  or '').strip()
-        descricao = (data.get('descricao') or '').strip() or None
+        lista         = (data.get('lista')              or '').strip()
+        status        = (data.get('status')             or '').strip()
+        descricao     = (data.get('descricao')          or '').strip() or None
+        nome_fantasia = (data.get('nome_item_fantasia') or '').strip() or None
         if not lista or not status:
             return jsonify({'erro': 'Nome da lista e primeiro valor são obrigatórios'}), 400
         cur = get_cursor()
@@ -2091,13 +2234,42 @@ def status_cat_criar_lista():
         if cur.fetchone():
             return jsonify({'erro': 'Já existe uma lista com esse nome'}), 409
         cur.execute("""
-            INSERT INTO categoricas.c_geral_status (schema_table_coluna_r, status, descricao)
-            VALUES (%s, %s, %s) RETURNING id
-        """, (lista, status, descricao))
+            INSERT INTO categoricas.c_geral_status
+                (schema_table_coluna_r, status, descricao, nome_item_fantasia)
+            VALUES (%s, %s, %s, %s) RETURNING id
+        """, (lista, status, descricao, nome_fantasia))
         novo_id = cur.fetchone()['id']
         get_db().commit()
         cur.close()
         return jsonify({'id': novo_id, 'lista': lista, 'status': status}), 201
+    except Exception as e:
+        get_db().rollback()
+        return jsonify({'erro': str(e)}), 500
+
+
+@listas_bp.route("/api/status-cat/listas/nome", methods=["PUT"])
+@login_required
+@requires_access('listas')
+def status_cat_renomear_lista():
+    """Atualiza nome_item_fantasia de todos os itens de um grupo."""
+    try:
+        data = request.get_json(force=True)
+        lista = (data.get('lista') or '').strip()
+        nome  = (data.get('nome')  or '').strip() or None
+        if not lista:
+            return jsonify({'erro': 'Parâmetro "lista" é obrigatório'}), 400
+        cur = get_cursor()
+        cur.execute("""
+            UPDATE categoricas.c_geral_status
+            SET nome_item_fantasia = %s, atualizado_em = now()
+            WHERE schema_table_coluna_r = %s
+        """, (nome, lista))
+        if cur.rowcount == 0:
+            get_db().rollback()
+            return jsonify({'erro': 'Lista não encontrada'}), 404
+        get_db().commit()
+        cur.close()
+        return jsonify({'ok': True})
     except Exception as e:
         get_db().rollback()
         return jsonify({'erro': str(e)}), 500

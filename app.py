@@ -25,7 +25,6 @@ from routes.analises import analises_bp
 from routes.pesquisa_parcerias import pesquisa_parcerias_bp
 from routes.analises_pc import analises_pc_bp
 from routes.parcerias_notificacoes import bp as parcerias_notificacoes_bp
-from routes.conc_bancaria import bp as conc_bancaria_bp
 from routes.conc_banc import bp as conc_banc_bp
 from routes.conc_rendimentos import bp as conc_rendimentos_bp
 from routes.conc_contrapartida import bp as conc_contrapartida_bp
@@ -276,7 +275,6 @@ def create_app():
     app.register_blueprint(pesquisa_parcerias_bp)
     app.register_blueprint(analises_pc_bp)
     app.register_blueprint(parcerias_notificacoes_bp)
-    app.register_blueprint(conc_bancaria_bp)
     app.register_blueprint(conc_banc_bp)
     app.register_blueprint(conc_rendimentos_bp)
     app.register_blueprint(conc_contrapartida_bp)

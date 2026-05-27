@@ -66,9 +66,13 @@
     .btn-violet.warning { background: linear-gradient(135deg, #78350f, #d97706); }
     .btn-violet.success { background: linear-gradient(135deg, #064e3b, #059669); }
     .btn-violet.outline {
-      background: transparent; border: 1.5px solid #7c3aed; color: #7c3aed;
+      background: transparent; border: 1.5px solid rgba(255,255,255,.7); color: #fff;
     }
-    .btn-violet.outline:hover { background: #f5f0ff; opacity: 1; }
+    .btn-violet.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+    .btn-violet.outline.dark {
+      border-color: #7c3aed; color: #7c3aed; background: transparent;
+    }
+    .btn-violet.outline.dark:hover { background: #f5f0ff; opacity: 1; }
 
     /* Edição inline */
     .editing-row td { background: #faf5ff !important; }
@@ -79,13 +83,21 @@
       border-color: #7c3aed; box-shadow: 0 0 0 .15rem rgba(124,58,237,.2);
     }
 
-    /* Nova lista / novo item */
-    .add-row td input { font-size: .84rem; }
+    /* Barra de renomear grupo */
+    #areaRenomear {
+      background: #faf5ff; border-bottom: 1px solid #e9e3ff;
+      padding: 10px 18px;
+    }
+    #areaRenomear input {
+      border-color: #a78bfa; font-size: .88rem; border-radius: 6px;
+    }
+    #areaRenomear input:focus {
+      border-color: #7c3aed; box-shadow: 0 0 0 .15rem rgba(124,58,237,.2);
+    }
 
     /* Placeholder */
     #areaVazia { color: #9ca3af; padding: 40px 0; }
 
-    /* Responsividade da coluna lateral */
     @media (max-width: 767px) {
       #colunaListas { margin-bottom: 16px; }
     }
@@ -134,12 +146,30 @@
       <div class="panel-header">
         <i class="bi bi-tags"></i>
         <h5 id="tituloGrupo" class="text-truncate">Selecione uma lista à esquerda</h5>
-        <div id="acoesGrupo" style="display:none;" class="d-flex gap-2 flex-wrap">
+        <div id="acoesGrupo" style="display:none;" class="d-flex gap-2 flex-wrap align-items-center">
+          <button class="btn-violet btn-sm outline" onclick="iniciarRenomear()" title="Renomear lista">
+            <i class="bi bi-pencil"></i>
+          </button>
           <button class="btn-violet btn-sm success" onclick="adicionarItemNovo()">
             <i class="bi bi-plus-lg"></i> Adicionar
           </button>
         </div>
       </div>
+
+      <!-- Barra inline de renomear -->
+      <div id="areaRenomear" style="display:none;">
+        <label class="form-label small fw-semibold text-muted mb-1">Nome da lista (nome amigável)</label>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="text" id="inputNomeFantasia" class="form-control form-control-sm flex-grow-1"
+                 placeholder="ex: Alterações › Instrumentos de Alteração">
+          <button class="btn-violet btn-sm success" onclick="salvarRenomear()"><i class="bi bi-check-lg"></i> Salvar</button>
+          <button class="btn-violet btn-sm outline dark" onclick="cancelarRenomear()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="mt-1">
+          <small class="text-muted font-monospace" id="labelCampoRenomear"></small>
+        </div>
+      </div>
+
       <div class="panel-body">
         <!-- Tag do campo referenciado (oculto — referência interna) -->
         <div id="tagCampo" style="display:none;">
@@ -192,13 +222,19 @@
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label fw-semibold">Nome da lista (referência do campo)</label>
+          <label class="form-label fw-semibold">Nome amigável <span class="text-muted">(opcional)</span></label>
+          <input type="text" id="novaListaNomeFantasia" class="form-control"
+                 placeholder="ex: Alterações › Instrumentos de Alteração">
+          <div class="form-text">Exibido na sidebar. Se vazio, usa a chave técnica.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Referência do campo <span class="text-danger">*</span></label>
           <input type="text" id="novaListaNome" class="form-control font-monospace"
                  placeholder="ex: public.parcerias_monit.visita_status">
           <div class="form-text">Use o padrão <code>schema.tabela.coluna</code></div>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Primeiro valor obrigatório</label>
+          <label class="form-label fw-semibold">Primeiro valor obrigatório <span class="text-danger">*</span></label>
           <input type="text" id="novaListaStatus" class="form-control" placeholder="ex: Não analisado">
         </div>
         <div>
@@ -248,33 +284,17 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
-// Nomes amigáveis para os campos técnicos
-// ─────────────────────────────────────────────────────────────────────────────
-const LABELS = {
-  'public.parcerias_monit.visita_status':              'M&A › Visita — Status',
-  'public.parcerias_monit.visita_avaliacao':           'M&A › Visita — Avaliação',
-  'public.parcerias_monit.monit_status':               'M&A › Monitoramento — Status',
-  'public.parcerias_monit.monit_avaliacao':            'M&A › Monitoramento — Avaliação',
-  'public.parcerias_monit_adicional.justificativa_status': 'M&A › Justificativa — Status',
-  'public.parcerias_monit_adicional.comissao_visita':  'M&A › Comissão — Visita',
-};
-
-function getLabel(lista) {
-  return LABELS[lista] || lista;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Estado global
 // ─────────────────────────────────────────────────────────────────────────────
-let todosGrupos   = [];   // [{lista, total}]
+let todosGrupos   = [];   // [{lista, total, nome}]
 let grupoAtivo    = null; // string schema_table_coluna_r
-let itensAtivos   = [];   // [{id, status, descricao}]
+let itensAtivos   = [];   // [{id, status, descricao, ativo}]
 let editandoId    = null; // id do item em edição, ou 'novo' para nova linha
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap modais / toast
 // ─────────────────────────────────────────────────────────────────────────────
-const modalNovaLista  = new bootstrap.Modal('#modalNovaLista');
+const modalNovaLista   = new bootstrap.Modal('#modalNovaLista');
 const modalConfExcluir = new bootstrap.Modal('#modalConfExcluir');
 
 function toast(msg, tipo = 'success') {
@@ -284,12 +304,16 @@ function toast(msg, tipo = 'success') {
   bootstrap.Toast.getOrCreateInstance(el).show();
 }
 
+function getLabel(g) {
+  return (g.nome && g.nome.trim()) ? g.nome : g.lista;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Carregar lista de grupos (sidebar)
 // ─────────────────────────────────────────────────────────────────────────────
 async function carregarGrupos() {
   try {
-    const res  = await fetch('/listas/api/status-cat/listas');
+    const res   = await fetch('/listas/api/status-cat/listas');
     todosGrupos = await res.json();
     renderizarSidebar(todosGrupos);
   } catch(e) {
@@ -308,8 +332,7 @@ function renderizarSidebar(grupos) {
     <div class="lista-item ${g.lista === grupoAtivo ? 'active' : ''}"
          onclick="selecionarGrupo('${g.lista.replace(/'/g,"\\'")}')">
       <div class="me-2" style="min-width:0;">
-        <div class="fw-semibold text-truncate" style="font-size:.83rem;">${esc(getLabel(g.lista))}</div>
-
+        <div class="fw-semibold text-truncate" style="font-size:.83rem;">${esc(getLabel(g))}</div>
       </div>
       <span class="badge-count flex-shrink-0">${g.total}</span>
     </div>
@@ -318,7 +341,9 @@ function renderizarSidebar(grupos) {
 
 function filtrarListas() {
   const q = document.getElementById('filtroPesquisaLista').value.toLowerCase();
-  const filtrado = todosGrupos.filter(g => g.lista.toLowerCase().includes(q));
+  const filtrado = todosGrupos.filter(g =>
+    g.lista.toLowerCase().includes(q) || (g.nome || '').toLowerCase().includes(q)
+  );
   renderizarSidebar(filtrado);
 }
 
@@ -327,26 +352,25 @@ function filtrarListas() {
 // ─────────────────────────────────────────────────────────────────────────────
 async function selecionarGrupo(lista) {
   if (editandoId !== null) cancelarEdicao();
+  cancelarRenomear();
   grupoAtivo = lista;
   editandoId = null;
 
-  // Atualizar sidebar
-  renderizarSidebar(document.getElementById('filtroPesquisaLista').value
-    ? todosGrupos.filter(g => g.lista.toLowerCase().includes(
-        document.getElementById('filtroPesquisaLista').value.toLowerCase()))
-    : todosGrupos);
+  const q = document.getElementById('filtroPesquisaLista').value.toLowerCase();
+  renderizarSidebar(q ? todosGrupos.filter(g =>
+    g.lista.toLowerCase().includes(q) || (g.nome || '').toLowerCase().includes(q)) : todosGrupos);
 
-  // Título e controles
-  document.getElementById('tituloGrupo').textContent = getLabel(lista);
+  const g = todosGrupos.find(x => x.lista === lista);
+  document.getElementById('tituloGrupo').textContent = getLabel(g || {lista, nome: ''});
   document.getElementById('acoesGrupo').style.display = '';
-  document.getElementById('tagCampo').style.display = '';
-  document.getElementById('labelCampo').textContent = lista;
+  document.getElementById('tagCampo').style.display   = '';
+  document.getElementById('labelCampo').textContent   = lista;
   document.getElementById('areaVazia').style.display  = 'none';
   document.getElementById('areaTabela').style.display = 'none';
   document.getElementById('areaLoading').style.display = '';
 
   try {
-    const res = await fetch(`/listas/api/status-cat/itens?lista=${encodeURIComponent(lista)}`);
+    const res  = await fetch(`/listas/api/status-cat/itens?lista=${encodeURIComponent(lista)}`);
     itensAtivos = await res.json();
     renderizarTabela();
     document.getElementById('areaLoading').style.display = 'none';
@@ -355,6 +379,43 @@ async function selecionarGrupo(lista) {
     document.getElementById('areaLoading').style.display = 'none';
     toast('Erro ao carregar itens.', 'danger');
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Renomear grupo (nome_item_fantasia)
+// ─────────────────────────────────────────────────────────────────────────────
+function iniciarRenomear() {
+  const g = todosGrupos.find(x => x.lista === grupoAtivo);
+  document.getElementById('inputNomeFantasia').value     = g ? (g.nome || '') : '';
+  document.getElementById('labelCampoRenomear').textContent = grupoAtivo;
+  document.getElementById('areaRenomear').style.display  = '';
+  document.getElementById('inputNomeFantasia').focus();
+}
+
+function cancelarRenomear() {
+  document.getElementById('areaRenomear').style.display = 'none';
+}
+
+async function salvarRenomear() {
+  const nome = document.getElementById('inputNomeFantasia').value.trim();
+  try {
+    const res = await fetch('/listas/api/status-cat/listas/nome', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lista: grupoAtivo, nome })
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.erro || 'Erro ao renomear.', 'danger'); return; }
+
+    const g = todosGrupos.find(x => x.lista === grupoAtivo);
+    if (g) g.nome = nome;
+    document.getElementById('tituloGrupo').textContent = getLabel(g || {lista: grupoAtivo, nome});
+    cancelarRenomear();
+    const q = document.getElementById('filtroPesquisaLista').value.toLowerCase();
+    renderizarSidebar(q ? todosGrupos.filter(x =>
+      x.lista.toLowerCase().includes(q) || (x.nome || '').toLowerCase().includes(q)) : todosGrupos);
+    toast('Nome atualizado!');
+  } catch(e) { toast('Erro de conexão.', 'danger'); }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -376,7 +437,7 @@ function renderizarTabela() {
           </td>
           <td class="text-center">
             <button class="btn-violet btn-sm success me-1" onclick="salvarEdicao(${item.id})"><i class="bi bi-check-lg"></i></button>
-            <button class="btn-violet btn-sm outline"       onclick="cancelarEdicao()"><i class="bi bi-x-lg"></i></button>
+            <button class="btn-violet btn-sm outline dark"  onclick="cancelarEdicao()"><i class="bi bi-x-lg"></i></button>
           </td>
         </tr>`;
     } else {
@@ -397,7 +458,6 @@ function renderizarTabela() {
     }
   });
 
-  // Linha de novo item
   if (editandoId === 'novo') {
     tbody.innerHTML += `
       <tr class="editing-row table-success" id="row-novo">
@@ -407,7 +467,7 @@ function renderizarTabela() {
         <td class="text-center"><input type="checkbox" class="form-check-input" checked disabled style="width:1.15em;height:1.15em;"></td>
         <td class="text-center">
           <button class="btn-violet btn-sm success me-1" onclick="salvarNovoItem()"><i class="bi bi-check-lg"></i></button>
-          <button class="btn-violet btn-sm outline"       onclick="cancelarEdicao()"><i class="bi bi-x-lg"></i></button>
+          <button class="btn-violet btn-sm outline dark"  onclick="cancelarEdicao()"><i class="bi bi-x-lg"></i></button>
         </td>
       </tr>`;
     setTimeout(() => document.getElementById('novo-status')?.focus(), 50);
@@ -429,7 +489,7 @@ function cancelarEdicao() {
 }
 
 async function salvarEdicao(id) {
-  const status   = document.getElementById(`edit-status-${id}`).value.trim();
+  const status    = document.getElementById(`edit-status-${id}`).value.trim();
   const descricao = document.getElementById(`edit-desc-${id}`).value.trim();
   if (!status) { toast('O valor (status) é obrigatório.', 'warning'); return; }
 
@@ -459,7 +519,7 @@ function adicionarItemNovo() {
 }
 
 async function salvarNovoItem() {
-  const status   = document.getElementById('novo-status').value.trim();
+  const status    = document.getElementById('novo-status').value.trim();
   const descricao = document.getElementById('novo-desc').value.trim();
   if (!status) { toast('O valor (status) é obrigatório.', 'warning'); return; }
 
@@ -475,7 +535,6 @@ async function salvarNovoItem() {
     itensAtivos.push({ id: data.id, status, descricao, ativo: true });
     editandoId = null;
     renderizarTabela();
-    // Atualizar contador na sidebar
     const g = todosGrupos.find(x => x.lista === grupoAtivo);
     if (g) g.total++;
     renderizarSidebar(todosGrupos);
@@ -506,29 +565,31 @@ async function toggleAtivo(id, novoValor) {
 // Nova lista
 // ─────────────────────────────────────────────────────────────────────────────
 function abrirModalNovaLista() {
-  document.getElementById('novaListaNome').value     = '';
-  document.getElementById('novaListaStatus').value   = '';
-  document.getElementById('novaListaDescricao').value = '';
+  document.getElementById('novaListaNomeFantasia').value = '';
+  document.getElementById('novaListaNome').value         = '';
+  document.getElementById('novaListaStatus').value       = '';
+  document.getElementById('novaListaDescricao').value    = '';
   modalNovaLista.show();
 }
 
 async function criarNovaLista() {
-  const lista    = document.getElementById('novaListaNome').value.trim();
-  const status   = document.getElementById('novaListaStatus').value.trim();
-  const descricao = document.getElementById('novaListaDescricao').value.trim();
-  if (!lista || !status) { toast('Nome da lista e primeiro valor são obrigatórios.', 'warning'); return; }
+  const lista         = document.getElementById('novaListaNome').value.trim();
+  const status        = document.getElementById('novaListaStatus').value.trim();
+  const descricao     = document.getElementById('novaListaDescricao').value.trim();
+  const nomeFantasia  = document.getElementById('novaListaNomeFantasia').value.trim();
+  if (!lista || !status) { toast('Referência do campo e primeiro valor são obrigatórios.', 'warning'); return; }
 
   try {
     const res = await fetch('/listas/api/status-cat/listas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lista, status, descricao })
+      body: JSON.stringify({ lista, status, descricao, nome_item_fantasia: nomeFantasia || null })
     });
     const data = await res.json();
     if (!res.ok) { toast(data.erro || 'Erro ao criar lista.', 'danger'); return; }
 
-    todosGrupos.push({ lista, total: 1 });
-    todosGrupos.sort((a, b) => a.lista.localeCompare(b.lista));
+    todosGrupos.push({ lista, total: 1, nome: nomeFantasia });
+    todosGrupos.sort((a, b) => getLabel(a).localeCompare(getLabel(b)));
     modalNovaLista.hide();
     await selecionarGrupo(lista);
     toast('Lista criada com sucesso!');
@@ -558,6 +619,7 @@ async function excluirListaConfirmado() {
     document.getElementById('tituloGrupo').textContent = 'Selecione uma lista à esquerda';
     document.getElementById('acoesGrupo').style.display = 'none';
     document.getElementById('tagCampo').style.display   = 'none';
+    document.getElementById('areaRenomear').style.display = 'none';
     document.getElementById('areaTabela').style.display = 'none';
     document.getElementById('areaVazia').style.display  = '';
     renderizarSidebar(todosGrupos);
@@ -582,8 +644,12 @@ function esc(str) {
 // ─────────────────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
-  if (editandoId === 'novo')          salvarNovoItem();
-  else if (editandoId !== null)       salvarEdicao(editandoId);
+  if (document.getElementById('areaRenomear').style.display !== 'none' &&
+      document.activeElement?.id === 'inputNomeFantasia') {
+    salvarRenomear(); return;
+  }
+  if (editandoId === 'novo')    salvarNovoItem();
+  else if (editandoId !== null) salvarEdicao(editandoId);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

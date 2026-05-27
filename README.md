@@ -1,4 +1,4 @@
-# 🤝 FPDH - Ferramenta de Parcerias de Direitos Humanos
+# 🤝 FParcerias - Ferramenta de Parcerias
 
 > **Plataforma completa de gestão de parcerias, análises financeiras e controle administrativo**  
 > Secretaria Municipal de Direitos Humanos e Cidadania de São Paulo
@@ -32,7 +32,7 @@
 
 ## 🎯 Sobre o Projeto
 
-O **FPDH** é uma plataforma web enterprise desenvolvida para gerenciar todo o ciclo de vida de parcerias com organizações da sociedade civil (OSCs), incluindo termos de fomento (TFM), colaboração (TCC) e apostilamentos (TAP), com foco em transparência, eficiência e controle financeiro.
+O **FParcerias** é uma plataforma web enterprise desenvolvida para gerenciar todo o ciclo de vida de parcerias com organizações da sociedade civil (OSCs), incluindo termos de fomento (TFM), colaboração (TCC) e apostilamentos (TAP), com foco em transparência, eficiência e controle financeiro.
 
 **Principais diferenciais:**
 - ✅ Gestão completa de parcerias com 25+ tipos de alterações contratuais
@@ -304,7 +304,7 @@ VALUES (
 ## 📁 Estrutura de Pastas
 
 ```
-FPDH/
+FParcerias/
 ├── app.py                      # Flask app principal
 ├── config.py                   # Configurações (SECRET_KEY, DEBUG, DB)
 ├── db.py                       # Database layer (get_cursor, get_db)
@@ -1744,5 +1744,5 @@ python run_dev.py
 
 **Versão**: 4.0  
 **Última Atualização**: Fevereiro/2026  
-**Nome do Projeto**: FPDH - Ferramenta de Parcerias de Direitos Humanos  
+**Nome do Projeto**: FParcerias - Ferramenta de Parcerias  
 **Organização**: Secretaria Municipal de Direitos Humanos e Cidadania - São Paulo

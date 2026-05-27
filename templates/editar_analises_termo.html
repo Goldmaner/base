@@ -44,165 +44,139 @@
           </h5>
           <small>Vigência: {{ analise.vigencia_inicial.strftime('%d/%m/%Y') if analise.vigencia_inicial else '' }} até {{ analise.vigencia_final.strftime('%d/%m/%Y') if analise.vigencia_final else '' }}</small>
         </div>
-        <div class="card-body">
+        <div class="card-body p-0">
+          <!-- campos ocultos de chave -->
           <input type="hidden" name="id_{{ loop.index }}" value="{{ analise.id }}">
-          
-          <div class="row g-3">
-            <!-- Responsabilidade da Análise (NOVO CAMPO) -->
-            <div class="col-md-6">
-              <label for="responsabilidade_analise_{{ loop.index }}" class="form-label fw-bold text-primary">
-                <i class="bi bi-person-badge"></i> Responsabilidade da Análise
-              </label>
-              <select class="form-select" id="responsabilidade_analise_{{ loop.index }}" name="responsabilidade_analise_{{ loop.index }}">
-                <option value="">-- Sem Responsabilidade --</option>
-                <option value="1" {{ 'selected' if analise.responsabilidade_analise == 1 else '' }}>DP</option>
-                <option value="2" {{ 'selected' if analise.responsabilidade_analise == 2 else '' }}>Compartilhada</option>
-                <option value="3" {{ 'selected' if analise.responsabilidade_analise == 3 else '' }}>Pessoa Gestora</option>
-              </select>
-              <small class="text-muted">
-                <strong>Auto:</strong> 
-                021/090 após transição = PG | 
-                021/090 antes transição = Compartilhada | 
-                121/140 = Compartilhada | 
-                Outras = DP
-              </small>
-            </div>
-
-            <div class="col-md-6">
-              <!-- Espaço vazio para alinhar com layout existente -->
-            </div>
-
-            <!-- Campos booleanos -->
-            <div class="col-md-12">
-              <label class="form-label fw-bold">Status da Prestação</label>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="entregue_{{ loop.index }}" name="entregue_{{ loop.index }}" {{ 'checked' if analise.entregue else '' }}>
-                <label class="form-check-label" for="entregue_{{ loop.index }}">Entregue</label>
-              </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="cobrado_{{ loop.index }}" name="cobrado_{{ loop.index }}" {{ 'checked' if analise.cobrado else '' }}>
-                <label class="form-check-label" for="cobrado_{{ loop.index }}">Cobrado</label>
-              </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="e_notificacao_{{ loop.index }}" name="e_notificacao_{{ loop.index }}" {{ 'checked' if analise.e_notificacao else '' }}>
-                <label class="form-check-label" for="e_notificacao_{{ loop.index }}">Notificação</label>
-              </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="e_parecer_{{ loop.index }}" name="e_parecer_{{ loop.index }}" {{ 'checked' if analise.e_parecer else '' }}>
-                <label class="form-check-label" for="e_parecer_{{ loop.index }}">Parecer</label>
-              </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="e_fase_recursal_{{ loop.index }}" name="e_fase_recursal_{{ loop.index }}" {{ 'checked' if analise.e_fase_recursal else '' }}>
-                <label class="form-check-label" for="e_fase_recursal_{{ loop.index }}">Fase Recursal</label>
-              </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="e_encerramento_{{ loop.index }}" name="e_encerramento_{{ loop.index }}" {{ 'checked' if analise.e_encerramento else '' }}>
-                <label class="form-check-label" for="e_encerramento_{{ loop.index }}">Encerramento</label>
-              </div>
-            </div>
-
-            <!-- Datas e valores -->
-            <div class="col-md-4">
-              <label for="data_parecer_dp_{{ loop.index }}" class="form-label">Data Parecer DP</label>
-              <input type="date" class="form-control" id="data_parecer_dp_{{ loop.index }}" name="data_parecer_dp_{{ loop.index }}" value="{{ analise.data_parecer_dp.strftime('%Y-%m-%d') if analise.data_parecer_dp else '' }}">
-            </div>
-
-            <div class="col-md-4">
-              <label for="data_parecer_pg_{{ loop.index }}" class="form-label">Data Parecer PG</label>
-              <input type="date" class="form-control" id="data_parecer_pg_{{ loop.index }}" name="data_parecer_pg_{{ loop.index }}" value="{{ analise.data_parecer_pg.strftime('%Y-%m-%d') if analise.data_parecer_pg else '' }}">
-            </div>
-
-            <div class="col-md-4">
-              <label for="responsavel_dp_{{ loop.index }}" class="form-label">Responsável DP</label>
-              <select class="form-control" id="responsavel_dp_{{ loop.index }}" name="responsavel_dp_{{ loop.index }}">
-                <option value="">Selecione...</option>
-                {% for analista in analistas %}
-                <option value="{{ analista.id }}" {{ 'selected' if analise.responsavel_dp == analista.id else '' }}>{{ analista.nome_analista }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="col-md-4">
-              <label for="responsavel_pg_{{ loop.index }}" class="form-label">Responsável PG</label>
-              <input type="text" class="form-control" id="responsavel_pg_{{ loop.index }}" name="responsavel_pg_{{ loop.index }}" value="{{ analise.responsavel_pg or '' }}">
-            </div>
-
-            <div class="col-md-4">
-              <label for="valor_devolucao_{{ loop.index }}" class="form-label">Valor Devolução (R$)</label>
-              <input type="number" step="0.01" class="form-control" id="valor_devolucao_{{ loop.index }}" name="valor_devolucao_{{ loop.index }}" value="{{ analise.valor_devolucao or '' }}">
-            </div>
-
-            <div class="col-md-4">
-              <label for="valor_devolvido_{{ loop.index }}" class="form-label">Valor Devolvido (R$)</label>
-              <input type="number" step="0.01" class="form-control" id="valor_devolvido_{{ loop.index }}" name="valor_devolvido_{{ loop.index }}" value="{{ analise.valor_devolvido or '' }}">
-            </div>
-
-            <!-- Observações -->
-            <div class="col-md-12">
-              <label for="observacoes_{{ loop.index }}" class="form-label">Observações</label>
-              <textarea class="form-control" id="observacoes_{{ loop.index }}" name="observacoes_{{ loop.index }}" rows="3">{{ analise.observacoes or '' }}</textarea>
-            </div>
-          </div>
-
-          <!-- === Seção M&A (Monitoramento & Avaliação) === -->
-          {%- set mk = (analise.tipo_prestacao, analise.numero_prestacao|int) %}
-          {%- set monit = monit_por_chave.get(mk, {}) %}
-          {%- set adic  = adicional_por_chave.get(mk, {}) %}
-
-          <!-- campos ocultos de chave para o JS -->
           <input type="hidden" id="numero_termo_{{ loop.index }}" value="{{ numero_termo }}">
           <input type="hidden" id="tipo_prestacao_{{ loop.index }}" value="{{ analise.tipo_prestacao }}">
           <input type="hidden" id="numero_prestacao_{{ loop.index }}" value="{{ analise.numero_prestacao }}">
 
-          <div class="mt-3 d-flex align-items-center gap-2 flex-wrap">
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#monit_{{ loop.index }}">
-              <i class="bi bi-binoculars me-1"></i>Monitoramento &amp; Avaliação
-            </button>
-            {% if not loop.last %}
-            <button type="button" class="btn btn-outline-warning btn-sm"
-                    onclick="replicarMonit({{ loop.index }}, event)"
-                    title="Copiar estes dados de M&amp;A para todas as prestações abaixo">
-              <i class="bi bi-arrow-down-square me-1"></i>Replicar ↓
-            </button>
-            {% endif %}
-          </div>
+          {%- set mk = (analise.tipo_prestacao, analise.numero_prestacao|int) %}
+          {%- set monit = monit_por_chave.get(mk, {}) %}
+          {%- set adic  = adicional_por_chave.get(mk, {}) %}
 
-          <div class="collapse show mt-3" id="monit_{{ loop.index }}">
-            <div class="card card-body border-secondary">
-              <h6 class="text-secondary mb-3"><i class="bi bi-binoculars"></i> Padrão Físico</h6>
+          <div class="row g-0">
 
-              <div class="row g-3">
-                <!-- Visita -->
-                <div class="col-md-3">
-                  <label class="form-label">Status Visita</label>
-                  <select class="form-select" id="visita_status_{{ loop.index }}">
+            <!-- ====== COLUNA ESQUERDA: PARTE FINANCEIRA ====== -->
+            <div class="col-lg-6 p-3 border-end">
+              <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-currency-dollar me-1"></i>Parte Financeira
+              </h6>
+
+              <div class="row g-2">
+
+                <div class="col-12">
+                  <label class="form-label small fw-semibold text-primary">
+                    <i class="bi bi-person-badge me-1"></i>Responsabilidade da Análise
+                  </label>
+                  <select class="form-select form-select-sm" id="responsabilidade_analise_{{ loop.index }}" name="responsabilidade_analise_{{ loop.index }}">
+                    <option value="">-- Sem Responsabilidade --</option>
+                    <option value="1" {{ 'selected' if analise.responsabilidade_analise == 1 else '' }}>DP</option>
+                    <option value="2" {{ 'selected' if analise.responsabilidade_analise == 2 else '' }}>Compartilhada</option>
+                    <option value="3" {{ 'selected' if analise.responsabilidade_analise == 3 else '' }}>Pessoa Gestora</option>
+                  </select>
+                  <div class="text-muted" style="font-size:.72rem;">021/090 pós-transição=PG · 021/090 pré=Comp. · 121/140=Comp. · Outras=DP</div>
+                </div>
+
+                <div class="col-12 mt-1">
+                  <label class="form-label small fw-semibold">Status</label>
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for campo, label in [
+                        ('entregue','Entregue'),
+                        ('cobrado','Cobrado'),
+                        ('e_notificacao','Notificação'),
+                        ('e_parecer','Parecer'),
+                        ('e_fase_recursal','Fase Recursal'),
+                        ('e_encerramento','Encerramento')
+                    ] %}
+                    <div class="form-check mb-0">
+                      <input class="form-check-input" type="checkbox"
+                             id="{{ campo }}_{{ loop.index }}" name="{{ campo }}_{{ loop.index }}"
+                             {{ 'checked' if analise[campo] else '' }}>
+                      <label class="form-check-label small" for="{{ campo }}_{{ loop.index }}">{{ label }}</label>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                <div class="col-6">
+                  <label class="form-label small">Data Parecer DP</label>
+                  <input type="date" class="form-control form-control-sm" id="data_parecer_dp_{{ loop.index }}" name="data_parecer_dp_{{ loop.index }}"
+                         value="{{ analise.data_parecer_dp.strftime('%Y-%m-%d') if analise.data_parecer_dp else '' }}">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Data Parecer PG</label>
+                  <input type="date" class="form-control form-control-sm" id="data_parecer_pg_{{ loop.index }}" name="data_parecer_pg_{{ loop.index }}"
+                         value="{{ analise.data_parecer_pg.strftime('%Y-%m-%d') if analise.data_parecer_pg else '' }}">
+                </div>
+
+                <div class="col-6">
+                  <label class="form-label small">Responsável DP</label>
+                  <select class="form-select form-select-sm" id="responsavel_dp_{{ loop.index }}" name="responsavel_dp_{{ loop.index }}">
+                    <option value="">Selecione...</option>
+                    {% for analista in analistas %}
+                    <option value="{{ analista.id }}" {{ 'selected' if analise.responsavel_dp == analista.id else '' }}>{{ analista.nome_analista }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Responsável PG</label>
+                  <select class="form-select form-select-sm" id="responsavel_pg_{{ loop.index }}" name="responsavel_pg_{{ loop.index }}">
+                    <option value="">-- Selecione --</option>
+                    {% for pg in pessoas_gestoras %}
+                    <option value="{{ pg }}" {{ 'selected' if analise.responsavel_pg == pg else '' }}>{{ pg }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="col-6">
+                  <label class="form-label small">Valor Devolução (R$)</label>
+                  <input type="number" step="0.01" class="form-control form-control-sm" id="valor_devolucao_{{ loop.index }}" name="valor_devolucao_{{ loop.index }}"
+                         value="{{ analise.valor_devolucao or '' }}">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Valor Devolvido (R$)</label>
+                  <input type="number" step="0.01" class="form-control form-control-sm" id="valor_devolvido_{{ loop.index }}" name="valor_devolvido_{{ loop.index }}"
+                         value="{{ analise.valor_devolvido or '' }}">
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small">Observações</label>
+                  <textarea class="form-control form-control-sm" id="observacoes_{{ loop.index }}" name="observacoes_{{ loop.index }}" rows="2">{{ analise.observacoes or '' }}</textarea>
+                </div>
+
+              </div><!-- /row financeiro -->
+            </div><!-- /col financeira -->
+
+            <!-- ====== COLUNA DIREITA: PADRÃO FÍSICO ====== -->
+            <div class="col-lg-6 p-3">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-secondary mb-0">
+                  <i class="bi bi-binoculars me-1"></i>Padrão Físico
+                </h6>
+                {% if not loop.last %}
+                <button type="button" class="btn btn-outline-warning btn-sm"
+                        onclick="replicarMonit({{ loop.index }}, event)"
+                        title="Copiar estes dados de M&amp;A para todas as prestações abaixo">
+                  <i class="bi bi-arrow-down-square me-1"></i>Replicar ↓
+                </button>
+                {% endif %}
+              </div>
+
+              <div class="row g-2" id="monit_{{ loop.index }}">
+
+                <div class="col-7">
+                  <label class="form-label small">Status Visita</label>
+                  <select class="form-select form-select-sm" id="visita_status_{{ loop.index }}">
                     <option value="">-- Selecione --</option>
                     {% for s in status_options.get('visita_status', []) %}
                     <option value="{{ s.status }}" {{ 'selected' if monit.get('visita_status') == s.status else '' }}>{{ s.descricao or s.status }}</option>
                     {% endfor %}
                   </select>
                 </div>
-                <div class="col-md-2">
-                  <label class="form-label">Data Visita</label>
-                  <input type="date" class="form-control" id="visita_data_{{ loop.index }}"
-                         value="{{ monit.get('visita_data').strftime('%Y-%m-%d') if monit.get('visita_data') else '' }}">
-                </div>
-                <div class="col-md-2">
-                  <label class="form-label">Horário</label>
-                  <input type="time" class="form-control" id="visita_horario_{{ loop.index }}"
-                         value="{{ monit.get('visita_horario') or '' }}">
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label">Responsável Visita</label>
-                  <input type="text" class="form-control" id="visita_responsavel_{{ loop.index }}"
-                         value="{{ monit.get('visita_responsavel') or '' }}"
-                         list="listaAgentesDGP">
-                </div>
-                <div class="col-md-2">
-                  <label class="form-label">Avaliação Visita</label>
-                  <select class="form-select" id="visita_avaliacao_{{ loop.index }}">
+                <div class="col-5">
+                  <label class="form-label small">Avaliação Visita</label>
+                  <select class="form-select form-select-sm" id="visita_avaliacao_{{ loop.index }}">
                     <option value="">-- Selecione --</option>
                     {% for s in status_options.get('visita_avaliacao', []) %}
                     <option value="{{ s.status }}" {{ 'selected' if monit.get('visita_avaliacao') == s.status else '' }}>{{ s.descricao or s.status }}</option>
@@ -210,30 +184,35 @@
                   </select>
                 </div>
 
-                <!-- M&A -->
-                <div class="col-md-3">
-                  <label class="form-label">Status M&amp;A</label>
-                  <select class="form-select" id="monit_status_{{ loop.index }}">
+                <div class="col-6">
+                  <label class="form-label small">Data Visita</label>
+                  <input type="date" class="form-control form-control-sm" id="visita_data_{{ loop.index }}"
+                         value="{{ monit.get('visita_data').strftime('%Y-%m-%d') if monit.get('visita_data') else '' }}">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Horário</label>
+                  <input type="time" class="form-control form-control-sm" id="visita_horario_{{ loop.index }}"
+                         value="{{ monit.get('visita_horario') or '' }}">
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small">Responsável Visita</label>
+                  <input type="text" class="form-control form-control-sm" id="visita_responsavel_{{ loop.index }}"
+                         value="{{ monit.get('visita_responsavel') or '' }}" list="listaAgentesDGP">
+                </div>
+
+                <div class="col-7">
+                  <label class="form-label small">Status M&amp;A</label>
+                  <select class="form-select form-select-sm" id="monit_status_{{ loop.index }}">
                     <option value="">-- Selecione --</option>
                     {% for s in status_options.get('monit_status', []) %}
                     <option value="{{ s.status }}" {{ 'selected' if monit.get('monit_status') == s.status else '' }}>{{ s.descricao or s.status }}</option>
                     {% endfor %}
                   </select>
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label">Responsável M&amp;A</label>
-                  <input type="text" class="form-control" id="monit_responsavel_{{ loop.index }}"
-                         value="{{ monit.get('monit_responsavel') or '' }}"
-                         list="listaAgentesDGP">
-                </div>
-                <div class="col-md-2">
-                  <label class="form-label">Data M&amp;A</label>
-                  <input type="date" class="form-control" id="monit_data_{{ loop.index }}"
-                         value="{{ monit.get('monit_data').strftime('%Y-%m-%d') if monit.get('monit_data') else '' }}">
-                </div>
-                <div class="col-md-2">
-                  <label class="form-label">Avaliação M&amp;A</label>
-                  <select class="form-select" id="monit_avaliacao_{{ loop.index }}">
+                <div class="col-5">
+                  <label class="form-label small">Avaliação M&amp;A</label>
+                  <select class="form-select form-select-sm" id="monit_avaliacao_{{ loop.index }}">
                     <option value="">-- Selecione --</option>
                     {% for s in status_options.get('monit_avaliacao', []) %}
                     <option value="{{ s.status }}" {{ 'selected' if monit.get('monit_avaliacao') == s.status else '' }}>{{ s.descricao or s.status }}</option>
@@ -241,72 +220,82 @@
                   </select>
                 </div>
 
-                <!-- Observações M&A -->
-                <div class="col-md-12">
-                  <label class="form-label">Observações (M&amp;A)</label>
-                  <textarea class="form-control" id="monit_observacoes_{{ loop.index }}" rows="2">{{ monit.get('observacoes') or '' }}</textarea>
+                <div class="col-6">
+                  <label class="form-label small">Data M&amp;A</label>
+                  <input type="date" class="form-control form-control-sm" id="monit_data_{{ loop.index }}"
+                         value="{{ monit.get('monit_data').strftime('%Y-%m-%d') if monit.get('monit_data') else '' }}">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Responsável M&amp;A</label>
+                  <input type="text" class="form-control form-control-sm" id="monit_responsavel_{{ loop.index }}"
+                         value="{{ monit.get('monit_responsavel') or '' }}" list="listaAgentesDGP">
                 </div>
 
-                <!-- Adicional -->
                 <div class="col-12">
-                  <button type="button" class="btn btn-outline-info btn-sm"
+                  <label class="form-label small">Observações (M&amp;A)</label>
+                  <textarea class="form-control form-control-sm" id="monit_observacoes_{{ loop.index }}" rows="2">{{ monit.get('observacoes') or '' }}</textarea>
+                </div>
+
+                <!-- Adicional (collapsível) -->
+                <div class="col-12 mt-1">
+                  <button type="button" class="btn btn-outline-info btn-sm w-100"
                           data-bs-toggle="collapse"
                           data-bs-target="#adicional_{{ loop.index }}">
                     <i class="bi bi-plus-circle me-1"></i>Informações Adicionais (Justificativa / Comissão)
                   </button>
                 </div>
-                <div class="collapse" id="adicional_{{ loop.index }}">
-                  <div class="row g-3 mt-1">
-                    <div class="col-md-3">
-                      <label class="form-label">Justificativa Status</label>
-                      <select class="form-select" id="justificativa_status_{{ loop.index }}">
+                <div class="collapse col-12" id="adicional_{{ loop.index }}">
+                  <div class="row g-2 mt-1">
+                    <div class="col-6">
+                      <label class="form-label small">Justificativa Status</label>
+                      <select class="form-select form-select-sm" id="justificativa_status_{{ loop.index }}">
                         <option value="">-- Selecione --</option>
                         {% for s in status_options.get('justificativa_status', []) %}
                         <option value="{{ s.status }}" {{ 'selected' if adic.get('justificativa_status') == s.status else '' }}>{{ s.descricao or s.status }}</option>
                         {% endfor %}
                       </select>
                     </div>
-                    <div class="col-md-3">
-                      <label class="form-label">Justificativa Avaliação</label>
-                      <input type="text" class="form-control" id="justificativa_avaliacao_{{ loop.index }}"
+                    <div class="col-6">
+                      <label class="form-label small">Justificativa Avaliação</label>
+                      <input type="text" class="form-control form-control-sm" id="justificativa_avaliacao_{{ loop.index }}"
                              value="{{ adic.get('justificativa_avaliacao') or '' }}">
                     </div>
-                    <div class="col-md-2">
-                      <label class="form-label">Justificativa Data</label>
-                      <input type="date" class="form-control" id="justificativa_data_{{ loop.index }}"
+                    <div class="col-6">
+                      <label class="form-label small">Justificativa Data</label>
+                      <input type="date" class="form-control form-control-sm" id="justificativa_data_{{ loop.index }}"
                              value="{{ adic.get('justificativa_data').strftime('%Y-%m-%d') if adic.get('justificativa_data') else '' }}">
                     </div>
-                    <div class="col-md-3">
-                      <label class="form-label">Justificativa Responsável</label>
-                      <input type="text" class="form-control" id="justificativa_responsavel_{{ loop.index }}"
-                             value="{{ adic.get('justificativa_responsavel') or '' }}"
-                             list="listaAgentesDGP">
+                    <div class="col-6">
+                      <label class="form-label small">Justificativa Responsável</label>
+                      <input type="text" class="form-control form-control-sm" id="justificativa_responsavel_{{ loop.index }}"
+                             value="{{ adic.get('justificativa_responsavel') or '' }}" list="listaAgentesDGP">
                     </div>
-                    <div class="col-md-2">
-                      <label class="form-label">Comissão Visita</label>
-                      <select class="form-select" id="comissao_visita_{{ loop.index }}">
+                    <div class="col-4">
+                      <label class="form-label small">Comissão Visita</label>
+                      <select class="form-select form-select-sm" id="comissao_visita_{{ loop.index }}">
                         <option value="">-- Selecione --</option>
                         {% for s in status_options.get('comissao_visita', []) %}
                         <option value="{{ s.status }}" {{ 'selected' if adic.get('comissao_visita') == s.status else '' }}>{{ s.descricao or s.status }}</option>
                         {% endfor %}
                       </select>
                     </div>
-                    <div class="col-md-2">
-                      <label class="form-label">Comissão M&amp;A</label>
-                      <input type="text" class="form-control" id="comissao_ma_{{ loop.index }}"
+                    <div class="col-4">
+                      <label class="form-label small">Comissão M&amp;A</label>
+                      <input type="text" class="form-control form-control-sm" id="comissao_ma_{{ loop.index }}"
                              value="{{ adic.get('comissao_ma') or '' }}">
                     </div>
-                    <div class="col-md-2">
-                      <label class="form-label">Comissão Descumprimento</label>
-                      <input type="text" class="form-control" id="comissao_descumprimento_{{ loop.index }}"
+                    <div class="col-4">
+                      <label class="form-label small">Comissão Descumprimento</label>
+                      <input type="text" class="form-control form-control-sm" id="comissao_descumprimento_{{ loop.index }}"
                              value="{{ adic.get('comissao_descumprimento') or '' }}">
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
 
+              </div><!-- /row M&A -->
+            </div><!-- /col físico -->
+
+          </div><!-- /row principal -->
         </div><!-- /card-body -->
       </div><!-- /card -->
       {% endfor %}
@@ -499,11 +488,6 @@
           const dst = document.getElementById(`${campo}_${toIdx}`);
           if (src && dst) dst.value = src.value;
         });
-        // Abrir seção monit do destino se estiver fechada
-        const monit = document.getElementById(`monit_${toIdx}`);
-        if (monit && !monit.classList.contains('show')) {
-          new bootstrap.Collapse(monit, { toggle: false }).show();
-        }
         count++; toIdx++;
       }
       const btn = evt.currentTarget;

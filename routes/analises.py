@@ -718,6 +718,7 @@ def editar_por_termo():
                              analises=analises,
                              analistas=analistas,
                              agentes_dgp=agentes_dgp,
+                             pessoas_gestoras=pessoas_gestoras,
                              monit_por_chave=monit_por_chave,
                              adicional_por_chave=adicional_por_chave,
                              status_options=status_options,

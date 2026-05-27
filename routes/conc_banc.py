@@ -168,86 +168,76 @@ def api_salvar_extrato():
                 # Se não há IDs (todas linhas novas), deletar tudo do termo
                 cur.execute("DELETE FROM analises_pc.conc_extrato WHERE numero_termo = %s", (numero_termo,))
 
-        # UPSERT: UPDATE se existe, INSERT se não existe
+        # UPSERT com savepoints: cada linha é isolada — erro em 1 não cancela as demais
         ids_processados = []
-        ids_inseridos = []  # Apenas os IDs de novas linhas (INSERT)
-        for linha in linhas:
-            # Validar campos obrigatórios
+        ids_inseridos = []   # apenas INSERTs
+        erros_linhas = []    # linhas que falharam: [{indice, id, mensagem}]
+
+        for i, linha in enumerate(linhas):
             if not linha.get('indice'):
-                continue  # Pular linhas sem índice
+                continue
 
-            # Validar: não pode ter crédito e débito ao mesmo tempo
             credito = linha.get('credito')
-            debito = linha.get('debito')
-
-            if credito and debito:
-                return jsonify({'erro': 'Não é possível ter crédito e débito na mesma linha'}), 400
-
+            debito  = linha.get('debito')
             linha_id = linha.get('id')
+            sp = f'sp_{i}'
 
-            if linha_id:
-                # UPDATE: linha já existe
-                cur.execute("""
-                    UPDATE analises_pc.conc_extrato SET
-                        indice = %s,
-                        data = %s,
-                        credito = %s,
-                        debito = %s,
-                        discriminacao = %s,
-                        cat_transacao = %s,
-                        competencia = %s,
-                        origem_destino = %s,
-                        cat_avaliacao = %s,
-                        avaliacao_analista = %s,
-                        mesclado_com = %s
-                    WHERE id = %s AND numero_termo = %s
-                    RETURNING id
-                """, (
-                    linha.get('indice'),
-                    linha.get('data') or None,
-                    credito or None,
-                    debito or None,
-                    linha.get('discriminacao') or None,
-                    linha.get('cat_transacao') or None,
-                    linha.get('competencia') or None,
-                    linha.get('origem_destino') or None,
-                    linha.get('cat_avaliacao') or None,
-                    linha.get('avaliacao_analista') or None,
-                    linha.get('mesclado_com') or None,
-                    linha_id,
-                    numero_termo
-                ))
-                result = cur.fetchone()
-                if result:
-                    ids_processados.append(result['id'])
-            else:
-                # INSERT: nova linha
-                cur.execute("""
-                    INSERT INTO analises_pc.conc_extrato (
-                        indice, data, credito, debito, discriminacao,
-                        cat_transacao, competencia, origem_destino,
-                        cat_avaliacao, avaliacao_analista, mesclado_com, numero_termo
-                    ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                    )
-                    RETURNING id
-                """, (
-                    linha.get('indice'),
-                    linha.get('data') or None,
-                    credito or None,
-                    debito or None,
-                    linha.get('discriminacao') or None,
-                    linha.get('cat_transacao') or None,
-                    linha.get('competencia') or None,
-                    linha.get('origem_destino') or None,
-                    linha.get('cat_avaliacao') or None,
-                    linha.get('avaliacao_analista') or None,
-                    linha.get('mesclado_com') or None,
-                    numero_termo
-                ))
-                novo_id = cur.fetchone()['id']
-                ids_processados.append(novo_id)
-                ids_inseridos.append(novo_id)  # Rastrear apenas INSERTs
+            cur.execute(f'SAVEPOINT {sp}')
+            try:
+                # Validação semântica (antes de ir ao banco)
+                if credito and debito:
+                    raise ValueError('Linha com crédito e débito ao mesmo tempo')
+
+                if linha_id:
+                    cur.execute("""
+                        UPDATE analises_pc.conc_extrato SET
+                            indice = %s, data = %s, credito = %s, debito = %s,
+                            discriminacao = %s, cat_transacao = %s, competencia = %s,
+                            origem_destino = %s, cat_avaliacao = %s,
+                            avaliacao_analista = %s, mesclado_com = %s
+                        WHERE id = %s AND numero_termo = %s
+                        RETURNING id
+                    """, (
+                        linha.get('indice'), linha.get('data') or None,
+                        credito or None, debito or None,
+                        linha.get('discriminacao') or None, linha.get('cat_transacao') or None,
+                        linha.get('competencia') or None, linha.get('origem_destino') or None,
+                        linha.get('cat_avaliacao') or None, linha.get('avaliacao_analista') or None,
+                        linha.get('mesclado_com') or None, linha_id, numero_termo
+                    ))
+                    result = cur.fetchone()
+                    if result:
+                        ids_processados.append(result['id'])
+                else:
+                    cur.execute("""
+                        INSERT INTO analises_pc.conc_extrato (
+                            indice, data, credito, debito, discriminacao,
+                            cat_transacao, competencia, origem_destino,
+                            cat_avaliacao, avaliacao_analista, mesclado_com, numero_termo
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (
+                        linha.get('indice'), linha.get('data') or None,
+                        credito or None, debito or None,
+                        linha.get('discriminacao') or None, linha.get('cat_transacao') or None,
+                        linha.get('competencia') or None, linha.get('origem_destino') or None,
+                        linha.get('cat_avaliacao') or None, linha.get('avaliacao_analista') or None,
+                        linha.get('mesclado_com') or None, numero_termo
+                    ))
+                    novo_id = cur.fetchone()['id']
+                    ids_processados.append(novo_id)
+                    ids_inseridos.append(novo_id)
+
+                cur.execute(f'RELEASE SAVEPOINT {sp}')
+
+            except Exception as linha_err:
+                cur.execute(f'ROLLBACK TO SAVEPOINT {sp}')
+                erros_linhas.append({
+                    'indice': linha.get('indice'),
+                    'id': linha_id,
+                    'mensagem': str(linha_err)
+                })
+                print(f'[SAVE] Linha {linha.get("indice")} falhou (savepoint revertido): {linha_err}')
 
         # ============================================================
         # AUTOMAÇÃO: Destinatário Identificado/Não Identificado
@@ -353,10 +343,13 @@ def api_salvar_extrato():
         tempo_total = (time.time() - inicio) * 1000
         print(f"\n[SAVE] Tempo total: {tempo_total:.2f}ms | Linhas: {len(ids_processados)}")
 
+        tem_erros = len(erros_linhas) > 0
         return jsonify({
-            'mensagem': f'{len(ids_processados)} linhas salvas com sucesso',
+            'mensagem': (f'{len(ids_processados)} linhas salvas, {len(erros_linhas)} com erro'
+                         if tem_erros else f'{len(ids_processados)} linhas salvas com sucesso'),
             'ids': ids_processados,
-            'ids_inseridos': ids_inseridos  # IDs apenas das novas linhas (INSERT)
+            'ids_inseridos': ids_inseridos,
+            'erros': erros_linhas   # [{indice, id, mensagem}] — linhas que falharam
         }), 200
 
     except Exception as e:

@@ -281,7 +281,7 @@
         </div>
       </button>
     </h2>
-    <div id="sei_{{ loop.index }}" class="accordion-collapse collapse {% if loop.index == 1 %}show{% endif %}">
+    <div id="sei_{{ loop.index }}" class="accordion-collapse collapse {% if loop.index == 1 %}show{% endif %}" data-sei="{{ sg.sei_numero }}">
       <div class="accordion-body">
         <!-- Controles por SEI -->
         <div class="mb-3 d-flex justify-content-between align-items-center">
@@ -1060,7 +1060,7 @@ async function salvarObjetivo() {
     if (!res.ok) throw new Error(json.erro || 'Erro ao salvar');
     mostrarToast('Objetivo salvo com sucesso!');
     modalObjetivo.hide();
-    setTimeout(() => location.reload(), 800);
+    setTimeout(() => { _salvarEstadoUI(sei); location.reload(); }, 800);
   } catch(e) { mostrarToast(e.message, 'danger'); }
 }
 
@@ -1080,6 +1080,21 @@ async function _carregarDatasTermoObj(sei) {
       if (d.fim)    inputFim.value    = d.fim;
     }
   } catch(_) {}
+}
+
+// ── Preservação de estado UI ─────────────────────────────────────────────────
+function _salvarEstadoUI(seiAberto, objIdAberto) {
+  // SEI do accordion aberto
+  const sei = seiAberto || document.querySelector('.accordion-collapse.show')?.dataset?.sei;
+  if (sei) sessionStorage.setItem('pm_sei_aberto', sei);
+  // Quais metas-collapse estão expandidas
+  const metasAbertas = [...document.querySelectorAll('.metas-collapse.show')].map(el => el.id);
+  // Se temos um objId específico (recém-salvo), garante que ele entra na lista
+  if (objIdAberto) {
+    const idAlvo = `metas_obj_${objIdAberto}`;
+    if (!metasAbertas.includes(idAlvo)) metasAbertas.push(idAlvo);
+  }
+  sessionStorage.setItem('pm_metas_abertas', JSON.stringify(metasAbertas));
 }
 
 // ── Modal Meta ────────────────────────────────────────────────────────────────
@@ -1157,7 +1172,10 @@ async function salvarMeta() {
     if (!res.ok) throw new Error(json.erro || 'Erro ao salvar');
     mostrarToast('Meta salva com sucesso!');
     modalMeta.hide();
-    setTimeout(() => location.reload(), 800);
+    // Identificar o SEI do objetivo para restaurar o accordion
+    const _objCard = document.querySelector(`.obj-card[data-obj-id="${objId}"]`);
+    const _seiAberto = _objCard?.closest('.accordion-collapse')?.dataset?.sei || null;
+    setTimeout(() => { _salvarEstadoUI(_seiAberto, objId); location.reload(); }, 800);
   } catch(e) { mostrarToast(e.message, 'danger'); }
 }
 
@@ -1183,12 +1201,39 @@ async function executarExcluir() {
     if (!res.ok) throw new Error('Erro ao excluir');
     mostrarToast('Registro excluído.');
     modalExcluir.hide();
-    setTimeout(() => location.reload(), 800);
+    const _seiExcluir = document.querySelector('.accordion-collapse.show')?.dataset?.sei || null;
+    setTimeout(() => { _salvarEstadoUI(_seiExcluir); location.reload(); }, 800);
   } catch(e) { mostrarToast(e.message, 'danger'); }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+
+  // ── Restaurar estado após reload ─────────────────────────────────────────
+  const _seiSalvo    = sessionStorage.getItem('pm_sei_aberto');
+  const _metasSalvas = JSON.parse(sessionStorage.getItem('pm_metas_abertas') || '[]');
+  sessionStorage.removeItem('pm_sei_aberto');
+  sessionStorage.removeItem('pm_metas_abertas');
+
+  if (_seiSalvo) {
+    const alvo = document.querySelector(`.accordion-collapse[data-sei="${CSS.escape(_seiSalvo)}"]`);
+    if (alvo) {
+      // Fechar o padrão (primeiro) e abrir o alvo
+      document.querySelectorAll('.accordion-collapse.show').forEach(el => {
+        if (el !== alvo) el.classList.remove('show');
+      });
+      alvo.classList.add('show');
+      setTimeout(() => alvo.closest('.accordion-item')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    }
+  }
+  if (_metasSalvas.length) {
+    _metasSalvas.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('show');
+    });
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   Promise.all([
     carregarSeiDatalists(),
     carregarMetaTipos(),

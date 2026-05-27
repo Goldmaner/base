@@ -535,6 +535,17 @@
             btnContatos.title = 'Contatos';
             tdAcoes.appendChild(btnContatos);
           }
+
+          // Botão Fundamentações — somente tabela c_dac_glosas
+          if (tabelaAtual === 'c_dac_glosas') {
+            const btnFund = document.createElement('button');
+            btnFund.className = 'btn btn-sm btn-outline-warning ms-1';
+            const qtd = registro.total_fundamentacoes || 0;
+            btnFund.title = `Fundamentações legais (${qtd})`;
+            btnFund.innerHTML = `<i class="bi bi-book"></i>${qtd > 0 ? ` <span class="badge bg-warning text-dark">${qtd}</span>` : ''}`;
+            btnFund.onclick = () => abrirFundamentacoes(registro.id, registro.glosa_nome);
+            tdAcoes.appendChild(btnFund);
+          }
           
           tr.appendChild(tdAcoes);
 
@@ -1614,6 +1625,159 @@
       ordenarPorColuna('total_pareceres');
     }
 
+    // ── Fundamentações de Glosas ──────────────────────────────────────────────
+    let _fundGlosaIdAtual = null;
+    let _leisCarregadas = false;
+
+    async function carregarLeisOpcoes() {
+      if (_leisCarregadas) return;  // só busca uma vez por sessão de página
+      try {
+        const res = await fetch('/listas/glosas/leis-opcoes');
+        const d = await res.json();
+        if (d.leis && d.leis.length > 0) {
+          const dl = document.getElementById('datalist-leis-fund');
+          dl.innerHTML = d.leis.map(l => '<option value="' + l.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"><\/option>').join('');
+          _leisCarregadas = true;
+        }
+      } catch (err) {
+        console.warn('[datalist-leis-fund] Não foi possível carregar as leis:', err);
+      }
+    }
+
+    function abrirFundamentacoes(glosaId, glosaNome) {
+      if (!glosaId) return;
+      _fundGlosaIdAtual = glosaId;
+      document.getElementById('modalFundamentacoesTitulo').textContent = glosaNome || `Glosa #${glosaId}`;
+      document.getElementById('fundLista').innerHTML =
+        '<div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-1"></span>Carregando...</div>';
+      document.getElementById('formNovoFund').style.display = 'none';
+      document.getElementById('formEditarFund').style.display = 'none';
+      document.getElementById('btnMostrarNovoFund').style.display = '';
+      new bootstrap.Modal(document.getElementById('modalFundamentacoes')).show();
+      carregarFundamentacoes(glosaId);
+      carregarLeisOpcoes();  // popula datalist sugestivo
+    }
+
+    // Utilitário local para escapar HTML (evita XSS e quebras de atributo)
+    function escapeHtmlFund(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Mapa de dados dos fundamentos carregados — evita passar strings longas em onclick
+    const _fundMap = {};
+
+    async function carregarFundamentacoes(glosaId) {
+      try {
+        const res = await fetch(`/listas/glosas/fundamentos/${glosaId}`);
+        const d = await res.json();
+        const lista = document.getElementById('fundLista');
+        if (!d.fundamentos || d.fundamentos.length === 0) {
+          lista.innerHTML = '<p class="text-muted small text-center py-2">Nenhum fundamento cadastrado.</p>';
+          return;
+        }
+        // Armazenar no mapa para uso seguro no editarFundamento
+        d.fundamentos.forEach(f => { _fundMap[f.id] = f; });
+        lista.innerHTML = d.fundamentos.map(f => `
+          <div class="border rounded p-2 mb-2">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div class="flex-grow-1">
+                <div class="fw-semibold small">${escapeHtmlFund(f.glosa_lei) || '<span class="text-muted fst-italic">Sem lei</span>'}</div>
+                ${f.glosa_artigo ? `<div class="text-muted small" style="white-space:pre-wrap;">${escapeHtmlFund(f.glosa_artigo)}</div>` : ''}
+                <div class="text-muted mt-1" style="font-size:0.72rem;">Adicionado em ${f.criado_em}${f.criado_por ? ' por ' + escapeHtmlFund(f.criado_por) : ''}</div>
+              </div>
+              <div class="d-flex gap-1 flex-shrink-0">
+                <button class="btn btn-sm btn-outline-primary" style="padding:1px 6px;"
+                  onclick="editarFundamento(${f.id})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" style="padding:1px 6px;"
+                  onclick="deletarFundamento(${f.id})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        document.getElementById('fundLista').innerHTML =
+          '<div class="alert alert-danger py-1 small">Erro ao carregar fundamentos.</div>';
+      }
+    }
+
+    function editarFundamento(id) {
+      const f = _fundMap[id] || {};
+      document.getElementById('formNovoFund').style.display = 'none';
+      document.getElementById('btnMostrarNovoFund').style.display = '';
+      const frm = document.getElementById('formEditarFund');
+      frm.style.display = '';
+      frm.dataset.id = id;
+      document.getElementById('ef_lei').value = f.glosa_lei || '';
+      document.getElementById('ef_artigo').value = f.glosa_artigo || '';
+      // rolar até o form de edição
+      frm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function salvarEditarFundamento() {
+      const frm = document.getElementById('formEditarFund');
+      const body = {
+        glosa_lei:     document.getElementById('ef_lei').value.trim(),
+        glosa_artigo:  document.getElementById('ef_artigo').value.trim()
+      };
+      if (!body.glosa_lei && !body.glosa_artigo) { alert('Informe ao menos a lei ou o artigo.'); return; }
+      try {
+        const res = await fetch(`/listas/glosas/fundamentos/editar/${frm.dataset.id}`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+        });
+        const d = await res.json();
+        if (res.ok) {
+          frm.style.display = 'none';
+          document.getElementById('btnMostrarNovoFund').style.display = '';
+          carregarFundamentacoes(_fundGlosaIdAtual);
+          carregarTabela(); // atualizar contagem na tabela
+        } else { alert(d.erro || 'Erro ao salvar.'); }
+      } catch (err) { alert('Erro: ' + err); }
+    }
+
+    async function deletarFundamento(id) {
+      if (!confirm('Excluir este fundamento?')) return;
+      try {
+        const res = await fetch(`/listas/glosas/fundamentos/deletar/${id}`, { method: 'POST' });
+        const d = await res.json();
+        if (res.ok) {
+          carregarFundamentacoes(_fundGlosaIdAtual);
+          carregarTabela(); // atualizar contagem na tabela
+        } else { alert(d.erro || 'Erro ao excluir.'); }
+      } catch (err) { alert('Erro: ' + err); }
+    }
+
+    async function salvarNovoFundamento() {
+      const body = {
+        glosa_id:      _fundGlosaIdAtual,
+        glosa_lei:     document.getElementById('nf_lei').value.trim(),
+        glosa_artigo:  document.getElementById('nf_artigo').value.trim()
+      };
+      if (!body.glosa_lei && !body.glosa_artigo) { alert('Informe ao menos a lei ou o artigo.'); return; }
+      try {
+        const res = await fetch('/listas/glosas/fundamentos/criar', {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+        });
+        const d = await res.json();
+        if (res.ok) {
+          document.getElementById('formNovoFund').style.display = 'none';
+          document.getElementById('btnMostrarNovoFund').style.display = '';
+          document.getElementById('nf_lei').value = '';
+          document.getElementById('nf_artigo').value = '';
+          carregarFundamentacoes(_fundGlosaIdAtual);
+          carregarTabela(); // atualizar contagem na tabela
+        } else { alert(d.erro || 'Erro ao criar fundamento.'); }
+      } catch (err) { alert('Erro: ' + err); }
+    }
+
     // ── Contatos de Vereadores ────────────────────────────────────────────────
     let _contatosVereadorAtual = null;
 
@@ -1848,6 +2012,93 @@
       atualizarRodape();
     }
   </script>
+
+  <!-- datalist compartilhado: leis/normas de c_geral_legislacao -->
+  <datalist id="datalist-leis-fund"></datalist>
+
+  <!-- Modal: Fundamentações de Glosa -->
+  <div class="modal fade" id="modalFundamentacoes" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header py-2" style="background:linear-gradient(135deg,#b45309,#d97706);color:#fff;">
+          <h5 class="modal-title">
+            <i class="bi bi-book me-2"></i>Fundamentações —
+            <span id="modalFundamentacoesTitulo" class="fw-normal fst-italic"></span>
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
+        </div>
+        <div class="modal-body px-4 py-3">
+
+          <!-- Lista de fundamentos existentes -->
+          <div id="fundLista" class="mb-3"></div>
+
+          <!-- Form: Editar fundamento -->
+          <div id="formEditarFund" style="display:none;" class="border rounded p-4 mb-3 bg-light">
+            <h6 class="fw-bold mb-3" style="color:#b45309;"><i class="bi bi-pencil me-1"></i>Editar Fundamento</h6>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label fw-bold mb-1">Lei / Norma</label>
+                <input type="text" class="form-control" id="ef_lei"
+                  list="datalist-leis-fund"
+                  placeholder="Ex: Lei Federal nº 13.019/2014 — comece a digitar para sugestões">
+                <div class="form-text">Selecione da lista ou digite livremente.</div>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-bold mb-1">Artigo(s) / Fundamentação</label>
+                <textarea class="form-control" id="ef_artigo" rows="6"
+                  placeholder="Ex: Art. 64, caput e §1º — proíbe despesas com taxas bancárias à conta de recursos repassados..."></textarea>
+              </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+              <button class="btn btn-warning" onclick="salvarEditarFundamento()">
+                <i class="bi bi-check-lg me-1"></i>Salvar Alterações
+              </button>
+              <button class="btn btn-outline-secondary"
+                onclick="document.getElementById('formEditarFund').style.display='none'">
+                Cancelar
+              </button>
+            </div>
+          </div>
+
+          <!-- Form: Novo fundamento -->
+          <div id="formNovoFund" style="display:none;" class="border rounded p-4 bg-light">
+            <h6 class="fw-bold mb-3 text-success"><i class="bi bi-plus-circle me-1"></i>Novo Fundamento</h6>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label fw-bold mb-1">Lei / Norma</label>
+                <input type="text" class="form-control" id="nf_lei"
+                  list="datalist-leis-fund"
+                  placeholder="Ex: Lei Federal nº 13.019/2014 — comece a digitar para sugestões">
+                <div class="form-text">Selecione da lista ou digite livremente.</div>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-bold mb-1">Artigo(s) / Fundamentação</label>
+                <textarea class="form-control" id="nf_artigo" rows="6"
+                  placeholder="Ex: Art. 64, caput e §1º — proíbe despesas com taxas bancárias à conta de recursos repassados..."></textarea>
+              </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+              <button class="btn btn-success" onclick="salvarNovoFundamento()">
+                <i class="bi bi-check-lg me-1"></i>Adicionar Fundamento
+              </button>
+              <button class="btn btn-outline-secondary"
+                onclick="document.getElementById('formNovoFund').style.display='none';document.getElementById('btnMostrarNovoFund').style.display=''">
+                Cancelar
+              </button>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer py-2">
+          <button id="btnMostrarNovoFund" class="btn btn-success btn-sm"
+            onclick="document.getElementById('formNovoFund').style.display='';document.getElementById('formEditarFund').style.display='none';this.style.display='none'">
+            <i class="bi bi-plus-lg me-1"></i>Adicionar Fundamento
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal: Contatos do Vereador -->
   <div class="modal fade" id="modalContatosVereador" tabindex="-1">

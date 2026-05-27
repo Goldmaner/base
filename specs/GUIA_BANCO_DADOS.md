@@ -18,6 +18,7 @@
 - [Módulo Quadro de Metas](#-módulo-quadro-de-metas)
 - [Schema `auditoria_memoria`](#-schema-auditoria_memoria)
 - [Schema `calendario`](#-schema-calendario--calendário-institucional)
+- [Schema `archive`](#-schema-archive--tabelas-arquivadas)
 - [Relacionamentos Principais](#-relacionamentos-principais)
 - [Índices de Performance](#-índices-de-performance)
 - [Row Level Security (RLS)](#-row-level-security-rls)
@@ -1043,9 +1044,7 @@ Log de erros HTTP, queries lentas e falhas em APIs externas.
 |--------|-----------|---------------|
 | `c_dac_analistas` | Analistas da DAC | `nome_analista`, `status`, `posicao_analista`, `contrato_inicio`, `contrato_fim` |
 | `c_dac_despesas_analise` | Categorias de despesa | `categoria_extra`, `tipo_transacao`, `correspondente`, `aplicacao` |
-| `c_dac_despesas_provisao` | Despesas de provisão | `despesa_provisao`, `descricao` |
 | `c_dac_modelo_textos_inconsistencias` | Modelos de inconsistência | `nome_item`, `tipo_inconsistencia`, `modelo_texto`, `nivel_gravidade` |
-| `c_dac_parcela_andamento_status` | Status de andamento | `status_parcela`, `status_status` |
 | `c_dac_responsabilidade_analise` | Setores responsáveis | `nome_setor` |
 | `c_dac_status_pagamento` | Status de pagamento | `status_principal`, `status_secundario` |
 | `c_dac_tipos_parcelas` | Tipos de parcelas | `parcela_tipo`, `status` |
@@ -1055,7 +1054,6 @@ Log de erros HTTP, queries lentas e falhas em APIs externas.
 | Tabela | Descrição | Colunas-chave |
 |--------|-----------|---------------|
 | `c_alt_tipo` | ⭐ 25+ tipos de alteração | `alt_tipo`, `alt_modalidade`, `alt_escopo`, `alt_campo`, `alt_instrumento`, `alt_principios` |
-| `c_alt_instrumento` | Instrumentos jurídicos | `instrumento_alteracao`, `descricao`, `status` |
 | `c_alt_normas` | Normas e regimentos | `norma`, `regimento`, `referencia_legal`, `data_aplicacao` |
 | `c_alt_principios` | Princípios aplicáveis | `nome_principio`, `descricao_principio`, `exemplo_principio` |
 
@@ -1748,4 +1746,20 @@ Tabelas que armazenam ações do usuário sempre incluem:
 
 ---
 
-*Última atualização: 18/05/2026 | Fonte: `backup_faf_20260428_143800.sql` + migrações incrementais*
+## 📦 Schema `archive` — Tabelas Arquivadas
+
+Tabelas categóricas que foram **migradas para `categoricas.c_geral_status`** e removidas do
+fluxo ativo do sistema. Mantidas aqui para referência histórica/rollback.
+
+> **Não usar estas tabelas em novas queries** — consulte `categoricas.c_geral_status`
+> filtrando por `schema_table_coluna_r`.
+
+| Tabela | Origem | Migrada para `c_geral_status` com |
+|--------|--------|----------------------------------|
+| `c_alt_instrumento` | `categoricas` | `schema_table_coluna_r = 'public.termos_alteracoes.instrumento_alteracao'` |
+| `c_dac_despesas_provisao` | `categoricas` | `schema_table_coluna_r = 'gestao_financeira.despesas.categoria_provisao'` |
+| `c_dac_parcela_andamento_status` | `categoricas` | `schema_table_coluna_r = 'gestao_financeira.ultra_liquidacoes.parcela_andamento'` |
+
+---
+
+*Última atualização: 25/05/2026 | Adicionado schema `archive`, migração para `c_geral_status`, coluna `nome_item_fantasia`*

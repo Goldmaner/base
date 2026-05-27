@@ -3,210 +3,532 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciar Portarias e Legislações</title>
+    <title>Legislações - FAF</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
-        body { background-color: #f8f9fa; padding: 20px; }
-        .header-section { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .form-container { background: #fff; padding: 30px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .table-container { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .btn-editar { opacity: 0; transition: opacity 0.2s; }
-        tr:hover .btn-editar { opacity: 1; }
+        body { background-color: #f0f4ff; padding: 20px; }
+
+        .page-header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+            color: #fff; padding: 22px 28px; border-radius: 12px;
+            margin-bottom: 20px; box-shadow: 0 4px 18px rgba(37,99,235,.28);
+        }
+        .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+        .page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+        .btn-parc {
+            background: linear-gradient(135deg, #1e3a5f, #2563eb);
+            color: #fff; border: none; border-radius: 8px;
+            padding: 7px 16px; font-weight: 600; transition: opacity .15s;
+            display: inline-flex; align-items: center; gap: 6px;
+            text-decoration: none; cursor: pointer; font-size: .875rem;
+        }
+        .btn-parc:hover { opacity: .88; color: #fff; }
+        .btn-parc.outline {
+            background: transparent;
+            border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+        }
+        .btn-parc.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+        .btn-parc.success { background: linear-gradient(135deg,#065f46,#059669); }
+        .btn-parc.danger  { background: linear-gradient(135deg,#7f1d1d,#dc2626); }
+
+        .filter-section {
+            background: #fff; padding: 20px; border-radius: 10px;
+            margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+            border-left: 4px solid #2563eb;
+        }
+
+        .nav-tabs .nav-link {
+            font-weight: 600; color: #374151;
+            border-radius: 8px 8px 0 0; border-color: transparent;
+            padding: 8px 14px; font-size: .82rem;
+        }
+        .nav-tabs .nav-link.active {
+            background: linear-gradient(135deg,#1e3a5f,#2563eb);
+            color: #fff; border-color: transparent;
+        }
+        .nav-tabs .nav-link:not(.active):hover { background: #e0e7ff; color: #1e3a5f; }
+
+        .content-card {
+            background: #fff; border-radius: 0 0 10px 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden;
+        }
+
+        .leg-table thead tr th {
+            background: linear-gradient(135deg,#1e3a5f,#2563eb);
+            color: #fff; border: none; white-space: nowrap; font-size: .78rem;
+            padding: 10px 8px;
+        }
+        .leg-table tbody tr:hover { background-color: #eff6ff; }
+        .leg-table td { vertical-align: top; font-size: .82rem; padding: 8px; line-height: 1.4; }
+
+        .badge-vigente  { background: #d1fae5; color: #065f46; font-weight: 600; }
+        .badge-revogado { background: #fee2e2; color: #7f1d1d; font-weight: 600; }
+        .badge-alterado { background: #fef3c7; color: #78350f; font-weight: 600; }
+
+        .chip-tipo { display:inline-block; padding:2px 10px; border-radius:20px; font-size:.73rem; font-weight:700; }
+        .chip-Lei                  { background:#dbeafe; color:#1e40af; }
+        .chip-Decreto              { background:#ede9fe; color:#4c1d95; }
+        .chip-Portaria             { background:#d1fae5; color:#065f46; }
+        .chip-Resolucao            { background:#fef3c7; color:#78350f; }
+        .chip-Orientacao-Normativa { background:#fce7f3; color:#831843; }
+        .chip-Manual               { background:#e0e7ff; color:#3730a3; }
+        .chip-Guia                 { background:#f0fdf4; color:#14532d; }
+        .chip-Outros               { background:#f3f4f6; color:#374151; }
+
+        .link-ext { color: #2563eb; }
+        .link-ext:hover { color: #1e3a5f; }
+
+        .modal .modal-header {
+            background: linear-gradient(135deg,#1e3a5f,#2563eb); color: #fff;
+        }
+        .modal .modal-header .btn-close { filter: invert(1); }
+
+        .btn-row-action { opacity: 0; transition: opacity .15s; }
+        tr:hover .btn-row-action { opacity: 1; }
+
+        .desc-cell { white-space: normal; word-break: break-word; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Cabeçalho -->
-        <div class="header-section">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2><i class="bi bi-file-earmark-text"></i> Gerenciar Portarias e Legislações</h2>
-                    <p class="text-muted mb-0">Configure as legislações que regem os termos de parceria</p>
-                </div>
-                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left"></i> Voltar
-                </a>
-            </div>
-        </div>
 
-        <!-- Mensagens Flash -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for cat, msg in messages %}
-                    <div class="alert alert-{{cat}} alert-dismissible fade show" role="alert">
-                        {{ msg }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
+{# ── MACRO: tabela de legislações ─────────────────────────────────────────── #}
+{% macro render_table(rows) %}
+<div class="content-card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 leg-table">
+      <thead>
+        <tr>
+          <th style="width:16%">Nome / Identificação</th>
+          <th style="width:7%">Tipo</th>
+          <th style="width:6%" class="text-center">Início</th>
+          <th style="width:7%" class="text-center">Término</th>
+          <th style="width:40%">Ementa</th>
+          <th style="width:13%">Status</th>
+          <th style="width:4%" class="text-center">Link</th>
+          <th style="width:7%" class="text-center">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          {% set leg_id    = row[0] %}
+          {% set lei       = row[1] or '' %}
+          {% set tipo_doc  = row[2] or '' %}
+          {% set inicio    = row[3] %}
+          {% set termino   = row[4] %}
+          {% set descricao = row[5] or '' %}
+          {% set link      = row[6] or '' %}
+          {% set status    = row[7] or 'vigente' %}
+
+          {# classe do chip de tipo #}
+          {% set chip_cls = 'chip-' + tipo_doc
+              .replace(' ', '-')
+              .replace('ã','a')
+              .replace('ê','e')
+              .replace('ç','c')
+              .replace('é','e')
+              .replace('ó','o') %}
+
+          {# badge de status #}
+          {% set sl = status|lower %}
+          {% if 'revogad' in sl %}
+            {% set bdg = 'badge-revogado' %}{% set sl_label = 'Revogada' %}
+          {% elif 'alterad' in sl or 'instru' in sl %}
+            {% set bdg = 'badge-alterado' %}{% set sl_label = 'Alterada' %}
+          {% else %}
+            {% set bdg = 'badge-vigente' %}{% set sl_label = 'Vigente' %}
+          {% endif %}
+
+        <tr data-busca="{{ (lei + ' ' + descricao + ' ' + tipo_doc)|lower }}" data-status="{{ sl }}">
+          <td><strong>{{ lei }}</strong></td>
+          <td><span class="chip-tipo {{ chip_cls }}">{{ tipo_doc }}</span></td>
+          <td class="text-center">
+            {% if inicio %}{{ inicio.strftime('%d/%m/%Y') }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-center">
+            {% if termino %}
+              {{ termino.strftime('%d/%m/%Y') }}
+            {% else %}
+              <span class="badge {{ 'badge-vigente' }} px-2" style="font-size:.72rem;">Sem previsão</span>
             {% endif %}
-        {% endwith %}
+          </td>
+          <td><span class="desc-cell" title="{{ descricao }}">{{ descricao or '—' }}</span></td>
+          <td>
+            <span class="badge {{ bdg }} px-2 py-1" style="font-size:.72rem;" title="{{ status }}">
+              {{ sl_label }}{% if sl != sl_label|lower and sl != 'vigente' and sl != 'revogada' and sl != 'alterada' %}*{% endif %}
+            </span>
+            {% if sl not in ('vigente','revogada','alterada') %}
+              <div style="font-size:.7rem;color:#6b7280;margin-top:2px;" title="{{ status }}">{{ status[:50] }}</div>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            {% if link %}
+              <a href="{{ link }}" target="_blank" rel="noopener" class="link-ext" title="Abrir legislação">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-center" style="white-space:nowrap;">
+            <button class="btn btn-sm btn-outline-primary btn-row-action me-1" title="Editar"
+                    onclick="abrirEdicao(
+                      {{ leg_id }},
+                      {{ lei|tojson|forceescape }},
+                      {{ tipo_doc|tojson|forceescape }},
+                      '{{ inicio.strftime('%Y-%m-%d') if inicio else '' }}',
+                      '{{ termino.strftime('%Y-%m-%d') if termino else '' }}',
+                      {{ descricao|tojson|forceescape }},
+                      {{ link|tojson|forceescape }},
+                      {{ status|tojson|forceescape }}
+                    )">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger btn-row-action" title="Excluir"
+                    onclick="confirmarExclusao({{ leg_id }}, {{ lei|tojson|forceescape }})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">Nenhum registro nesta categoria.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endmacro %}
+{# ─────────────────────────────────────────────────────────────────────────── #}
 
-        <!-- Formulário de Nova/Edição -->
-        <div class="form-container">
-            <h4><i class="bi bi-plus-circle"></i> Adicionar/Editar Legislação</h4>
-            <form method="post" id="formLegislacao">
-                <div class="row mb-3">
-                    <div class="col-md-12">
-                        <label for="lei" class="form-label">Nome da Lei/Portaria</label>
-                        <input type="text" class="form-control" id="lei" name="lei" required 
-                               placeholder="Ex: Portaria nº 090/SMDHC/2023">
-                    </div>
-                </div>
 
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label for="inicio" class="form-label">Data de Início</label>
-                        <input type="date" class="form-control" id="inicio" name="inicio">
-                        <small class="text-muted">Quando a legislação entrou em vigor</small>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="termino" class="form-label">Data de Término</label>
-                        <input type="date" class="form-control" id="termino" name="termino">
-                        <small class="text-muted">Quando a legislação perdeu vigência (deixe vazio se ainda vigente)</small>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="vigencia" class="form-label">Vigência</label>
-                        <input type="text" class="form-control" id="vigencia" readonly style="background-color: #e9ecef;">
-                        <small class="text-muted">Calculado automaticamente</small>
-                    </div>
-                </div>
+<div class="container-fluid px-3">
 
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> <strong>Nota:</strong> As regras de termo (TCV, TFM, TCL) e coordenação (FUMCAD, FMID) 
-                    são aplicadas automaticamente no formulário de parcerias com base nas datas e no nome da legislação.
-                </div>
-
-                <div class="d-flex justify-content-end">
-                    <button type="button" class="btn btn-secondary me-2" onclick="limparFormulario()">
-                        <i class="bi bi-x-circle"></i> Limpar
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Salvar Legislação
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Tabela de Legislações -->
-        <div class="table-container">
-            <h4><i class="bi bi-table"></i> Legislações Cadastradas</h4>
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th style="width: 40%">Lei/Portaria</th>
-                            <th style="width: 15%" class="text-center">Início</th>
-                            <th style="width: 15%" class="text-center">Término</th>
-                            <th style="width: 20%" class="text-center">Vigência</th>
-                            <th style="width: 10%" class="text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if legislacoes %}
-                            {% for leg in legislacoes %}
-                            <tr>
-                                <td><strong>{{ leg[0] }}</strong></td>
-                                <td class="text-center">
-                                    {% if leg[1] %}
-                                        {{ leg[1].strftime('%d/%m/%Y') }}
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">
-                                    {% if leg[2] %}
-                                        {{ leg[2].strftime('%d/%m/%Y') }}
-                                    {% else %}
-                                        <span class="badge bg-success">Vigente</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">
-                                    {% if leg[1] and leg[2] %}
-                                        {% set dias = (leg[2] - leg[1]).days %}
-                                        {% set anos = (dias / 365.25) | int %}
-                                        {% set meses = ((dias % 365.25) / 30.44) | int %}
-                                        {{ anos }}a {{ meses }}m
-                                    {% elif leg[1] %}
-                                        <span class="text-muted">Em vigor</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">
-                                    <button class="btn btn-sm btn-warning btn-editar" 
-                                            onclick="editarLegislacao('{{ leg[0] }}', '{{ leg[1].strftime('%Y-%m-%d') if leg[1] else '' }}', '{{ leg[2].strftime('%Y-%m-%d') if leg[2] else '' }}')">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">
-                                    Nenhuma legislação cadastrada. Adicione a primeira acima!
-                                </td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  <!-- Cabeçalho -->
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2><i class="bi bi-journal-bookmark-fill me-2"></i>Índice de Legislações</h2>
+        <p>Legislações, decretos, portarias e normas aplicáveis ao Departamento de Parcerias</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn-parc outline" data-bs-toggle="modal" data-bs-target="#modalForm"
+                onclick="abrirNovo()">
+          <i class="bi bi-plus-circle"></i> Nova Legislação
+        </button>
+        <a href="{{ url_for('main.index') }}" class="btn-parc outline">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+      </div>
     </div>
+  </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Calcular vigência automaticamente
-        function calcularVigencia() {
-            const inicioInput = document.getElementById('inicio');
-            const terminoInput = document.getElementById('termino');
-            const vigenciaInput = document.getElementById('vigencia');
-            
-            if (inicioInput.value && terminoInput.value) {
-                const dataInicio = new Date(inicioInput.value);
-                const dataTermino = new Date(terminoInput.value);
-                
-                const diffTime = Math.abs(dataTermino - dataInicio);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
-                const anos = Math.floor(diffDays / 365.25);
-                const meses = Math.floor((diffDays % 365.25) / 30.44);
-                
-                vigenciaInput.value = `${anos} ano(s) e ${meses} mês(es)`;
-            } else if (inicioInput.value) {
-                vigenciaInput.value = 'Em vigor';
-            } else {
-                vigenciaInput.value = '';
-            }
-        }
+  <!-- Flash -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }} alert-dismissible fade show">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}{% endif %}
+  {% endwith %}
 
-        document.getElementById('inicio').addEventListener('change', calcularVigencia);
-        document.getElementById('termino').addEventListener('change', calcularVigencia);
+  <!-- Filtros -->
+  <div class="filter-section">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-6">
+        <div style="position:relative;">
+          <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#2563eb;pointer-events:none;"></i>
+          <input type="text" id="buscaGlobal" class="form-control"
+                 style="padding-left:36px; border-color:#bfdbfe;"
+                 placeholder="Buscar em todas as legislações..."
+                 oninput="filtrarTabela()">
+        </div>
+      </div>
+      <div class="col-md-3">
+        <select id="filtroStatus" class="form-select" style="border-color:#bfdbfe;" onchange="filtrarTabela()">
+          <option value="">Todos os status</option>
+          <option value="vigente">Vigente</option>
+          <option value="revogad">Revogada</option>
+          <option value="alterad">Alterada</option>
+        </select>
+      </div>
+      <div class="col-md-3 text-end">
+        <span id="contadorRegistros" class="text-muted" style="font-size:.85rem;"></span>
+      </div>
+    </div>
+  </div>
 
-        // Editar legislação
-        function editarLegislacao(lei, inicio, termino) {
-            document.getElementById('lei').value = lei;
-            document.getElementById('inicio').value = inicio;
-            document.getElementById('termino').value = termino;
-            
-            calcularVigencia();
-            
-            // Scroll para o formulário
-            document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth' });
-            
-            // Feedback visual
-            const form = document.getElementById('formLegislacao');
-            form.style.borderLeft = '4px solid #ffc107';
-            setTimeout(() => {
-                form.style.borderLeft = '';
-            }, 2000);
-        }
+  <!-- Abas -->
+  {% if tipos_ordenados %}
+  <ul class="nav nav-tabs mb-0" id="tabTipos" role="tablist">
+    <li class="nav-item">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-todos" type="button">
+        <i class="bi bi-list-ul me-1"></i>Todos
+        <span class="badge bg-secondary ms-1">{{ grupos.values()|map('length')|sum }}</span>
+      </button>
+    </li>
+    {% for tipo in tipos_ordenados %}
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-{{ loop.index }}" type="button">
+        {% if tipo == 'Lei' %}<i class="bi bi-bank2 me-1"></i>
+        {% elif tipo == 'Decreto' %}<i class="bi bi-file-ruled me-1"></i>
+        {% elif tipo == 'Portaria' %}<i class="bi bi-file-earmark-text me-1"></i>
+        {% elif tipo == 'Resolução' %}<i class="bi bi-shield-check me-1"></i>
+        {% elif tipo == 'Orientação Normativa' %}<i class="bi bi-journal-text me-1"></i>
+        {% elif tipo == 'Manual' %}<i class="bi bi-book me-1"></i>
+        {% elif tipo == 'Guia' %}<i class="bi bi-compass me-1"></i>
+        {% else %}<i class="bi bi-file me-1"></i>{% endif %}
+        {{ tipo }}
+        <span class="badge bg-secondary ms-1">{{ grupos[tipo]|length }}</span>
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
 
-        // Limpar formulário
-        function limparFormulario() {
-            document.getElementById('formLegislacao').reset();
-            document.getElementById('vigencia').value = '';
-        }
-    </script>
+  <div class="tab-content" id="tabContent">
+    <div class="tab-pane fade show active" id="tab-todos">
+      {% set all_rows = [] %}
+      {% for tipo in tipos_ordenados %}{% for row in grupos[tipo] %}{% if all_rows.append(row) %}{% endif %}{% endfor %}{% endfor %}
+      {{ render_table(all_rows) }}
+    </div>
+    {% for tipo in tipos_ordenados %}
+    <div class="tab-pane fade" id="tab-{{ loop.index }}">
+      {{ render_table(grupos[tipo]) }}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="content-card p-5 text-center text-muted mt-3">
+    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+    Nenhuma legislação cadastrada. Clique em <strong>Nova Legislação</strong> para começar.
+  </div>
+  {% endif %}
+
+</div><!-- /container -->
+
+
+<!-- ── MODAL: Formulário ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="modalForm" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalFormTitulo">
+          <i class="bi bi-plus-circle me-2"></i>Nova Legislação
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formLegislacao">
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="lei_id" id="f_lei_id">
+        <div class="modal-body">
+          <div class="row g-3">
+
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Nome / Identificação <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="lei" id="f_lei" required
+                     placeholder="Ex: Portaria SMDHC nº 90/2023">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Tipo de Documento</label>
+              <select class="form-select" name="tipo_doc" id="f_tipo_doc">
+                <option value="Lei">Lei</option>
+                <option value="Decreto">Decreto</option>
+                <option value="Portaria" selected>Portaria</option>
+                <option value="Orientação Normativa">Orientação Normativa</option>
+                <option value="Resolução">Resolução</option>
+                <option value="Manual">Manual</option>
+                <option value="Guia">Guia</option>
+                <option value="Outros">Outros</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Ementa / Descrição</label>
+              <textarea class="form-control" name="descricao" id="f_descricao" rows="2"
+                        placeholder="Descrição resumida do conteúdo da norma..."></textarea>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Data de Início</label>
+              <input type="date" class="form-control" name="inicio" id="f_inicio">
+              <div class="form-text">Quando entrou em vigor</div>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Data de Término</label>
+              <input type="date" class="form-control" name="termino" id="f_termino">
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="sem_termino"
+                       id="f_sem_termino" value="1" onchange="toggleTermino(this)">
+                <label class="form-check-label text-muted" for="f_sem_termino" style="font-size:.85rem;">
+                  Sem previsão de término
+                </label>
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Status de Vigência</label>
+              <select class="form-select" name="status_vigencia" id="f_status_vigencia"
+                      onchange="toggleStatusCustom(this)">
+                <option value="vigente">Vigente</option>
+                <option value="Revogada">Revogada</option>
+                <option value="Alterada">Alterada</option>
+                <option value="_custom">Outro (especificar)</option>
+              </select>
+              <input type="text" class="form-control mt-1" id="f_status_custom"
+                     placeholder="Ex: Revogada pela Portaria 90/2023"
+                     style="display:none; font-size:.8rem;">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Link para consulta online</label>
+              <div style="position:relative;">
+                <i class="bi bi-link-45deg" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#2563eb;pointer-events:none;"></i>
+                <input type="url" class="form-control" name="link" id="f_link"
+                       style="padding-left:36px;"
+                       placeholder="https://legislacao.prefeitura.sp.gov.br/...">
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn-parc success">
+            <i class="bi bi-check-all"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Confirmar exclusão ─────────────────────────────────────────── -->
+<div class="modal fade" id="modalExcluir" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#7f1d1d,#dc2626);color:#fff;">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar Exclusão</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
+      </div>
+      <div class="modal-body">
+        Deseja excluir a legislação <strong id="excluirNome"></strong>?
+        <br><small class="text-muted">Esta ação não pode ser desfeita.</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="post" id="formExcluir">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="lei_id" id="excluirId">
+          <button type="submit" class="btn-parc danger"><i class="bi bi-trash"></i> Excluir</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ── Filtro ────────────────────────────────────────────────────────────────
+function filtrarTabela() {
+    const q  = (document.getElementById('buscaGlobal').value || '').toLowerCase();
+    const st = (document.getElementById('filtroStatus').value || '').toLowerCase();
+    const pane = document.querySelector('.tab-pane.active');
+    if (!pane) return;
+
+    const rows = pane.querySelectorAll('tbody tr[data-busca]');
+    let vis = 0;
+    rows.forEach(tr => {
+        const ok = (!q  || tr.dataset.busca.includes(q)) &&
+                   (!st || tr.dataset.status.includes(st));
+        tr.style.display = ok ? '' : 'none';
+        if (ok) vis++;
+    });
+    document.getElementById('contadorRegistros').textContent =
+        vis + ' registro' + (vis !== 1 ? 's' : '') + ' exibido' + (vis !== 1 ? 's' : '');
+}
+
+document.getElementById('tabTipos')?.addEventListener('shown.bs.tab', () => {
+    document.getElementById('buscaGlobal').value = '';
+    document.getElementById('filtroStatus').value = '';
+    filtrarTabela();
+});
+
+document.addEventListener('DOMContentLoaded', filtrarTabela);
+
+// ── Formulário ────────────────────────────────────────────────────────────
+function abrirNovo() {
+    document.getElementById('modalFormTitulo').innerHTML =
+        '<i class="bi bi-plus-circle me-2"></i>Nova Legislação';
+    document.getElementById('formLegislacao').reset();
+    document.getElementById('f_lei_id').value = '';
+    document.getElementById('f_termino').disabled = false;
+    document.getElementById('f_status_custom').style.display = 'none';
+}
+
+function abrirEdicao(id, lei, tipo, inicio, termino, descricao, link, status) {
+    document.getElementById('modalFormTitulo').innerHTML =
+        '<i class="bi bi-pencil me-2"></i>Editar Legislação';
+    document.getElementById('f_lei_id').value    = id;
+    document.getElementById('f_lei').value       = lei;
+    document.getElementById('f_descricao').value = descricao || '';
+    document.getElementById('f_inicio').value    = inicio;
+    document.getElementById('f_link').value      = link || '';
+
+    // Tipo
+    const tipSel = document.getElementById('f_tipo_doc');
+    tipSel.value = tipo;
+    if (!tipSel.value) tipSel.value = 'Portaria';
+
+    // Término
+    const semTermino = !termino;
+    document.getElementById('f_sem_termino').checked = semTermino;
+    document.getElementById('f_termino').value       = semTermino ? '' : termino;
+    document.getElementById('f_termino').disabled    = semTermino;
+
+    // Status
+    const sel = document.getElementById('f_status_vigencia');
+    const known = ['vigente', 'Revogada', 'Alterada'];
+    if (known.includes(status)) {
+        sel.value = status;
+        document.getElementById('f_status_custom').style.display = 'none';
+    } else {
+        sel.value = '_custom';
+        document.getElementById('f_status_custom').style.display = '';
+        document.getElementById('f_status_custom').value = status;
+    }
+
+    new bootstrap.Modal(document.getElementById('modalForm')).show();
+}
+
+function toggleTermino(cb) {
+    const inp = document.getElementById('f_termino');
+    inp.disabled = cb.checked;
+    if (cb.checked) inp.value = '';
+}
+
+function toggleStatusCustom(sel) {
+    const c = document.getElementById('f_status_custom');
+    c.style.display = sel.value === '_custom' ? '' : 'none';
+}
+
+document.getElementById('formLegislacao').addEventListener('submit', function () {
+    const sel    = document.getElementById('f_status_vigencia');
+    const custom = document.getElementById('f_status_custom');
+    if (sel.value === '_custom') {
+        sel.name  = '';          // não envia o select
+        custom.name = 'status_vigencia';  // envia o texto
+    }
+});
+
+// ── Exclusão ──────────────────────────────────────────────────────────────
+function confirmarExclusao(id, nome) {
+    document.getElementById('excluirId').value = id;
+    document.getElementById('excluirNome').textContent = nome;
+    new bootstrap.Modal(document.getElementById('modalExcluir')).show();
+}
+</script>
 </body>
 </html>

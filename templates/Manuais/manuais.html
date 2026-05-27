@@ -179,9 +179,14 @@
         <h2><i class="bi bi-journal-bookmark-fill me-2"></i>Biblioteca Informativa</h2>
         <p>Operações e projetos documentados por área da unidade</p>
       </div>
-      <a href="{{ url_for('main.index') }}" class="btn-man outline">
-        <i class="bi bi-arrow-left"></i> Voltar
-      </a>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('main.gerenciar_portarias') }}" class="btn-man outline">
+          <i class="bi bi-journal-bookmark-fill"></i> Índice de Legislações
+        </a>
+        <a href="{{ url_for('main.index') }}" class="btn-man outline">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+      </div>
     </div>
   </div>
 

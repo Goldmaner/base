@@ -131,6 +131,15 @@
     .alert-info-custom {
       background:#e7f3ff; border-left:4px solid #0d6efd; padding:12px; margin-bottom:14px;
     }
+    /* Copy button */
+    .btn-copy {
+      background: none; border: none; padding: 1px 4px; border-radius: 4px;
+      cursor: pointer; color: #adb5bd; font-size: .72rem; line-height: 1;
+      transition: color .15s, background .15s;
+      vertical-align: middle;
+    }
+    .btn-copy:hover { color: #0d6efd; background: rgba(13,110,253,.08); }
+    .btn-copy.copied { color: #198754; }
     /* Add card btn */
     .btn-add-card { font-size:.78rem; color:#6c757d; background:none; border:1px dashed #dee2e6;
                     width:100%; text-align:left; border-radius:6px; padding:5px 10px; }
@@ -305,19 +314,60 @@
              data-marcadores="{{ card.alt_marcadores or '' }}"
              data-osc="{{ card.osc or '' }}"
              data-tipos="{{ card.tipos_alteracao or '' }}"
-             data-status="{{ card.alt_status }}">
+             data-status="{{ card.alt_status }}"
+             data-lote-id="{{ card.alt_lote_id or '' }}">
           <!-- Actions -->
           <div class="card-actions">
+            {% if not card.alt_lote_id %}
             <button class="btn btn-outline-warning btn-sm" onclick='editarAlteracao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})' title="Editar">
               <i class="bi bi-pencil"></i>
             </button>
-            <button class="btn btn-outline-secondary btn-sm" onclick='ocultarCard("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }}, true)' title="Ocultar">
+            {% else %}
+            <button class="btn btn-outline-warning btn-sm" onclick='editarLote({{ card.alt_lote_id }})' title="Editar lote">
+              <i class="bi bi-pencil"></i>
+            </button>
+            {% endif %}
+            <button class="btn btn-outline-secondary btn-sm" onclick='ocultarCard("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }}, true, {{ card.alt_lote_id or "null" }})' title="Ocultar">
               <i class="bi bi-eye-slash"></i>
             </button>
+            {% if not card.alt_lote_id %}
             <button class="btn btn-outline-danger btn-sm" onclick='confirmarExclusao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})' title="Excluir">
               <i class="bi bi-trash"></i>
             </button>
+            {% else %}
+            <button class="btn btn-outline-danger btn-sm" onclick='confirmarExclusaoLote({{ card.alt_lote_id }}, {{ card.lote_count }})' title="Excluir lote">
+              <i class="bi bi-trash"></i>
+            </button>
+            {% endif %}
           </div>
+          {% if card.alt_lote_id %}
+          <!-- LOTE CARD -->
+          <div class="d-flex align-items-center gap-1 mb-1 flex-wrap">
+            <span class="badge bg-warning text-dark inst-badge"><i class="bi bi-stack"></i> LOTE</span>
+            <span class="badge bg-secondary inst-badge">Desp. Aut.</span>
+            <span class="badge bg-dark inst-badge">#{{ card.alt_lote_id }}</span>
+          </div>
+          <span class="d-flex align-items-center gap-1">
+            <strong style="font-size:.82rem;">{{ card.lote_count }} termo{{ 's' if card.lote_count != 1 else '' }}</strong>
+            {% if card.lote_termos %}
+            <button type="button" class="btn-copy" title="Copiar todos os processos"
+              onclick='copyToClipboard("{{ card.lote_termos|replace('"','&quot;')|e }}", this)'><i class="bi bi-clipboard"></i></button>
+            {% endif %}
+          </span>
+          {% if card.lote_termos %}
+            {% set termos_list = card.lote_termos.split(', ') %}
+            <div style="font-size:.65rem; line-height:1.5; word-break:break-word; white-space:normal;" title="{{ card.lote_termos }}">
+              {% for t in termos_list[:3] %}
+                <span class="d-flex align-items-center gap-1">
+                  <span class="text-muted">{{ t }}</span>
+                  <button type="button" class="btn-copy" onclick='copyToClipboard("{{ t|e }}", this)' title="Copiar"><i class="bi bi-clipboard" style="font-size:.6rem;"></i></button>
+                </span>
+              {% endfor %}
+              {% if termos_list|length > 3 %}<em class="text-muted">+{{ termos_list|length - 3 }} mais</em>{% endif %}
+            </div>
+          {% endif %}
+          {% else %}
+          <!-- CARD INDIVIDUAL -->
           <!-- Instrument badge + numero -->
           <div class="d-flex align-items-center gap-1 mb-1">
             <span class="badge bg-secondary inst-badge">{{ inst_short.get(card.instrumento_alteracao, card.instrumento_alteracao[:4]) }}</span>
@@ -331,12 +381,16 @@
           </div>
           <strong class="d-block" style="font-size:.85rem;">{{ card.numero_termo }}</strong>
           {% if card.sei_celeb %}
-            <small class="d-block" style="font-size:.68rem; color:#0d6efd; font-family:monospace;" title="SEI Celebração"><i class="bi bi-file-earmark-text"></i> {{ card.sei_celeb }}</small>
+            <span class="d-flex align-items-center gap-1">
+              <small style="font-size:.68rem; color:#0d6efd; font-family:monospace;" title="SEI Celebração"><i class="bi bi-file-earmark-text"></i> {{ card.sei_celeb }}</small>
+              <button type="button" class="btn-copy" onclick='copyToClipboard("{{ card.sei_celeb|e }}", this)' title="Copiar número do processo SEI"><i class="bi bi-clipboard"></i></button>
+            </span>
           {% endif %}
           {% if card.osc %}
             <small class="text-muted d-block" style="font-size:.7rem; word-break:break-word; white-space:normal; line-height:1.3;" title="{{ card.osc }}">{{ card.osc }}</small>
           {% endif %}
-          <!-- Footer info -->
+          {% endif %}
+          <!-- Footer info (comum a ambos) -->
           <div class="d-flex justify-content-between align-items-start mt-2" style="font-size:.72rem; color:#6c757d; gap:4px;">
             <span style="word-break:break-word; flex:1; min-width:0;">
               <i class="bi bi-person-fill"></i>
@@ -570,6 +624,19 @@
                   <select class="form-select" id="numero_termo" name="numero_termo" required>
                     <option value="">Digite para buscar...</option>
                   </select>
+                  <div id="numero-termo-display" class="d-none mt-1">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text" style="font-size:.72rem; padding:2px 6px;"><i class="bi bi-file-earmark-text text-primary"></i></span>
+                      <input type="text" id="numero-termo-readonly" class="form-control form-control-sm bg-light"
+                             readonly style="font-size:.75rem; cursor:text; user-select:all; font-family:monospace;"
+                             title="Processo SEI de celebração — clique para selecionar">
+                      <button type="button" class="btn btn-outline-secondary btn-sm"
+                              onclick='copyToClipboard(document.getElementById("numero-termo-readonly").value, this)'
+                              title="Copiar processo SEI">
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <div class="col-md-4">
                   <label for="alt_status" class="form-label">Status *</label>
@@ -699,7 +766,7 @@
                     <tr>
                       <th style="min-width:220px;">Tipo de Alteração</th>
                       <th style="min-width:180px;">Nova Informação</th>
-                      <th style="min-width:190px;">Número do Termo</th>
+                      <th style="min-width:220px;">Proc. de Celebração (SEI)</th>
                       <th style="min-width:130px;">Documento SEI</th>
                       <th style="width:40px;"></th>
                     </tr>
@@ -710,6 +777,54 @@
               <button type="button" class="btn btn-outline-success btn-sm" onclick="adicionarLinhaLote()">
                 <i class="bi bi-plus-circle"></i> Adicionar linha
               </button>
+            </div>
+
+            <!-- SEÇÃO LOTE: tabela de registros individuais (visível só em modo editar lote) -->
+            <div class="mb-3" id="lote-registros-section" style="display:none;">
+              <h6 class="border-bottom pb-2"><i class="bi bi-list-ul"></i> Processos do Lote</h6>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle" id="lote-registros-table">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Nº do Termo</th>
+                      <th>SEI Celebração</th>
+                      <th>Tipo</th>
+                      <th>Nova Info</th>
+                      <th style="width:90px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="lote-registros-tbody"></tbody>
+                </table>
+              </div>
+              <!-- Adicionar novo processo ao lote -->
+              <div class="border rounded p-2 mt-2" style="background:#f8f9fa;">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-4">
+                    <label class="form-label mb-1" style="font-size:.78rem;">Proc. de Celebração (SEI)</label>
+                    <select id="lote-add-sei" class="form-select form-select-sm"></select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label mb-1" style="font-size:.78rem;">Tipo de Alteração</label>
+                    <select id="lote-add-tipo" class="form-select form-select-sm">
+                      <option value="">-- Selecione --</option>
+                      {% for t in tipos_alteracao %}
+                        {% if t.alt_instrumento == 'Despacho Autorizatório' %}
+                        <option value="{{ t.alt_tipo }}">{{ t.alt_tipo }}</option>
+                        {% endif %}
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label mb-1" style="font-size:.78rem;">Nova Info <small class="text-muted">(opcional)</small></label>
+                    <input type="text" id="lote-add-info" class="form-control form-control-sm" placeholder="Nova informação">
+                  </div>
+                  <div class="col-md-1">
+                    <button type="button" class="btn btn-success btn-sm w-100" id="btn-lote-add-registro" onclick="adicionarAoLote()">
+                      <i class="bi bi-plus-lg"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- SEÇÃO 4: Observações -->
@@ -761,6 +876,42 @@ tiposAlteracao.forEach(t => {
 let contadorTipos = 0;
 let tiposSelecionados = new Set();
 let contadorLote = 0;
+
+// ====================================================
+// CLIPBOARD
+// ====================================================
+function copyToClipboard(text, btn) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(function() {
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-clipboard-check"></i>';
+    btn.classList.add('copied');
+    setTimeout(function() { btn.innerHTML = orig; btn.classList.remove('copied'); }, 1500);
+  }).catch(function() {
+    // Fallback para browsers sem Clipboard API
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="bi bi-clipboard-check"></i>';
+      btn.classList.add('copied');
+      setTimeout(function() { btn.innerHTML = orig; btn.classList.remove('copied'); }, 1500);
+    }
+  });
+}
+
+// Atualizar display de cópia do numero_termo no modal
+function atualizarDisplayTermo(val) {
+  const disp = document.getElementById('numero-termo-display');
+  const inp  = document.getElementById('numero-termo-readonly');
+  if (!disp || !inp) return;
+  if (val) { inp.value = val; disp.classList.remove('d-none'); }
+  else     { disp.classList.add('d-none'); inp.value = ''; }
+}
 
 // ====================================================
 // DARK MODE
@@ -864,8 +1015,16 @@ $('#modalCadastroAlteracao').on('hidden.bs.modal', function() {
   contadorLote = 0;
   $('#numero_termo').closest('.col-md-4').show();
   $('#numero_termo').prop('required', true);
+  $('#instrumento_alteracao').closest('.col-md-4').show();
+  $('#instrumento_alteracao').prop('required', true);
   $('#tipos-section').show();
+  $('#tipos-section select.tipo-select').prop('required', true);
   $('#alt_sei_documento').closest('.col-md-6').show();
+  $('#lote-registros-section').hide();
+  $('#lote-registros-tbody').empty();
+  if ($('#lote-add-sei').hasClass('select2-hidden-accessible')) $('#lote-add-sei').select2('destroy');
+  _loteIdAtual = null;
+  atualizarDisplayTermo('');
 });
 
 // Status → show/hide SEI fields + re-render required on info fields
@@ -969,6 +1128,7 @@ $(document).on('change', '#modo_lote', function() {
     $('#numero_termo').closest('.col-md-4').hide();
     $('#numero_termo').prop('required', false).val(null).trigger('change');
     $('#tipos-section').hide();
+    $('#tipos-section select, #tipos-section input, #tipos-section textarea').prop('required', false);
     $('#lote-section').show();
     // Ajustar SEI se status já for Concluído
     if ($('#alt_status').val() === 'Concluído') {
@@ -981,6 +1141,8 @@ $(document).on('change', '#modo_lote', function() {
     $('#numero_termo').closest('.col-md-4').show();
     $('#numero_termo').prop('required', true);
     $('#tipos-section').show();
+    // Restaurar required nos selects de tipo (sempre obrigatórios quando visíveis)
+    $('#tipos-section select.tipo-select').prop('required', true);
     $('#lote-section').hide();
     // Destruir Select2 das linhas do lote
     $('#lote-tbody tr').each(function() {
@@ -1128,7 +1290,7 @@ $('#formAlteracao').submit(function(e) {
 function adicionarLinhaLote() {
   contadorLote++;
   const rowId = `lote-row-${contadorLote}`;
-  const selectId = `lote-termo-${contadorLote}`;
+  const selectId = `lote-sei-${contadorLote}`;
   const cellId = `lote-info-cell-${contadorLote}`;
 
   // Filtrar tipos disponíveis para Despacho Autorizatório
@@ -1149,10 +1311,8 @@ function adicionarLinhaLote() {
       <td id="${cellId}" style="min-width:180px;">
         <input type="text" name="lote_info[]" class="form-control form-control-sm" placeholder="Nova informação">
       </td>
-      <td style="min-width:190px;">
-        <select id="${selectId}" name="lote_numero_termo[]" class="form-select form-select-sm">
-          <option value="">Buscar...</option>
-        </select>
+      <td style="min-width:220px;">
+        <select id="${selectId}" name="lote_numero_termo[]" class="form-select form-select-sm"></select>
       </td>
       <td style="min-width:130px;">
         <input type="text" name="lote_sei_doc[]" class="form-control form-control-sm"
@@ -1168,20 +1328,50 @@ function adicionarLinhaLote() {
 
   $('#lote-tbody').append(html);
 
-  // Inicializar Select2 na célula do termo
+  // Inicializar Select2 buscando por sei_celeb, valor = numero_termo
   $(`#${selectId}`).select2({
     theme: 'bootstrap-5',
-    placeholder: 'Digite para buscar...',
+    placeholder: 'Digite SEI ou nº do termo…',
     allowClear: true,
     minimumInputLength: 2,
     dropdownParent: $('#modalCadastroAlteracao'),
     ajax: {
-      url: '{{ url_for("parcerias.api_termos_parcerias") }}',
-      dataType: 'json', delay: 250,
+      url: '{{ url_for("parcerias.api_termos_por_sei") }}',
+      dataType: 'json',
+      delay: 250,
       data: p => ({ q: p.term }),
       processResults: d => ({ results: d }),
       cache: true
     }
+  });
+
+  // Paste handler: ao colar um texto, dispara busca automática e seleciona se houver resultado único
+  $(`#${selectId}`).on('select2:open', function() {
+    const selId = selectId;
+    setTimeout(function() {
+      const input = document.querySelector('.select2-container--open .select2-search__field');
+      if (!input) return;
+      input.addEventListener('paste', function(e) {
+        const pasted = (e.clipboardData || window.clipboardData).getData('text').trim();
+        if (!pasted) return;
+        // Preenche o campo de busca com o texto colado e dispara Ajax
+        setTimeout(function() {
+          $.ajax({
+            url: '{{ url_for("parcerias.api_termos_por_sei") }}',
+            data: { q: pasted },
+            dataType: 'json',
+            success: function(results) {
+              if (!results.length) return;
+              // Auto-seleciona o primeiro resultado
+              const first = results[0];
+              const opt = new Option(first.text, first.id, true, true);
+              $(`#${selId}`).append(opt).trigger('change');
+              $(`#${selId}`).select2('close');
+            }
+          });
+        }, 50);
+      }, { once: false });
+    }, 100);
   });
 
   // Auto-selecionar tipo se há apenas um
@@ -1374,12 +1564,203 @@ function editarAlteracao(numeroTermo, instrumento, altNumero) {
       const actionUrl = `{{ url_for('parcerias.atualizar_alteracao') }}?numero_termo=${encodeURIComponent(numeroTermo)}&instrumento=${encodeURIComponent(instrumento)}&alt_numero=${altNumero}`;
       $('#formAlteracao').attr('action', actionUrl);
       $('#modalCadastroLabel').html('<i class="bi bi-pencil"></i> Editar Alteração');
+      atualizarDisplayTermo(data.sei_celeb || '');
       $('#modalCadastroAlteracao').modal('show');
     },
     error: function(xhr) {
       alert('Erro ao carregar dados: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
     }
   });
+}
+
+// ====================================================
+// EDITAR LOTE
+// ====================================================
+let _loteIdAtual = null;
+
+function editarLote(loteId) {
+  _loteIdAtual = loteId;
+  $.ajax({
+    url: '/parcerias/alteracao/editar_lote',
+    method: 'GET',
+    data: { lote_id: loteId },
+    success: function(data) {
+      // Ocultar campos não aplicáveis ao lote
+      $('#numero_termo').closest('.col-md-4').hide();
+      $('#numero_termo').prop('required', false);
+      $('#instrumento_alteracao').closest('.col-md-4').hide();
+      $('#instrumento_alteracao').prop('required', false);
+      $('#alt_status').closest('.col-md-4').show();
+      $('#tipos-section').hide();
+      $('#tipos-section select, #tipos-section input, #tipos-section textarea').prop('required', false);
+      $('#lote-toggle-container').hide();
+      $('#lote-section').hide();
+
+      // Preencher campos comuns
+      $('#alt_status').val(data.status).trigger('change');
+      if (data.responsavel) $('#alt_responsavel').val(data.responsavel.split(';').map(r => r.trim()));
+      $('#alt_prioridade').val(data.prioridade || '');
+      $('#alt_data_inicio').val(data.data_inicio || '');
+      $('#alt_data_conclusao').val(data.data_conclusao || '');
+      $('#alt_observacao').val(data.observacao || '');
+      setMarcadoresSelecionados(data.marcadores || '');
+
+      // Popular tabela de registros individuais
+      const tbody = $('#lote-registros-tbody').empty();
+      (data.registros || []).forEach(function(r) {
+        const sei = escHtml(r.sei_celeb || '—');
+        const termo = escHtml(r.numero_termo || '');
+        const tipo = escHtml(r.alt_tipo || '');
+        const info = escHtml(r.alt_info || '');
+        tbody.append(`
+          <tr id="lote-reg-${r.id}">
+            <td>
+              <small>${termo}</small>
+              <button type="button" class="btn-copy ms-1" onclick="copyToClipboard('${escJs(r.numero_termo)}', this)" title="Copiar"><i class="bi bi-clipboard"></i></button>
+            </td>
+            <td><small class="font-monospace">${sei}</small></td>
+            <td><small>${tipo}</small></td>
+            <td><small>${info}</small></td>
+            <td class="text-center">
+              <button type="button" class="btn btn-xs btn-outline-secondary" style="font-size:.7rem;padding:2px 6px;"
+                title="Desagrupar — vira card individual"
+                onclick="desagruparDoLote(${r.id}, ${loteId})">
+                <i class="bi bi-box-arrow-right"></i>
+              </button>
+              <button type="button" class="btn btn-xs btn-outline-danger" style="font-size:.7rem;padding:2px 6px;"
+                title="Excluir este registro"
+                onclick="excluirRegistroLote(${r.id}, ${loteId})">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>`);
+      });
+      $('#lote-registros-section').show();
+
+      // Inicializar Select2 para adicionar processos ao lote
+      if ($('#lote-add-sei').hasClass('select2-hidden-accessible')) $('#lote-add-sei').select2('destroy');
+      $('#lote-add-sei').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Digite SEI ou nº do termo…',
+        allowClear: true,
+        minimumInputLength: 2,
+        dropdownParent: $('#modalCadastroAlteracao'),
+        ajax: {
+          url: '{{ url_for("parcerias.api_termos_por_sei") }}',
+          dataType: 'json', delay: 250,
+          data: p => ({ q: p.term }),
+          processResults: d => ({ results: d }),
+          cache: true
+        }
+      });
+      // Reset add-form
+      $('#lote-add-tipo').val('');
+      $('#lote-add-info').val('');
+
+      const actionUrl = `{{ url_for('parcerias.atualizar_lote') }}?lote_id=${loteId}`;
+      $('#formAlteracao').attr('action', actionUrl);
+      $('#modalCadastroLabel').html(`<i class="bi bi-stack"></i> Editar Lote #${loteId} <small class="fw-normal fs-6">(${(data.registros||[]).length} termos)</small>`);
+      $('#modalCadastroAlteracao').modal('show');
+    },
+    error: function(xhr) {
+      alert('Erro ao carregar lote: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+    }
+  });
+}
+
+function adicionarAoLote() {
+  const termo = $('#lote-add-sei').val();
+  const tipo  = $('#lote-add-tipo').val();
+  const info  = $('#lote-add-info').val().trim();
+  if (!termo || !tipo) { alert('Selecione o processo e o tipo de alteração.'); return; }
+  const btn = document.getElementById('btn-lote-add-registro');
+  btn.disabled = true;
+  $.ajax({
+    url: '/parcerias/alteracao/adicionar_ao_lote',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify({ lote_id: _loteIdAtual, numero_termo: termo, alt_tipo: tipo, alt_info: info }),
+    success: function(r) {
+      btn.disabled = false;
+      if (!r.success) { alert('Erro: ' + (r.error || '')); return; }
+      const reg = r.registro;
+      const sei = escHtml(reg.sei_celeb || '—');
+      $('#lote-registros-tbody').append(`
+        <tr id="lote-reg-${reg.id}">
+          <td>
+            <small>${escHtml(reg.numero_termo)}</small>
+            <button type="button" class="btn-copy ms-1" onclick="copyToClipboard('${escJs(reg.numero_termo)}', this)" title="Copiar"><i class="bi bi-clipboard"></i></button>
+          </td>
+          <td><small class="font-monospace">${sei}</small></td>
+          <td><small>${escHtml(reg.alt_tipo)}</small></td>
+          <td><small>${escHtml(reg.alt_info)}</small></td>
+          <td class="text-center">
+            <button type="button" class="btn btn-xs btn-outline-secondary" style="font-size:.7rem;padding:2px 6px;"
+              title="Desagrupar" onclick="desagruparDoLote(${reg.id}, ${_loteIdAtual})">
+              <i class="bi bi-box-arrow-right"></i>
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-danger" style="font-size:.7rem;padding:2px 6px;"
+              title="Excluir" onclick="excluirRegistroLote(${reg.id}, ${_loteIdAtual})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>`);
+      // Limpar campos de adição
+      $('#lote-add-sei').val(null).trigger('change');
+      $('#lote-add-tipo').val('');
+      $('#lote-add-info').val('');
+    },
+    error: function(xhr) {
+      btn.disabled = false;
+      alert('Erro: ' + (xhr.responseJSON?.error || 'Erro desconhecido'));
+    }
+  });
+}
+
+function desagruparDoLote(registroId, loteId) {
+  if (!confirm('Desagrupar este processo? Ele será movido para um card individual.')) return;
+  $.ajax({
+    url: '/parcerias/alteracao/desagrupar_do_lote',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify({ id: registroId }),
+    success: function(r) {
+      if (!r.success) { alert('Erro: ' + (r.error || '')); return; }
+      $(`#lote-reg-${registroId}`).fadeOut(200, function() { $(this).remove(); });
+      // Atualizar contador no título
+      const remaining = $('#lote-registros-tbody tr:visible').length - 1;
+      const titulo = $('#modalCadastroLabel');
+      titulo.html(titulo.html().replace(/\(\d+ termos?\)/, `(${remaining} termos)`));
+    },
+    error: function() { alert('Erro ao desagrupar.'); }
+  });
+}
+
+function excluirRegistroLote(registroId, loteId) {
+  if (!confirm('Excluir este registro permanentemente?')) return;
+  $.ajax({
+    url: '/parcerias/alteracao/deletar_registro',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify({ id: registroId }),
+    success: function(r) {
+      if (!r.success) { alert('Erro: ' + (r.error || '')); return; }
+      $(`#lote-reg-${registroId}`).fadeOut(200, function() { $(this).remove(); });
+    },
+    error: function() { alert('Erro ao excluir.'); }
+  });
+}
+
+// ====================================================
+// CONFIRMAR EXCLUSÃO DE LOTE
+// ====================================================
+function confirmarExclusaoLote(loteId, count) {
+  document.getElementById('termoExcluir').textContent = `Lote #${loteId}`;
+  document.getElementById('instrumentoExcluir').textContent = 'Despacho Autorizatório em lote';
+  document.getElementById('numeroExcluir').textContent = `${count} termo(s)`;
+  const url = `{{ url_for('parcerias.deletar_lote') }}?lote_id=${loteId}`;
+  document.getElementById('formExcluir').action = url;
+  new bootstrap.Modal(document.getElementById('modalExcluir')).show();
 }
 
 // ====================================================
@@ -1406,12 +1787,14 @@ function novoCardStatus(status) {
 // ====================================================
 // OCULTAR / REEXIBIR CARD
 // ====================================================
-function ocultarCard(numero, instrumento, altNumero, oculto) {
+function ocultarCard(numero, instrumento, altNumero, oculto, loteId) {
+  const payload = { numero_termo: numero, instrumento: instrumento, alt_numero: parseInt(altNumero), oculto: oculto };
+  if (loteId) payload.lote_id = parseInt(loteId);
   $.ajax({
     url: '/parcerias/alteracao/ocultar',
     method: 'POST',
     contentType: 'application/json',
-    data: JSON.stringify({ numero_termo: numero, instrumento: instrumento, alt_numero: parseInt(altNumero), oculto: oculto }),
+    data: JSON.stringify(payload),
     success: function(r) {
       if (!r.success) { alert('Erro: ' + (r.error || '')); return; }
       if (oculto) {
@@ -1849,13 +2232,14 @@ document.querySelectorAll('.sortable-container').forEach(function(el) {
       const instrumento = item.dataset.instrumento;
       const altNumero  = parseInt(item.dataset.altNumero);
       const temSei     = item.dataset.sei;
+      const loteId     = item.dataset.loteId ? parseInt(item.dataset.loteId) : null;
 
       const doMove = () => {
         $.ajax({
           url: '/parcerias/alteracao/mover',
           method: 'POST',
           contentType: 'application/json',
-          data: JSON.stringify({ numero_termo: numero, instrumento: instrumento, alt_numero: altNumero, novo_status: novoStatus }),
+          data: JSON.stringify({ numero_termo: numero, instrumento: instrumento, alt_numero: altNumero, novo_status: novoStatus, lote_id: loteId }),
           success: function(r) {
             if (!r.success) {
               alert('Erro ao mover: ' + (r.error || ''));
@@ -1962,6 +2346,23 @@ $(document).ready(function() {
       const cor = marcadoresCores[nome];
       if (cor) { pill.style.background = cor.bg; pill.style.color = cor.text; }
     });
+  });
+
+  $(document).on('select2:select', '#numero_termo', function() {
+    const termo = $(this).val() || '';
+    if (!termo) { atualizarDisplayTermo(''); return; }
+    // Buscar sei_celeb para o termo selecionado
+    $.ajax({
+      url: '{{ url_for("parcerias.api_termos_por_sei") }}',
+      data: { q: termo }, dataType: 'json',
+      success: function(results) {
+        const match = results.find(r => r.termo === termo || r.id === termo);
+        atualizarDisplayTermo(match ? match.sei : '');
+      }
+    });
+  });
+  $(document).on('select2:clear', '#numero_termo', function() {
+    atualizarDisplayTermo('');
   });
 
   // Auto-marcadores: quando numero_termo mudar via Select2

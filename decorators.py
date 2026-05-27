@@ -17,6 +17,9 @@ ACCESS_INHERITANCE = {
         'conc_demonstrativo',
         'ocr_testes',
     ],
+    'manuais': [
+        'portarias',
+    ],
 }
 
 

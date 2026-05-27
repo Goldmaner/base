@@ -3531,24 +3531,60 @@ def api_termos_parcerias():
         return jsonify([]), 500
 
 
+@parcerias_bp.route("/api/termos_por_sei", methods=["GET"])
+@login_required
+def api_termos_por_sei():
+    """Busca termos pelo sei_celeb para uso no Select2 do modo lote.
+    Retorna id=numero_termo, text=sei_celeb — numero_termo.
+    """
+    q = request.args.get('q', '').strip()
+    cur = get_cursor()
+    try:
+        if q:
+            cur.execute("""
+                SELECT numero_termo, sei_celeb
+                FROM public.parcerias
+                WHERE sei_celeb ILIKE %s OR numero_termo ILIKE %s
+                ORDER BY sei_celeb NULLS LAST, numero_termo
+                LIMIT 50
+            """, (f'%{q}%', f'%{q}%'))
+        else:
+            cur.execute("""
+                SELECT numero_termo, sei_celeb
+                FROM public.parcerias
+                ORDER BY sei_celeb NULLS LAST, numero_termo
+                LIMIT 50
+            """)
+        rows = cur.fetchall()
+        cur.close()
+        results = []
+        for r in rows:
+            sei = r['sei_celeb'] or ''
+            termo = r['numero_termo'] or ''
+            text = f"{sei} — {termo}" if sei else termo
+            results.append({'id': termo, 'text': text, 'sei': sei, 'termo': termo})
+        return jsonify(results)
+    except Exception as e:
+        print(f"[ERRO] api_termos_por_sei: {e}")
+        return jsonify([]), 500
+
+
 @parcerias_bp.route("/api/lista_oscs", methods=["GET"])
 @login_required
 def api_lista_oscs():
-    """
-    API para listar todas as OSCs únicas
-    """
+    """API para listar todas as OSCs únicas."""
     cur = get_cursor()
-    
+
     try:
         cur.execute("""
-            SELECT DISTINCT osc 
-            FROM public.parcerias 
+            SELECT DISTINCT osc
+            FROM public.parcerias
             WHERE osc IS NOT NULL AND osc != ''
             ORDER BY osc
         """)
         oscs = [row['osc'] for row in cur.fetchall()]
         cur.close()
-        
+
         return jsonify(oscs)
         
     except Exception as e:
@@ -5150,8 +5186,19 @@ def editar_alteracao():
             except Exception as e:
                 print(f"[WARN] Erro ao buscar SEI documento e data assinatura: {e}")
         
+        # Buscar sei_celeb da parceria para o display de cópia
+        sei_celeb = ''
+        try:
+            cur.execute("SELECT sei_celeb FROM public.parcerias WHERE numero_termo = %s LIMIT 1",
+                        (numero_termo,))
+            r_sei = cur.fetchone()
+            if r_sei:
+                sei_celeb = r_sei['sei_celeb'] or ''
+        except Exception:
+            pass
+
         cur.close()
-        
+
         return jsonify({
             'tipos': tipos,
             'infos': infos,
@@ -5163,7 +5210,8 @@ def editar_alteracao():
             'prioridade': prioridade,
             'data_inicio': data_inicio_str,
             'data_conclusao': data_conclusao_str,
-            'marcadores': marcadores
+            'marcadores': marcadores,
+            'sei_celeb': sei_celeb,
         })
         
     except Exception as e:
@@ -5345,6 +5393,236 @@ def atualizar_alteracao():
         return redirect(url_for('parcerias.dgp_kanban'))
 
 
+@parcerias_bp.route("/alteracao/editar_lote", methods=["GET"])
+@login_required
+@requires_access('dgp_alteracoes')
+def editar_lote():
+    """Retorna os campos compartilhados e a lista de registros de um lote para edição."""
+    lote_id = request.args.get('lote_id', type=int)
+    if not lote_id:
+        return jsonify({'error': 'lote_id obrigatório'}), 400
+    cur = get_cursor()
+    try:
+        cur.execute("""
+            SELECT t.id, t.numero_termo, t.alt_tipo, t.alt_info,
+                   t.alt_status, t.alt_responsavel, t.alt_observacao,
+                   t.alt_prioridade, t.alt_data_inicio, t.alt_data_conclusao,
+                   t.alt_marcadores,
+                   p.sei_celeb
+            FROM public.termos_alteracoes t
+            LEFT JOIN public.parcerias p ON t.numero_termo = p.numero_termo
+            WHERE t.alt_lote_id = %s
+            ORDER BY t.id
+        """, (lote_id,))
+        rows = cur.fetchall()
+        cur.close()
+        if not rows:
+            return jsonify({'error': 'Lote não encontrado'}), 404
+        first = rows[0]
+        di = first['alt_data_inicio']
+        dc = first['alt_data_conclusao']
+        registros = []
+        for r in rows:
+            registros.append({
+                'id':          r['id'],
+                'numero_termo': r['numero_termo'],
+                'sei_celeb':   r['sei_celeb'] or '',
+                'alt_tipo':    r['alt_tipo'] or '',
+                'alt_info':    r['alt_info'] or '',
+            })
+        return jsonify({
+            'status':         first['alt_status'] or '',
+            'responsavel':    first['alt_responsavel'] or '',
+            'observacao':     first['alt_observacao'] or '',
+            'prioridade':     first['alt_prioridade'] or '',
+            'data_inicio':    di.strftime('%Y-%m-%d') if di else '',
+            'data_conclusao': dc.strftime('%Y-%m-%d') if dc else '',
+            'marcadores':     first['alt_marcadores'] or '',
+            'registros':      registros,
+        })
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@parcerias_bp.route("/alteracao/adicionar_ao_lote", methods=["POST"])
+@login_required
+@requires_access('dgp_alteracoes')
+def adicionar_ao_lote():
+    """Adiciona um novo registro a um lote existente, herdando os campos compartilhados."""
+    dados = request.get_json(force=True)
+    lote_id     = dados.get('lote_id')
+    numero_termo = (dados.get('numero_termo') or '').strip()
+    alt_tipo    = (dados.get('alt_tipo') or '').strip()
+    alt_info    = (dados.get('alt_info') or '').strip() or None
+
+    if not (lote_id and numero_termo and alt_tipo):
+        return jsonify({'success': False, 'error': 'lote_id, numero_termo e alt_tipo são obrigatórios'}), 400
+
+    cur = get_cursor()
+    try:
+        # Buscar campos compartilhados do lote
+        cur.execute("""
+            SELECT alt_status, alt_responsavel, alt_prioridade,
+                   alt_data_inicio, alt_data_conclusao, alt_observacao,
+                   alt_marcadores, instrumento_alteracao
+            FROM public.termos_alteracoes
+            WHERE alt_lote_id = %s
+            LIMIT 1
+        """, (lote_id,))
+        base = cur.fetchone()
+        if not base:
+            cur.close()
+            return jsonify({'success': False, 'error': 'Lote não encontrado'}), 404
+
+        cur.execute("""
+            INSERT INTO public.termos_alteracoes
+                (numero_termo, instrumento_alteracao, alt_numero, alt_tipo, alt_info,
+                 alt_status, alt_responsavel, alt_prioridade,
+                 alt_data_inicio, alt_data_conclusao, alt_observacao, alt_marcadores,
+                 alt_lote_id, alt_data_cadastro_inicio)
+            VALUES (%s,%s,0,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+            RETURNING id
+        """, (
+            numero_termo, base['instrumento_alteracao'], alt_tipo, alt_info,
+            base['alt_status'], base['alt_responsavel'], base['alt_prioridade'],
+            base['alt_data_inicio'], base['alt_data_conclusao'],
+            base['alt_observacao'], base['alt_marcadores'], lote_id
+        ))
+        novo_id = cur.fetchone()['id']
+
+        # Buscar sei_celeb para retornar ao frontend
+        cur.execute("SELECT sei_celeb FROM public.parcerias WHERE numero_termo = %s", (numero_termo,))
+        p = cur.fetchone()
+        sei_celeb = p['sei_celeb'] if p else ''
+
+        get_db().commit()
+        cur.close()
+        return jsonify({
+            'success': True,
+            'registro': {
+                'id': novo_id,
+                'numero_termo': numero_termo,
+                'sei_celeb': sei_celeb or '',
+                'alt_tipo': alt_tipo,
+                'alt_info': alt_info or '',
+            }
+        })
+    except Exception as e:
+        get_db().rollback()
+        cur.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@parcerias_bp.route("/alteracao/desagrupar_do_lote", methods=["POST"])
+@login_required
+@requires_access('dgp_alteracoes')
+def desagrupar_do_lote():
+    """Remove um registro específico do lote (alt_lote_id = NULL) — vira card individual."""
+    dados = request.get_json(force=True)
+    registro_id = dados.get('id')
+    if not registro_id:
+        return jsonify({'success': False, 'error': 'id obrigatório'}), 400
+    cur = get_cursor()
+    try:
+        cur.execute(
+            "UPDATE public.termos_alteracoes SET alt_lote_id = NULL WHERE id = %s",
+            (registro_id,)
+        )
+        get_db().commit()
+        cur.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        get_db().rollback()
+        cur.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@parcerias_bp.route("/alteracao/deletar_registro", methods=["POST"])
+@login_required
+@requires_access('dgp_alteracoes')
+def deletar_registro_lote():
+    """Deleta um único registro pelo id (para remoção de item individual de um lote)."""
+    dados = request.get_json(force=True)
+    registro_id = dados.get('id')
+    if not registro_id:
+        return jsonify({'success': False, 'error': 'id obrigatório'}), 400
+    cur = get_cursor()
+    try:
+        cur.execute("DELETE FROM public.termos_alteracoes WHERE id = %s", (registro_id,))
+        get_db().commit()
+        cur.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        get_db().rollback()
+        cur.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@parcerias_bp.route("/alteracao/atualizar_lote", methods=["POST"])
+@login_required
+@requires_access('dgp_alteracoes')
+def atualizar_lote():
+    """Atualiza os campos compartilhados de todos os registros de um lote."""
+    lote_id = request.args.get('lote_id', type=int)
+    if not lote_id:
+        return jsonify({'success': False, 'message': 'lote_id obrigatório'}), 400
+    alt_status       = request.form.get('alt_status', '').strip()
+    alt_responsavel  = ';'.join(request.form.getlist('alt_responsavel[]'))
+    alt_prioridade   = request.form.get('alt_prioridade', '') or None
+    alt_data_inicio  = request.form.get('alt_data_inicio') or None
+    alt_data_conclusao = request.form.get('alt_data_conclusao') or None
+    alt_observacao   = request.form.get('alt_observacao', '').strip() or None
+    alt_marcadores   = request.form.get('alt_marcadores', '') or None
+    cur = get_cursor()
+    try:
+        data_fim_expr = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+        cur.execute(f"""
+            UPDATE public.termos_alteracoes
+            SET alt_status         = %s,
+                alt_responsavel    = %s,
+                alt_prioridade     = %s,
+                alt_data_inicio    = %s,
+                alt_data_conclusao = %s,
+                alt_data_cadastro_fim = {data_fim_expr},
+                alt_observacao     = %s,
+                alt_marcadores     = %s
+            WHERE alt_lote_id = %s
+        """, (alt_status, alt_responsavel, alt_prioridade,
+              alt_data_inicio, alt_data_conclusao,
+              alt_observacao, alt_marcadores, lote_id))
+        get_db().commit()
+        cur.close()
+        is_xhr = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        if is_xhr:
+            return jsonify({'success': True})
+        return redirect(url_for('parcerias.dgp_kanban'))
+    except Exception as e:
+        get_db().rollback()
+        cur.close()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@parcerias_bp.route("/alteracao/deletar_lote", methods=["POST"])
+@login_required
+@requires_access('dgp_alteracoes')
+def deletar_lote():
+    """Deleta todos os registros de um lote."""
+    lote_id = request.args.get('lote_id', type=int)
+    if not lote_id:
+        return jsonify({'success': False, 'message': 'lote_id obrigatório'}), 400
+    cur = get_cursor()
+    try:
+        cur.execute("DELETE FROM public.termos_alteracoes WHERE alt_lote_id = %s", (lote_id,))
+        get_db().commit()
+        cur.close()
+        return redirect(url_for('parcerias.dgp_kanban'))
+    except Exception as e:
+        get_db().rollback()
+        cur.close()
+        return redirect(url_for('parcerias.dgp_kanban'))
+
+
 @parcerias_bp.route("/alteracao/deletar", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
@@ -5407,10 +5685,13 @@ def dgp_kanban():
         tipos_alteracao = cur.fetchall()
 
         cur.execute("""
-            SELECT DISTINCT instrumento_alteracao
-            FROM categoricas.c_alt_instrumento ORDER BY instrumento_alteracao
+            SELECT status
+            FROM categoricas.c_geral_status
+            WHERE schema_table_coluna_r = 'public.termos_alteracoes.instrumento_alteracao'
+              AND ativo = TRUE
+            ORDER BY id
         """)
-        instrumentos = [r['instrumento_alteracao'] for r in cur.fetchall()]
+        instrumentos = [r['status'] for r in cur.fetchall()]
 
         analistas_ativos = []
         analistas_inativos = []
@@ -5429,30 +5710,64 @@ def dgp_kanban():
             analistas_ativos = [{'nome': 'Administrador', 'status': True}]
 
         # Buscar todas as alterações (sem paginação — kanban mostra tudo)
+        # Rows sem lote_id: card individual. Rows com lote_id: um card por lote.
         cur.execute("""
-            SELECT
-                t.numero_termo,
-                t.instrumento_alteracao,
-                t.alt_numero,
-                string_agg(DISTINCT t.alt_tipo, ', ' ORDER BY t.alt_tipo) AS tipos_alteracao,
-                MAX(t.alt_responsavel) AS responsavel,
-                MAX(t.alt_status) AS alt_status,
-                MAX(t.alt_prioridade) AS alt_prioridade,
-                MAX(t.alt_data_inicio) AS alt_data_inicio,
-                MAX(t.alt_data_conclusao) AS alt_data_conclusao,
-                BOOL_OR(COALESCE(t.alt_oculto, FALSE)) AS alt_oculto,
-                MAX(t.alt_marcadores) AS alt_marcadores,
-                MAX(t.alt_data_cadastro_inicio) AS alt_data_cadastro_inicio,
-                MAX(t.alt_observacao) AS alt_observacao,
-                p.osc AS osc,
-                MAX(p.sei_celeb) AS sei_celeb
-            FROM public.termos_alteracoes t
-            LEFT JOIN public.parcerias p ON t.numero_termo = p.numero_termo
-            GROUP BY t.numero_termo, t.instrumento_alteracao, t.alt_numero, p.osc
+            SELECT * FROM (
+                -- Cards individuais (sem lote)
+                SELECT
+                    t.numero_termo,
+                    t.instrumento_alteracao,
+                    t.alt_numero,
+                    NULL::integer                                                          AS alt_lote_id,
+                    0                                                                      AS lote_count,
+                    NULL::text                                                             AS lote_termos,
+                    string_agg(DISTINCT t.alt_tipo, ', ' ORDER BY t.alt_tipo)             AS tipos_alteracao,
+                    MAX(t.alt_responsavel)                                                 AS responsavel,
+                    MAX(t.alt_status)                                                      AS alt_status,
+                    MAX(t.alt_prioridade)                                                  AS alt_prioridade,
+                    MAX(t.alt_data_inicio)                                                 AS alt_data_inicio,
+                    MAX(t.alt_data_conclusao)                                              AS alt_data_conclusao,
+                    BOOL_OR(COALESCE(t.alt_oculto, FALSE))                                AS alt_oculto,
+                    MAX(t.alt_marcadores)                                                  AS alt_marcadores,
+                    MAX(t.alt_data_cadastro_inicio)                                        AS alt_data_cadastro_inicio,
+                    MAX(t.alt_observacao)                                                  AS alt_observacao,
+                    p.osc                                                                  AS osc,
+                    MAX(p.sei_celeb)                                                       AS sei_celeb
+                FROM public.termos_alteracoes t
+                LEFT JOIN public.parcerias p ON t.numero_termo = p.numero_termo
+                WHERE t.alt_lote_id IS NULL
+                GROUP BY t.numero_termo, t.instrumento_alteracao, t.alt_numero, p.osc
+
+                UNION ALL
+
+                -- Cards de lote (um card por alt_lote_id)
+                SELECT
+                    'LOTE-' || t.alt_lote_id::text                                        AS numero_termo,
+                    MAX(t.instrumento_alteracao)                                           AS instrumento_alteracao,
+                    0                                                                      AS alt_numero,
+                    t.alt_lote_id                                                          AS alt_lote_id,
+                    COUNT(DISTINCT t.numero_termo)                                         AS lote_count,
+                    string_agg(DISTINCT t.numero_termo, ', ' ORDER BY t.numero_termo)     AS lote_termos,
+                    string_agg(DISTINCT t.alt_tipo, ', ' ORDER BY t.alt_tipo)             AS tipos_alteracao,
+                    MAX(t.alt_responsavel)                                                 AS responsavel,
+                    MAX(t.alt_status)                                                      AS alt_status,
+                    MAX(t.alt_prioridade)                                                  AS alt_prioridade,
+                    MAX(t.alt_data_inicio)                                                 AS alt_data_inicio,
+                    MAX(t.alt_data_conclusao)                                              AS alt_data_conclusao,
+                    BOOL_OR(COALESCE(t.alt_oculto, FALSE))                                AS alt_oculto,
+                    MAX(t.alt_marcadores)                                                  AS alt_marcadores,
+                    MAX(t.alt_data_cadastro_inicio)                                        AS alt_data_cadastro_inicio,
+                    MAX(t.alt_observacao)                                                  AS alt_observacao,
+                    NULL::text                                                             AS osc,
+                    NULL::text                                                             AS sei_celeb
+                FROM public.termos_alteracoes t
+                WHERE t.alt_lote_id IS NOT NULL
+                GROUP BY t.alt_lote_id
+            ) AS todas
             ORDER BY
-                CASE WHEN MAX(t.alt_status) = 'Concluído' THEN 1 ELSE 0 END,
-                MAX(t.alt_data_cadastro_inicio) DESC NULLS LAST,
-                t.numero_termo, t.alt_numero
+                CASE WHEN alt_status = 'Concluído' THEN 1 ELSE 0 END,
+                alt_data_cadastro_inicio DESC NULLS LAST,
+                numero_termo, alt_numero
         """)
         todas_alteracoes = cur.fetchall()
 
@@ -5498,13 +5813,22 @@ def dgp_kanban():
 @login_required
 @requires_access('dgp_alteracoes')
 def api_mover_card():
-    """Mover card para novo status via drag-drop."""
+    """Mover card para novo status via drag-drop.
+    Suporta lote: se lote_id for fornecido, atualiza todos os registros do lote.
+    """
     dados = request.get_json(force=True)
     numero_termo = (dados.get('numero_termo') or '').strip()
-    instrumento = (dados.get('instrumento') or '').strip()
-    novo_status = (dados.get('novo_status') or '').strip()
+    instrumento  = (dados.get('instrumento') or '').strip()
+    novo_status  = (dados.get('novo_status') or '').strip()
+    lote_id      = dados.get('lote_id')  # int ou None
 
-    if not (numero_termo and instrumento and novo_status):
+    if lote_id:
+        try:
+            lote_id = int(lote_id)
+        except (TypeError, ValueError):
+            lote_id = None
+
+    if not (novo_status and (lote_id or (numero_termo and instrumento))):
         return jsonify({'success': False, 'error': 'Parâmetros inválidos'}), 400
 
     try:
@@ -5514,7 +5838,6 @@ def api_mover_card():
 
     cur = get_cursor()
     try:
-        # Verificar se o status novo existe
         cur.execute("""
             SELECT 1 FROM categoricas.c_alt_status_alteracao WHERE alt_status = %s
         """, (novo_status,))
@@ -5527,14 +5850,22 @@ def api_mover_card():
         else:
             data_fim_expr = 'NULL'
 
-        cur.execute(f"""
-            UPDATE public.termos_alteracoes
-            SET alt_status = %s, alt_data_cadastro_fim = {data_fim_expr}
-            WHERE numero_termo = %s AND instrumento_alteracao = %s AND alt_numero = %s
-        """, (novo_status, numero_termo, instrumento, alt_numero))
+        if lote_id:
+            # Atualiza todos os registros do lote de uma vez
+            cur.execute(f"""
+                UPDATE public.termos_alteracoes
+                SET alt_status = %s, alt_data_cadastro_fim = {data_fim_expr}
+                WHERE alt_lote_id = %s
+            """, (novo_status, lote_id))
+        else:
+            cur.execute(f"""
+                UPDATE public.termos_alteracoes
+                SET alt_status = %s, alt_data_cadastro_fim = {data_fim_expr}
+                WHERE numero_termo = %s AND instrumento_alteracao = %s AND alt_numero = %s
+            """, (novo_status, numero_termo, instrumento, alt_numero))
 
-        if novo_status == 'Concluído':
-            # Buscar tipos para chamar _atualizar_tabela_original
+        if novo_status == 'Concluído' and not lote_id:
+            # Buscar tipos para chamar _atualizar_tabela_original (só cards individuais)
             cur.execute("""
                 SELECT alt_tipo, alt_info, alt_numero
                 FROM public.termos_alteracoes
@@ -5566,23 +5897,35 @@ def api_mover_card():
 @login_required
 @requires_access('dgp_alteracoes')
 def api_ocultar_card():
-    """Ocultar ou reexibir um card no kanban."""
+    """Ocultar ou reexibir um card no kanban. Suporta lote via lote_id."""
     dados = request.get_json(force=True)
     numero_termo = (dados.get('numero_termo') or '').strip()
-    instrumento = (dados.get('instrumento') or '').strip()
-    alt_numero = int(dados.get('alt_numero', 0))
-    oculto = bool(dados.get('oculto', True))
+    instrumento  = (dados.get('instrumento') or '').strip()
+    alt_numero   = int(dados.get('alt_numero', 0))
+    oculto       = bool(dados.get('oculto', True))
+    lote_id      = dados.get('lote_id')
+    if lote_id:
+        try:
+            lote_id = int(lote_id)
+        except (TypeError, ValueError):
+            lote_id = None
 
-    if not (numero_termo and instrumento):
+    if not (lote_id or (numero_termo and instrumento)):
         return jsonify({'success': False, 'error': 'Parâmetros inválidos'}), 400
 
     cur = get_cursor()
     try:
-        cur.execute("""
-            UPDATE public.termos_alteracoes
-            SET alt_oculto = %s
-            WHERE numero_termo = %s AND instrumento_alteracao = %s AND alt_numero = %s
-        """, (oculto, numero_termo, instrumento, alt_numero))
+        if lote_id:
+            cur.execute("""
+                UPDATE public.termos_alteracoes SET alt_oculto = %s
+                WHERE alt_lote_id = %s
+            """, (oculto, lote_id))
+        else:
+            cur.execute("""
+                UPDATE public.termos_alteracoes
+                SET alt_oculto = %s
+                WHERE numero_termo = %s AND instrumento_alteracao = %s AND alt_numero = %s
+            """, (oculto, numero_termo, instrumento, alt_numero))
         get_db().commit()
         cur.close()
         return jsonify({'success': True})

@@ -191,7 +191,8 @@ def api_gerencial_semana():
                     SELECT COUNT(*)
                     FROM gestao_pessoas.relatorios_desempenho rd
                     WHERE rd.usuario_email = et.usuario_email
-                      AND (rd.criado_em AT TIME ZONE 'America/Sao_Paulo')::date = et.data_teletrabalho
+                      AND (rd.criado_em AT TIME ZONE 'America/Sao_Paulo')::date
+                          BETWEEN %s AND %s + INTERVAL '6 days'
                 ) AS total_registros
             FROM calendario.escala_teletrabalho et
             LEFT JOIN gestao_pessoas.usuarios_infos ui
@@ -201,7 +202,7 @@ def api_gerencial_semana():
             ORDER BY ui.usuario_unidade_alocada NULLS LAST,
                      et.data_teletrabalho,
                      COALESCE(ui.usuario_nome, et.usuario_email)
-        """, (semana_inicio,))
+        """, (semana_inicio, semana_inicio, semana_inicio))
 
         pessoas = []
         for row in cur.fetchall():

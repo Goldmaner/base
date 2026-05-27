@@ -263,6 +263,14 @@
     .avaliacao-glosar td {
         background-color: #fbe2d5 !important;
     }
+
+    /* Linha com erro de save: borda vermelha à esquerda + fundo levemente rosado */
+    tr.linha-erro td:first-child {
+        border-left: 3px solid #dc3545 !important;
+    }
+    tr.linha-erro {
+        background-color: rgba(220, 53, 69, 0.05) !important;
+    }
     
     /* Linha de separação entre meses */
     tr.mudanca-mes {
@@ -639,6 +647,21 @@
                                                 <h6 class="mb-0 text-info">Modelo Importação</h6>
                                             </div>
                                             <small class="text-muted">Baixa planilha modelo para importação de dados</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+
+                            <!-- Relação de Glosas -->
+                            <div class="col-6">
+                                <a href="#" id="btnGlosas" onmousedown="atualizarHrefGlosas()" onclick="abrirGlosas(event)" class="text-decoration-none">
+                                    <div class="card border-danger h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-x-circle-fill fs-4 text-danger me-2"></i>
+                                                <h6 class="mb-0 text-danger">Relação de Glosas</h6>
+                                            </div>
+                                            <small class="text-muted">Despesas marcadas como Glosar, organizadas por mês</small>
                                         </div>
                                     </div>
                                 </a>
@@ -3819,7 +3842,12 @@
             } else if (linha.cat_avaliacao === 'Glosar') {
                 tr.classList.add('avaliacao-glosar');
             }
-            
+
+            // Linha com erro de save anterior: borda vermelha à esquerda
+            if (linha._salvo_erro) {
+                tr.classList.add('linha-erro');
+            }
+
             // Detectar mudança de mês: se há linha anterior e o mês mudou
             // Aplicar borda na linha ATUAL (que inicia o novo mês)
             if (index > 0) {
@@ -4553,7 +4581,13 @@
     function atualizarCampo(index, campo, valor) {
         linhas[index][campo] = valor;
         linhas[index]._dirty = true;  // dirty tracking
-        
+        // Se a linha tinha erro de save, limpar highlight ao ser editada
+        if (linhas[index]._salvo_erro) {
+            linhas[index]._salvo_erro = false;
+            const tr = document.querySelector(`tr[data-index="${index}"]`);
+            if (tr) tr.classList.remove('linha-erro');
+        }
+
         // Rastrear deleção manual de competência
         if (campo === 'competencia') {
             if (!valor || valor.trim() === '') {
@@ -5026,7 +5060,13 @@
         const linhaAnterior = linhas[index][campo];
         linhas[index][campo] = valorNumerico;
         linhas[index]._dirty = true;  // dirty tracking
-        
+        // Se a linha tinha erro de save, limpar highlight ao ser editada
+        if (linhas[index]._salvo_erro) {
+            linhas[index]._salvo_erro = false;
+            const tr = document.querySelector(`tr[data-index="${index}"]`);
+            if (tr) tr.classList.remove('linha-erro');
+        }
+
         // Auto-preencher composição apenas na PRIMEIRA vez que crédito/débito for preenchido
         // (se composição ainda está vazia ou não foi editada manualmente)
         if ((campo === 'credito' || campo === 'debito') && valorNumerico) {
@@ -6221,6 +6261,30 @@
         }
     }
 
+    function atualizarHrefGlosas() {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (numeroTermo) {
+            document.getElementById('btnGlosas').href = `/conc_glosas/?termo=${encodeURIComponent(numeroTermo)}`;
+        }
+    }
+
+    function abrirGlosas(event) {
+        const numeroTermo = document.getElementById('numeroTermo').value;
+        if (!numeroTermo) {
+            event.preventDefault();
+            alert('Selecione um termo primeiro!');
+            return false;
+        }
+        const url = `/conc_glosas/?termo=${encodeURIComponent(numeroTermo)}`;
+        document.getElementById('btnGlosas').href = url;
+
+        if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+            event.preventDefault();
+            window.open(url, '_blank');
+        }
+        return true;
+    }
+
     function atualizarHrefRendimentos() {
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (numeroTermo) {
@@ -6592,8 +6656,10 @@
             }
 
             const resultado = await response.json();
-            // Não mostrar mensagem de sucesso - apenas erros
-            
+            // Tratar erros parciais de linhas (savepoints por linha no backend)
+            const errosLinhas = resultado.erros || [];
+            const indiceFalhou = new Set(errosLinhas.map(e => e.indice));
+
             // Salvar Notas Fiscais (se seção ativada)
             if (secaoNotasFiscaisAtiva && Object.keys(notasFiscais).length > 0) {
                 const notasParaSalvar = Object.entries(notasFiscais)
@@ -6698,8 +6764,17 @@
                 linhasExcluidasIds.clear();
             }
 
-            // Limpar dirty flags após save bem-sucedido
-            linhas.forEach(l => l._dirty = false);
+            // Dirty tracking parcial: limpar apenas linhas salvas com sucesso;
+            // manter _dirty=true e marcar _salvo_erro nas que falharam
+            linhas.forEach(l => {
+                if (indiceFalhou.has(l.indice)) {
+                    l._salvo_erro = true;   // borda vermelha no próximo render
+                    // _dirty permanece true — linha ainda precisa ser salva
+                } else {
+                    l._dirty = false;
+                    l._salvo_erro = false;
+                }
+            });
             documentosAnaliseDirty.clear();
             
             // Recarregar dados auxiliares se necessário
@@ -6710,9 +6785,21 @@
                 await carregarDocumentosAnalise();
             }
             
-            // Re-renderizar tabela para atualizar IDs e estado visual
+            // Re-renderizar tabela para atualizar IDs e estado visual (inclui linha-erro)
             renderizarTabela();
-            atualizarBadgeEstado('salvo');
+
+            // Toast e badge: diferencia save limpo de save parcial
+            if (errosLinhas.length > 0) {
+                const listaLinhas = errosLinhas.slice(0, 5).map(e => `linha ${e.indice}`).join(', ');
+                const sufixo = errosLinhas.length > 5 ? ` e mais ${errosLinhas.length - 5}` : '';
+                showToast(
+                    `⚠️ ${resultado.ids.length} linhas salvas · ${errosLinhas.length} com erro (${listaLinhas}${sufixo})`,
+                    'warning', 8000
+                );
+                atualizarBadgeEstado('pendente');
+            } else {
+                atualizarBadgeEstado('salvo');
+            }
 
         } catch (error) {
             console.error('❌ Erro ao salvar:', error);

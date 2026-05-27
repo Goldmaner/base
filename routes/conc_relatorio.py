@@ -363,9 +363,10 @@ def dados_relatorio():
             
             # Buscar lista oficial de categorias de provisão
             cursor.execute("""
-                SELECT DISTINCT despesa_provisao
-                FROM categoricas.c_dac_despesas_provisao
-                WHERE despesa_provisao IS NOT NULL
+                SELECT status AS despesa_provisao
+                FROM categoricas.c_geral_status
+                WHERE schema_table_coluna_r = 'gestao_financeira.despesas.categoria_provisao'
+                  AND ativo = TRUE
             """)
             categorias_provisao_db = [row['despesa_provisao'] for row in cursor.fetchall()]
             print(f"[DEBUG MISTO] Categorias de provisão (do banco): {categorias_provisao_db}")

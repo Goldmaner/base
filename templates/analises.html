@@ -194,6 +194,50 @@
           </button>
         </div>
       </div>
+      <!-- Colunas opcionais -->
+      <div class="row mt-2 pt-2 border-top">
+        <div class="col-12">
+          <small class="text-muted fw-semibold me-3">Colunas opcionais:</small>
+          <div class="d-inline-flex flex-wrap gap-3">
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinNotificacao" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinNotificacao">Notificação</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinParecer" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinParecer">Parecer</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinFaseRecursal" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinFaseRecursal">Fase Recursal</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinEncerramento" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinEncerramento">Encerramento</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinDataDP" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinDataDP">Data Parecer DP</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinValorDev" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinValorDev">Valor Devolução</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinValorDevolvido" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinValorDevolvido">Valor Devolvido</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinRespDP" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinRespDP">Responsável DP</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="chkFinDataPG" onchange="toggleColFinanceiro()">
+              <label class="form-check-label small" for="chkFinDataPG">Data Parecer PG</label>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Filtros Padrão Físico (M&A) -->
@@ -345,15 +389,15 @@
                   <th>Entregue</th>
                   <th>Regularidade</th>
                   <th>Cobrado</th>
-                  <th>Notificação</th>
-                  <th>Parecer</th>
-                  <th>Fase Recursal</th>
-                  <th>Encerramento</th>
-                  <th>Data Parecer DP</th>
-                  <th>Valor Devolução</th>
-                  <th>Valor Devolvido</th>
-                  <th>Responsável DP</th>
-                  <th>Data Parecer PG</th>
+                  <th class="col-opt-fin" data-opt="notificacao" style="display:none;">Notificação</th>
+                  <th class="col-opt-fin" data-opt="parecer" style="display:none;">Parecer</th>
+                  <th class="col-opt-fin" data-opt="fase_recursal" style="display:none;">Fase Recursal</th>
+                  <th class="col-opt-fin" data-opt="encerramento" style="display:none;">Encerramento</th>
+                  <th class="col-opt-fin" data-opt="data_dp" style="display:none;">Data Parecer DP</th>
+                  <th class="col-opt-fin" data-opt="valor_dev" style="display:none;">Valor Devolução</th>
+                  <th class="col-opt-fin" data-opt="valor_devolvido" style="display:none;">Valor Devolvido</th>
+                  <th class="col-opt-fin" data-opt="resp_dp" style="display:none;">Responsável DP</th>
+                  <th class="col-opt-fin" data-opt="data_pg" style="display:none;">Data Parecer PG</th>
                   <th>Responsável PG</th>
                   <th>Observações</th>
                   <th>Ações</th>
@@ -616,15 +660,15 @@
           <td>${row.entregue}</td>
           <td><span class="badge ${badgeClass}">${row.regularidade}</span></td>
           <td>${row.cobrado}</td>
-          <td>${row.e_notificacao}</td>
-          <td>${row.e_parecer}</td>
-          <td>${row.e_fase_recursal}</td>
-          <td>${row.e_encerramento}</td>
-          <td>${row.data_parecer_dp}</td>
-          <td>${row.valor_devolucao}</td>
-          <td>${row.valor_devolvido}</td>
-          <td>${row.responsavel_dp}</td>
-          <td>${row.data_parecer_pg}</td>
+          <td data-opt="notificacao">${row.e_notificacao}</td>
+          <td data-opt="parecer">${row.e_parecer}</td>
+          <td data-opt="fase_recursal">${row.e_fase_recursal}</td>
+          <td data-opt="encerramento">${row.e_encerramento}</td>
+          <td data-opt="data_dp">${row.data_parecer_dp}</td>
+          <td data-opt="valor_dev">${row.valor_devolucao}</td>
+          <td data-opt="valor_devolvido">${row.valor_devolvido}</td>
+          <td data-opt="resp_dp">${row.responsavel_dp}</td>
+          <td data-opt="data_pg">${row.data_parecer_pg}</td>
           <td>${row.responsavel_pg}</td>
           <td title="${row.observacoes}">${row.observacoes.substring(0, 50)}${row.observacoes.length > 50 ? '...' : ''}</td>
           <td>
@@ -634,6 +678,27 @@
           </td>
         `;
         tbody.appendChild(tr);
+      });
+      toggleColFinanceiro();
+    }
+
+    function toggleColFinanceiro() {
+      const mapa = {
+        notificacao:     document.getElementById('chkFinNotificacao')?.checked,
+        parecer:         document.getElementById('chkFinParecer')?.checked,
+        fase_recursal:   document.getElementById('chkFinFaseRecursal')?.checked,
+        encerramento:    document.getElementById('chkFinEncerramento')?.checked,
+        data_dp:         document.getElementById('chkFinDataDP')?.checked,
+        valor_dev:       document.getElementById('chkFinValorDev')?.checked,
+        valor_devolvido: document.getElementById('chkFinValorDevolvido')?.checked,
+        resp_dp:         document.getElementById('chkFinRespDP')?.checked,
+        data_pg:         document.getElementById('chkFinDataPG')?.checked,
+      };
+      document.querySelectorAll('#tabelaAnalises th.col-opt-fin').forEach(th => {
+        th.style.display = mapa[th.dataset.opt] ? '' : 'none';
+      });
+      document.querySelectorAll('#corpoTabela td[data-opt]').forEach(td => {
+        td.style.display = mapa[td.dataset.opt] ? '' : 'none';
       });
     }
 
