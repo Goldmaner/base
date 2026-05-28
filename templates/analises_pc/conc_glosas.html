@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relação de Despesas Glosadas - FAF</title>
+    <title>Relação de Despesas Glosadas - FParcerias</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 <style>
@@ -66,6 +66,7 @@
         border-collapse: collapse;
         margin-bottom: 0;
         width: 100%;
+        table-layout: fixed;   /* respeita os widths declarados */
     }
 
     .table-glosa thead th {
@@ -83,6 +84,13 @@
         padding: 7px 10px;
         vertical-align: middle;
         border: 1px solid #dee2e6;
+    }
+
+    /* Colunas curtas: cortar com reticências (tooltip já está no title=) */
+    .cell-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .table-glosa tbody tr:nth-child(odd) {
@@ -107,11 +115,71 @@
         white-space: nowrap;
     }
 
-    .cell-motivo {
-        max-width: 360px;
-        white-space: pre-line;
-        font-size: 0.83rem;
-        line-height: 1.4;
+    /* ===== GRUPO POR MOTIVO ===== */
+    .grupo-header {
+        background: #fff;
+        border-left: 4px solid #dc3545;
+        border-bottom: 1px solid #f0d0d0;
+        padding: 8px 14px 8px 12px;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        transition: background 0.1s;
+    }
+    .grupo-header:hover { background: #fff8f8; }
+    .grupo-header.sem-motivo { border-left-color: #adb5bd; }
+    .grupo-header.collapsed .grupo-toggle { transform: rotate(-90deg); }
+
+    .grupo-motivo-info { flex: 1; min-width: 0; }
+    .grupo-motivo-nome {
+        font-weight: 700;
+        font-size: 0.82rem;
+        color: #842029;
+        white-space: normal;
+        word-break: break-word;
+    }
+    .grupo-header.sem-motivo .grupo-motivo-nome {
+        color: #6c757d;
+        font-style: italic;
+        font-weight: 400;
+    }
+    .grupo-motivo-desc {
+        font-size: 0.74rem;
+        color: #495057;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin-top: 3px;
+    }
+    .grupo-right {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        flex-shrink: 0;
+        padding-top: 1px;
+    }
+    .grupo-valor {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        color: #dc3545;
+        font-size: 0.88rem;
+        white-space: nowrap;
+    }
+    .grupo-toggle { font-size: 0.78rem; opacity: 0.7; transition: transform 0.2s; }
+
+    .grupo-body { border-left: 3px solid #f5c6cb; }
+
+    .mes-total-bar {
+        background: #f8d7da;
+        text-align: right;
+        padding: 6px 14px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        border-top: 2px solid #dc3545;
+        font-family: 'Courier New', monospace;
+        color: #842029;
     }
 
     /* ===== TOTAL GERAL ===== */
@@ -301,7 +369,29 @@
                 return;
             }
 
-            renderizarDados(dados);
+            // Normalização: compatibilidade com formato antigo (linhas → grupos)
+        // Remove-se quando o servidor for reiniciado com o novo conc_glosas.py
+        dados.meses.forEach(mes => {
+            if (!mes.grupos) {
+                const linhas = mes.linhas || [];
+                const grupos_map = {};
+                const grupos_order = [];
+                linhas.forEach(linha => {
+                    const motivo = linha.motivo_automatico || '';
+                    if (!grupos_map[motivo]) {
+                        grupos_map[motivo] = { motivo, total: 0, linhas: [] };
+                        grupos_order.push(motivo);
+                    }
+                    grupos_map[motivo].total += linha.valor_glosado;
+                    grupos_map[motivo].linhas.push(linha);
+                });
+                mes.grupos = grupos_order
+                    .map(k => grupos_map[k])
+                    .sort((a, b) => (a.motivo === '') - (b.motivo === '') || b.total - a.total);
+            }
+        });
+
+        renderizarDados(dados);
 
         } catch (err) {
             document.getElementById('loadingState').style.display = 'none';
@@ -348,26 +438,54 @@
     }
 
     // =========================================================
-    // CRIAR BLOCO DE UM MÊS
+    // PARSEAR MOTIVO → { nome, desc, isSemMotivo }
+    // =========================================================
+    function parseMotivo(motivo) {
+        if (!motivo) return { nome: 'Sem motivo identificado', desc: '', isSemMotivo: true };
+
+        // Múltiplos motivos numerados: "1. Nome: texto\n2. Nome: texto"
+        if (/^\d+\.\s/.test(motivo)) {
+            const nomes = motivo.split('\n').map(l => {
+                const m = l.match(/^\d+\.\s+(.+?):/);
+                return m ? m[1] : l.replace(/^\d+\.\s+/, '');
+            });
+            return { nome: nomes.join(' + '), desc: motivo, isSemMotivo: false };
+        }
+
+        // Motivo único: "Nome da Glosa: descrição completa"
+        const idx = motivo.indexOf(': ');
+        if (idx > -1) {
+            return {
+                nome: motivo.substring(0, idx),
+                desc: motivo.substring(idx + 2),
+                isSemMotivo: false
+            };
+        }
+
+        return { nome: motivo, desc: '', isSemMotivo: false };
+    }
+
+    // =========================================================
+    // CRIAR BLOCO DE UM MÊS (com grupos por motivo)
     // =========================================================
     function criarBlocoMes(mes, numMes, dataInicioTermo) {
         const wrapper = document.createElement('div');
-
         const labelMes = formatarLabelMes(mes.competencia, numMes, dataInicioTermo);
+        const totalLinhas = mes.grupos.reduce((s, g) => s + g.linhas.length, 0);
 
-        // Header clicável
+        // ── Cabeçalho do mês ──────────────────────────────────────
         const header = document.createElement('div');
         header.className = 'mes-header';
         header.innerHTML = `
             <span class="mes-label"><i class="bi bi-calendar3 me-2"></i>${labelMes}</span>
             <div class="d-flex align-items-center gap-3">
                 <span class="mes-total">${formatarMoeda(mes.total)}</span>
-                <span class="badge bg-white text-danger">${mes.linhas.length} item${mes.linhas.length !== 1 ? 's' : ''}</span>
+                <span class="badge bg-white text-danger">${totalLinhas} item${totalLinhas !== 1 ? 's' : ''}</span>
                 <i class="bi bi-chevron-down toggle-icon"></i>
             </div>
         `;
 
-        // Corpo colapsável
+        // ── Corpo colapsável do mês ───────────────────────────────
         const corpo = document.createElement('div');
         corpo.className = 'mes-body';
         corpo.style.borderRadius = '0 0 6px 6px';
@@ -375,55 +493,88 @@
         corpo.style.border = '1px solid #dee2e6';
         corpo.style.borderTop = 'none';
 
-        // Tabela
-        const tabela = document.createElement('table');
-        tabela.className = 'table-glosa';
+        // ── Um sub-bloco por grupo de motivo ─────────────────────
+        mes.grupos.forEach(grupo => {
+            const parsed = parseMotivo(grupo.motivo);
 
-        // Thead
-        tabela.innerHTML = `
-            <thead>
-                <tr>
-                    <th style="width:55px;">Índice</th>
-                    <th style="width:100px;">Data</th>
-                    <th style="width:30%;">Categoria</th>
-                    <th style="width:25%;">Origem / Destino</th>
-                    <th style="width:110px;">Valor Glosado</th>
-                    <th>Motivo</th>
-                </tr>
-            </thead>
-            <tbody id="tbody-${mes.competencia}"></tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="4" class="text-end">Subtotal ${labelMes}</td>
-                    <td class="cell-money">${formatarMoeda(mes.total)}</td>
-                    <td></td>
-                </tr>
-            </tfoot>
-        `;
-
-        const tbody = tabela.querySelector('tbody');
-        mes.linhas.forEach(linha => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="text-center">${linha.indice ?? '-'}</td>
-                <td class="text-center">${linha.data ? formatarDataCurta(linha.data) : '-'}</td>
-                <td title="${escapeHtml(linha.cat_transacao)}">${escapeHtml(linha.cat_transacao) || '<span class="text-muted">—</span>'}</td>
-                <td title="${escapeHtml(linha.origem_destino)}">${escapeHtml(linha.origem_destino) || '<span class="text-muted">—</span>'}</td>
-                <td class="cell-money text-danger">${formatarMoeda(linha.valor_glosado)}</td>
-                <td class="cell-motivo" title="${escapeHtml(linha.motivo_automatico)}">${renderMotivo(linha.motivo_automatico)}</td>
+            // Cabeçalho do grupo
+            const gHeader = document.createElement('div');
+            gHeader.className = 'grupo-header' + (parsed.isSemMotivo ? ' sem-motivo' : '');
+            gHeader.innerHTML = `
+                <div class="grupo-motivo-info" title="${escapeHtml(grupo.motivo)}">
+                    <div class="grupo-motivo-nome">${escapeHtml(parsed.nome)}</div>
+                    ${parsed.desc
+                        ? `<div class="grupo-motivo-desc">${escapeHtml(parsed.desc)}</div>`
+                        : ''}
+                </div>
+                <div class="grupo-right">
+                    <span class="grupo-valor">${formatarMoeda(grupo.total)}</span>
+                    <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:0.7rem;">
+                        ${grupo.linhas.length} item${grupo.linhas.length !== 1 ? 's' : ''}
+                    </span>
+                    <i class="bi bi-chevron-down grupo-toggle"></i>
+                </div>
             `;
-            tbody.appendChild(tr);
+
+            // Corpo do grupo (tabela de linhas)
+            const gBody = document.createElement('div');
+            gBody.className = 'grupo-body';
+
+            const tabela = document.createElement('table');
+            tabela.className = 'table-glosa';
+            tabela.innerHTML = `
+                <thead>
+                    <tr>
+                        <th style="width:5%;">Índice</th>
+                        <th style="width:9%;">Data</th>
+                        <th style="width:22%;">Categoria</th>
+                        <th style="width:49%;">Origem / Destino</th>
+                        <th style="width:15%;">Valor Glosado</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+
+            const tbody = tabela.querySelector('tbody');
+            grupo.linhas.forEach(linha => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-center">${linha.indice ?? '-'}</td>
+                    <td class="text-center">${linha.data ? formatarDataCurta(linha.data) : '-'}</td>
+                    <td class="cell-truncate" title="${escapeHtml(linha.cat_transacao)}">${escapeHtml(linha.cat_transacao) || '<span class="text-muted">—</span>'}</td>
+                    <td class="cell-truncate" title="${escapeHtml(linha.origem_destino)}">${escapeHtml(linha.origem_destino) || '<span class="text-muted">—</span>'}</td>
+                    <td class="cell-money text-danger">${formatarMoeda(linha.valor_glosado)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            gBody.appendChild(tabela);
+
+            // Toggle colapso do grupo
+            gHeader.addEventListener('click', () => {
+                const col = gBody.style.display === 'none';
+                gBody.style.display = col ? '' : 'none';
+                gHeader.classList.toggle('collapsed', !col);
+            });
+
+            corpo.appendChild(gHeader);
+            corpo.appendChild(gBody);
         });
 
-        corpo.appendChild(tabela);
+        // Barra de total do mês (rodapé visual)
+        const totalBar = document.createElement('div');
+        totalBar.className = 'mes-total-bar';
+        totalBar.textContent = `Total ${labelMes}: ${formatarMoeda(mes.total)}`;
+        corpo.appendChild(totalBar);
+
         wrapper.appendChild(header);
         wrapper.appendChild(corpo);
 
-        // Toggle collapse
+        // Toggle colapso do mês inteiro
         header.addEventListener('click', () => {
-            const collapsed = corpo.style.display === 'none';
-            corpo.style.display = collapsed ? '' : 'none';
-            header.classList.toggle('collapsed', !collapsed);
+            const col = corpo.style.display === 'none';
+            corpo.style.display = col ? '' : 'none';
+            header.classList.toggle('collapsed', !col);
         });
 
         return wrapper;
@@ -440,16 +591,18 @@
         ];
 
         dadosGlosas.meses.forEach(mes => {
-            mes.linhas.forEach(linha => {
-                linhas.push([
-                    linha.indice ?? '',
-                    mes.competencia,
-                    linha.data ?? '',
-                    linha.cat_transacao,
-                    linha.origem_destino,
-                    linha.valor_glosado.toFixed(2).replace('.', ','),
-                    linha.motivo_automatico || linha.avaliacao_analista || ''
-                ]);
+            mes.grupos.forEach(grupo => {
+                grupo.linhas.forEach(linha => {
+                    linhas.push([
+                        linha.indice ?? '',
+                        mes.competencia,
+                        linha.data ?? '',
+                        linha.cat_transacao,
+                        linha.origem_destino,
+                        linha.valor_glosado.toFixed(2).replace('.', ','),
+                        grupo.motivo || ''
+                    ]);
+                });
             });
             // Subtotal do mês
             linhas.push(['', mes.competencia, '', 'SUBTOTAL', '', mes.total.toFixed(2).replace('.', ','), '']);
@@ -519,15 +672,6 @@
             .replace(/"/g, '&quot;');
     }
 
-    /**
-     * Renderiza o campo Motivo respeitando quebras de linha (\n).
-     * Múltiplos motivos ficam numerados em linhas separadas.
-     */
-    function renderMotivo(motivo) {
-        if (!motivo) return '<span class="text-muted fst-italic">sem motivo</span>';
-        // Escapar HTML e converter \n em <br>
-        return escapeHtml(motivo).replace(/\n/g, '<br>');
-    }
 </script>
 </body>
 </html>

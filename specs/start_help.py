@@ -1,10 +1,10 @@
-"""
+﻿"""
 Script auxiliar para iniciar os servidores
 """
 
 print("""
 ╔════════════════════════════════════════════════════════════╗
-║           FAF - Ferramenta de Análise Financeira          ║
+║           FParcerias - Ferramenta de Parcerias          ║
 ╠════════════════════════════════════════════════════════════╣
 ║                                                            ║
 ║  Para iniciar os servidores, abra dois terminais:         ║

@@ -800,10 +800,10 @@ def editar_por_termo():
                         analise.get('visita_status') or None,
                         analise.get('visita_data') or None,
                         analise.get('visita_horario') or None,
-                        analise.get('visita_responsavel') or None,
+                        analise.get('visita_responsavel') or None,   # list → psycopg2 converte para text[]
                         analise.get('visita_avaliacao') or None,
                         analise.get('monit_status') or None,
-                        analise.get('monit_responsavel') or None,
+                        analise.get('monit_responsavel') or None,     # list → psycopg2 converte para text[]
                         analise.get('monit_avaliacao') or None,
                         analise.get('monit_data') or None,
                         analise.get('monit_observacoes') or None,
@@ -1966,7 +1966,10 @@ def obter_dados_fisico():
             query += " AND p.vigencia_inicial <= %s"
             params.append(filtro_vig_fim)
         if filtro_responsavel:
-            query += " AND (pm.visita_responsavel ILIKE %s OR pm.monit_responsavel ILIKE %s)"
+            query += (
+                " AND (EXISTS (SELECT 1 FROM unnest(pm.visita_responsavel) _r WHERE _r ILIKE %s)"
+                "  OR  EXISTS (SELECT 1 FROM unnest(pm.monit_responsavel)  _r WHERE _r ILIKE %s))"
+            )
             params.append(f'%%{filtro_responsavel}%%')
             params.append(f'%%{filtro_responsavel}%%')
 
@@ -1995,10 +1998,10 @@ def obter_dados_fisico():
                 'visita_status':         row['visita_status'] or '',
                 'visita_data':           row['visita_data'].strftime('%d/%m/%Y') if row['visita_data'] else '',
                 'visita_horario':        str(row['visita_horario'])[:5] if row['visita_horario'] else '',
-                'visita_responsavel':    row['visita_responsavel'] or '',
+                'visita_responsavel':    ', '.join(row['visita_responsavel']) if row['visita_responsavel'] else '',
                 'visita_avaliacao':      row['visita_avaliacao'] or '',
                 'monit_status':          row['monit_status'] or '',
-                'monit_responsavel':     row['monit_responsavel'] or '',
+                'monit_responsavel':     ', '.join(row['monit_responsavel']) if row['monit_responsavel'] else '',
                 'monit_avaliacao':       row['monit_avaliacao'] or '',
                 'monit_data':            row['monit_data'].strftime('%d/%m/%Y') if row['monit_data'] else '',
                 'observacoes':           row['observacoes'] or '',
@@ -2030,7 +2033,9 @@ def obter_responsaveis_fisico():
     try:
         cur = get_cursor()
         cur.execute("""
-            SELECT DISTINCT unnest(ARRAY[visita_responsavel, monit_responsavel]) AS nome
+            SELECT DISTINCT unnest(
+                COALESCE(visita_responsavel,'{}') || COALESCE(monit_responsavel,'{}')
+            ) AS nome
             FROM public.parcerias_monit
             WHERE visita_responsavel IS NOT NULL OR monit_responsavel IS NOT NULL
             ORDER BY nome

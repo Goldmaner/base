@@ -1,5 +1,5 @@
 ﻿"""
-Aplicação Flask - FAF (Ferramenta de Análise Financeira)
+Aplicação Flask - FParcerias (Ferramenta de Parcerias)
 
 Arquivo principal que inicializa a aplicação e registra os blueprints.
 """
@@ -26,6 +26,7 @@ from routes.pesquisa_parcerias import pesquisa_parcerias_bp
 from routes.analises_pc import analises_pc_bp
 from routes.parcerias_notificacoes import bp as parcerias_notificacoes_bp
 from routes.conc_banc import bp as conc_banc_bp
+from routes.conc_classificacao import bp as conc_classificacao_bp
 from routes.conc_rendimentos import bp as conc_rendimentos_bp
 from routes.conc_contrapartida import bp as conc_contrapartida_bp
 from routes.conc_exportacao import bp as conc_exportacao_bp
@@ -276,6 +277,7 @@ def create_app():
     app.register_blueprint(analises_pc_bp)
     app.register_blueprint(parcerias_notificacoes_bp)
     app.register_blueprint(conc_banc_bp)
+    app.register_blueprint(conc_classificacao_bp)
     app.register_blueprint(conc_rendimentos_bp)
     app.register_blueprint(conc_contrapartida_bp)
     app.register_blueprint(conc_exportacao_bp)

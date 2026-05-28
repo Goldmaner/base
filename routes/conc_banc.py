@@ -338,6 +338,57 @@ def api_salvar_extrato():
                     """, atualizacoes)
                     print(f"[AUTOMAÇÃO] ✅ {len(atualizacoes)} linhas categorizadas automaticamente")
 
+        # ============================================================
+        # AUTOMAÇÃO: Preencher avaliacao_comprovante via palavra-chave
+        # ============================================================
+        # Quando cat_avaliacao = 'Glosar' e avaliacao_analista contém uma
+        # palavra-chave conhecida (case-insensitive), preenche automaticamente
+        # o campo correspondente em conc_analise — apenas se ainda estiver vazio.
+        #
+        # Para adicionar novas regras, inclua uma entrada em _AUTO_COMPROVANTE.
+        _AUTO_COMPROVANTE = [
+            ('cheque',  'Pago em Cheque'),
+        ]
+
+        if ids_processados:
+            for palavra, valor_comprovante in _AUTO_COMPROVANTE:
+                padrao = f'%{palavra}%'
+
+                # 1. UPDATE: conc_analise já existe mas avaliacao_comprovante está vazio
+                cur.execute("""
+                    UPDATE analises_pc.conc_analise ca
+                    SET avaliacao_comprovante = %s
+                    FROM analises_pc.conc_extrato ce
+                    WHERE ca.conc_extrato_id = ce.id
+                      AND ce.id = ANY(%s)
+                      AND ce.cat_avaliacao = 'Glosar'
+                      AND LOWER(ce.avaliacao_analista) LIKE LOWER(%s)
+                      AND (ca.avaliacao_comprovante IS NULL
+                           OR TRIM(ca.avaliacao_comprovante) = '')
+                """, (valor_comprovante, ids_processados, padrao))
+                n_upd = cur.rowcount
+
+                # 2. INSERT: extrato com critério mas sem registro em conc_analise
+                cur.execute("""
+                    INSERT INTO analises_pc.conc_analise
+                        (conc_extrato_id, numero_termo, avaliacao_comprovante)
+                    SELECT ce.id, ce.numero_termo, %s
+                    FROM analises_pc.conc_extrato ce
+                    WHERE ce.id = ANY(%s)
+                      AND ce.cat_avaliacao = 'Glosar'
+                      AND LOWER(ce.avaliacao_analista) LIKE LOWER(%s)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM analises_pc.conc_analise ca
+                          WHERE ca.conc_extrato_id = ce.id
+                      )
+                """, (valor_comprovante, ids_processados, padrao))
+                n_ins = cur.rowcount
+
+                total = n_upd + n_ins
+                if total > 0:
+                    print(f"[AUTO COMPROVANTE] '{palavra}' → '{valor_comprovante}': "
+                          f"{n_upd} atualizados, {n_ins} inseridos")
+
         db.commit()
 
         tempo_total = (time.time() - inicio) * 1000

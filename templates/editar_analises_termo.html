@@ -10,6 +10,25 @@
     body { background-color: #f8f9fa; }
     .analise-card { margin-bottom: 20px; border-left: 4px solid #0d6efd; }
     .form-check-inline { margin-right: 15px; }
+    /* ---- Chips (multi-responsável) ---- */
+    .chips-field {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      padding: 4px 6px; min-height: 32px;
+      border: 1px solid #ced4da; border-radius: 4px;
+      background: #fff;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 8px; border-radius: 12px;
+      background: #0d6efd; color: #fff;
+      font-size: .73rem; line-height: 1.5;
+    }
+    .chip-remove {
+      background: none; border: none; color: #fff;
+      font-size: .7rem; padding: 0; cursor: pointer;
+      line-height: 1; opacity: .8;
+    }
+    .chip-remove:hover { opacity: 1; }
   </style>
 </head>
 <body>
@@ -197,8 +216,14 @@
 
                 <div class="col-12">
                   <label class="form-label small">Responsável Visita</label>
-                  <input type="text" class="form-control form-control-sm" id="visita_responsavel_{{ loop.index }}"
-                         value="{{ monit.get('visita_responsavel') or '' }}" list="listaAgentesDGP">
+                  <input type="hidden" id="visita_responsavel_{{ loop.index }}"
+                         data-chips-init='{{ (monit.get("visita_responsavel") or []) | tojson }}'>
+                  <div class="chips-field" id="chips_visita_responsavel_{{ loop.index }}"></div>
+                  <input type="text" class="form-control form-control-sm mt-1 chip-add-input"
+                         placeholder="Adicionar nome e Enter..."
+                         list="listaAgentesDGP"
+                         onchange="chipAdd(this,'visita_responsavel',{{ loop.index }})"
+                         onkeydown="return chipKeydown(event,'visita_responsavel',{{ loop.index }})">
                 </div>
 
                 <div class="col-7">
@@ -227,8 +252,14 @@
                 </div>
                 <div class="col-6">
                   <label class="form-label small">Responsável M&amp;A</label>
-                  <input type="text" class="form-control form-control-sm" id="monit_responsavel_{{ loop.index }}"
-                         value="{{ monit.get('monit_responsavel') or '' }}" list="listaAgentesDGP">
+                  <input type="hidden" id="monit_responsavel_{{ loop.index }}"
+                         data-chips-init='{{ (monit.get("monit_responsavel") or []) | tojson }}'>
+                  <div class="chips-field" id="chips_monit_responsavel_{{ loop.index }}"></div>
+                  <input type="text" class="form-control form-control-sm mt-1 chip-add-input"
+                         placeholder="Adicionar nome e Enter..."
+                         list="listaAgentesDGP"
+                         onchange="chipAdd(this,'monit_responsavel',{{ loop.index }})"
+                         onkeydown="return chipKeydown(event,'monit_responsavel',{{ loop.index }})">
                 </div>
 
                 <div class="col-12">
@@ -344,6 +375,14 @@
     
     // Bloquear campos PG para termos TCV até 2016
     document.addEventListener('DOMContentLoaded', function() {
+      initChips();
+      // Interceptar Enter em chip-add inputs ANTES do mecanismo de submit do form
+      document.getElementById('formEditarAnalises').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.target.classList.contains('chip-add-input')) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true); // capture=true: intercepta antes de qualquer handler
       const numeroTermo = "{{ numero_termo }}";
       
       // Verificar se é TCV e extrair ano
@@ -416,10 +455,12 @@
           obj.visita_status     = document.getElementById(`visita_status_${idx}`)?.value     || null;
           obj.visita_data       = document.getElementById(`visita_data_${idx}`)?.value       || null;
           obj.visita_horario    = document.getElementById(`visita_horario_${idx}`)?.value    || null;
-          obj.visita_responsavel= document.getElementById(`visita_responsavel_${idx}`)?.value|| null;
+          const _vr = JSON.parse(document.getElementById(`visita_responsavel_${idx}`)?.value || '[]');
+          obj.visita_responsavel = _vr.length ? _vr : null;
           obj.visita_avaliacao  = document.getElementById(`visita_avaliacao_${idx}`)?.value  || null;
           obj.monit_status      = document.getElementById(`monit_status_${idx}`)?.value      || null;
-          obj.monit_responsavel = document.getElementById(`monit_responsavel_${idx}`)?.value || null;
+          const _mr = JSON.parse(document.getElementById(`monit_responsavel_${idx}`)?.value || '[]');
+          obj.monit_responsavel = _mr.length ? _mr : null;
           obj.monit_avaliacao   = document.getElementById(`monit_avaliacao_${idx}`)?.value   || null;
           obj.monit_data        = document.getElementById(`monit_data_${idx}`)?.value        || null;
           obj.monit_observacoes = document.getElementById(`monit_observacoes_${idx}`)?.value || null;
@@ -472,10 +513,67 @@
         alert('Erro ao salvar: ' + error.message);
       }
     });
+    // =====================================================================
+    // Chips — multi-responsável
+    // =====================================================================
+    const chipsData = {};
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function initChips() {
+      document.querySelectorAll('[data-chips-init]').forEach(el => {
+        const key = el.id;
+        try { chipsData[key] = JSON.parse(el.dataset.chipsInit || '[]'); }
+        catch { chipsData[key] = []; }
+        renderChips(key);
+      });
+    }
+
+    function renderChips(key) {
+      const container = document.getElementById('chips_' + key);
+      if (!container) return;
+      const values = chipsData[key] || [];
+      container.innerHTML = values.map((v, i) =>
+        `<span class="chip">${escHtml(v)}`+
+        ` <button type="button" class="chip-remove" onclick="removeChip('${key}',${i})">&times;</button></span>`
+      ).join('');
+      const hidden = document.getElementById(key);
+      if (hidden) hidden.value = JSON.stringify(values);
+    }
+
+    function removeChip(key, idx) {
+      chipsData[key] = (chipsData[key] || []).filter((_, i) => i !== idx);
+      renderChips(key);
+    }
+
+    function chipAdd(input, fieldName, loopIdx) {
+      const key = `${fieldName}_${loopIdx}`;
+      const val = input.value.trim();
+      if (!val) return;
+      if (!chipsData[key]) chipsData[key] = [];
+      if (!chipsData[key].includes(val)) {
+        chipsData[key].push(val);
+        renderChips(key);
+      }
+      input.value = '';
+    }
+
+    function chipKeydown(e, fieldName, loopIdx) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        chipAdd(e.target, fieldName, loopIdx);
+        return false;
+      }
+    }
+
     function replicarMonit(fromIdx, evt) {
       const campos = [
-        'visita_status','visita_data','visita_horario','visita_responsavel','visita_avaliacao',
-        'monit_status','monit_responsavel','monit_data','monit_avaliacao','monit_observacoes'
+        'visita_status','visita_data','visita_horario','visita_avaliacao',
+        'monit_status','monit_data','monit_avaliacao','monit_observacoes'
       ];
       const camposAdic = [
         'justificativa_status','justificativa_avaliacao','justificativa_data','justificativa_responsavel',
@@ -488,7 +586,18 @@
           const dst = document.getElementById(`${campo}_${toIdx}`);
           if (src && dst) dst.value = src.value;
         });
+        // Replicar chips de responsáveis
+        ['visita_responsavel','monit_responsavel'].forEach(campo => {
+          const srcHidden = document.getElementById(`${campo}_${fromIdx}`);
+          const dstHidden = document.getElementById(`${campo}_${toIdx}`);
+          if (srcHidden && dstHidden) {
+            dstHidden.value = srcHidden.value;
+            try { chipsData[`${campo}_${toIdx}`] = JSON.parse(srcHidden.value || '[]'); } catch { chipsData[`${campo}_${toIdx}`] = []; }
+            renderChips(`${campo}_${toIdx}`);
+          }
+        });
         count++; toIdx++;
+      }
       }
       const btn = evt.currentTarget;
       const orig = btn.innerHTML;

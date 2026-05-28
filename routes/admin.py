@@ -1,4 +1,4 @@
-"""
+﻿"""
 Blueprint do painel administrativo — erros do sistema e testes de regressão.
 Acesso restrito a usuários do tipo 'Agente Público'.
 """
@@ -200,7 +200,7 @@ def exportar_erros(formato):
         tipo_icons  = {'http_erro': '🔴', 'query_lenta': '🟡', 'api_externa': '🔵'}
 
         lines = [
-            '# Erros Pendentes — FAF',
+            '# Erros Pendentes — FParcerias',
             '',
             f'**Exportado em:** {datetime.now().strftime("%d/%m/%Y %H:%M")}  ',
             f'**Total pendente:** {len(erros)}  ',

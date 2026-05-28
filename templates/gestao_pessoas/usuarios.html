@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gerenciar Usuários - FAF</title>
+  <title>Gerenciar Usuários - FParcerias</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <style>
@@ -843,27 +843,34 @@
   // CONTROLE DE ACESSOS POR PÁGINA
   // ═══════════════════════════════════════
   const MODULOS_PAGINAS = [
+    // ── Geral ────────────────────────────────────────────────────────────────
     { id: 'parcerias',              nome: 'Parcerias',                          grupo: 'Geral' },
     { id: 'orcamento',              nome: 'Orçamento Anual',                    grupo: 'Geral' },
     { id: 'certidoes',              nome: 'Central de Certidões',               grupo: 'Geral' },
     { id: 'parcerias_notificacoes', nome: 'Ofícios, Documentos e Notificações', grupo: 'Geral' },
-    { id: 'manuais',                nome: 'Biblioteca Informativa',             grupo: 'Geral' },
+    { id: 'manuais',                nome: 'Biblioteca Informativa (inclui Índice de Legislações)', grupo: 'Geral' },
     { id: 'parcerias_metas',        nome: 'Quadro de Metas',                    grupo: 'Geral' },
+    // ── Análise de Contas ────────────────────────────────────────────────────
     { id: 'analises',               nome: 'Análise de Contas / Menu de PC',     grupo: 'Análise de Contas' },
     { id: 'pesquisa_parcerias',     nome: 'Pesquisa de Parcerias',              grupo: 'Análise de Contas' },
     { id: 'gestao_financeira',      nome: 'Gestão Financeira',                  grupo: 'Análise de Contas' },
+    // ── Gestão de Parcerias ──────────────────────────────────────────────────
     { id: 'cents',                  nome: 'CENTS',                              grupo: 'Gestão de Parcerias' },
     { id: 'celebracao_parcerias',   nome: 'Celebração de Parcerias',            grupo: 'Gestão de Parcerias' },
     { id: 'dgp_alteracoes',         nome: 'Aditamentos e outras alterações',    grupo: 'Gestão de Parcerias' },
+    // ── Departamento de Parcerias ────────────────────────────────────────────
     { id: 'editais',                nome: 'Editais',                            grupo: 'Departamento de Parcerias' },
     { id: 'gestao_orcamentaria',    nome: 'Gestão Orçamentária',                grupo: 'Departamento de Parcerias' },
+    // ── Gestão de Dados ──────────────────────────────────────────────────────
     { id: 'listas',                 nome: 'Listas Suspensas',                   grupo: 'Gestão de Dados' },
     { id: 'modelos_textos',         nome: 'Modelos de Texto',                   grupo: 'Gestão de Dados' },
-    { id: 'usuarios',               nome: 'Gerenciar Usuários',                 grupo: 'Gestão de Pessoas e Usuários' },
-    { id: 'ferias',                 nome: 'Calendário Geral',                   grupo: 'Gestão de Pessoas e Usuários' },
-    { id: 'gestao_pessoas',         nome: 'Nomeações CDA',                      grupo: 'Gestão de Pessoas e Usuários' },
-    { id: 'relatorios_desempenho',  nome: 'Relatórios de Desempenho',           grupo: 'Gestão de Pessoas e Usuários' },
-    { id: 'portarias',              nome: 'Gerenciar Portarias/Legislações',    grupo: 'Opções de Administrador' },
+    { id: 'relatorios_desempenho',  nome: 'Relatórios de Desempenho',           grupo: 'Gestão de Dados' },
+    // ── Gestão de Pessoas ────────────────────────────────────────────────────
+    { id: 'ferias',                 nome: 'Calendário Geral',                   grupo: 'Gestão de Pessoas' },
+    { id: 'gestao_pessoas',         nome: 'Nomeações CDA',                      grupo: 'Gestão de Pessoas' },
+    // ── Opções de Administrador ──────────────────────────────────────────────
+    { id: 'usuarios',               nome: 'Gerenciar Usuários',                 grupo: 'Opções de Administrador' },
+    // ── Módulos Técnicos (herdados de analises) ───────────────────────────────
     { id: 'conc_bancaria',          nome: 'Conciliação Bancária',               grupo: 'Módulos Técnicos' },
     { id: 'conc_rendimentos',       nome: 'Rendimentos',                        grupo: 'Módulos Técnicos' },
     { id: 'conc_contrapartida',     nome: 'Contrapartida',                      grupo: 'Módulos Técnicos' },
@@ -873,14 +880,14 @@
   ];
 
   const GRUPO_ICONS = {
-    'Geral':                        'bi-house',
-    'Análise de Contas':            'bi-clipboard-check',
-    'Gestão de Parcerias':          'bi-building',
-    'Departamento de Parcerias':    'bi-megaphone',
-    'Gestão de Dados':              'bi-database',
-    'Gestão de Pessoas e Usuários': 'bi-person-badge',
-    'Opções de Administrador':      'bi-gear',
-    'Módulos Técnicos':             'bi-wrench',
+    'Geral':                     'bi-house',
+    'Análise de Contas':         'bi-clipboard-check',
+    'Gestão de Parcerias':       'bi-building',
+    'Departamento de Parcerias': 'bi-megaphone',
+    'Gestão de Dados':           'bi-database',
+    'Gestão de Pessoas':         'bi-person-badge',
+    'Opções de Administrador':   'bi-gear',
+    'Módulos Técnicos':          'bi-wrench',
   };
 
   let moduloAtual = null;

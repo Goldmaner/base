@@ -1,4 +1,4 @@
-"""
+﻿"""
 Blueprint de Datas Importantes
 Gerencia abonos, folgas, consultas médicas e eventos por usuário.
 """
@@ -984,7 +984,7 @@ def exportar_pdf_evento(id):
     # Cabeçalho colorido
     cab_dados = [[
         Paragraph('<b><font color="white" size="13">FOLHA DE ROSTO — EVENTO INSTITUCIONAL</font></b>', estilos['Normal']),
-        Paragraph(f'<font color="white" size="8">FAF · Gestão de Eventos<br/>{datetime.now().strftime("%d/%m/%Y %H:%M")}</font>', estilos['Normal']),
+        Paragraph(f'<font color="white" size="8">FParcerias · Gestão de Eventos<br/>{datetime.now().strftime("%d/%m/%Y %H:%M")}</font>', estilos['Normal']),
     ]]
     cab_tabela = Table(cab_dados, colWidths=[W * 0.65, W * 0.35])
     cab_tabela.setStyle(TableStyle([

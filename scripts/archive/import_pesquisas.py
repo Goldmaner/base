@@ -1,8 +1,8 @@
-"""
+﻿"""
 Script de importação de pesquisas de parcerias do CSV para o banco de dados
 Tabela: public.o_pesquisa_parcerias
 
-Autor: Sistema FAF
+Autor: Sistema FParcerias
 Data: Novembro 2025
 """
 

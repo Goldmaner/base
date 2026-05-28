@@ -1,4 +1,4 @@
-"""
+﻿"""
 sql_backup_to_excel.py
 ======================
 Converte um backup PostgreSQL (.sql com COPY ... FROM stdin) em arquivos Excel
@@ -267,7 +267,7 @@ def main():
         sys.exit(1)
 
     # Pasta de saída
-    nome_base = sql_path.stem  # ex: backup_faf_20260320_095637
+    nome_base = sql_path.stem  # ex: backup_FParcerias_20260320_095637
     pasta_saida = sql_path.parent / f"exportado_{nome_base}"
 
     if not usar_csv and not XLSX_AVAILABLE:

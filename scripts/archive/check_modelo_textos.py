@@ -1,9 +1,9 @@
-import psycopg2
+﻿import psycopg2
 
 conn = psycopg2.connect(
     host='200.144.197.137',
-    dbname='smdhc_faf',
-    user='faf_fmusp',
+    dbname='smdhc_FParcerias',
+    user='FParcerias_fmusp',
     password='w3i2o2m2',
     port=5432
 )

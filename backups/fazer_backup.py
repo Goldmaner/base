@@ -1,4 +1,4 @@
-"""
+﻿"""
 Script de Backup do Banco de Dados PostgreSQL
 ==============================================
 
@@ -35,11 +35,11 @@ BACKUP_DIR.mkdir(exist_ok=True)
 
 # Nome do arquivo com timestamp
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-backup_file = BACKUP_DIR / f'backup_faf_{timestamp}.sql'
+backup_file = BACKUP_DIR / f'backup_FParcerias_{timestamp}.sql'
 
 print()
 print("=" * 60)
-print("  BACKUP DO BANCO DE DADOS FAF")
+print("  BACKUP DO BANCO DE DADOS FParcerias")
 print("=" * 60)
 print()
 print(f"[INFO] Banco: {DB_NAME}")
@@ -99,7 +99,7 @@ try:
         print()
         
         # Listar todos os backups existentes
-        backups = sorted(BACKUP_DIR.glob('backup_faf_*.sql'), reverse=True)
+        backups = sorted(BACKUP_DIR.glob('backup_FParcerias_*.sql'), reverse=True)
         
         # Manter apenas os 10 backups mais recentes
         MAX_BACKUPS = 10
@@ -120,7 +120,7 @@ try:
         
         if len(backups) > 1:
             # Atualizar lista após deleção
-            backups = sorted(BACKUP_DIR.glob('backup_faf_*.sql'), reverse=True)
+            backups = sorted(BACKUP_DIR.glob('backup_FParcerias_*.sql'), reverse=True)
             print(f"[INFO] Total de backups na pasta: {len(backups)}")
             print()
             print("Últimos 5 backups:")

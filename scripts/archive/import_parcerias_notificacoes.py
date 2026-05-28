@@ -1,6 +1,6 @@
-"""
+﻿"""
 Script para importar dados do CSV parcerias_notificacoes.csv para a tabela parcerias_notificacoes
-Autor: Sistema FAF
+Autor: Sistema FParcerias
 Data: 2025-11-17
 """
 

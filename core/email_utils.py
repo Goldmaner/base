@@ -1,4 +1,4 @@
-"""
+﻿"""
 Utilitários para envio de e-mail
 """
 
@@ -81,7 +81,7 @@ def gerar_email_reset_senha(email_usuario, token):
     Returns:
         tuple: (assunto, corpo_html, corpo_texto)
     """
-    assunto = "Reset de Senha - Módulo de Análise FAF"
+    assunto = "Reset de Senha - Módulo de Análise FParcerias"
     
     corpo_html = f"""
     <!DOCTYPE html>
@@ -104,7 +104,7 @@ def gerar_email_reset_senha(email_usuario, token):
         <div class="container">
             <div class="header">
                 <h1>🔐 Reset de Senha</h1>
-                <p>Módulo de Análise de Contas - FAF</p>
+                <p>Módulo de Análise de Contas - FParcerias</p>
             </div>
             <div class="content">
                 <p>Olá,</p>
@@ -142,7 +142,7 @@ def gerar_email_reset_senha(email_usuario, token):
     """
     
     corpo_texto = f"""
-    Reset de Senha - Módulo de Análise FAF
+    Reset de Senha - Módulo de Análise FParcerias
     
     Olá,
     
@@ -161,7 +161,7 @@ def gerar_email_reset_senha(email_usuario, token):
     ⚠️ Se você não solicitou este reset, ignore este e-mail.
     
     ---
-    Módulo de Análise de Contas - FAF
+    Módulo de Análise de Contas - FParcerias
     """
     
     return assunto, corpo_html, corpo_texto
