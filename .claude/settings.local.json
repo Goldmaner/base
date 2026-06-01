@@ -11,7 +11,17 @@
       "Bash(xargs grep -l \"por.pagina\\\\|Controle.*Acesso\\\\|controle.*acesso\")",
       "Bash(grep -v \"^\\\\[relatorios\\\\|Traceback\\\\|File \\\\|^$\")",
       "Read(//c/Users/d843702/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/2cf7a759-72ca-4f4f-8b39-fb7e5ce0f12a/ea76330b-4ad1-49a4-881c-4d26befdc228/skills/xlsx/**)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\d843702\\\\OneDrive - rede.sp\\\\Área de Trabalho\\\\FAF\\\\FAF\" -Recurse -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\d843702\\\\OneDrive - rede.sp\\\\Área de Trabalho\\\\FAF\\\\FAF\" -Recurse -Force)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName, PSIsContainer)",
+      "Bash(xargs grep -l \"acessos\\\\|permiss\")",
+      "Bash(python -m pip install python-docx pdfplumber openpyxl -q)",
+      "Bash(python)",
+      "Bash(unzip -p \"Central_specs.docx\" word/document.xml)",
+      "Bash(unzip -l \"Central_specs.docx\")"
     ]
   }
 }

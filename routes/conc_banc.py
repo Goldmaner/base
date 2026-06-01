@@ -1213,6 +1213,260 @@ def api_limpar_termo():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# EXPORTAR PDF
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Mapeamento: nome interno → (label header, largura relativa, alinhamento)
+_PDF_COLUNAS = {
+    'indice':           ('Nº',             1.0,  'center'),
+    'data':             ('Data',           2.2,  'center'),
+    'credito':          ('Crédito (R$)',   2.8,  'right'),
+    'debito':           ('Débito (R$)',    2.8,  'right'),
+    'discriminacao':    ('Composição',     2.8,  'right'),
+    'cat_transacao':    ('Categoria',      4.5,  'left'),
+    'competencia':      ('Competência',   2.5,  'center'),
+    'origem_destino':   ('Origem/Destino', 4.5,  'left'),
+    'cat_avaliacao':    ('Avaliação',      3.0,  'center'),
+    'avaliacao_analista': ('Observações',  5.0,  'left'),
+}
+
+_PDF_COR_AVALIACAO = {
+    'Avaliado':          (0.88, 0.97, 0.88),   # verde claro
+    'Glosar':            (1.00, 0.88, 0.88),   # vermelho claro
+    'Aguardando resposta': (1.00, 0.97, 0.80), # amarelo claro
+    'Pessoa Gestora':    (0.88, 0.94, 1.00),   # azul claro
+}
+
+
+@bp.route('/api/exportar-pdf', methods=['GET'])
+@login_required
+@requires_access('conc_bancaria')
+def api_exportar_pdf():
+    """Gera PDF da conciliação bancária com as colunas selecionadas."""
+    from io import BytesIO
+    from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+                                    Paragraph, Spacer)
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from flask import make_response
+
+    numero_termo = request.args.get('numero_termo', '').strip()
+    colunas_param = request.args.get('colunas', '').strip()
+
+    if not numero_termo:
+        return jsonify({'erro': 'numero_termo é obrigatório'}), 400
+
+    # Filtrar apenas colunas válidas, mantendo a ordem original
+    colunas_validas = [c for c in colunas_param.split(',') if c in _PDF_COLUNAS]
+    if not colunas_validas:
+        return jsonify({'erro': 'Nenhuma coluna válida selecionada'}), 400
+
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT id, indice, data, credito, debito, discriminacao,
+                   cat_transacao, competencia, origem_destino,
+                   cat_avaliacao, avaliacao_analista
+            FROM analises_pc.conc_extrato
+            WHERE numero_termo = %s
+            ORDER BY indice ASC, id ASC
+        """, (numero_termo,))
+        rows = cur.fetchall()
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+    # ── Helpers de formatação ──────────────────────────────────────────────
+    def _fmt_date(v):
+        if not v:
+            return ''
+        try:
+            return v.strftime('%d/%m/%Y')
+        except Exception:
+            return str(v)
+
+    def _fmt_brl(v):
+        if v is None:
+            return ''
+        try:
+            f = float(v)
+            return f'R$ {f:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+        except Exception:
+            return str(v)
+
+    def _fmt_competencia(v):
+        if not v:
+            return ''
+        try:
+            return v.strftime('%m/%Y')
+        except Exception:
+            return str(v)
+
+    _FORMATADORES = {
+        'data':          _fmt_date,
+        'credito':       _fmt_brl,
+        'debito':        _fmt_brl,
+        'discriminacao': _fmt_brl,
+        'competencia':   _fmt_competencia,
+    }
+
+    # ── Estilos ────────────────────────────────────────────────────────────
+    styles = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle(
+        'Titulo', parent=styles['Heading2'],
+        fontSize=13, spaceAfter=6, leading=16,
+    )
+    estilo_subtitulo = ParagraphStyle(
+        'Subtitulo', parent=styles['Normal'],
+        fontSize=9, spaceAfter=10, textColor=colors.HexColor('#555555'),
+    )
+
+    # Estilo de célula pequeno (para caber conteúdo longo em células)
+    estilo_celula = ParagraphStyle(
+        'Celula', parent=styles['Normal'],
+        fontSize=7.5, leading=9, wordWrap='LTR',
+    )
+    estilo_celula_r = ParagraphStyle(
+        'CelulaR', parent=estilo_celula, alignment=TA_RIGHT,
+    )
+    estilo_celula_c = ParagraphStyle(
+        'CelulaC', parent=estilo_celula, alignment=TA_CENTER,
+    )
+
+    # ── Calcular larguras das colunas ──────────────────────────────────────
+    page_width, page_height = landscape(A4)
+    margin = 1.5 * cm
+    usable_width = page_width - 2 * margin
+
+    total_weight = sum(_PDF_COLUNAS[c][1] for c in colunas_validas)
+    col_widths = [
+        (_PDF_COLUNAS[c][1] / total_weight) * usable_width
+        for c in colunas_validas
+    ]
+
+    # ── Construir dados da tabela ──────────────────────────────────────────
+    _ALINHAMENTO_ESTILO = {
+        'center': estilo_celula_c,
+        'right':  estilo_celula_r,
+        'left':   estilo_celula,
+    }
+
+    header = [
+        Paragraph(f'<b>{_PDF_COLUNAS[c][0]}</b>', estilo_celula_c)
+        for c in colunas_validas
+    ]
+
+    data_table = [header]
+    # Cor de linha por avaliação (usada na TableStyle)
+    row_colors = []  # lista de (linha_idx, cor_rgb)
+
+    for row_idx, row in enumerate(rows, start=1):  # 1-based após header
+        row_dict = dict(row)
+        linha_avaliacao = row_dict.get('cat_avaliacao') or ''
+        bg_color = _PDF_COR_AVALIACAO.get(linha_avaliacao)
+        if bg_color:
+            row_colors.append((row_idx, bg_color))
+
+        cells = []
+        for col in colunas_validas:
+            val = row_dict.get(col)
+            fmt = _FORMATADORES.get(col)
+            texto = fmt(val) if fmt else (str(val) if val is not None else '')
+            align = _PDF_COLUNAS[col][2]
+            estilo = _ALINHAMENTO_ESTILO[align]
+            cells.append(Paragraph(texto, estilo))
+        data_table.append(cells)
+
+    # ── TableStyle base ────────────────────────────────────────────────────
+    ts = TableStyle([
+        # Header
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#343a40')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('ALIGN',      (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, 0), 7.5),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+        ('TOPPADDING',    (0, 0), (-1, 0), 5),
+        # Body
+        ('FONTSIZE',   (0, 1), (-1, -1), 7),
+        ('TOPPADDING',    (0, 1), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        # Grid
+        ('GRID',       (0, 0), (-1, -1), 0.25, colors.HexColor('#cccccc')),
+        # Zebra stripe
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1),
+         [colors.white, colors.HexColor('#f8f9fa')]),
+    ])
+
+    # Aplicar cores de avaliação por linha (sobrepõe zebra)
+    for row_idx, (r, g, b) in row_colors:
+        ts.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.Color(r, g, b))
+
+    table = Table(data_table, colWidths=col_widths, repeatRows=1)
+    table.setStyle(ts)
+
+    # ── Montar documento ───────────────────────────────────────────────────
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=margin, rightMargin=margin,
+        topMargin=1.2 * cm, bottomMargin=1.2 * cm,
+    )
+
+    # Número de linhas e totais de crédito/débito para o subtítulo
+    total_linhas = len(rows)
+    total_credito = sum(float(dict(r)['credito'] or 0) for r in rows)
+    total_debito  = sum(float(dict(r)['debito']  or 0) for r in rows)
+
+    def _brl(v):
+        return f'R$ {v:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    story = [
+        Paragraph(f'Conciliação Bancária — {numero_termo}', estilo_titulo),
+        Paragraph(
+            f'{total_linhas} linhas  |  '
+            f'Créditos: {_brl(total_credito)}  |  '
+            f'Débitos: {_brl(total_debito)}  |  '
+            f'Colunas: {len(colunas_validas)}/10',
+            estilo_subtitulo
+        ),
+        Spacer(1, 0.3 * cm),
+        table,
+    ]
+
+    # Rodapé com número de página
+    def _rodape(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(colors.HexColor('#888888'))
+        canvas.drawRightString(
+            page_width - margin,
+            0.6 * cm,
+            f'Página {doc.page}'
+        )
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=_rodape, onLaterPages=_rodape)
+
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    # Nome de arquivo seguro
+    nome_arquivo = f"conc_banc_{numero_termo.replace('/', '_').replace(' ', '_')}.pdf"
+
+    response = make_response(pdf_bytes)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+    response.headers['Content-Length'] = len(pdf_bytes)
+    return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SEÇÃO 4 — VINCULAÇÃO DE DOCUMENTOS (Cloudflare R2)
 # ─────────────────────────────────────────────────────────────────────────────
 

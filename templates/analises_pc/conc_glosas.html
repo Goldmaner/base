@@ -255,6 +255,16 @@
             <button class="btn btn-outline-dark" onclick="window.print()">
                 <i class="bi bi-printer me-1"></i>Imprimir
             </button>
+            <button class="btn btn-outline-secondary no-print" id="btnOcultarTodas"
+                    onclick="toggleTodasLinhas(false)" style="display:none;"
+                    title="Ocultar todas as linhas de extrato">
+                <i class="bi bi-arrows-collapse me-1"></i>Ocultar linhas
+            </button>
+            <button class="btn btn-outline-secondary no-print" id="btnMostrarTodas"
+                    onclick="toggleTodasLinhas(true)" style="display:none;"
+                    title="Mostrar todas as linhas de extrato">
+                <i class="bi bi-arrows-expand me-1"></i>Mostrar linhas
+            </button>
             <button class="btn btn-outline-success" onclick="exportarCSV()" id="btnExportarCSV" style="display:none;">
                 <i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar CSV
             </button>
@@ -423,8 +433,10 @@
         document.getElementById('totalLinhasTexto').textContent =
             `${dados.total_linhas} despesa${dados.total_linhas !== 1 ? 's' : ''}`;
 
-        // Mostrar botão CSV
+        // Mostrar botões de ação
         document.getElementById('btnExportarCSV').style.display = '';
+        document.getElementById('btnOcultarTodas').style.display = '';
+        document.getElementById('btnMostrarTodas').style.display = '';
         document.getElementById('conteudoPrincipal').style.display = '';
 
         // Renderizar cada mês
@@ -484,6 +496,25 @@
                 <i class="bi bi-chevron-down toggle-icon"></i>
             </div>
         `;
+
+        // ── Botões ocultar/mostrar por mês (adicionados ao header) ──
+        // Criados programaticamente para ter stopPropagation sem inline onclick
+        const mesControls = header.querySelector('.d-flex');
+        const toggleIcon  = header.querySelector('.toggle-icon');
+
+        const _btnMesOcultar = document.createElement('button');
+        _btnMesOcultar.className = 'btn btn-sm btn-link text-white p-0 no-print';
+        _btnMesOcultar.title = 'Ocultar todas as linhas deste mês';
+        _btnMesOcultar.innerHTML = '<i class="bi bi-arrows-collapse" style="font-size:0.9rem;"></i>';
+
+        const _btnMesMostrar = document.createElement('button');
+        _btnMesMostrar.className = 'btn btn-sm btn-link text-white p-0 no-print';
+        _btnMesMostrar.title = 'Mostrar todas as linhas deste mês';
+        _btnMesMostrar.innerHTML = '<i class="bi bi-arrows-expand" style="font-size:0.9rem;"></i>';
+
+        // Inserir antes do ícone chevron
+        mesControls.insertBefore(_btnMesMostrar, toggleIcon);
+        mesControls.insertBefore(_btnMesOcultar, _btnMesMostrar);
 
         // ── Corpo colapsável do mês ───────────────────────────────
         const corpo = document.createElement('div');
@@ -570,6 +601,18 @@
         wrapper.appendChild(header);
         wrapper.appendChild(corpo);
 
+        // Handlers dos botões por mês (corpo já definido aqui)
+        _btnMesOcultar.addEventListener('click', e => {
+            e.stopPropagation();
+            corpo.querySelectorAll('.grupo-body').forEach(gb => gb.style.display = 'none');
+            corpo.querySelectorAll('.grupo-header').forEach(gh => gh.classList.add('collapsed'));
+        });
+        _btnMesMostrar.addEventListener('click', e => {
+            e.stopPropagation();
+            corpo.querySelectorAll('.grupo-body').forEach(gb => gb.style.display = '');
+            corpo.querySelectorAll('.grupo-header').forEach(gh => gh.classList.remove('collapsed'));
+        });
+
         // Toggle colapso do mês inteiro
         header.addEventListener('click', () => {
             const col = corpo.style.display === 'none';
@@ -578,6 +621,18 @@
         });
 
         return wrapper;
+    }
+
+    // =========================================================
+    // TOGGLE GLOBAL: ocultar/mostrar todas as linhas de extrato
+    // =========================================================
+    function toggleTodasLinhas(mostrar) {
+        document.querySelectorAll('.grupo-body').forEach(gb => {
+            gb.style.display = mostrar ? '' : 'none';
+        });
+        document.querySelectorAll('.grupo-header').forEach(gh => {
+            gh.classList.toggle('collapsed', !mostrar);
+        });
     }
 
     // =========================================================

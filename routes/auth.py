@@ -27,8 +27,8 @@ def login():
 
         cur = get_cursor()
         cur.execute("""
-            SELECT id, email, senha, tipo_usuario, acessos, d_usuario, session_token, data_ultimo_login 
-            FROM gestao_pessoas.usuarios 
+            SELECT id, email, senha, tipo_usuario, acessos, acessos_escrita, d_usuario, session_token, data_ultimo_login
+            FROM gestao_pessoas.usuarios
             WHERE email = %s
         """, (email_input,))
         user = cur.fetchone()
@@ -95,6 +95,7 @@ def login():
                 if basico not in acessos_lista:
                     acessos_lista.append(basico)
             session["acessos"] = ';'.join(acessos_lista)
+            session["acessos_escrita"] = user["acessos_escrita"] or ""
             session["d_usuario"] = user["d_usuario"] or ""
             session["session_token"] = novo_token
             session["sessao_ativa_aviso"] = sessao_ativa  # Flag para mostrar aviso
@@ -139,6 +140,7 @@ def listar_usuarios():
         cur = get_cursor()
         cur.execute("""
             SELECT u.id, u.email, u.tipo_usuario, u.d_usuario, u.data_criacao, u.acessos,
+                   u.auth_user_id,
                    i.usuario_nome, i.usuario_status, i.usuario_aniversario, i.usuario_vinculo
             FROM gestao_pessoas.usuarios u
             LEFT JOIN gestao_pessoas.usuarios_infos i ON i.usuario_email = u.email
@@ -159,6 +161,7 @@ def listar_usuarios():
                 "d_usuario": user["d_usuario"],
                 "data_criacao": user["data_criacao"].isoformat() if user["data_criacao"] else None,
                 "acessos": user["acessos"],
+                "auth_user_id": str(user["auth_user_id"]) if user["auth_user_id"] else "",
                 "usuario_nome": user["usuario_nome"] or "",
                 "usuario_status": user["usuario_status"] or "",
                 "usuario_aniversario": user["usuario_aniversario"].isoformat() if user["usuario_aniversario"] else "",
@@ -198,20 +201,20 @@ def criar_usuario():
         if d_usuario and len(d_usuario) > 20:
             return jsonify({"erro": "Departamento do usuário deve ter no máximo 20 caracteres"}), 400
         
-        tipos_validos = ["Agente Público", "Agente DAC", "Agente DGP", "Agente DP", "Externo"]
-        if tipo_usuario not in tipos_validos:
+        from config import TIPOS_USUARIO
+        if tipo_usuario not in TIPOS_USUARIO:
             return jsonify({"erro": "Tipo de usuário inválido"}), 400
-        
+
         # Gerar hash da senha
         senha_hash = generate_password_hash(senha)
-        
+
         # Inserir no banco com pack básico de acessos
         cur = get_cursor()
         try:
             acessos_padrao = ';'.join(ACESSOS_BASICOS)
             cur.execute("""
-                INSERT INTO gestao_pessoas.usuarios (email, senha, tipo_usuario, d_usuario, acessos)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO gestao_pessoas.usuarios (email, senha, tipo_usuario, d_usuario, acessos, acessos_escrita)
+                VALUES (%s, %s, %s, %s, %s, '')
                 RETURNING id
             """, (email, senha_hash, tipo_usuario, d_usuario if d_usuario else None, acessos_padrao))
             
@@ -287,14 +290,20 @@ def atualizar_usuario(user_id):
         tipo_usuario = data.get("tipo_usuario", "").strip()
         d_usuario = data.get("d_usuario", "").strip()
         acessos = data.get("acessos", "").strip()
-        
+        auth_user_id = data.get("auth_user_id", "").strip() or None
+
         # Validações
-        tipos_validos = ["Agente Público", "Agente DAC", "Agente DGP", "Agente DP", "Externo"]
-        if tipo_usuario and tipo_usuario not in tipos_validos:
+        from config import TIPOS_USUARIO
+        if tipo_usuario and tipo_usuario not in TIPOS_USUARIO:
             return jsonify({"erro": "Tipo de usuário inválido"}), 400
-        
+
         if d_usuario and len(d_usuario) > 20:
             return jsonify({"erro": "Departamento do usuário deve ter no máximo 20 caracteres"}), 400
+
+        if auth_user_id:
+            import re
+            if not re.fullmatch(r'[0-9a-f-]{36}', auth_user_id.lower()):
+                return jsonify({"erro": "auth_user_id deve ser um UUID válido"}), 400
         
         # Atualizar no banco
         cur = get_cursor()
@@ -321,6 +330,10 @@ def atualizar_usuario(user_id):
         if "acessos" in data:  # Permite enviar vazio para limpar
             updates.append("acessos = %s")
             params.append(acessos if acessos else None)
+
+        if "auth_user_id" in data:
+            updates.append("auth_user_id = %s")
+            params.append(auth_user_id)
 
         if not updates:
             return jsonify({"erro": "Nenhum campo para atualizar"}), 400
@@ -352,10 +365,9 @@ def atualizar_usuario(user_id):
                 )
 
         # Se tipo_usuario foi alterado, atualizar unidade alocada automaticamente
+        from config import TIPOS_USUARIO
         _UNIDADE_POR_TIPO = {
-            'Agente DAC': 'Divisão de Análise de Contas',
-            'Agente DGP': 'Divisão de Gestão de Parcerias',
-            'Agente DP':  'Departamento de Parcerias',
+            k: v['unidade'] for k, v in TIPOS_USUARIO.items() if v.get('unidade')
         }
         if tipo_usuario and tipo_usuario in _UNIDADE_POR_TIPO:
             nova_unidade = _UNIDADE_POR_TIPO[tipo_usuario]
@@ -388,13 +400,14 @@ def atualizar_usuario(user_id):
         if 'user_id' in session and session['user_id'] == user_id:
             # Recarregar dados do usuário na sessão atual
             cur = get_cursor()
-            cur.execute("SELECT tipo_usuario, acessos, d_usuario FROM gestao_pessoas.usuarios WHERE id = %s", (user_id,))
+            cur.execute("SELECT tipo_usuario, acessos, acessos_escrita, d_usuario FROM gestao_pessoas.usuarios WHERE id = %s", (user_id,))
             updated_user = cur.fetchone()
             cur.close()
-            
+
             if updated_user:
                 session['tipo_usuario'] = updated_user['tipo_usuario']
                 session['acessos'] = updated_user['acessos'] or ""
+                session['acessos_escrita'] = updated_user['acessos_escrita'] or ""
                 session['d_usuario'] = updated_user['d_usuario'] or ""
                 print(f"[INFO] Sessão atualizada para usuário ID {user_id}")
         
@@ -614,7 +627,7 @@ def acessos_por_pagina_get(modulo):
     try:
         cur = get_cursor()
         cur.execute("""
-            SELECT id, email, tipo_usuario, d_usuario, acessos
+            SELECT id, email, tipo_usuario, d_usuario, acessos, acessos_escrita
             FROM gestao_pessoas.usuarios
             WHERE tipo_usuario != 'Agente Público'
             ORDER BY tipo_usuario, email
@@ -625,6 +638,7 @@ def acessos_por_pagina_get(modulo):
         resultado = []
         for u in usuarios:
             status_acesso = get_module_access_status(u['acessos'], modulo)
+            acessos_esc = [a.strip() for a in (u['acessos_escrita'] or '').split(';') if a.strip()]
             resultado.append({
                 "id": u["id"],
                 "email": u["email"],
@@ -633,7 +647,8 @@ def acessos_por_pagina_get(modulo):
                 "tem_acesso": status_acesso["tem_acesso"],
                 "tem_acesso_direto": status_acesso["tem_acesso_direto"],
                 "tem_acesso_herdado": status_acesso["tem_acesso_herdado"],
-                "herdado_de": status_acesso["origem"] if status_acesso["tem_acesso_herdado"] else None
+                "herdado_de": status_acesso["origem"] if status_acesso["tem_acesso_herdado"] else None,
+                "tem_acesso_escrita": modulo in acessos_esc,
             })
         return jsonify(resultado), 200
     except Exception as e:
@@ -652,10 +667,11 @@ def acessos_por_pagina_put(modulo):
     try:
         data = request.get_json()
         ids_com_acesso = set(data.get("user_ids_com_acesso", []))
+        ids_com_escrita = set(data.get("user_ids_com_escrita", []))
 
         cur = get_cursor()
         cur.execute("""
-            SELECT id, acessos
+            SELECT id, acessos, acessos_escrita
             FROM gestao_pessoas.usuarios
             WHERE tipo_usuario != 'Agente Público'
         """)
@@ -664,30 +680,80 @@ def acessos_por_pagina_put(modulo):
         atualizados = 0
         for u in usuarios:
             acessos_lista = [a.strip() for a in (u['acessos'] or '').split(';') if a.strip()]
-            tinha = modulo in acessos_lista
+            acessos_esc_lista = [a.strip() for a in (u['acessos_escrita'] or '').split(';') if a.strip()]
+            tinha_acesso = modulo in acessos_lista
+            tinha_escrita = modulo in acessos_esc_lista
+            deve_acesso = u['id'] in ids_com_acesso
+            deve_escrita = u['id'] in ids_com_escrita
 
-            if u['id'] in ids_com_acesso and not tinha:
-                acessos_lista.append(modulo)
-            elif u['id'] not in ids_com_acesso and tinha:
-                acessos_lista = [a for a in acessos_lista if a != modulo]
-            else:
+            if tinha_acesso == deve_acesso and tinha_escrita == deve_escrita:
                 continue  # sem mudança
 
+            if deve_acesso and not tinha_acesso:
+                acessos_lista.append(modulo)
+            elif not deve_acesso and tinha_acesso:
+                acessos_lista = [a for a in acessos_lista if a != modulo]
+                acessos_esc_lista = [a for a in acessos_esc_lista if a != modulo]
+
+            if deve_escrita and not tinha_escrita:
+                acessos_esc_lista.append(modulo)
+            elif not deve_escrita and tinha_escrita:
+                acessos_esc_lista = [a for a in acessos_esc_lista if a != modulo]
+
             novo_acessos = ';'.join(acessos_lista) if acessos_lista else None
+            novo_acessos_escrita = ';'.join(acessos_esc_lista)
             cur.execute("""
-                UPDATE gestao_pessoas.usuarios SET acessos = %s WHERE id = %s
-            """, (novo_acessos, u['id']))
+                UPDATE gestao_pessoas.usuarios SET acessos = %s, acessos_escrita = %s WHERE id = %s
+            """, (novo_acessos, novo_acessos_escrita, u['id']))
             atualizados += 1
 
             # Atualizar sessão se for o usuário logado
             if session.get('user_id') == u['id']:
                 session['acessos'] = novo_acessos or ""
+                session['acessos_escrita'] = novo_acessos_escrita
 
         get_db().commit()
         cur.close()
         return jsonify({"mensagem": f"{atualizados} usuário(s) atualizado(s)", "atualizados": atualizados}), 200
     except Exception as e:
         get_db().rollback()
+        return jsonify({"erro": str(e)}), 500
+
+
+@auth_bp.route("/api/usuarios/todos-com-acessos", methods=["GET"])
+@login_required
+def usuarios_todos_com_acessos():
+    """
+    Retorna todos os usuários não-admin com seus campos de acessos e acessos_escrita.
+    Usado pela Matriz de Permissões.
+    """
+    if session.get("tipo_usuario") != "Agente Público":
+        return jsonify({"erro": "Acesso negado"}), 403
+    try:
+        cur = get_cursor()
+        cur.execute("""
+            SELECT u.id, u.email, u.tipo_usuario, u.d_usuario, u.acessos, u.acessos_escrita,
+                   i.usuario_nome
+            FROM gestao_pessoas.usuarios u
+            LEFT JOIN gestao_pessoas.usuarios_infos i ON i.usuario_email = u.email
+            WHERE u.tipo_usuario != 'Agente Público'
+            ORDER BY u.tipo_usuario, u.email
+        """)
+        usuarios = cur.fetchall()
+        cur.close()
+        resultado = []
+        for u in usuarios:
+            resultado.append({
+                "id": u["id"],
+                "email": u["email"],
+                "tipo_usuario": u["tipo_usuario"],
+                "d_usuario": u["d_usuario"] or "",
+                "acessos": u["acessos"] or "",
+                "acessos_escrita": u["acessos_escrita"] or "",
+                "usuario_nome": u["usuario_nome"] or "",
+            })
+        return jsonify(resultado), 200
+    except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
 

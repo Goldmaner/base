@@ -272,3 +272,7 @@ Sempre usar Bootstrap 5.3.0 e Bootstrap Icons 1.10.x:
 | `templates/parcerias/parcerias_form.html`  | Parcerias   | `#4c1d95 → #7c3aed` |
 | `templates/parcerias/parcerias_osc_dict.html` | Parcerias | `#4c1d95 → #7c3aed` |
 | `templates/listas.html`                    | Listas      | `#4c1d95 → #7c3aed` |
+| `templates/orcamento_1.html`               | Orçamento   | `#78350f → #d97706` |
+| `templates/orcamento_2.html`               | Orçamento   | `#78350f → #d97706` |
+| `templates/orcamento_3_dict.html`          | Orçamento   | `#78350f → #d97706` |
+| `templates/orcamento_analise.html`         | Orçamento   | `#78350f → #d97706` |

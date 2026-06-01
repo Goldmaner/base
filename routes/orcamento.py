@@ -916,3 +916,323 @@ def api_clonar_aditivo():
 
     except Exception as e:
         return jsonify({'error': f'Erro ao criar aditivo: {str(e)}'}), 500
+
+
+# ─── Análise de Despesas ──────────────────────────────────────────────────────
+
+MESES_NOMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+               'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+TIPOS_EXCLUIDOS = (
+    'Convênio de Cooperação', 'Convênio', 'Convênio - Passivo', 'Acordo de Cooperação'
+)
+
+
+RUBRICAS_FIXAS = [
+    'Pessoal', 'Materiais', 'Administrativas', 'Serviços de Terceiros',
+    'Outras Despesas', 'Imobilizado', 'Implantação',
+]
+
+PREFIXOS_TIPO = ['TFM', 'TCL']
+
+
+def _parse_analise_filtros():
+    """Lê e valida os filtros comuns de GET para análise de despesas."""
+    ano = request.args.get('ano', datetime.now().year, type=int)
+    termos = request.args.getlist('termos')
+    tipos_termo = request.args.getlist('tipo_termo')   # prefixos: TFM, TCL
+    vigentes = request.args.get('vigentes', '') == '1'
+    rubrica = request.args.get('rubrica', '').strip()
+    categoria = request.args.get('categoria', '').strip()
+    return ano, termos, tipos_termo, vigentes, rubrica, categoria
+
+
+def _query_analise(ano, termos, tipos_termo, vigentes, rubrica, categoria):
+    """
+    Executa a query principal de análise de despesas e retorna linhas pivotadas.
+    Converte meses relativos (parcerias_despesas.mes) em meses calendário usando
+    parcerias.inicio como âncora. O filtro de tipo usa o prefixo de numero_termo
+    (TCL%, TFM%) em vez da coluna tipo_termo.
+    """
+    cur = get_cursor()
+
+    conditions = [
+        "p.tipo_termo NOT IN %s",
+        "EXTRACT(YEAR FROM (p.inicio + (pd.mes - 1) * INTERVAL '1 month')) = %s",
+    ]
+    params = [TIPOS_EXCLUIDOS, ano]
+
+    if termos:
+        conditions.append("pd.numero_termo = ANY(%s)")
+        params.append(list(termos))
+
+    if tipos_termo:
+        # Filtro por prefixo de numero_termo (TCL%, TFM%)
+        tipo_parts = " OR ".join("pd.numero_termo ILIKE %s" for _ in tipos_termo)
+        conditions.append(f"({tipo_parts})")
+        for prefixo in tipos_termo:
+            params.append(f"{prefixo}%")
+
+    if vigentes:
+        conditions.append("p.inicio <= CURRENT_DATE AND p.final >= CURRENT_DATE")
+
+    if rubrica:
+        conditions.append("pd.rubrica = %s")
+        params.append(rubrica)
+
+    if categoria:
+        conditions.append("pd.categoria_despesa ILIKE %s")
+        params.append(f"%{categoria}%")
+
+    where = " AND ".join(conditions)
+
+    cur.execute(f"""
+        SELECT
+            pd.numero_termo,
+            p.tipo_termo,
+            p.osc,
+            pd.rubrica,
+            pd.categoria_despesa,
+            COALESCE(pd.aditivo, 0) AS aditivo,
+            EXTRACT(MONTH FROM (p.inicio + (pd.mes - 1) * INTERVAL '1 month'))::int AS cal_mes,
+            SUM(pd.valor) AS valor
+        FROM public.parcerias p
+        JOIN public.parcerias_despesas pd ON pd.numero_termo = p.numero_termo
+        WHERE {where}
+        GROUP BY pd.numero_termo, p.tipo_termo, p.osc,
+                 pd.rubrica, pd.categoria_despesa, COALESCE(pd.aditivo, 0), cal_mes
+        ORDER BY pd.numero_termo, pd.rubrica, pd.categoria_despesa, cal_mes
+    """, params)
+
+    rows = cur.fetchall()
+    cur.close()
+
+    # Pivô: agrupa em (termo, tipo, osc, rubrica, categoria, aditivo) × 12 meses
+    from collections import defaultdict, OrderedDict
+    pivot = OrderedDict()
+    totais_mes = [0.0] * 12  # índice 0 = Jan
+
+    for r in rows:
+        chave = (r['numero_termo'], r['tipo_termo'], r['osc'],
+                 r['rubrica'], r['categoria_despesa'], r['aditivo'])
+        if chave not in pivot:
+            pivot[chave] = [None] * 12
+        mes_idx = int(r['cal_mes']) - 1
+        if 0 <= mes_idx < 12:
+            valor = float(r['valor'] or 0)
+            pivot[chave][mes_idx] = valor
+            totais_mes[mes_idx] = (totais_mes[mes_idx] or 0) + valor
+
+    # Converte para lista de dicts para o template
+    linhas = []
+    for (numero_termo, tipo_termo, osc, rubrica, categoria_despesa, aditivo), meses in pivot.items():
+        total_linha = sum(v for v in meses if v is not None)
+        linhas.append({
+            'numero_termo': numero_termo,
+            'tipo_termo': tipo_termo or '-',
+            'osc': osc or '-',
+            'rubrica': rubrica or '-',
+            'categoria_despesa': categoria_despesa or '-',
+            'aditivo': aditivo,
+            'meses': meses,
+            'total': total_linha,
+        })
+
+    total_geral = sum(totais_mes)
+    return linhas, totais_mes, total_geral
+
+
+@orcamento_bp.route('/analise', methods=['GET'])
+@login_required
+@requires_access('orcamento')
+def analise():
+    """Análise de despesas: tabela pivotada de valores mensais por termo."""
+    cur = get_cursor()
+
+    # Lista de termos para o seletor — apenas TCL e TFM (por prefixo de numero_termo)
+    cur.execute("""
+        SELECT numero_termo, tipo_termo, osc,
+               TO_CHAR(inicio, 'MM/YYYY') AS inicio_fmt,
+               TO_CHAR(final, 'MM/YYYY')  AS final_fmt,
+               inicio, final
+        FROM public.parcerias
+        WHERE inicio IS NOT NULL
+          AND tipo_termo NOT IN %s
+          AND (numero_termo ILIKE 'TFM%%' OR numero_termo ILIKE 'TCL%%')
+        ORDER BY numero_termo
+    """, (TIPOS_EXCLUIDOS,))
+    todos_termos = cur.fetchall()
+    cur.close()
+
+    # Anos disponíveis (ano atual ± 3)
+    ano_atual = datetime.now().year
+    anos = list(range(ano_atual - 2, ano_atual + 4))
+
+    # Se houver filtros ativos, executar a query principal
+    ano, termos, tipos_termo, vigentes, rubrica, categoria = _parse_analise_filtros()
+    linhas, totais_mes, total_geral = [], [0.0] * 12, 0.0
+    filtros_ativos = bool(termos or tipos_termo or vigentes or rubrica or
+                          categoria or request.args.get('ano'))
+
+    if filtros_ativos:
+        linhas, totais_mes, total_geral = _query_analise(
+            ano, termos, tipos_termo, vigentes, rubrica, categoria)
+
+    return render_template(
+        'orcamento_analise.html',
+        todos_termos=todos_termos,
+        rubricas=RUBRICAS_FIXAS,
+        anos=anos,
+        ano_selecionado=ano,
+        termos_selecionados=termos,
+        tipos_selecionados=tipos_termo,
+        vigentes=vigentes,
+        rubrica_selecionada=rubrica,
+        categoria_selecionada=categoria,
+        linhas=linhas,
+        totais_mes=totais_mes,
+        total_geral=total_geral,
+        meses_nomes=MESES_NOMES,
+        filtros_ativos=filtros_ativos,
+        prefixos_tipo=PREFIXOS_TIPO,
+    )
+
+
+@orcamento_bp.route('/analise/exportar-csv', methods=['GET'])
+@login_required
+@requires_access('orcamento')
+def analise_exportar_csv():
+    """Exporta a análise de despesas em CSV com os filtros ativos."""
+    ano, termos, tipos_termo, vigentes, rubrica, categoria = _parse_analise_filtros()
+    linhas, totais_mes, total_geral = _query_analise(
+        ano, termos, tipos_termo, vigentes, rubrica, categoria)
+
+    output = StringIO()
+    output.write('﻿')  # BOM UTF-8 para Excel
+    writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+
+    cabecalho = ['Termo', 'Tipo', 'OSC', 'Rubrica', 'Item de Despesa', 'Aditivo'] + \
+                [f'{m}/{str(ano)[-2:]}' for m in MESES_NOMES] + ['Total']
+    writer.writerow(cabecalho)
+
+    def fmt(v):
+        if v is None:
+            return ''
+        return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    for l in linhas:
+        linha = [
+            l['numero_termo'], l['tipo_termo'], l['osc'],
+            l['rubrica'], l['categoria_despesa'],
+            'Base' if l['aditivo'] == 0 else f"Aditivo {l['aditivo']}",
+        ] + [fmt(v) for v in l['meses']] + [fmt(l['total'])]
+        writer.writerow(linha)
+
+    # Linha de totais
+    writer.writerow([])
+    writer.writerow(
+        ['TOTAL', '', '', '', '', ''] +
+        [fmt(t) if t else '' for t in totais_mes] +
+        [fmt(total_geral)]
+    )
+
+    output.seek(0)
+    data_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'analise_despesas_{ano}_{data_str}.csv'
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={
+            'Content-Disposition': f'attachment; filename={filename}',
+            'Content-Type': 'text/csv; charset=utf-8',
+        }
+    )
+
+
+@orcamento_bp.route('/analise/exportar-pdf', methods=['GET'])
+@login_required
+@requires_access('orcamento')
+def analise_exportar_pdf():
+    """Exporta a análise de despesas em PDF landscape com ReportLab."""
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+    ano, termos, tipos_termo, vigentes, rubrica, categoria = _parse_analise_filtros()
+    linhas, totais_mes, total_geral = _query_analise(
+        ano, termos, tipos_termo, vigentes, rubrica, categoria)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=1 * cm, leftMargin=1 * cm,
+        topMargin=1.5 * cm, bottomMargin=1 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+    amber = colors.HexColor('#d97706')
+    dark_amber = colors.HexColor('#78350f')
+
+    def fmt(v):
+        if v is None:
+            return ''
+        return f"R${v:,.0f}".replace(',', '.')
+
+    # Cabeçalho do documento
+    story = [
+        Paragraph(f'Análise de Despesas — {ano}', ParagraphStyle(
+            'titulo', parent=styles['Heading1'], fontSize=14, textColor=dark_amber)),
+        Spacer(1, 0.3 * cm),
+    ]
+
+    # Tabela
+    header_row = ['Termo', 'Rubrica', 'Item de Despesa'] + \
+                 MESES_NOMES + ['Total']
+    table_data = [header_row]
+
+    for l in linhas:
+        row = [
+            l['numero_termo'],
+            l['rubrica'],
+            l['categoria_despesa'],
+        ] + [fmt(v) for v in l['meses']] + [fmt(l['total'])]
+        table_data.append(row)
+
+    # Linha de totais
+    table_data.append(
+        ['TOTAL', '', ''] +
+        [fmt(t) if t else '' for t in totais_mes] +
+        [fmt(total_geral)]
+    )
+
+    # Larguras de coluna
+    col_widths = [3.5 * cm, 2.5 * cm, 4 * cm] + [1.6 * cm] * 12 + [2 * cm]
+    tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), dark_amber),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 6.5),
+        ('ALIGN', (3, 0), (-1, -1), 'RIGHT'),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#e5e7eb')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#fef3c7')]),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#fef3c7')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    story.append(tbl)
+
+    doc.build(story)
+    buffer.seek(0)
+    data_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'analise_despesas_{ano}_{data_str}.pdf'
+    return Response(
+        buffer.read(),
+        mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename={filename}'},
+    )

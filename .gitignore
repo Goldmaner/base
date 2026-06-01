@@ -47,6 +47,9 @@ testes/
 *.xlsx
 *.xls
 
+# Specs / roadmap interno (não vai para o repositório)
+specs/
+
 # Editor / OS
 .vscode/
 Thumbs.db

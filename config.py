@@ -30,6 +30,20 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-padrao')
 # Esses módulos não precisam de permissão explícita — são garantidos pelo decorator
 # e adicionados à sessão no login, para que os botões da home apareçam corretamente.
 ACESSOS_BASICOS = ['ferias', 'manuais']
+
+# Tipos de usuário com suas propriedades.
+# Para adicionar um novo tipo no futuro: insira uma entrada aqui + adicione ao dropdown do template.
+# escrita_padrao=False → tipo recebe apenas leitura por default; escrita precisa ser liberada
+# por módulo via Controle de Acessos.
+TIPOS_USUARIO = {
+    "Agente Público":    {"admin": True,  "unidade": None,                            "escrita_padrao": True},
+    "Agente DAC":        {"admin": False, "unidade": "Divisão de Análise de Contas",   "escrita_padrao": True},
+    "Agente DGP":        {"admin": False, "unidade": "Divisão de Gestão de Parcerias", "escrita_padrao": True},
+    "Agente DP":         {"admin": False, "unidade": "Departamento de Parcerias",      "escrita_padrao": True},
+    "Externo":           {"admin": False, "unidade": None,                             "escrita_padrao": True},
+    "Externo: Gabinete": {"admin": False, "unidade": "Gabinete",                       "escrita_padrao": False},
+}
+
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Configuração de e-mail (SMTP)

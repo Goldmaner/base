@@ -5,8 +5,8 @@ from functools import wraps
 from threading import Thread
 import json
 import traceback as _traceback
-from flask import session, redirect, url_for, flash, request, current_app
-from config import ACESSOS_BASICOS
+from flask import session, redirect, url_for, flash, request, current_app, jsonify
+from config import ACESSOS_BASICOS, TIPOS_USUARIO
 
 ACCESS_INHERITANCE = {
     'analises': [
@@ -211,16 +211,17 @@ def requires_access(modulo):
                 try:
                     cursor = get_cursor()
                     cursor.execute("""
-                        SELECT acessos, tipo_usuario FROM gestao_pessoas.usuarios WHERE id = %s
+                        SELECT acessos, acessos_escrita, tipo_usuario FROM gestao_pessoas.usuarios WHERE id = %s
                     """, (session['user_id'],))
                     result = cursor.fetchone()
                     cursor.close()
                     
                     if result:
                         acessos = result['acessos'] or ''
-                        session['acessos'] = acessos  # Atualizar sessão
-                        session['tipo_usuario'] = result['tipo_usuario']  # Garantir tipo atualizado
-                        
+                        session['acessos'] = acessos
+                        session['tipo_usuario'] = result['tipo_usuario']
+                        session['acessos_escrita'] = result.get('acessos_escrita') or ''
+
                         # Se virou Agente Público, permitir acesso
                         if result['tipo_usuario'] == 'Agente Público':
                             print(f"[INFO FALLBACK] Usuário {session['user_id']} é Agente Público - acesso total")
@@ -255,12 +256,46 @@ def check_module_access(user_acessos, modulo):
     """
     Função auxiliar para verificar acesso a um módulo.
     Útil para usar em templates.
-    
+
     Args:
         user_acessos (str): String de acessos do usuário (ex: 'instrucoes;analises')
         modulo (str): Nome do módulo a verificar
-    
+
     Returns:
         bool: True se tem acesso, False caso contrário
     """
     return get_module_access_status(user_acessos, modulo)['tem_acesso']
+
+
+def has_write_access(modulo):
+    """
+    Verifica se o usuário logado tem permissão de escrita no módulo.
+    Tipos com escrita_padrao=True (agentes internos) passam direto.
+    Tipos com escrita_padrao=False (Externo: Gabinete) precisam de liberação explícita.
+    """
+    tipo = session.get('tipo_usuario', '')
+    cfg = TIPOS_USUARIO.get(tipo, {})
+    if cfg.get('admin') or cfg.get('escrita_padrao', True):
+        return True
+    acessos_esc = parse_access_list(session.get('acessos_escrita', ''))
+    return modulo in acessos_esc
+
+
+def requires_write_access(modulo):
+    """
+    Decorador para rotas POST/PUT/DELETE que exigem permissão de escrita no módulo.
+    Retorna 403 com tipo='sem_permissao_escrita' quando bloqueado, para que o
+    frontend exiba a mensagem amigável 'Solicite permissão ao admin'.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if not has_write_access(modulo):
+                return jsonify({
+                    "erro": "Você não tem permissão para realizar esta ação.",
+                    "detalhe": "Solicite permissão ao administrador do sistema.",
+                    "tipo": "sem_permissao_escrita"
+                }), 403
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
