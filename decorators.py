@@ -1,5 +1,28 @@
 """
 Decorators para controle de acesso por módulo e captura de erros
+
+════════════════════════════════════════════════════════════════════
+CONVENÇÃO OBRIGATÓRIA DE CONTROLE DE ACESSO EM ROTAS FLASK
+════════════════════════════════════════════════════════════════════
+
+Toda rota deve seguir esta ordem de decoradores:
+
+    @blueprint.route('/path', methods=['GET', 'POST'])
+    @login_required                   # 1. usuário autenticado?
+    @requires_access('modulo')        # 2. tem acesso ao módulo?
+    @requires_write_access('modulo')  # 3. pode escrever? (ignorado em GET/HEAD/OPTIONS)
+    def minha_rota():
+        ...
+
+REGRAS:
+  - Rotas GET puras      → @login_required + @requires_access
+  - Rotas POST/PUT/DELETE → + @requires_write_access (obrigatório)
+  - Rotas GET+POST mistas → todos os três (@requires_write_access ignora GETs)
+  - Rotas admin-only      → checar session.get('tipo_usuario') diretamente
+
+@requires_write_access bloqueia apenas tipos com escrita_padrao=False (ex: Externo: Gabinete).
+Todos os agentes internos (DAC, DGP, DP, Externo, Agente Público) passam sem verificação.
+════════════════════════════════════════════════════════════════════
 """
 from functools import wraps
 from threading import Thread
@@ -283,19 +306,37 @@ def has_write_access(modulo):
 
 def requires_write_access(modulo):
     """
-    Decorador para rotas POST/PUT/DELETE que exigem permissão de escrita no módulo.
-    Retorna 403 com tipo='sem_permissao_escrita' quando bloqueado, para que o
-    frontend exiba a mensagem amigável 'Solicite permissão ao admin'.
+    Bloqueia escrita para tipos com escrita_padrao=False (ex: Externo: Gabinete)
+    quando o módulo não está em acessos_escrita.
+
+    Seguro em qualquer rota: métodos GET/HEAD/OPTIONS passam sem verificação.
+    - POST/PUT/DELETE/PATCH em API/AJAX → JSON 403 com tipo='sem_permissao_escrita'
+    - POST/PUT/DELETE/PATCH em páginas  → flash + redirect para home
     """
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
+            # Métodos de leitura sempre passam — seguro em rotas mistas GET+POST
+            if request.method in ('GET', 'HEAD', 'OPTIONS'):
+                return f(*args, **kwargs)
             if not has_write_access(modulo):
-                return jsonify({
-                    "erro": "Você não tem permissão para realizar esta ação.",
-                    "detalhe": "Solicite permissão ao administrador do sistema.",
-                    "tipo": "sem_permissao_escrita"
-                }), 403
+                is_api = (
+                    request.is_json
+                    or '/api/' in request.path
+                    or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+                )
+                if is_api:
+                    return jsonify({
+                        "erro": "Você não tem permissão para realizar esta ação.",
+                        "detalhe": "Solicite permissão ao administrador do sistema.",
+                        "tipo": "sem_permissao_escrita"
+                    }), 403
+                flash(
+                    'Você não tem permissão de escrita neste módulo. '
+                    'Solicite permissão ao administrador do sistema.',
+                    'danger'
+                )
+                return redirect(url_for('main.index'))
             return f(*args, **kwargs)
         return wrapper
     return decorator

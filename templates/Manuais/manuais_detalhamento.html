@@ -223,6 +223,7 @@
   <div class="content-section">
     <div class="content-section-header">
       <h5><i class="bi bi-text-paragraph"></i> Descrição da Operação / Projeto</h5>
+      {% if has_write_access('manuais') %}
       <button class="btn btn-sm"
               style="background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.5);
                      color:#fff; font-size:.78rem; border-radius:6px;"
@@ -230,6 +231,7 @@
               id="btnEditarDesc">
         <i class="bi bi-pencil me-1"></i>Editar
       </button>
+      {% endif %}
       <style>
         #btnEditarDesc, .btn-adicionar-versao {
           font-size: .88rem !important; padding: 6px 16px !important;
@@ -282,6 +284,7 @@
           {{ versoes|length }}
         </span>
       </h5>
+      {% if has_write_access('manuais') %}
       <button class="btn btn-sm"
               style="background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.5);
                      color:#fff; font-size:.78rem; border-radius:6px;"
@@ -289,6 +292,7 @@
               class="btn btn-sm btn-adicionar-versao">
         <i class="bi bi-plus-lg me-1"></i>Adicionar Versão
       </button>
+      {% endif %}
     </div>
     <div class="content-section-body">
 
@@ -354,6 +358,7 @@
             <span class="badge-pendencias"><i class="bi bi-exclamation-circle me-1"></i>Com pend&#234;ncias</span>
             {% endif %}
             <div class="ms-auto">
+              {% if has_write_access('manuais') %}
               <button class="btn btn-sm btn-outline-secondary"
                       style="font-size:.85rem; padding:5px 12px;"
                       onclick="abrirEditarVersao({{ v.id }})"
@@ -366,6 +371,7 @@
                       title="Excluir versão">
                 <i class="bi bi-trash3"></i>
               </button>
+              {% endif %}
             </div>
           </div>
           <div class="versao-card-body">

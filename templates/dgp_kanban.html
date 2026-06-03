@@ -1046,9 +1046,11 @@ $(document).on('change', '#alt_status', function() {
       $('#alt_data_assinatura').prop('required', true);
     }
   } else {
+    // Oculta o container mas NÃO limpa os valores — eles são guardados silenciosamente
+    // e só serão gravados pelo backend se o status final for Concluído
     $('#campo-sei-documento-container').hide();
-    $('#alt_sei_documento').prop('required', false).val('').closest('.col-md-6').show();
-    $('#alt_data_assinatura').prop('required', false).val('');
+    $('#alt_sei_documento').prop('required', false);
+    $('#alt_data_assinatura').prop('required', false);
   }
 });
 
@@ -1192,6 +1194,7 @@ $('#formAlteracao').submit(function(e) {
   const $btn = $('button[type="submit"][form="formAlteracao"]');
   const origText = $btn.html();
 
+  serializarTodosEnderecos();
   // ---- MODO LOTE ----
   if (isLote) {
     if ($('#lote-tbody tr').length === 0) {
@@ -1244,6 +1247,7 @@ $('#formAlteracao').submit(function(e) {
   }
 
   // ---- MODO NORMAL ----
+  serializarTodosEnderecos();  // garante JSON nos hidden inputs de endereços
   const inst = $('#instrumento_alteracao').val();
   let num = 0;
   if (['Termo de Aditamento','Termo de Apostilamento'].includes(inst)) {
@@ -1421,6 +1425,156 @@ $('#numero_termo').on('select2:select', function() {
   buscarProximoNumero();
 });
 
+// ====================================================
+// EDITOR DE ENDEREÇOS (tipo 'enderecos')
+// ====================================================
+let _enderecoCounter = 0;
+
+function _htmlEnderecoRow(index, dado) {
+  _enderecoCounter++;
+  const rid = `end-row-${index}-${_enderecoCounter}`;
+  const endId = dado && dado.id ? dado.id : '';
+  return `
+    <div class="card mb-2 p-2 endereco-row" id="${rid}" data-endereco-id="${endId}" style="font-size:.83rem;">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <span class="badge bg-secondary" style="font-size:.65rem;">Endereço #${_enderecoCounter}</span>
+        <button type="button" class="btn btn-xs btn-outline-danger" style="padding:1px 6px;font-size:.72rem;"
+                onclick="removerEnderecoRow('${rid}',${index})"><i class="bi bi-trash"></i></button>
+      </div>
+      <div class="row g-2">
+        <div class="col-md-5">
+          <label class="form-label mb-0" style="font-size:.73rem;">Logradouro</label>
+          <input type="text" class="form-control form-control-sm end-logradouro"
+                 placeholder="Rua, Av., Pça…" value="${escAttr(dado?.parceria_logradouro||'')}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label mb-0" style="font-size:.73rem;">Número</label>
+          <input type="text" class="form-control form-control-sm end-numero"
+                 placeholder="s/n" value="${escAttr(String(dado?.parceria_numero||''))}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-0" style="font-size:.73rem;">Complemento</label>
+          <input type="text" class="form-control form-control-sm end-complemento"
+                 placeholder="Apto, Bloco…" value="${escAttr(dado?.parceria_complemento||'')}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label mb-0" style="font-size:.73rem;">CEP</label>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control form-control-sm end-cep"
+                   placeholder="00000-000" maxlength="9"
+                   value="${escAttr(dado?.parceria_cep||'')}"
+                   oninput="this.value=this.value.replace(/\D/g,'').replace(/(\d{5})(\d)/,'$1-$2').slice(0,9)"
+                   onblur="buscarCepEndereco(this,this.closest('.endereco-row'))">
+            <button type="button" class="btn btn-outline-secondary"
+                    onclick="buscarCepEndereco(this.previousElementSibling,this.closest('.endereco-row'))"
+                    title="Buscar CEP"><i class="bi bi-search"></i></button>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label mb-0" style="font-size:.73rem;">Distrito / Cód.</label>
+          <input type="text" class="form-control form-control-sm end-distrito"
+                 placeholder="Código do distrito" value="${escAttr(dado?.parceria_distrito||'')}">
+        </div>
+        <div class="col-md-9">
+          <label class="form-label mb-0" style="font-size:.73rem;">Observação</label>
+          <input type="text" class="form-control form-control-sm end-observacao"
+                 placeholder="Observações sobre o endereço" value="${escAttr(dado?.observacao||'')}">
+        </div>
+      </div>
+    </div>`;
+}
+
+function adicionarEnderecoRow(index, dado) {
+  const list = document.getElementById(`enderecos-list-${index}`);
+  if (!list) return;
+  const div = document.createElement('div');
+  div.innerHTML = _htmlEnderecoRow(index, dado || {});
+  list.appendChild(div.firstElementChild);
+  serializarEnderecos(index);
+}
+
+function removerEnderecoRow(rowId, index) {
+  const row = document.getElementById(rowId);
+  if (row) row.remove();
+  serializarEnderecos(index);
+}
+
+function serializarEnderecos(index) {
+  const list = document.getElementById(`enderecos-list-${index}`);
+  const hidden = document.getElementById(`alt_info_enderecos_${index}`);
+  if (!list || !hidden) return;
+  const enderecos = [];
+  list.querySelectorAll('.endereco-row').forEach(function(row) {
+    const endId = row.dataset.enderecoId;
+    const obj = {
+      parceria_logradouro: row.querySelector('.end-logradouro')?.value || '',
+      parceria_numero:     row.querySelector('.end-numero')?.value || '',
+      parceria_complemento:row.querySelector('.end-complemento')?.value || '',
+      parceria_cep:        row.querySelector('.end-cep')?.value || '',
+      parceria_distrito:   row.querySelector('.end-distrito')?.value || '',
+      observacao:          row.querySelector('.end-observacao')?.value || '',
+    };
+    if (endId) obj.id = parseInt(endId);
+    enderecos.push(obj);
+  });
+  hidden.value = JSON.stringify(enderecos);
+}
+
+function carregarEnderecosDoTermo(index) {
+  const termo = $('#numero_termo').val();
+  if (!termo) { alert('Selecione o Número do Termo primeiro.'); return; }
+  const btn = document.getElementById(`btn-carregar-end-${index}`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+  $.get(`/parcerias/api/enderecos/${encodeURIComponent(termo)}`, function(resp) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Carregar endereços atuais do termo'; }
+    if (!resp.success) { alert('Erro ao carregar endereços.'); return; }
+    const list = document.getElementById(`enderecos-list-${index}`);
+    if (!list) return;
+    list.innerHTML = '';
+    _enderecoCounter = 0;
+    if (resp.enderecos && resp.enderecos.length) {
+      resp.enderecos.forEach(e => adicionarEnderecoRow(index, e));
+    } else {
+      adicionarEnderecoRow(index, {});
+    }
+  }).fail(function() {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Carregar endereços atuais do termo'; }
+    alert('Erro ao buscar endereços do termo.');
+  });
+}
+
+function buscarCepEndereco(cepInput, row) {
+  const cep = (cepInput.value || '').replace(/\D/g, '');
+  if (cep.length !== 8) return;
+  cepInput.disabled = true;
+  // Usa proxy server-side para evitar ERR_CERT_AUTHORITY_INVALID em redes corporativas
+  $.get(`/parcerias/api/cep/${cep}`, function(resp) {
+    cepInput.disabled = false;
+    if (!resp.success) return;
+    const data = resp.data;
+    const logr = row.querySelector('.end-logradouro');
+    if (logr && !logr.value) logr.value = [data.logradouro, data.bairro].filter(Boolean).join(', ');
+    const obs = row.querySelector('.end-observacao');
+    if (obs && !obs.value && data.bairro) obs.value = data.bairro;
+  }).fail(function() { cepInput.disabled = false; });
+}
+
+// Serializar todos os editores de endereço antes do submit
+function serializarTodosEnderecos() {
+  document.querySelectorAll('[id^="enderecos-list-"]').forEach(function(list) {
+    const m = list.id.match(/enderecos-list-(\d+)/);
+    if (m) serializarEnderecos(parseInt(m[1]));
+  });
+}
+
+// Auto-atualizar serialização ao digitar nos campos de endereço
+$(document).on('input change', '#tipos-alteracao-container .end-logradouro, #tipos-alteracao-container .end-numero, #tipos-alteracao-container .end-complemento, #tipos-alteracao-container .end-cep, #tipos-alteracao-container .end-distrito, #tipos-alteracao-container .end-observacao', function() {
+  const editor = $(this).closest('[id^="enderecos-editor-"]');
+  if (!editor.length) return;
+  const m = editor.attr('id').match(/enderecos-editor-(\d+)/);
+  if (m) serializarEnderecos(parseInt(m[1]));
+});
+
 function _infoRequerida() {
   return $('#alt_status').val() === 'Concluído';
 }
@@ -1461,10 +1615,35 @@ function atualizarCampoDinamico(index) {
       html += `<select class="form-select" name="alt_info[]"${reqAttr}><option value="">-- Selecione a Pessoa Gestora --</option></select>`;
       setTimeout(() => { $.get('/parcerias/api/lista_pgs', d => { const s = $(`#campo_info_${index} select[name="alt_info[]"]`); d.forEach(v => s.append(`<option value="${v}">${v}</option>`)); }); }, 100);
       break;
+    case 'enderecos':
+      html = `
+        <label class="form-label"><i class="bi bi-geo-alt-fill text-danger"></i> Endereços do Projeto</label>
+        <input type="hidden" name="alt_info[]" id="alt_info_enderecos_${index}" value="[]">
+        <div id="enderecos-editor-${index}" class="border rounded p-2" style="background:#fff;">
+          <div id="enderecos-list-${index}"></div>
+          <div class="d-flex gap-2 mt-2 flex-wrap">
+            <button type="button" class="btn btn-outline-success btn-sm"
+                    onclick="adicionarEnderecoRow(${index})">
+              <i class="bi bi-plus-circle"></i> Adicionar endereço
+            </button>
+            <button type="button" class="btn btn-outline-primary btn-sm"
+                    onclick="carregarEnderecosDoTermo(${index})" id="btn-carregar-end-${index}">
+              <i class="bi bi-arrow-clockwise"></i> Carregar endereços atuais do termo
+            </button>
+          </div>
+        </div>
+        <small class="text-muted">Edite, adicione ou remova endereços. Os dados serão gravados em <strong>Concluído</strong>.</small>`;
+      setTimeout(() => {
+        const termo = $('#numero_termo').val();
+        if (termo) carregarEnderecosDoTermo(index);
+      }, 200);
+      break;
     default:
       html += `<input type="text" class="form-control" name="alt_info[]" placeholder="Nova informação"${reqAttr}>`;
   }
-  html += `<small class="text-muted">Preencha a nova informação para este tipo de alteração</small>`;
+  if (config.tipo !== 'enderecos') {
+    html += `<small class="text-muted">Preencha a nova informação para este tipo de alteração</small>`;
+  }
   campoContainer.html(html).show();
   if (config.tipo === 'money') {
     $(`#campo_info_${index} .money-input`).on('input', function() {
@@ -1551,6 +1730,20 @@ function editarAlteracao(numeroTermo, instrumento, altNumero) {
                   const parts = info.split('|');
                   $(`#campo_info_${idx + 1} [name="alt_info_inicio[]"]`).val(parts[0] || '');
                   $(`#campo_info_${idx + 1} [name="alt_info_fim[]"]`).val(parts[1] || '');
+                } else if (conf.tipo === 'enderecos') {
+                  // Restaurar editor de endereços a partir do JSON salvo
+                  try {
+                    const endsList = JSON.parse(info);
+                    const listEl = document.getElementById(`enderecos-list-${idx + 1}`);
+                    if (listEl) {
+                      listEl.innerHTML = '';
+                      _enderecoCounter = 0;
+                      endsList.forEach(e => adicionarEnderecoRow(idx + 1, e));
+                    }
+                  } catch(e) {
+                    // Se não for JSON válido, só atualiza o hidden
+                    $(`#alt_info_enderecos_${idx + 1}`).val(info);
+                  }
                 } else if (conf.tipo === 'money') {
                   $(`#campo_info_${idx + 1} [name="alt_info[]"]`).val(info);
                 } else {

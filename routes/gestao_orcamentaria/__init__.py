@@ -7,7 +7,7 @@ Sistema de controle e acompanhamento orçamentário
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_db, get_cursor
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 import re
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta

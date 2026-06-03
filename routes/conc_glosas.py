@@ -6,7 +6,7 @@ Exibe todas as despesas marcadas como 'Glosar' no extrato, organizadas por compe
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor
 from functools import wraps
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 
 bp = Blueprint('conc_glosas', __name__, url_prefix='/conc_glosas')
 

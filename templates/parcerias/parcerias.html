@@ -161,9 +161,11 @@
         <button class="btn-parc" onclick="exportarCSV()">
           <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
         </button>
+        {% if has_write_access('parcerias') %}
         <a href="{{ url_for('parcerias.nova') }}" class="btn-parc">
           <i class="bi bi-plus-circle"></i> Adicionar Parceria
         </a>
+        {% endif %}
         <a href="{{ url_for('main.index') }}" class="btn-parc outline">
           <i class="bi bi-arrow-left"></i> Voltar
         </a>
@@ -630,9 +632,15 @@
                 </td>
                 <td class="col-objeto" style="display: none;">{{ parceria.parceria_objeto or '-' }}</td>
                 <td class="text-center">
+                  {% if has_write_access('parcerias') %}
                   <a class="btn btn-sm" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;border:none;border-radius:6px;" href="{{ url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}">
                     <i class="bi bi-pencil"></i> Modificar
                   </a>
+                  {% else %}
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('parcerias.editar', numero_termo=parceria.numero_termo) }}" title="Visualizar (somente leitura)">
+                    <i class="bi bi-eye"></i> Visualizar
+                  </a>
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}

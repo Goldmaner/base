@@ -6,7 +6,7 @@ Gestão de Certificados de Entidades (CENTS) por OSC
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 from datetime import datetime
 
 cents_bp = Blueprint('cents', __name__, url_prefix='/cents')
@@ -130,6 +130,7 @@ def index():
 @cents_bp.route("/adicionar", methods=["POST"])
 @login_required
 @requires_access('cents')
+@requires_write_access('cents')
 def adicionar():
     """Adicionar novo registro de CENTS"""
     cur = get_cursor()
@@ -217,6 +218,7 @@ def obter(id):
 @cents_bp.route("/editar/<int:id>", methods=["PUT"])
 @login_required
 @requires_access('cents')
+@requires_write_access('cents')
 def editar(id):
     """Atualizar registro de CENTS"""
     cur = get_cursor()

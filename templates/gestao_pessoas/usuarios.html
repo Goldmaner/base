@@ -486,6 +486,10 @@
     'Opções de Administrador': 'bi-gear', 'Módulos Técnicos': 'bi-wrench',
   };
 
+  // Tipos cujo acesso de escrita é controlado pelo TIPO (não por módulo).
+  // Para estes, acessos_escrita é irrelevante — quem tem acesso, tem L+E.
+  const TIPOS_ESCRITA_PADRAO = new Set(['Agente DAC', 'Agente DGP', 'Agente DP', 'Externo']);
+
   const ACCESS_INHERITANCE = {
     'analises': ['conc_bancaria','conc_rendimentos','conc_contrapartida','conc_relatorio','conc_demonstrativo','ocr_testes'],
     'manuais':  ['portarias'],
@@ -912,9 +916,11 @@
   }
 
   function derivarEstadoInicial(u) {
-    if (u.tem_acesso_escrita) return 2;
-    if (u.tem_acesso) return 1;
-    return 0;
+    if (!u.tem_acesso) return 0;
+    // Tipos internos: se tem acesso, tem L+E (escrita controlada pelo tipo)
+    if (TIPOS_ESCRITA_PADRAO.has(u.tipo_usuario)) return 2;
+    // Tipo restrito: depende de tem_acesso_escrita
+    return u.tem_acesso_escrita ? 2 : 1;
   }
 
   function setEstadoUsuarioPagina(uid, novoEstado) {
@@ -978,22 +984,27 @@
         const labels  = ['Sem acesso', 'Leitura', 'L + Escrita'];
         const classes = ['bg-light text-muted border', 'bg-warning text-dark', 'bg-success'];
         const uid = u.id;
+        // Tipos internos não têm estado "Leitura" — escrita é controlada pelo tipo
+        const isInterno = TIPOS_ESCRITA_PADRAO.has(u.tipo_usuario);
+        const btnLeitura = isInterno ? '' : `
+            <input type="radio" class="btn-check" name="est_${uid}" id="e1_${uid}" value="1" autocomplete="off" ${estado===1?'checked':''}>
+            <label class="btn btn-outline-warning" for="e1_${uid}" title="Leitura" onclick="setEstadoUsuarioPagina(${uid},1)">
+              <i class="bi bi-eye"></i>
+            </label>`;
         html += `<div class="d-flex align-items-center py-2 px-2 rounded mb-1 row-usuario"
                       data-uid="${uid}" data-estado="${estado}"
                       style="border:1px solid #dee2e6;">
           <div class="me-auto">
             <i class="bi bi-person-circle me-1 text-muted"></i>
             <span>${u.email}</span>${dep}
+            ${isInterno ? '<small class="text-muted ms-2" title="Escrita controlada pelo tipo">(L+E por padrão)</small>' : ''}
           </div>
           <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Nível de acesso">
             <input type="radio" class="btn-check" name="est_${uid}" id="e0_${uid}" value="0" autocomplete="off" ${estado===0?'checked':''}>
             <label class="btn btn-outline-secondary" for="e0_${uid}" title="Sem acesso" onclick="setEstadoUsuarioPagina(${uid},0)">
               <i class="bi bi-x-circle"></i>
             </label>
-            <input type="radio" class="btn-check" name="est_${uid}" id="e1_${uid}" value="1" autocomplete="off" ${estado===1?'checked':''}>
-            <label class="btn btn-outline-warning" for="e1_${uid}" title="Leitura" onclick="setEstadoUsuarioPagina(${uid},1)">
-              <i class="bi bi-eye"></i>
-            </label>
+            ${btnLeitura}
             <input type="radio" class="btn-check" name="est_${uid}" id="e2_${uid}" value="2" autocomplete="off" ${estado===2?'checked':''}>
             <label class="btn btn-outline-success" for="e2_${uid}" title="Leitura + Escrita" onclick="setEstadoUsuarioPagina(${uid},2)">
               <i class="bi bi-pencil"></i>
@@ -1098,11 +1109,13 @@
 
   function calcularEstadoOriginal(usuario, modulo) {
     if (isHerdado(usuario.acessos, modulo)) return 'herdado';
-    const esc = (usuario.acessos_escrita || '').split(';').map(a => a.trim()).filter(a => a);
-    if (esc.includes(modulo)) return 2;
     const acess = (usuario.acessos || '').split(';').map(a => a.trim()).filter(a => a);
-    if (acess.includes(modulo)) return 1;
-    return 0;
+    if (!acess.includes(modulo)) return 0;
+    // Tipos internos: escrita é controlada pelo tipo → sempre L+E se tem acesso
+    if (TIPOS_ESCRITA_PADRAO.has(usuario.tipo_usuario)) return 2;
+    // Tipo restrito: checar acessos_escrita
+    const esc = (usuario.acessos_escrita || '').split(';').map(a => a.trim()).filter(a => a);
+    return esc.includes(modulo) ? 2 : 1;
   }
 
   function obterEstadoAtual(uid, modulo) {
@@ -1207,9 +1220,13 @@
     const uid    = parseInt(cell.dataset.uid);
     const modulo = cell.dataset.modulo;
     const atual  = parseInt(cell.dataset.estado);
-    const prox   = (atual + 1) % 3;
     const u      = todosUsuariosMatriz.find(x => x.id === uid);
     const original = u ? calcularEstadoOriginal(u, modulo) : 0;
+
+    // Tipos internos só alternam Sem acesso ↔ L+E (não existe "Leitura" para eles)
+    const prox = (u && TIPOS_ESCRITA_PADRAO.has(u.tipo_usuario))
+      ? (atual === 0 ? 2 : 0)
+      : (atual + 1) % 3;
 
     // Atualizar pendingChanges
     if (!pendingChanges[modulo]) pendingChanges[modulo] = {};

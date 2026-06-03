@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from flask import Blueprint, render_template, session, request, redirect, url_for, flash, jsonify
 from db import get_cursor, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 
 main_bp = Blueprint('main', __name__)
 
@@ -144,6 +144,7 @@ def index():
 @main_bp.route("/admin/portarias", methods=["GET", "POST"])
 @login_required
 @requires_access('portarias')
+@requires_write_access('portarias')
 def gerenciar_portarias():
     conn = get_db()
     cur  = conn.cursor()
@@ -425,6 +426,7 @@ def modelos_textos_list():
 @main_bp.route('/modelos-textos/api', methods=['POST'])
 @login_required
 @requires_access('modelos_textos')
+@requires_write_access('modelos_textos')
 def modelos_textos_create():
     """Cria um novo modelo de texto"""
     try:
@@ -455,6 +457,7 @@ def modelos_textos_create():
 @main_bp.route('/modelos-textos/api/<int:id>', methods=['PUT'])
 @login_required
 @requires_access('modelos_textos')
+@requires_write_access('modelos_textos')
 def modelos_textos_update(id):
     """Atualiza título e/ou conteúdo do modelo"""
     try:
@@ -498,6 +501,7 @@ def modelos_textos_update(id):
 @main_bp.route('/modelos-textos/api/<int:id>/toggle_oculto', methods=['POST'])
 @login_required
 @requires_access('modelos_textos')
+@requires_write_access('modelos_textos')
 def modelos_textos_toggle_oculto(id):
     """Alterna sinalizador oculto (true/false)."""
     try:
@@ -524,6 +528,7 @@ def modelos_textos_toggle_oculto(id):
 @main_bp.route('/modelos-textos/api/<int:id>', methods=['DELETE'])
 @login_required
 @requires_access('modelos_textos')
+@requires_write_access('modelos_textos')
 def modelos_textos_delete(id):
     """Apaga um modelo de texto (apenas para Agente Público)"""
     try:

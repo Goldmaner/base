@@ -635,10 +635,19 @@ def acessos_por_pagina_get(modulo):
         usuarios = cur.fetchall()
         cur.close()
 
+        from config import TIPOS_USUARIO
         resultado = []
         for u in usuarios:
             status_acesso = get_module_access_status(u['acessos'], modulo)
-            acessos_esc = [a.strip() for a in (u['acessos_escrita'] or '').split(';') if a.strip()]
+            tipo_cfg = TIPOS_USUARIO.get(u['tipo_usuario'], {})
+            escrita_por_tipo = tipo_cfg.get('escrita_padrao', True)
+            # Tipos com escrita por padrão têm escrita sempre que têm acesso.
+            # Tipos restritos (Externo: Gabinete) dependem de acessos_escrita.
+            if escrita_por_tipo:
+                tem_escrita = status_acesso["tem_acesso"]
+            else:
+                acessos_esc = [a.strip() for a in (u['acessos_escrita'] or '').split(';') if a.strip()]
+                tem_escrita = modulo in acessos_esc
             resultado.append({
                 "id": u["id"],
                 "email": u["email"],
@@ -648,7 +657,8 @@ def acessos_por_pagina_get(modulo):
                 "tem_acesso_direto": status_acesso["tem_acesso_direto"],
                 "tem_acesso_herdado": status_acesso["tem_acesso_herdado"],
                 "herdado_de": status_acesso["origem"] if status_acesso["tem_acesso_herdado"] else None,
-                "tem_acesso_escrita": modulo in acessos_esc,
+                "tem_acesso_escrita": tem_escrita,
+                "escrita_por_tipo": escrita_por_tipo,
             })
         return jsonify(resultado), 200
     except Exception as e:
@@ -669,9 +679,10 @@ def acessos_por_pagina_put(modulo):
         ids_com_acesso = set(data.get("user_ids_com_acesso", []))
         ids_com_escrita = set(data.get("user_ids_com_escrita", []))
 
+        from config import TIPOS_USUARIO
         cur = get_cursor()
         cur.execute("""
-            SELECT id, acessos, acessos_escrita
+            SELECT id, tipo_usuario, acessos, acessos_escrita
             FROM gestao_pessoas.usuarios
             WHERE tipo_usuario != 'Agente Público'
         """)
@@ -679,12 +690,22 @@ def acessos_por_pagina_put(modulo):
 
         atualizados = 0
         for u in usuarios:
-            acessos_lista = [a.strip() for a in (u['acessos'] or '').split(';') if a.strip()]
+            tipo_cfg = TIPOS_USUARIO.get(u['tipo_usuario'], {})
+            escrita_por_tipo = tipo_cfg.get('escrita_padrao', True)
+
+            acessos_lista    = [a.strip() for a in (u['acessos'] or '').split(';') if a.strip()]
             acessos_esc_lista = [a.strip() for a in (u['acessos_escrita'] or '').split(';') if a.strip()]
-            tinha_acesso = modulo in acessos_lista
-            tinha_escrita = modulo in acessos_esc_lista
-            deve_acesso = u['id'] in ids_com_acesso
-            deve_escrita = u['id'] in ids_com_escrita
+            tinha_acesso  = modulo in acessos_lista
+            deve_acesso   = u['id'] in ids_com_acesso
+
+            # Para tipos restritos (escrita_padrao=False), controla acessos_escrita.
+            # Para tipos internos, acessos_escrita é irrelevante — não tocar.
+            if escrita_por_tipo:
+                tinha_escrita = False  # forçar sem mudança no acessos_escrita
+                deve_escrita  = False
+            else:
+                tinha_escrita = modulo in acessos_esc_lista
+                deve_escrita  = u['id'] in ids_com_escrita
 
             if tinha_acesso == deve_acesso and tinha_escrita == deve_escrita:
                 continue  # sem mudança
@@ -693,12 +714,14 @@ def acessos_por_pagina_put(modulo):
                 acessos_lista.append(modulo)
             elif not deve_acesso and tinha_acesso:
                 acessos_lista = [a for a in acessos_lista if a != modulo]
-                acessos_esc_lista = [a for a in acessos_esc_lista if a != modulo]
+                if not escrita_por_tipo:
+                    acessos_esc_lista = [a for a in acessos_esc_lista if a != modulo]
 
-            if deve_escrita and not tinha_escrita:
-                acessos_esc_lista.append(modulo)
-            elif not deve_escrita and tinha_escrita:
-                acessos_esc_lista = [a for a in acessos_esc_lista if a != modulo]
+            if not escrita_por_tipo:
+                if deve_escrita and not tinha_escrita:
+                    acessos_esc_lista.append(modulo)
+                elif not deve_escrita and tinha_escrita:
+                    acessos_esc_lista = [a for a in acessos_esc_lista if a != modulo]
 
             novo_acessos = ';'.join(acessos_lista) if acessos_lista else None
             novo_acessos_escrita = ';'.join(acessos_esc_lista)

@@ -240,11 +240,13 @@
         <i class="bi bi-folder2-open"></i>
         {{ area }}
         <div class="area-header-right">
+          {% if has_write_access('manuais') %}
           <button class="btn-novo-card"
                   onclick="abrirModalNovoCard('{{ area | e }}', '{{ cor.from | e }}', '{{ cor.to | e }}')"
                   title="Novo procedimento nesta área">
             <i class="bi bi-plus-lg"></i> Novo
           </button>
+          {% endif %}
           <span class="area-count">{{ areas[area]|length }}</span>
         </div>
       </div>

@@ -6,7 +6,7 @@ Gerenciamento centralizado de certidões por OSC/CNPJ
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, send_file, current_app
 from db import get_cursor, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime, date
@@ -496,6 +496,7 @@ def listar_oscs_ativas():
 @certidoes_bp.route("/api/gerar-pastas", methods=["POST"])
 @login_required
 @requires_access('certidoes')
+@requires_write_access('certidoes')
 def gerar_pastas_oscs():
     """
     Gera pastas físicas para cada OSC com parcelas futuras
@@ -632,6 +633,7 @@ def obter_certidao(certidao_id):
 @certidoes_bp.route("/api/certidoes/upload-individual", methods=["POST"])
 @login_required
 @requires_access('certidoes')
+@requires_write_access('certidoes')
 def upload_certidao_individual():
     """
     API: Upload de certidão individual (para grid da OSC)
@@ -772,6 +774,7 @@ def upload_certidao_individual():
 @certidoes_bp.route("/api/certidoes", methods=["POST"])
 @login_required
 @requires_access('certidoes')
+@requires_write_access('certidoes')
 def criar_certidao():
     """
     API: Criar nova certidão (com upload de arquivo)
@@ -863,6 +866,7 @@ def criar_certidao():
 @certidoes_bp.route("/api/certidoes/<int:certidao_id>", methods=["PUT"])
 @login_required
 @requires_access('certidoes')
+@requires_write_access('certidoes')
 def atualizar_certidao(certidao_id):
     """
     API: Atualizar dados de uma certidão (sem alterar arquivo)
@@ -933,6 +937,7 @@ def atualizar_certidao(certidao_id):
 @certidoes_bp.route("/api/certidoes/deletar-individual/<int:certidao_id>", methods=["DELETE"])
 @login_required
 @requires_access('certidoes')
+@requires_write_access('certidoes')
 def deletar_certidao_individual(certidao_id):
     """
     API: Deletar certidão individual (para grid da OSC)
@@ -980,6 +985,7 @@ def deletar_certidao_individual(certidao_id):
 @certidoes_bp.route("/api/certidoes/<int:certidao_id>", methods=["DELETE"])
 @login_required
 @requires_access('certidoes')
+@requires_write_access('certidoes')
 def excluir_certidao(certidao_id):
     """
     API: Excluir uma certidão (remove arquivo e registro)
@@ -1262,6 +1268,7 @@ def juntar_pdfs(nome_pasta):
 @certidoes_bp.route("/api/juntar-pdfs-selecionados", methods=["POST"])
 @login_required
 @requires_access('certidoes')
+@requires_write_access('certidoes')
 def juntar_pdfs_selecionados():
     """
     API: Junta certidões selecionadas (por ID) em um único PDF.

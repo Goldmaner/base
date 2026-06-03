@@ -14,7 +14,7 @@ from flask import (
 )
 from db import get_cursor, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 
 celebracao_parcerias_bp = Blueprint(
     'celebracao_parcerias', __name__, url_prefix='/celebracao-parcerias'
@@ -620,6 +620,7 @@ def listar_visualizacao_geral():
 @celebracao_parcerias_bp.route("/visualizacao-geral", methods=["POST"])
 @login_required
 @requires_access('celebracao_parcerias')
+@requires_write_access('celebracao_parcerias')
 def atualizar_visualizacao_geral():
     """
     Atualiza os flags de visualizacao_geral para analistas DGP.
@@ -660,6 +661,7 @@ def atualizar_visualizacao_geral():
 @celebracao_parcerias_bp.route("/criar", methods=["POST"])
 @login_required
 @requires_access('celebracao_parcerias')
+@requires_write_access('celebracao_parcerias')
 def criar():
     """Cria um novo registro de Celebração de Parcerias"""
     cur = get_cursor()
@@ -722,6 +724,7 @@ def criar():
 @celebracao_parcerias_bp.route("/editar/<int:id>", methods=["PUT"])
 @login_required
 @requires_access('celebracao_parcerias')
+@requires_write_access('celebracao_parcerias')
 def editar(id):
     """Atualiza os campos de um registro de Celebração de Parcerias"""
     cur = get_cursor()
@@ -930,6 +933,7 @@ def editar(id):
 @celebracao_parcerias_bp.route("/excluir/<int:id>", methods=["DELETE"])
 @login_required
 @requires_access('celebracao_parcerias')
+@requires_write_access('celebracao_parcerias')
 def excluir(id):
     """Exclui um registro de Celebração de Parcerias (somente usuários autorizados)"""
     tipo = session.get('tipo_usuario', '')
@@ -1243,6 +1247,7 @@ def api_emendas_por_sei():
 @celebracao_parcerias_bp.route("/inserir-parceria/<int:id>", methods=["POST"])
 @login_required
 @requires_access('celebracao_parcerias')
+@requires_write_access('celebracao_parcerias')
 def inserir_parceria(id):
     """
     Transfere um registro celebrado do schema celebracao para:

@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db
 from functools import wraps
 from datetime import datetime, date
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 import os
 import uuid
 import boto3
@@ -136,6 +136,7 @@ def api_listar_extrato():
 @bp.route('/api/extrato', methods=['POST'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_salvar_extrato():
     """API para salvar múltiplas linhas do extrato de uma vez"""
     try:
@@ -413,6 +414,7 @@ def api_salvar_extrato():
 @bp.route('/api/extrato/<int:extrato_id>', methods=['DELETE'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_excluir_extrato(extrato_id):
     """API para excluir uma linha do extrato"""
     try:
@@ -434,6 +436,7 @@ def api_excluir_extrato(extrato_id):
 @bp.route('/api/extrato/bulk', methods=['DELETE'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_excluir_extrato_bulk():
     """
     API: Exclui múltiplas linhas do extrato em 1 query (em vez de N chamadas DELETE).
@@ -668,6 +671,7 @@ def api_get_banco():
 @bp.route('/api/salvar-termo-session', methods=['POST'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_salvar_termo_session():
     """API para salvar o termo atual na session"""
     try:
@@ -688,6 +692,7 @@ def api_salvar_termo_session():
 @bp.route('/api/banco', methods=['POST'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_save_banco():
     """API para salvar o banco do extrato e conta específica de um termo"""
     try:
@@ -794,6 +799,7 @@ def api_listar_notas_fiscais():
 @bp.route('/api/notas-fiscais', methods=['POST'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_salvar_notas_fiscais():
     """API para salvar notas fiscais com UPSERT (UPDATE prioritário)"""
     try:
@@ -1006,6 +1012,7 @@ def api_listar_documentos_analise():
 @bp.route('/api/documentos-analise', methods=['POST'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_salvar_documentos_analise():
     """API para salvar documentos de análise com UPSERT e auto-marcação"""
     try:
@@ -1152,6 +1159,7 @@ def api_salvar_documentos_analise():
 @bp.route('/api/limpar-termo', methods=['DELETE'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_limpar_termo():
     """
     API para limpar TODOS os dados de um termo específico
@@ -1531,6 +1539,7 @@ def api_listar_vinculacao_docs():
 @bp.route('/api/vinculacao-docs/upload', methods=['POST'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_upload_vinculacao_doc():
     """Faz upload de um arquivo para o R2 e registra no banco."""
     extrato_id = request.form.get('extrato_id')
@@ -1598,6 +1607,7 @@ def api_upload_vinculacao_doc():
 @bp.route('/api/vinculacao-docs/<int:doc_id>', methods=['DELETE'])
 @login_required
 @requires_access('conc_bancaria')
+@requires_write_access('conc_bancaria')
 def api_excluir_vinculacao_doc(doc_id):
     """Exclui documento do R2 e do banco."""
     try:

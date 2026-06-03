@@ -207,9 +207,11 @@
         <a href="{{ url_for('sei_orcamentario.index') }}" class="btn btn-outline-light" title="Gerenciamento de SEI Orçamentário">
           <i class="bi bi-file-earmark-text me-1"></i> SEI Orçamentário
         </a>
+        {% if has_write_access('celebracao_parcerias') %}
         <button class="btn btn-success" onclick="abrirNovaParc()" title="Adicionar nova parceria">
           <i class="bi bi-plus-circle me-1"></i> Nova Parceria
         </button>
+        {% endif %}
         <a href="{{ url_for('celebracao_parcerias.exportar_csv',
             filtro_responsavel=filtro_responsavel, filtro_status=filtro_status,
             filtro_substatus=filtro_substatus, filtro_sei=filtro_sei,
@@ -578,7 +580,7 @@
                   <i class="bi bi-plus-circle"></i> Inserir parceria
                 </button>
                 {% endif %}
-                {% if pode_excluir %}
+                {% if pode_excluir and has_write_access('celebracao_parcerias') %}
                 <button class="btn btn-sm btn-outline-danger ms-1" onclick="excluirRegistro({{ r.id }}, '{{ (r.osc or r.sei_celeb or '#' ~ r.id) | e }}')" title="Excluir registro">
                   <i class="bi bi-trash"></i>
                 </button>
@@ -725,6 +727,9 @@
         </div>
       </div>
       <div class="modal-footer">
+        {# Flag de escrita para uso no JS do modal #}
+        <input type="hidden" id="temEscritaCelebracao"
+               value="{{ 'true' if has_write_access('celebracao_parcerias') else 'false' }}">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
         <button type="button" class="btn btn-success" id="btnSalvarRegistro" style="display:none" onclick="salvarRegistro()">
           <i class="bi bi-check-circle me-1"></i> Salvar Alterações
@@ -934,7 +939,9 @@ function verDetalhes(id) {
         return;
       }
       conteudo.innerHTML = montarFormularioEdicao(data.registro);
-      btnSalvar.style.display = '';
+      // Mostrar botão Salvar somente se usuário tem permissão de escrita
+      const _podeEscreverCeleb = document.getElementById('temEscritaCelebracao')?.value === 'true';
+      if (_podeEscreverCeleb) btnSalvar.style.display = '';
       // Validar SEI e construir Nº Termo com dados existentes
       const seiEl = document.getElementById('edit_sei_celeb');
       if (seiEl && seiEl.value) validarSEI(seiEl);

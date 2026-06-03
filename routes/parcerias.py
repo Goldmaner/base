@@ -5,7 +5,7 @@ Blueprint de parcerias (listagem e formulário)
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, jsonify, session
 from db import get_cursor, get_db, execute_query
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 import csv
 import time as _time
 from io import StringIO, BytesIO
@@ -581,6 +581,7 @@ def listar():
 @parcerias_bp.route("/nova", methods=["GET", "POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def nova():
     """
     Criar nova parceria
@@ -978,6 +979,7 @@ def nova():
 @parcerias_bp.route("/editar/<path:numero_termo>", methods=["GET", "POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def editar(numero_termo):
     """
     Formulário completo de edição de parceria
@@ -2219,6 +2221,7 @@ def conferencia():
 @parcerias_bp.route("/conferencia/processar", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def conferencia_processar():
     """
     Processa o CSV colado pelo usuário e compara com o banco de dados
@@ -2310,6 +2313,7 @@ def conferencia_processar():
 @parcerias_bp.route("/conferencia/atualizar", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def atualizar_conferencia():
     """
     Executa o script import_conferencia.py para atualizar os dados
@@ -2758,6 +2762,7 @@ def termos_por_osc(osc):
 @parcerias_bp.route("/atualizar-osc", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def atualizar_osc():
     """
     API para atualizar nome de uma OSC em todos os registros
@@ -2876,6 +2881,7 @@ def listar_contatos_osc(osc):
 @parcerias_bp.route("/contatos/criar", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def criar_contato():
     """
     API para criar novo(s) contato(s) de OSC
@@ -2948,6 +2954,7 @@ def criar_contato():
 @parcerias_bp.route("/contatos/editar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def editar_contato(id):
     """
     API para editar contato existente
@@ -3008,6 +3015,7 @@ def editar_contato(id):
 @parcerias_bp.route("/contatos/deletar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def deletar_contato(id):
     """
     API para deletar contato
@@ -3130,6 +3138,7 @@ def api_termos_disponiveis():
 @parcerias_bp.route("/rescisao/salvar", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def salvar_rescisao():
     """
     Salvar novo termo rescindido
@@ -3199,6 +3208,7 @@ def salvar_rescisao():
 @parcerias_bp.route("/rescisao/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def editar_rescisao(id):
     """
     Editar termo rescindido existente
@@ -3281,6 +3291,7 @@ def editar_rescisao(id):
 @parcerias_bp.route("/rescisao/deletar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def deletar_rescisao(id):
     """
     Deletar termo rescindido
@@ -4280,6 +4291,7 @@ def api_exportar_parcerias_sei_csv():
 @parcerias_bp.route("/api/parcerias_sei/atualizar", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def api_atualizar_parcerias_sei():
     """
     API para atualizar campo específico de registro em parcerias_sei
@@ -4320,6 +4332,7 @@ def api_atualizar_parcerias_sei():
 @parcerias_bp.route("/api/parcerias_sei/excluir", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def api_excluir_parcerias_sei():
     """
     API para excluir registro(s) de parcerias_sei
@@ -4355,6 +4368,7 @@ def api_excluir_parcerias_sei():
 @parcerias_bp.route("/api/parcerias_sei/inserir", methods=["POST"])
 @login_required
 @requires_access('parcerias')
+@requires_write_access('parcerias')
 def api_inserir_parcerias_sei():
     """
     API para inserir novo registro em parcerias_sei
@@ -4434,6 +4448,7 @@ def api_inserir_parcerias_sei():
 @parcerias_bp.route("/alteracao/salvar", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def salvar_alteracao():
     """
     Salvar alteração(ões) de termo
@@ -4590,6 +4605,7 @@ def salvar_alteracao():
 @parcerias_bp.route("/alteracao/salvar-lote", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def salvar_alteracao_lote():
     """
     Salva múltiplas alterações em lote para Despacho Autorizatório.
@@ -5448,6 +5464,7 @@ def editar_lote():
 @parcerias_bp.route("/alteracao/adicionar_ao_lote", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def adicionar_ao_lote():
     """Adiciona um novo registro a um lote existente, herdando os campos compartilhados."""
     dados = request.get_json(force=True)
@@ -5517,6 +5534,7 @@ def adicionar_ao_lote():
 @parcerias_bp.route("/alteracao/desagrupar_do_lote", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def desagrupar_do_lote():
     """Remove um registro específico do lote (alt_lote_id = NULL) — vira card individual."""
     dados = request.get_json(force=True)
@@ -5541,6 +5559,7 @@ def desagrupar_do_lote():
 @parcerias_bp.route("/alteracao/deletar_registro", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def deletar_registro_lote():
     """Deleta um único registro pelo id (para remoção de item individual de um lote)."""
     dados = request.get_json(force=True)
@@ -5562,6 +5581,7 @@ def deletar_registro_lote():
 @parcerias_bp.route("/alteracao/atualizar_lote", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def atualizar_lote():
     """Atualiza os campos compartilhados de todos os registros de um lote."""
     lote_id = request.args.get('lote_id', type=int)
@@ -5606,6 +5626,7 @@ def atualizar_lote():
 @parcerias_bp.route("/alteracao/deletar_lote", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def deletar_lote():
     """Deleta todos os registros de um lote."""
     lote_id = request.args.get('lote_id', type=int)
@@ -5626,6 +5647,7 @@ def deletar_lote():
 @parcerias_bp.route("/alteracao/deletar", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def deletar_alteracao():
     """
     Deletar alteracao(oes) de termo
@@ -5812,6 +5834,7 @@ def dgp_kanban():
 @parcerias_bp.route("/alteracao/mover", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def api_mover_card():
     """Mover card para novo status via drag-drop.
     Suporta lote: se lote_id for fornecido, atualiza todos os registros do lote.
@@ -5896,6 +5919,7 @@ def api_mover_card():
 @parcerias_bp.route("/alteracao/ocultar", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def api_ocultar_card():
     """Ocultar ou reexibir um card no kanban. Suporta lote via lote_id."""
     dados = request.get_json(force=True)
@@ -5938,6 +5962,7 @@ def api_ocultar_card():
 @parcerias_bp.route("/alteracao/ocultar_lote", methods=["POST"])
 @login_required
 @requires_access('dgp_alteracoes')
+@requires_write_access('dgp_alteracoes')
 def api_ocultar_lote():
     """Ocultar ou reexibir vários cards de uma vez (operação em lote)."""
     dados = request.get_json(force=True)
@@ -6183,53 +6208,72 @@ def api_distrito_info(codigo):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@parcerias_bp.route("/api/enderecos/<numero_termo>", methods=["GET"])
+@parcerias_bp.route("/api/cep/<cep>", methods=["GET"])
+@login_required
+def api_consulta_cep(cep):
+    """Proxy server-side para ViaCEP — evita erros de SSL em redes corporativas."""
+    import re, urllib.request, json as _json
+    cep_limpo = re.sub(r'\D', '', cep)
+    if len(cep_limpo) != 8:
+        return jsonify({'success': False, 'error': 'CEP inválido'}), 400
+    try:
+        url = f'https://viacep.com.br/ws/{cep_limpo}/json/'
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            data = _json.loads(resp.read().decode('utf-8'))
+        if data.get('erro'):
+            return jsonify({'success': False, 'error': 'CEP não encontrado'})
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@parcerias_bp.route("/api/enderecos/<path:numero_termo>", methods=["GET"])
 @login_required
 @requires_access('parcerias')
 def api_enderecos_termo(numero_termo):
     """
-    API para buscar todos os endereços de um termo
-    Usado na alteração "Localização do projeto"
+    API para buscar todos os endereços de um termo.
+    Usa <path:> para suportar barras no numero_termo (ex: TFM/141/2024/...).
+    Inclui nome do distrito, subprefeitura e região via JOIN com c_geral_regionalizacao.
     """
     cur = get_cursor()
-    
     try:
         cur.execute("""
-            SELECT 
-                id,
-                parceria_logradouro,
-                parceria_numero,
-                parceria_complemento,
-                parceria_cep,
-                parceria_distrito,
-                observacao
-            FROM public.parcerias_enderecos
-            WHERE numero_termo = %s
-            ORDER BY id
+            SELECT
+                pe.id,
+                pe.parceria_logradouro,
+                pe.parceria_numero,
+                pe.parceria_complemento,
+                pe.parceria_cep,
+                pe.parceria_distrito,
+                pe.observacao,
+                COALESCE(r.distrito,      '')  AS distrito_nome,
+                COALESCE(r.subprefeitura, '')  AS subprefeitura,
+                COALESCE(r.regiao,        '')  AS regiao
+            FROM public.parcerias_enderecos pe
+            LEFT JOIN categoricas.c_geral_regionalizacao r
+                   ON r.codigo_distrital = pe.parceria_distrito
+            WHERE pe.numero_termo = %s
+            ORDER BY pe.id
         """, (numero_termo,))
-        
-        enderecos = cur.fetchall()
+        rows = cur.fetchall()
         cur.close()
-        
-        # Converter para lista de dicionários
         resultado = []
-        for end in enderecos:
+        for e in rows:
             resultado.append({
-                'id': end['id'],
-                'parceria_logradouro': end['parceria_logradouro'] or '',
-                'parceria_numero': end['parceria_numero'] or '',
-                'parceria_complemento': end['parceria_complemento'] or '',
-                'parceria_cep': end['parceria_cep'] or '',
-                'parceria_distrito': end['parceria_distrito'] or '',
-                'observacao': end['observacao'] or ''
+                'id':                   e['id'],
+                'parceria_logradouro':  e['parceria_logradouro']  or '',
+                'parceria_numero':      str(e['parceria_numero'])  if e['parceria_numero'] else '',
+                'parceria_complemento': e['parceria_complemento'] or '',
+                'parceria_cep':         e['parceria_cep']         or '',
+                'parceria_distrito':    e['parceria_distrito']    or '',
+                'distrito_nome':        e['distrito_nome'],
+                'subprefeitura':        e['subprefeitura'],
+                'regiao':               e['regiao'],
+                'observacao':           e['observacao']           or '',
             })
-        
-        return jsonify({
-            'success': True,
-            'enderecos': resultado
-        })
-        
+        return jsonify({'success': True, 'enderecos': resultado})
     except Exception as e:
-        print(f"[ERRO] Erro ao buscar endereços: {str(e)}")
+        print(f"[ERRO] Erro ao buscar endereços: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 

@@ -1,7 +1,7 @@
 # routes/conc_contrapartida.py
 from flask import Blueprint, render_template, request, jsonify, session
 from functools import wraps
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 from db import get_cursor, get_db
 
 bp = Blueprint('conc_contrapartida', __name__, url_prefix='/conc_contrapartida')
@@ -91,6 +91,7 @@ def listar_contrapartidas():
 @bp.route('/api/contrapartidas', methods=['POST'])
 @login_required
 @requires_access('conc_contrapartida')
+@requires_write_access('conc_contrapartida')
 def salvar_contrapartidas():
     """Salva ou atualiza contrapartidas (UPSERT)"""
     try:
@@ -202,6 +203,7 @@ def salvar_contrapartidas():
 @bp.route('/api/contrapartidas/<int:id>', methods=['DELETE'])
 @login_required
 @requires_access('conc_contrapartida')
+@requires_write_access('conc_contrapartida')
 def excluir_contrapartida(id):
     """Exclui uma contrapartida"""
     try:

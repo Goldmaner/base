@@ -5,7 +5,7 @@ Rotas para Conciliação de Rendimentos de Ativos Financeiros - Análise PC
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db
 from functools import wraps
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 from datetime import datetime, date
 import calendar
 
@@ -91,6 +91,7 @@ def api_listar_rendimentos():
 @bp.route('/api/rendimentos', methods=['POST'])
 @login_required
 @requires_access('conc_rendimentos')
+@requires_write_access('conc_rendimentos')
 def api_salvar_rendimentos():
     """API para salvar rendimentos"""
     try:

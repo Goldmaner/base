@@ -2,7 +2,7 @@ from flask import render_template, request, jsonify, g, send_from_directory, sen
 from . import analises_pc_bp
 from db import get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import execute_values

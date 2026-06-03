@@ -34,9 +34,9 @@ def _ensure_tables():
                 operacao_nome    TEXT NOT NULL,
                 operacao_subtipo TEXT,
                 criado_por       TEXT,
-                criado_em        TIMESTAMP DEFAULT NOW(),
+                criado_em        TIMESTAMPTZ DEFAULT NOW(),
                 atualizado_por   TEXT,
-                atualizado_em    TIMESTAMP
+                atualizado_em    TIMESTAMPTZ
             )
         """)
         cur.execute("""
@@ -48,11 +48,35 @@ def _ensure_tables():
                 operacao_afericao      TEXT,
                 operacao_descricao     TEXT,
                 criado_por             TEXT,
-                criado_em              TIMESTAMP DEFAULT NOW(),
+                criado_em              TIMESTAMPTZ DEFAULT NOW(),
                 atualizado_por         TEXT,
-                atualizado_em          TIMESTAMP
+                atualizado_em          TIMESTAMPTZ
             )
         """)
+
+        # --- Migrar colunas TIMESTAMP → TIMESTAMPTZ (tabelas já existentes) ---
+        # PostgreSQL converte automaticamente: o valor naive é interpretado no
+        # fuso horário da sessão e armazenado como UTC.  Garantimos que a
+        # sessão esteja em 'America/Sao_Paulo' ANTES do ALTER para que os
+        # valores existentes sejam interpretados como horário de Brasília.
+        cur.execute("SET timezone = 'America/Sao_Paulo'")
+        cur.execute("""
+            ALTER TABLE gestao_pessoas.relatorios_desempenho
+            ALTER COLUMN criado_em TYPE TIMESTAMPTZ
+        """)
+        cur.execute("""
+            ALTER TABLE gestao_pessoas.relatorios_desempenho
+            ALTER COLUMN atualizado_em TYPE TIMESTAMPTZ
+        """)
+        cur.execute("""
+            ALTER TABLE gestao_pessoas.relatorios_desempenho_auxiliar
+            ALTER COLUMN criado_em TYPE TIMESTAMPTZ
+        """)
+        cur.execute("""
+            ALTER TABLE gestao_pessoas.relatorios_desempenho_auxiliar
+            ALTER COLUMN atualizado_em TYPE TIMESTAMPTZ
+        """)
+
         db.commit()
     except Exception as e:
         print(f'[relatorios_desempenho] Erro ao garantir tabelas: {e}')

@@ -9,7 +9,7 @@ from flask import (Blueprint, render_template, request,
 from werkzeug.utils import secure_filename
 from db import get_cursor
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 import utils_storage as storage
 
 manuais_bp = Blueprint('manuais', __name__, url_prefix='/manuais')
@@ -170,6 +170,7 @@ def index():
 @manuais_bp.route('/criar', methods=['POST'])
 @login_required
 @requires_access('manuais')
+@requires_write_access('manuais')
 def criar():
     area     = request.form.get('manual_area', '').strip()
     nome     = request.form.get('manual_nome', '').strip()
@@ -246,6 +247,7 @@ def detalhe(manual_id):
 @manuais_bp.route('/detalhe/<int:manual_id>/descricao', methods=['POST'])
 @login_required
 @requires_access('manuais')
+@requires_write_access('manuais')
 def atualizar_descricao(manual_id):
     descricao = request.form.get('manual_descricao', '').strip() or None
     cur = get_cursor()
@@ -271,6 +273,7 @@ def atualizar_descricao(manual_id):
 @manuais_bp.route('/detalhe/<int:manual_id>/toggle_meta', methods=['POST'])
 @login_required
 @requires_access('manuais')
+@requires_write_access('manuais')
 def toggle_meta(manual_id):
     cur = get_cursor()
     try:
@@ -301,6 +304,7 @@ def toggle_meta(manual_id):
 @manuais_bp.route('/detalhe/<int:manual_id>/versao/nova', methods=['POST'])
 @login_required
 @requires_access('manuais')
+@requires_write_access('manuais')
 def criar_versao(manual_id):
     nome         = request.form.get('manual_nome', '').strip()
     versionamento = request.form.get('manual_versionamento', '').strip() or None
@@ -348,6 +352,7 @@ def criar_versao(manual_id):
 @manuais_bp.route('/versao/<int:versao_id>/editar', methods=['POST'])
 @login_required
 @requires_access('manuais')
+@requires_write_access('manuais')
 def editar_versao(versao_id):
     cur = get_cursor()
     cur.execute("SELECT manual_id, manual_doc FROM public.manuais_documentos WHERE id = %s",
@@ -408,6 +413,7 @@ def editar_versao(versao_id):
 @manuais_bp.route('/versao/<int:versao_id>/deletar', methods=['POST'])
 @login_required
 @requires_access('manuais')
+@requires_write_access('manuais')
 def deletar_versao(versao_id):
     manual_id = request.form.get('manual_id', type=int)
     cur = get_cursor()

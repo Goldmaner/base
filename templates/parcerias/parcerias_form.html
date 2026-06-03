@@ -575,9 +575,16 @@
             <i class="bi bi-x-circle"></i> Cancelar
           </a>
           {% endif %}
+          {% if has_write_access('parcerias') %}
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-circle"></i> Salvar Alterações
           </button>
+          {% else %}
+          <div class="alert alert-info d-inline-flex align-items-center py-2 px-3 mb-0">
+            <i class="bi bi-eye me-2"></i>
+            <span>Modo leitura — sem permissão de escrita neste módulo.</span>
+          </div>
+          {% endif %}
         </div>
 
       </form>

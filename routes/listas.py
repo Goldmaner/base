@@ -5,7 +5,7 @@ Blueprint de gerenciamento de listas/tabelas categóricas
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, execute_query, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 
 listas_bp = Blueprint('listas', __name__, url_prefix='/listas')
 
@@ -1317,6 +1317,7 @@ def obter_opcoes_campo(tabela, campo):
 @listas_bp.route("/api/dados/<tabela>", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def criar_registro(tabela):
     """
     Cria um novo registro na tabela
@@ -1439,6 +1440,7 @@ def criar_registro(tabela):
 @listas_bp.route("/api/dados/<tabela>/<int:id>", methods=["PUT"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def atualizar_registro(tabela, id):
     """
     Atualiza um registro existente
@@ -1626,6 +1628,7 @@ def atualizar_registro(tabela, id):
 @listas_bp.route("/api/dados/<tabela>/<int:id>", methods=["DELETE"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def excluir_registro(tabela, id):
     """
     Exclui um registro
@@ -1657,6 +1660,7 @@ def excluir_registro(tabela, id):
 @listas_bp.route("/api/dados/<tabela>/salvar-lote", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def salvar_lote(tabela):
     """
     Salva múltiplos registros de uma vez (edição inline em lote)
@@ -1742,6 +1746,7 @@ def salvar_lote(tabela):
 @listas_bp.route("/api/dados/<tabela>/<int:id>/mover", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def mover_item(tabela, id):
     """
     Move um item para cima ou para baixo na ordenação
@@ -1850,6 +1855,7 @@ def listar_contatos_vereador(vereador_nome):
 @listas_bp.route("/vereadores/contatos/criar", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def criar_contato_vereador():
     """Cria um novo contato de vereador"""
     try:
@@ -1885,6 +1891,7 @@ def criar_contato_vereador():
 @listas_bp.route("/vereadores/contatos/editar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def editar_contato_vereador(id):
     """Edita um contato de vereador existente"""
     try:
@@ -1918,6 +1925,7 @@ def editar_contato_vereador(id):
 @listas_bp.route("/vereadores/contatos/deletar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def deletar_contato_vereador(id):
     """Exclui um contato de vereador"""
     try:
@@ -1964,6 +1972,7 @@ def listar_fundamentos(glosa_id):
 @listas_bp.route("/glosas/fundamentos/criar", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def criar_fundamento():
     """Cria um novo fundamento legal para uma glosa"""
     try:
@@ -1996,6 +2005,7 @@ def criar_fundamento():
 @listas_bp.route("/glosas/fundamentos/editar/<int:fund_id>", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def editar_fundamento(fund_id):
     """Edita um fundamento legal"""
     try:
@@ -2027,6 +2037,7 @@ def editar_fundamento(fund_id):
 @listas_bp.route("/glosas/fundamentos/deletar/<int:fund_id>", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def deletar_fundamento(fund_id):
     """Exclui um fundamento legal"""
     try:
@@ -2124,6 +2135,7 @@ def status_cat_listar_itens():
 @listas_bp.route("/api/status-cat/itens", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def status_cat_criar_item():
     """Cria um novo item em um grupo."""
     try:
@@ -2153,6 +2165,7 @@ def status_cat_criar_item():
 @listas_bp.route("/api/status-cat/itens/<int:item_id>", methods=["PUT"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def status_cat_editar_item(item_id):
     """Atualiza status, descrição e/ou ativo de um item."""
     try:
@@ -2200,6 +2213,7 @@ def status_cat_editar_item(item_id):
 @listas_bp.route("/api/status-cat/itens/<int:item_id>", methods=["DELETE"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def status_cat_excluir_item(item_id):
     """Exclui um item pelo id."""
     try:
@@ -2218,6 +2232,7 @@ def status_cat_excluir_item(item_id):
 @listas_bp.route("/api/status-cat/listas", methods=["POST"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def status_cat_criar_lista():
     """Cria uma nova lista (schema_table_coluna_r) com o primeiro item."""
     try:
@@ -2250,6 +2265,7 @@ def status_cat_criar_lista():
 @listas_bp.route("/api/status-cat/listas/nome", methods=["PUT"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def status_cat_renomear_lista():
     """Atualiza nome_item_fantasia de todos os itens de um grupo."""
     try:
@@ -2278,6 +2294,7 @@ def status_cat_renomear_lista():
 @listas_bp.route("/api/status-cat/listas", methods=["DELETE"])
 @login_required
 @requires_access('listas')
+@requires_write_access('listas')
 def status_cat_excluir_lista():
     """Exclui todos os itens de uma lista inteira."""
     try:

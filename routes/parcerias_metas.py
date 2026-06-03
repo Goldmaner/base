@@ -12,7 +12,7 @@ from flask import (
 )
 from db import get_cursor, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 
 parcerias_metas_bp = Blueprint(
     'parcerias_metas', __name__, url_prefix='/parcerias-metas'
@@ -442,6 +442,7 @@ def api_indicadores():
 @parcerias_metas_bp.route("/api/indicadores", methods=["POST"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_indicador_criar():
     data = request.get_json() or {}
     usuario = session.get('d_usuario', 'sistema')
@@ -467,6 +468,7 @@ def api_indicador_criar():
 @parcerias_metas_bp.route("/api/indicadores/<int:ind_id>", methods=["PUT"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_indicador_editar(ind_id):
     data = request.get_json() or {}
     indicador = (data.get('indicador') or '').strip().rstrip('.;,')
@@ -485,6 +487,7 @@ def api_indicador_editar(ind_id):
 @parcerias_metas_bp.route("/api/indicadores/<int:ind_id>", methods=["DELETE"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_indicador_excluir(ind_id):
     cur = get_cursor()
     cur.execute("DELETE FROM categoricas.c_dgp_indicadores WHERE id = %s", (ind_id,))
@@ -525,6 +528,7 @@ def api_meios():
 @parcerias_metas_bp.route("/api/meios-afericao", methods=["POST"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_meio_criar():
     data = request.get_json() or {}
     usuario = session.get('d_usuario', 'sistema')
@@ -549,6 +553,7 @@ def api_meio_criar():
 @parcerias_metas_bp.route("/api/meios-afericao/<int:meio_id>", methods=["PUT"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_meio_editar(meio_id):
     data = request.get_json() or {}
     meios_afericao = (data.get('meios_afericao') or '').strip().rstrip('.;,')
@@ -567,6 +572,7 @@ def api_meio_editar(meio_id):
 @parcerias_metas_bp.route("/api/meios-afericao/<int:meio_id>", methods=["DELETE"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_meio_excluir(meio_id):
     cur = get_cursor()
     cur.execute("DELETE FROM categoricas.c_dgp_meios_afericao WHERE id = %s", (meio_id,))
@@ -639,6 +645,7 @@ def api_meio_similares():
 @parcerias_metas_bp.route("/api/indicadores/orfaos", methods=["DELETE"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_indicador_excluir_orfaos():
     cur = get_cursor()
     cur.execute("""
@@ -657,6 +664,7 @@ def api_indicador_excluir_orfaos():
 @parcerias_metas_bp.route("/api/meios-afericao/orfaos", methods=["DELETE"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_meio_excluir_orfaos():
     cur = get_cursor()
     cur.execute("""
@@ -677,6 +685,7 @@ def api_meio_excluir_orfaos():
 @parcerias_metas_bp.route("/api/indicadores/<int:keep_id>/fundir/<int:remove_id>", methods=["POST"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_indicador_fundir(keep_id, remove_id):
     if keep_id == remove_id:
         return jsonify({'erro': 'IDs iguais'}), 400
@@ -695,6 +704,7 @@ def api_indicador_fundir(keep_id, remove_id):
 @parcerias_metas_bp.route("/api/meios-afericao/<int:keep_id>/fundir/<int:remove_id>", methods=["POST"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_meio_fundir(keep_id, remove_id):
     if keep_id == remove_id:
         return jsonify({'erro': 'IDs iguais'}), 400
@@ -715,6 +725,7 @@ def api_meio_fundir(keep_id, remove_id):
 @parcerias_metas_bp.route("/objetivo/<int:obj_id>/reordenar", methods=["PUT"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_objetivo_reordenar(obj_id):
     data  = request.get_json() or {}
     ordem = data.get('ordem')
@@ -732,6 +743,7 @@ def api_objetivo_reordenar(obj_id):
 @parcerias_metas_bp.route("/meta/<int:meta_id>/reordenar", methods=["PUT"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def api_meta_reordenar(meta_id):
     data  = request.get_json() or {}
     ordem = data.get('ordem')
@@ -751,6 +763,7 @@ def api_meta_reordenar(meta_id):
 @parcerias_metas_bp.route("/objetivo/criar", methods=["POST"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def criar_objetivo():
     data    = request.get_json() or {}
     usuario = session.get('d_usuario', 'sistema')
@@ -804,6 +817,7 @@ def criar_objetivo():
 @parcerias_metas_bp.route("/objetivo/editar/<int:obj_id>", methods=["PUT"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def editar_objetivo(obj_id):
     data    = request.get_json() or {}
     usuario = session.get('d_usuario', 'sistema')
@@ -856,6 +870,7 @@ def editar_objetivo(obj_id):
 @parcerias_metas_bp.route("/objetivo/excluir/<int:obj_id>", methods=["DELETE"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def excluir_objetivo(obj_id):
     cur = get_cursor()
     # CASCADE exclui as metas filhas automaticamente
@@ -869,6 +884,7 @@ def excluir_objetivo(obj_id):
 @parcerias_metas_bp.route("/meta/criar", methods=["POST"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def criar_meta():
     data    = request.get_json() or {}
     usuario = session.get('d_usuario', 'sistema')
@@ -925,6 +941,7 @@ def criar_meta():
 @parcerias_metas_bp.route("/meta/editar/<int:meta_id>", methods=["PUT"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def editar_meta(meta_id):
     data    = request.get_json() or {}
     usuario = session.get('d_usuario', 'sistema')
@@ -969,6 +986,7 @@ def editar_meta(meta_id):
 @parcerias_metas_bp.route("/meta/excluir/<int:meta_id>", methods=["DELETE"])
 @login_required
 @requires_access('parcerias_metas')
+@requires_write_access('parcerias_metas')
 def excluir_meta(meta_id):
     cur = get_cursor()
     cur.execute("DELETE FROM celebracao.celebracao_metas WHERE id = %s", (meta_id,))

@@ -231,6 +231,7 @@
       </div>
 
       <!-- ── ANÁLISE DE CONTAS (Verde) ── -->
+      {% if is_admin or 'analises' in user_acessos or 'pesquisa_parcerias' in user_acessos or 'gestao_financeira' in user_acessos %}
       <div class="faf-acc-item s-analise">
         <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAnalises">
           <i class="bi bi-clipboard-check-fill s-icon" style="font-size:1.05rem;"></i>
@@ -262,6 +263,7 @@
           </div>
         </div>
       </div>
+      {% endif %}
 
       <!-- ── GESTÃO DE PARCERIAS (Roxo) ── -->
       {% if is_admin or 'cents' in user_acessos or 'celebracao_parcerias' in user_acessos or 'parcerias' in user_acessos or 'dgp_alteracoes' in user_acessos %}
@@ -323,7 +325,7 @@
       {% endif %}
 
       <!-- ── GESTÃO DE DADOS (Âmbar) ── -->
-      {% if is_admin or 'listas' in user_acessos or 'modelos_textos' in user_acessos or True %}
+      {% if is_admin or 'listas' in user_acessos or 'modelos_textos' in user_acessos or 'relatorios_desempenho' in user_acessos %}
       <div class="faf-acc-item s-dados">
         <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDados">
           <i class="bi bi-database-fill s-icon" style="font-size:1.05rem;"></i>
@@ -344,9 +346,11 @@
               <i class="bi bi-file-text"></i> Modelos de Texto
             </a>
             {% endif %}
+            {% if is_admin or 'relatorios_desempenho' in user_acessos %}
             <a href="{{ url_for('relatorios_desempenho.index') }}" class="faf-btn">
               <i class="bi bi-bar-chart-line-fill"></i> Relatórios de Desempenho
             </a>
+            {% endif %}
           </div>
         </div>
       </div>

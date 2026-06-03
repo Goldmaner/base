@@ -6,7 +6,7 @@ Acompanhamento de Reservas, Empenhos e Controles Financeiros
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from db import get_cursor, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 
 gestao_financeira_bp = Blueprint('gestao_financeira', __name__, url_prefix='/gestao_financeira')
 
@@ -177,6 +177,7 @@ def api_parcelas_termo():
 @gestao_financeira_bp.route('/encaminhamento/gerar', methods=['POST'])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def gerar_encaminhamento():
     """
     Gera documento de encaminhamento usando modelo_texto id 19
@@ -758,6 +759,7 @@ def api_relatorio_empenhos():
 @gestao_financeira_bp.route('/api/atualizar-empenho/<int:id>', methods=['PUT'])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_atualizar_empenho(id):
     """
     API para atualizar um campo específico de um registro de empenho
@@ -810,6 +812,7 @@ def api_atualizar_empenho(id):
 @gestao_financeira_bp.route('/api/excluir-empenho/<int:id>', methods=['DELETE'])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_excluir_empenho(id):
     """
     API para excluir um registro de empenho
@@ -1455,6 +1458,7 @@ def api_fumcad_exportar_csv():
 @gestao_financeira_bp.route('/api/importar-dotacao', methods=['POST'])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_importar_dotacao():
     """
     API para importar arquivos CSV de dotação orçamentária
@@ -1620,6 +1624,7 @@ def api_importar_dotacao():
 @gestao_financeira_bp.route('/api/importar-reservas', methods=['POST'])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_importar_reservas():
     """
     API para importar arquivos CSV de reservas (sem executor e como executor).
@@ -1818,6 +1823,7 @@ def api_importar_reservas():
 @gestao_financeira_bp.route('/api/importar-empenhos', methods=['POST'])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_importar_empenhos():
     """
     Importa CSVs de Empenhos (5 sem executor + 1 como executor).
@@ -2068,6 +2074,7 @@ def api_importar_empenhos():
 @gestao_financeira_bp.route('/api/importar-todos', methods=['POST'])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_importar_todos():
     """
     API para importar todos os arquivos CSV de uma vez
@@ -2164,6 +2171,7 @@ def api_importar_todos():
 @gestao_financeira_bp.route('/api/importar-liquidacao', methods=['POST'])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_importar_liquidacao():
     """
     Importa CSVs de Liquidação (5 dotações sem executor).
@@ -2393,6 +2401,7 @@ def api_exportar_xlsx_completo():
 @gestao_financeira_bp.route("/api/sincronizar-empenhos", methods=["POST"])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_sincronizar_empenhos():
     """
     Sincroniza empenhos do SOF (back_empenhos) com acompanhamento de parcelas (temp_acomp_empenhos)
@@ -2831,6 +2840,7 @@ def api_sincronizar_empenhos():
 @gestao_financeira_bp.route("/api/adicionar-encaminhamento", methods=["POST"])
 @login_required
 @requires_access('gestao_financeira')
+@requires_write_access('gestao_financeira')
 def api_adicionar_encaminhamento():
     """
     Adiciona novo registro em temp_acomp_empenhos

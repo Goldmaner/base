@@ -157,9 +157,11 @@
       <p>Plano de Trabalho — objetivos e metas vinculados a processos SEI</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+      {% if has_write_access('parcerias_metas') %}
       <button type="button" class="btn-parc" onclick="abrirModalObjetivo('')">
         <i class="bi bi-plus-circle"></i> Novo Objetivo
       </button>
+      {% endif %}
       <a href="{{ url_for('parcerias_metas.dicionario') }}" class="btn-parc outline">
         <i class="bi bi-book"></i> Dicionário
       </a>
@@ -338,6 +340,7 @@
                       aria-expanded="false">
                 <i class="bi bi-list-ul me-1"></i>{{ obj.metas|length }} meta{{ 's' if obj.metas|length != 1 else '' }}
               </button>
+              {% if has_write_access('parcerias_metas') %}
               <button class="btn btn-sm btn-outline-primary ms-1" title="Editar objetivo"
                 onclick='abrirModalEditarObjetivo({{ obj|tojson }})'>
                 <i class="bi bi-pencil"></i>
@@ -350,6 +353,7 @@
                 onclick="abrirModalMeta({{ obj.id }})">
                 <i class="bi bi-plus"></i> Meta
               </button>
+              {% endif %}
             </div>
           </div>
 
@@ -408,6 +412,7 @@
                     <td class="text-center text-muted" style="width:46px;">{{ m.meta_ordem }}</td>
                     <td style="width:80px;">
                       <div class="d-flex gap-1">
+                        {% if has_write_access('parcerias_metas') %}
                         <button class="btn btn-sm btn-outline-primary" title="Editar meta"
                           onclick='abrirModalEditarMeta({{ m|tojson }}, {{ obj.id }})'>
                           <i class="bi bi-pencil"></i>
@@ -416,6 +421,9 @@
                           onclick="confirmarExcluirMeta({{ m.id }}, '{{ m.meta_titulo|e }}')">
                           <i class="bi bi-trash"></i>
                         </button>
+                        {% else %}
+                        <span class="badge bg-secondary"><i class="bi bi-eye"></i></span>
+                        {% endif %}
                       </div>
                     </td>
                   </tr>

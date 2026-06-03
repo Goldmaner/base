@@ -6,7 +6,7 @@ Exibe demonstrativo mensal de execução financeira para prestações de contas 
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor
 from functools import wraps
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 

@@ -263,6 +263,12 @@ def create_app():
         except (ValueError, TypeError):
             return "0,00"
     
+    # Expor funções de permissão como globais Jinja2.
+    # Uso nos templates: {% if has_write_access('parcerias') %} ... {% endif %}
+    from decorators import has_write_access as _has_write_access, check_module_access as _check_module_access
+    app.jinja_env.globals['has_write_access'] = _has_write_access
+    app.jinja_env.globals['check_module_access'] = _check_module_access
+
     # Registrar blueprints
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)

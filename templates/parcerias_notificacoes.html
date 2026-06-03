@@ -134,9 +134,11 @@
                         <button type="button" class="btn btn-outline-primary" onclick="alterarLimite('todas')">Todas</button>
                     </div>
                     
+                    {% if has_write_access('parcerias_notificacoes') %}
                     <button class="btn btn-success float-end" onclick="abrirModalNovo()">
                         <i class="bi bi-plus-circle me-2"></i>Adicionar Notificação
                     </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -331,6 +333,7 @@
         const TIPO_USUARIO = '{{ user.tipo_usuario }}';
         const NOME_ANALISTA_LOGADO = {{ nome_analista_logado | tojson }};
         const PODE_EDITAR = {{ pode_editar | tojson }};
+        const PODE_ESCREVER = {{ 'true' if has_write_access('parcerias_notificacoes') else 'false' }};
         const ORGAO_FILTER_MAP = {
             'Agente DGP': 'Agente DGP',
             'Agente DAC': 'Agente DAC',
@@ -713,12 +716,13 @@
                     <td>${notif.sei_doc || '-'}</td>
                     <td>${notif.observacoes ? (notif.observacoes.length > 30 ? notif.observacoes.substring(0, 30) + '...' : notif.observacoes) : '-'}</td>
                     <td class="text-nowrap">
+                        ${PODE_ESCREVER ? `
                         <button class="btn btn-sm btn-warning btn-action me-1" onclick="editarNotificacao(${notif.id})" title="Editar">
                             <i class="bi bi-pencil"></i>
                         </button>
                         <button class="btn btn-sm btn-danger btn-action" onclick="excluirNotificacao(${notif.id})" title="Excluir">
                             <i class="bi bi-trash"></i>
-                        </button>
+                        </button>` : '<span class="badge bg-secondary"><i class="bi bi-eye me-1"></i>Leitura</span>'}
                     </td>
                 `;
                 

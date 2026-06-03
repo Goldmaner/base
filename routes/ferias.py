@@ -5,7 +5,7 @@ Blueprint de gestão de férias
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, jsonify, session
 from db import get_cursor, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 import csv
 from io import StringIO
 from datetime import datetime, timedelta
@@ -262,6 +262,7 @@ def exportar_csv():
 @ferias_bp.route("/criar", methods=["POST"])
 @login_required
 @requires_access('ferias')
+@requires_write_access('ferias')
 def criar():
     """
     Criar novo período de férias
@@ -304,6 +305,7 @@ def criar():
 @ferias_bp.route("/editar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('ferias')
+@requires_write_access('ferias')
 def editar(id):
     """
     Editar período de férias existente
@@ -354,6 +356,7 @@ def editar(id):
 @ferias_bp.route("/deletar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('ferias')
+@requires_write_access('ferias')
 def deletar(id):
     """
     Deletar período de férias

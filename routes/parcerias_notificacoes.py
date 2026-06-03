@@ -7,7 +7,7 @@ import re
 from flask import Blueprint, render_template, request, jsonify, session
 from db import get_cursor, get_db, execute_query
 from functools import wraps
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 from datetime import timedelta, date, datetime
 
 bp = Blueprint('parcerias_notificacoes', __name__, url_prefix='/parcerias_notificacoes')
@@ -303,6 +303,7 @@ def api_obter_notificacao(notif_id):
 @bp.route('/api/notificacoes', methods=['POST'])
 @login_required
 @requires_access('parcerias_notificacoes')
+@requires_write_access('parcerias_notificacoes')
 def api_criar_notificacao():
     """API para criar uma nova notificação"""
     try:
@@ -361,6 +362,7 @@ def api_criar_notificacao():
 @bp.route('/api/notificacoes/<int:notif_id>', methods=['PUT'])
 @login_required
 @requires_access('parcerias_notificacoes')
+@requires_write_access('parcerias_notificacoes')
 def api_editar_notificacao(notif_id):
     """API para editar uma notificação existente"""
     try:
@@ -421,6 +423,7 @@ def api_editar_notificacao(notif_id):
 @bp.route('/api/notificacoes/<int:notif_id>', methods=['DELETE'])
 @login_required
 @requires_access('parcerias_notificacoes')
+@requires_write_access('parcerias_notificacoes')
 def api_excluir_notificacao(notif_id):
     """API para excluir uma notificação"""
     try:

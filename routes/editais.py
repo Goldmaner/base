@@ -5,7 +5,7 @@ Blueprint de gestão de editais
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, session
 from db import get_cursor, get_db
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 import csv
 from io import StringIO
 from datetime import datetime
@@ -283,6 +283,7 @@ def exportar_csv():
 @editais_bp.route("/criar", methods=["POST"])
 @login_required
 @requires_access('editais')
+@requires_write_access('editais')
 def criar():
     """
     Criar novo edital
@@ -334,6 +335,7 @@ def criar():
 @editais_bp.route("/editar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('editais')
+@requires_write_access('editais')
 def editar(id):
     """
     Editar edital existente
@@ -396,6 +398,7 @@ def editar(id):
 @editais_bp.route("/deletar/<int:id>", methods=["POST"])
 @login_required
 @requires_access('editais')
+@requires_write_access('editais')
 def deletar(id):
     """
     Deletar edital
@@ -621,6 +624,7 @@ def api_edital_detalhes(edital_nome):
 @editais_bp.route("/orcamento/criar", methods=["POST"])
 @login_required
 @requires_access('editais')
+@requires_write_access('editais')
 def orcamento_criar():
     """Criar novo orçamento de edital com cronograma mensal"""
     from flask import jsonify
@@ -702,6 +706,7 @@ def orcamento_criar():
 @editais_bp.route("/orcamento/deletar/<path:edital_nome>", methods=["POST"])
 @login_required
 @requires_access('editais')
+@requires_write_access('editais')
 def orcamento_deletar(edital_nome):
     """Deletar orçamento de edital (todas as linhas)"""
     conn = get_db()
@@ -732,6 +737,7 @@ def orcamento_deletar(edital_nome):
 @editais_bp.route("/orcamento/editar/<path:edital_nome>", methods=["POST"])
 @login_required
 @requires_access('editais')
+@requires_write_access('editais')
 def orcamento_editar(edital_nome):
     """Editar orçamento de edital (deletar tudo e reinserir)"""
     conn = get_db()

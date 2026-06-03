@@ -136,6 +136,9 @@ def get_db():
         try:
             db = _get_pool().getconn()
             db.autocommit = False
+            # Garantir que a sessão use o fuso horário de Brasília
+            with db.cursor() as _cur:
+                _cur.execute("SET timezone = 'America/Sao_Paulo'")
             g.db = db
         except PoolError:
             print("[ERRO] Pool de conexões esgotado — tente novamente em instantes")

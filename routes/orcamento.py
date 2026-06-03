@@ -5,7 +5,7 @@ Blueprint de orçamento (listagem e edição)
 from flask import Blueprint, render_template, request, Response, jsonify, session
 from db import get_cursor
 from utils import login_required
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
 import csv
 from io import StringIO
 from datetime import datetime
@@ -281,6 +281,7 @@ def dicionario_despesas():
 @orcamento_bp.route('/atualizar-categoria', methods=['POST'])
 @login_required
 @requires_access('orcamento')
+@requires_write_access('orcamento')
 def atualizar_categoria():
     """
     Atualiza em massa uma categoria de despesa no banco de dados
@@ -751,6 +752,7 @@ def buscar_observacoes(numero_termo):
 @orcamento_bp.route("/observacoes/<path:numero_termo>", methods=["POST"])
 @login_required
 @requires_access('orcamento')
+@requires_write_access('orcamento')
 def salvar_observacoes(numero_termo):
     """
     Salvar ou atualizar observações de um termo

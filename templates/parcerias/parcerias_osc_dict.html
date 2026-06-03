@@ -196,9 +196,11 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
     {% endif %}
 </td>
 <td class="text-center">
+    {% if has_write_access('parcerias') %}
     <button class="btn btn-primary btn-sm btn-salvar me-1" onclick="salvarOSC(this)" title="Salvar alterações">
         <i class="bi bi-check-lg"></i> Salvar
     </button>
+    {% endif %}
     <button class="btn btn-info btn-sm" onclick="gerenciarContatos('{{ osc_item.osc }}')" title="Gerenciar contatos">
         <i class="bi bi-person-lines-fill"></i> Contatos
     </button>
@@ -219,9 +221,11 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
             <button class="btn btn-light me-2" onclick="desmarcarTodos()">
                 <i class="bi bi-x-circle"></i> Desmarcar Todos
             </button>
+            {% if has_write_access('parcerias') %}
             <button class="btn btn-success btn-lg" onclick="salvarSelecionados()">
                 <i class="bi bi-check-circle"></i> Salvar Selecionados
             </button>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -271,7 +275,8 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
                     <strong>OSC:</strong> <span id="oscNomeContatos"></span>
                 </div>
                 
-                <!-- Formulário de Novo Contato -->
+                <!-- Formulário de Novo Contato — visível apenas com permissão de escrita -->
+                {% if has_write_access('parcerias') %}
                 <div class="card mb-3">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Adicionar Novos Contatos</h6>
@@ -283,7 +288,6 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
                         <form id="formNovoContato">
                             <!-- Blocos de Contato Dinâmicos -->
                             <div id="contatosContainer"></div>
-                            
                             <div class="text-end mt-3">
                                 <button type="submit" class="btn btn-success">
                                     <i class="bi bi-check-circle"></i> Salvar Todos os Contatos
@@ -292,6 +296,7 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
                         </form>
                     </div>
                 </div>
+                {% endif %}
                 
                 <!-- Lista de Contatos Existentes -->
                 <div class="card">
@@ -431,6 +436,9 @@ tr.marcado-alteracao { background-color: #fff9e6; border-left: 4px solid #ffc107
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// Flag de permissão de escrita — usada para condicionar botões gerados por JS
+window.PODE_ESCREVER_PARCERIAS = {{ 'true' if has_write_access('parcerias') else 'false' }};
+
 // Variável para armazenar timeout de busca
 let timeoutBusca = null;
 
@@ -1122,8 +1130,12 @@ function carregarContatos(osc) {
                 html += '<td><i class="bi ' + contatoIcon + '"></i> ' + contato.contato_info + '</td>';
                 html += '<td><span class="badge ' + statusBadge + '">' + contato.status + '</span></td>';
                 html += '<td>';
-                html += '<button class="btn btn-sm btn-warning me-1" onclick="editarContato(' + contato.id + ')" title="Editar"><i class="bi bi-pencil"></i></button>';
-                html += '<button class="btn btn-sm btn-danger" onclick="excluirContato(' + contato.id + ', \'' + contato.contato_nome + '\')" title="Excluir"><i class="bi bi-trash"></i></button>';
+                if (window.PODE_ESCREVER_PARCERIAS) {
+                    html += '<button class="btn btn-sm btn-warning me-1" onclick="editarContato(' + contato.id + ')" title="Editar"><i class="bi bi-pencil"></i></button>';
+                    html += '<button class="btn btn-sm btn-danger" onclick="excluirContato(' + contato.id + ', \'' + contato.contato_nome + '\')" title="Excluir"><i class="bi bi-trash"></i></button>';
+                } else {
+                    html += '<span class="badge bg-secondary"><i class="bi bi-eye me-1"></i>Leitura</span>';
+                }
                 html += '</td>';
                 html += '</tr>';
             });
