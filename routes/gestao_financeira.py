@@ -1827,20 +1827,21 @@ def api_importar_reservas():
 def api_importar_empenhos():
     """
     Importa CSVs de Empenhos (5 sem executor + 1 como executor).
-    Deduplica por (COD_EPH, ANO_EPH).
+    Deduplica por COD_IDT_EPH (PK do SOF a nível de item).
     fonte_relatorio = 'Sem Executor' ou 'Executor'.
     """
     import csv
     from io import StringIO
     from datetime import datetime
+    import psycopg2.extras
 
+    conn = get_db()
+    cur = conn.cursor()
     try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("SET statement_timeout = 0")  # Importação em lote — sem timeout
+        cur.execute("SET statement_timeout = 0")
         cur.execute("SET datestyle TO 'ISO, DMY'")
 
-        # Garantir coluna fonte_relatorio na tabela (só executa DDL se necessário)
+        # DDL guard: fonte_relatorio
         cur.execute("""
             SELECT EXISTS (
                 SELECT FROM information_schema.columns
@@ -1853,6 +1854,21 @@ def api_importar_empenhos():
             cur.execute("""
                 ALTER TABLE gestao_financeira.back_empenhos
                 ADD COLUMN fonte_relatorio VARCHAR(20)
+            """)
+
+        # DDL guard: atualizado_em (rastreia última reimportação; criado_em preserva a carga inicial)
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.columns
+                WHERE table_schema = 'gestao_financeira'
+                  AND table_name   = 'back_empenhos'
+                  AND column_name  = 'atualizado_em'
+            )
+        """)
+        if not cur.fetchone()[0]:
+            cur.execute("""
+                ALTER TABLE gestao_financeira.back_empenhos
+                ADD COLUMN atualizado_em TIMESTAMP WITHOUT TIME ZONE
             """)
 
         colunas_insert = [
@@ -1910,34 +1926,27 @@ def api_importar_empenhos():
         if not any(v for v in list(dados_sem_exec.values()) + list(dados_exec.values())):
             return jsonify({'success': False, 'error': 'Nenhum arquivo de empenhos enviado'}), 400
 
-        # Dedup em memória por (COD_EPH, ANO_EPH)
+        # Dedup por COD_IDT_EPH (PK do banco = identificador de item do SOF).
         # Executor tem prioridade MENOR: carregado primeiro.
-        # Sem executor tem prioridade MAIOR: sobrescreve exec linha a linha.
-        registros = {}
-        chaves_sem_exec = set()
+        # Sem executor sobrescreve executor quando a chave coincidir; primeiro arquivo sem_exec vence.
+        registros = {}  # cod_idt_eph -> (linha, fonte)
 
-        # Primeiro: executor (prioridade menor — será sobrescrito pelo sem_exec)
         for linhas in dados_exec.values():
             if not linhas:
                 continue
             for linha in linhas:
-                eph = (linha.get('COD_EPH') or '').strip()
-                ano = (linha.get('ANO_EPH') or '').strip()
-                chave = (eph, ano)
-                if chave not in registros:
-                    registros[chave] = linha
+                idt = (linha.get('COD_IDT_EPH') or '').strip()
+                if idt and idt not in registros:
+                    registros[idt] = (linha, 'Executor')
 
-        # Depois: sem executor (prioridade maior — sobrescreve TODOS os dados do exec se a chave coincidir)
         for linhas in dados_sem_exec.values():
             if not linhas:
                 continue
             for linha in linhas:
-                eph = (linha.get('COD_EPH') or '').strip()
-                ano = (linha.get('ANO_EPH') or '').strip()
-                chave = (eph, ano)
-                if chave not in chaves_sem_exec:   # primeiro arquivo sem_exec com esta chave vence
-                    registros[chave] = linha       # sobrescreve exec se necessário
-                chaves_sem_exec.add(chave)
+                idt = (linha.get('COD_IDT_EPH') or '').strip()
+                if idt:
+                    if idt not in registros or registros[idt][1] == 'Executor':
+                        registros[idt] = (linha, 'Sem Executor')
 
         def val(linha, col):
             v = (linha.get(col) or '').strip()
@@ -1947,128 +1956,133 @@ def api_importar_empenhos():
                 return None
             return v or None
 
-        total_importados = 0
-        for chave, linha in registros.items():
-            fonte = 'Sem Executor' if chave in chaves_sem_exec else 'Executor'
-            try:
-                cur.execute("""
-                    INSERT INTO gestao_financeira.back_empenhos (
-                        COD_IDT_EPH, DT_EPH, COD_EPH, ANO_EPH, COD_TIP_EPH_SOF, COD_NRO_PCSS_SOF,
-                        COD_TIP_DOC, COD_IDT_MODL_LICI, TXT_OBS_EPH, VAL_TOT_EPH, VAL_TOT_CANC_EPH,
-                        VAL_TOT_LQDC_EPH, VAL_TOT_PAGO_EPH, VAL_TOT_A_LIQ_EPH, VAL_TOT_A_PAG_EPH,
-                        COD_IDT_CRDR_SOF, NOM_RZAO_SOCI_SOF, COD_NAT_CRDR, COD_CPF_CNPJ_SOF,
-                        COD_IDT_ITEM_DESP, COD_ITEM_DESP_SOF, TXT_ITEM_DESP, COD_IDT_SUB_ELEM,
-                        COD_SUB_ELEM_DESP, TXT_SUB_ELEM, COD_IDT_CTA_DESP, IND_CTA_SINT_ANLT,
-                        COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP,
-                        COD_SUB_ELEM_CONTA_DESP, COD_IDT_FCAO_GOVR, COD_IDT_SUB_FCAO,
-                        COD_IDT_PGM_GOVR, COD_IDT_PROJ_ATVD, COD_ORG_EMP_EXECT, TXT_ORG_EMP_EXECT,
-                        COD_UNID_ORCM_SOF_EXECT, TXT_UNID_ORCM_EXECT, TXT_DOTACAO_FMT,
-                        COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_PGM_GOVR, TXT_PGM_GOVR,
-                        COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR, COD_PROJ_ATVD_SOF_P, TXT_PROJ_ATVD_P,
-                        COD_MODL_LICI_SOF, TXT_MODL_LICI, COD_EMP_PMSP, NOM_EMP_SOF,
-                        COD_IDT_FONT_REC, COD_IDT_DOTA, COD_IDT_CTA_DESP1, COD_CTA_DESP,
-                        TXT_CTA_DESP, COD_FONT_REC, TXT_FONT_REC, COD_FONT_REC_EXEC,
-                        TXT_FONT_REC_EXEC, COD_CAR, DESC_CAR, fonte_relatorio
-                    ) VALUES (
-                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
-                    )
-                    ON CONFLICT (COD_IDT_EPH) DO UPDATE SET
-                        DT_EPH                  = EXCLUDED.DT_EPH,
-                        COD_EPH                 = EXCLUDED.COD_EPH,
-                        ANO_EPH                 = EXCLUDED.ANO_EPH,
-                        COD_TIP_EPH_SOF         = EXCLUDED.COD_TIP_EPH_SOF,
-                        COD_NRO_PCSS_SOF        = EXCLUDED.COD_NRO_PCSS_SOF,
-                        COD_TIP_DOC             = EXCLUDED.COD_TIP_DOC,
-                        COD_IDT_MODL_LICI       = EXCLUDED.COD_IDT_MODL_LICI,
-                        TXT_OBS_EPH             = EXCLUDED.TXT_OBS_EPH,
-                        VAL_TOT_EPH             = EXCLUDED.VAL_TOT_EPH,
-                        VAL_TOT_CANC_EPH        = EXCLUDED.VAL_TOT_CANC_EPH,
-                        VAL_TOT_LQDC_EPH        = EXCLUDED.VAL_TOT_LQDC_EPH,
-                        VAL_TOT_PAGO_EPH        = EXCLUDED.VAL_TOT_PAGO_EPH,
-                        VAL_TOT_A_LIQ_EPH       = EXCLUDED.VAL_TOT_A_LIQ_EPH,
-                        VAL_TOT_A_PAG_EPH       = EXCLUDED.VAL_TOT_A_PAG_EPH,
-                        COD_IDT_CRDR_SOF        = EXCLUDED.COD_IDT_CRDR_SOF,
-                        NOM_RZAO_SOCI_SOF       = EXCLUDED.NOM_RZAO_SOCI_SOF,
-                        COD_NAT_CRDR            = EXCLUDED.COD_NAT_CRDR,
-                        COD_CPF_CNPJ_SOF        = EXCLUDED.COD_CPF_CNPJ_SOF,
-                        COD_IDT_ITEM_DESP       = EXCLUDED.COD_IDT_ITEM_DESP,
-                        COD_ITEM_DESP_SOF       = EXCLUDED.COD_ITEM_DESP_SOF,
-                        TXT_ITEM_DESP           = EXCLUDED.TXT_ITEM_DESP,
-                        COD_IDT_SUB_ELEM        = EXCLUDED.COD_IDT_SUB_ELEM,
-                        COD_SUB_ELEM_DESP       = EXCLUDED.COD_SUB_ELEM_DESP,
-                        TXT_SUB_ELEM            = EXCLUDED.TXT_SUB_ELEM,
-                        COD_IDT_CTA_DESP        = EXCLUDED.COD_IDT_CTA_DESP,
-                        IND_CTA_SINT_ANLT       = EXCLUDED.IND_CTA_SINT_ANLT,
-                        COD_CATG_ECMC           = EXCLUDED.COD_CATG_ECMC,
-                        COD_GRUP_DESP           = EXCLUDED.COD_GRUP_DESP,
-                        COD_MODL_APLC           = EXCLUDED.COD_MODL_APLC,
-                        COD_ELEM_DESP           = EXCLUDED.COD_ELEM_DESP,
-                        COD_SUB_ELEM_CONTA_DESP = EXCLUDED.COD_SUB_ELEM_CONTA_DESP,
-                        COD_IDT_FCAO_GOVR       = EXCLUDED.COD_IDT_FCAO_GOVR,
-                        COD_IDT_SUB_FCAO        = EXCLUDED.COD_IDT_SUB_FCAO,
-                        COD_IDT_PGM_GOVR        = EXCLUDED.COD_IDT_PGM_GOVR,
-                        COD_IDT_PROJ_ATVD       = EXCLUDED.COD_IDT_PROJ_ATVD,
-                        COD_ORG_EMP_EXECT       = EXCLUDED.COD_ORG_EMP_EXECT,
-                        TXT_ORG_EMP_EXECT       = EXCLUDED.TXT_ORG_EMP_EXECT,
-                        COD_UNID_ORCM_SOF_EXECT = EXCLUDED.COD_UNID_ORCM_SOF_EXECT,
-                        TXT_UNID_ORCM_EXECT     = EXCLUDED.TXT_UNID_ORCM_EXECT,
-                        TXT_DOTACAO_FMT         = EXCLUDED.TXT_DOTACAO_FMT,
-                        COD_FCAO_GOVR           = EXCLUDED.COD_FCAO_GOVR,
-                        TXT_FCAO_GOVR           = EXCLUDED.TXT_FCAO_GOVR,
-                        COD_PGM_GOVR            = EXCLUDED.COD_PGM_GOVR,
-                        TXT_PGM_GOVR            = EXCLUDED.TXT_PGM_GOVR,
-                        COD_SUB_FCAO_GOVR       = EXCLUDED.COD_SUB_FCAO_GOVR,
-                        TXT_SUB_FCAO_GOVR       = EXCLUDED.TXT_SUB_FCAO_GOVR,
-                        COD_PROJ_ATVD_SOF_P     = EXCLUDED.COD_PROJ_ATVD_SOF_P,
-                        TXT_PROJ_ATVD_P         = EXCLUDED.TXT_PROJ_ATVD_P,
-                        COD_MODL_LICI_SOF       = EXCLUDED.COD_MODL_LICI_SOF,
-                        TXT_MODL_LICI           = EXCLUDED.TXT_MODL_LICI,
-                        COD_EMP_PMSP            = EXCLUDED.COD_EMP_PMSP,
-                        NOM_EMP_SOF             = EXCLUDED.NOM_EMP_SOF,
-                        COD_IDT_FONT_REC        = EXCLUDED.COD_IDT_FONT_REC,
-                        COD_IDT_DOTA            = EXCLUDED.COD_IDT_DOTA,
-                        COD_IDT_CTA_DESP1       = EXCLUDED.COD_IDT_CTA_DESP1,
-                        COD_CTA_DESP            = EXCLUDED.COD_CTA_DESP,
-                        TXT_CTA_DESP            = EXCLUDED.TXT_CTA_DESP,
-                        COD_FONT_REC            = EXCLUDED.COD_FONT_REC,
-                        TXT_FONT_REC            = EXCLUDED.TXT_FONT_REC,
-                        COD_FONT_REC_EXEC       = EXCLUDED.COD_FONT_REC_EXEC,
-                        TXT_FONT_REC_EXEC       = EXCLUDED.TXT_FONT_REC_EXEC,
-                        COD_CAR                 = EXCLUDED.COD_CAR,
-                        DESC_CAR                = EXCLUDED.DESC_CAR,
-                        fonte_relatorio         = EXCLUDED.fonte_relatorio,
-                        criado_em               = NOW()
-                """, tuple(val(linha, c) for c in colunas_insert) + (fonte,))
-                total_importados += 1
-            except Exception as e:
-                conn.rollback()
-                return jsonify({'success': False, 'error': f'Erro na linha (EPH={chave[0]}, ANO={chave[1]}): {str(e)}'}), 400
+        sql_upsert = """
+            INSERT INTO gestao_financeira.back_empenhos (
+                COD_IDT_EPH, DT_EPH, COD_EPH, ANO_EPH, COD_TIP_EPH_SOF, COD_NRO_PCSS_SOF,
+                COD_TIP_DOC, COD_IDT_MODL_LICI, TXT_OBS_EPH, VAL_TOT_EPH, VAL_TOT_CANC_EPH,
+                VAL_TOT_LQDC_EPH, VAL_TOT_PAGO_EPH, VAL_TOT_A_LIQ_EPH, VAL_TOT_A_PAG_EPH,
+                COD_IDT_CRDR_SOF, NOM_RZAO_SOCI_SOF, COD_NAT_CRDR, COD_CPF_CNPJ_SOF,
+                COD_IDT_ITEM_DESP, COD_ITEM_DESP_SOF, TXT_ITEM_DESP, COD_IDT_SUB_ELEM,
+                COD_SUB_ELEM_DESP, TXT_SUB_ELEM, COD_IDT_CTA_DESP, IND_CTA_SINT_ANLT,
+                COD_CATG_ECMC, COD_GRUP_DESP, COD_MODL_APLC, COD_ELEM_DESP,
+                COD_SUB_ELEM_CONTA_DESP, COD_IDT_FCAO_GOVR, COD_IDT_SUB_FCAO,
+                COD_IDT_PGM_GOVR, COD_IDT_PROJ_ATVD, COD_ORG_EMP_EXECT, TXT_ORG_EMP_EXECT,
+                COD_UNID_ORCM_SOF_EXECT, TXT_UNID_ORCM_EXECT, TXT_DOTACAO_FMT,
+                COD_FCAO_GOVR, TXT_FCAO_GOVR, COD_PGM_GOVR, TXT_PGM_GOVR,
+                COD_SUB_FCAO_GOVR, TXT_SUB_FCAO_GOVR, COD_PROJ_ATVD_SOF_P, TXT_PROJ_ATVD_P,
+                COD_MODL_LICI_SOF, TXT_MODL_LICI, COD_EMP_PMSP, NOM_EMP_SOF,
+                COD_IDT_FONT_REC, COD_IDT_DOTA, COD_IDT_CTA_DESP1, COD_CTA_DESP,
+                TXT_CTA_DESP, COD_FONT_REC, TXT_FONT_REC, COD_FONT_REC_EXEC,
+                TXT_FONT_REC_EXEC, COD_CAR, DESC_CAR, fonte_relatorio
+            ) VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+            )
+            ON CONFLICT (COD_IDT_EPH) DO UPDATE SET
+                DT_EPH                  = EXCLUDED.DT_EPH,
+                COD_EPH                 = EXCLUDED.COD_EPH,
+                ANO_EPH                 = EXCLUDED.ANO_EPH,
+                COD_TIP_EPH_SOF         = EXCLUDED.COD_TIP_EPH_SOF,
+                COD_NRO_PCSS_SOF        = EXCLUDED.COD_NRO_PCSS_SOF,
+                COD_TIP_DOC             = EXCLUDED.COD_TIP_DOC,
+                COD_IDT_MODL_LICI       = EXCLUDED.COD_IDT_MODL_LICI,
+                TXT_OBS_EPH             = EXCLUDED.TXT_OBS_EPH,
+                VAL_TOT_EPH             = EXCLUDED.VAL_TOT_EPH,
+                VAL_TOT_CANC_EPH        = EXCLUDED.VAL_TOT_CANC_EPH,
+                VAL_TOT_LQDC_EPH        = EXCLUDED.VAL_TOT_LQDC_EPH,
+                VAL_TOT_PAGO_EPH        = EXCLUDED.VAL_TOT_PAGO_EPH,
+                VAL_TOT_A_LIQ_EPH       = EXCLUDED.VAL_TOT_A_LIQ_EPH,
+                VAL_TOT_A_PAG_EPH       = EXCLUDED.VAL_TOT_A_PAG_EPH,
+                COD_IDT_CRDR_SOF        = EXCLUDED.COD_IDT_CRDR_SOF,
+                NOM_RZAO_SOCI_SOF       = EXCLUDED.NOM_RZAO_SOCI_SOF,
+                COD_NAT_CRDR            = EXCLUDED.COD_NAT_CRDR,
+                COD_CPF_CNPJ_SOF        = EXCLUDED.COD_CPF_CNPJ_SOF,
+                COD_IDT_ITEM_DESP       = EXCLUDED.COD_IDT_ITEM_DESP,
+                COD_ITEM_DESP_SOF       = EXCLUDED.COD_ITEM_DESP_SOF,
+                TXT_ITEM_DESP           = EXCLUDED.TXT_ITEM_DESP,
+                COD_IDT_SUB_ELEM        = EXCLUDED.COD_IDT_SUB_ELEM,
+                COD_SUB_ELEM_DESP       = EXCLUDED.COD_SUB_ELEM_DESP,
+                TXT_SUB_ELEM            = EXCLUDED.TXT_SUB_ELEM,
+                COD_IDT_CTA_DESP        = EXCLUDED.COD_IDT_CTA_DESP,
+                IND_CTA_SINT_ANLT       = EXCLUDED.IND_CTA_SINT_ANLT,
+                COD_CATG_ECMC           = EXCLUDED.COD_CATG_ECMC,
+                COD_GRUP_DESP           = EXCLUDED.COD_GRUP_DESP,
+                COD_MODL_APLC           = EXCLUDED.COD_MODL_APLC,
+                COD_ELEM_DESP           = EXCLUDED.COD_ELEM_DESP,
+                COD_SUB_ELEM_CONTA_DESP = EXCLUDED.COD_SUB_ELEM_CONTA_DESP,
+                COD_IDT_FCAO_GOVR       = EXCLUDED.COD_IDT_FCAO_GOVR,
+                COD_IDT_SUB_FCAO        = EXCLUDED.COD_IDT_SUB_FCAO,
+                COD_IDT_PGM_GOVR        = EXCLUDED.COD_IDT_PGM_GOVR,
+                COD_IDT_PROJ_ATVD       = EXCLUDED.COD_IDT_PROJ_ATVD,
+                COD_ORG_EMP_EXECT       = EXCLUDED.COD_ORG_EMP_EXECT,
+                TXT_ORG_EMP_EXECT       = EXCLUDED.TXT_ORG_EMP_EXECT,
+                COD_UNID_ORCM_SOF_EXECT = EXCLUDED.COD_UNID_ORCM_SOF_EXECT,
+                TXT_UNID_ORCM_EXECT     = EXCLUDED.TXT_UNID_ORCM_EXECT,
+                TXT_DOTACAO_FMT         = EXCLUDED.TXT_DOTACAO_FMT,
+                COD_FCAO_GOVR           = EXCLUDED.COD_FCAO_GOVR,
+                TXT_FCAO_GOVR           = EXCLUDED.TXT_FCAO_GOVR,
+                COD_PGM_GOVR            = EXCLUDED.COD_PGM_GOVR,
+                TXT_PGM_GOVR            = EXCLUDED.TXT_PGM_GOVR,
+                COD_SUB_FCAO_GOVR       = EXCLUDED.COD_SUB_FCAO_GOVR,
+                TXT_SUB_FCAO_GOVR       = EXCLUDED.TXT_SUB_FCAO_GOVR,
+                COD_PROJ_ATVD_SOF_P     = EXCLUDED.COD_PROJ_ATVD_SOF_P,
+                TXT_PROJ_ATVD_P         = EXCLUDED.TXT_PROJ_ATVD_P,
+                COD_MODL_LICI_SOF       = EXCLUDED.COD_MODL_LICI_SOF,
+                TXT_MODL_LICI           = EXCLUDED.TXT_MODL_LICI,
+                COD_EMP_PMSP            = EXCLUDED.COD_EMP_PMSP,
+                NOM_EMP_SOF             = EXCLUDED.NOM_EMP_SOF,
+                COD_IDT_FONT_REC        = EXCLUDED.COD_IDT_FONT_REC,
+                COD_IDT_DOTA            = EXCLUDED.COD_IDT_DOTA,
+                COD_IDT_CTA_DESP1       = EXCLUDED.COD_IDT_CTA_DESP1,
+                COD_CTA_DESP            = EXCLUDED.COD_CTA_DESP,
+                TXT_CTA_DESP            = EXCLUDED.TXT_CTA_DESP,
+                COD_FONT_REC            = EXCLUDED.COD_FONT_REC,
+                TXT_FONT_REC            = EXCLUDED.TXT_FONT_REC,
+                COD_FONT_REC_EXEC       = EXCLUDED.COD_FONT_REC_EXEC,
+                TXT_FONT_REC_EXEC       = EXCLUDED.TXT_FONT_REC_EXEC,
+                COD_CAR                 = EXCLUDED.COD_CAR,
+                DESC_CAR                = EXCLUDED.DESC_CAR,
+                fonte_relatorio         = EXCLUDED.fonte_relatorio,
+                atualizado_em           = NOW()
+        """
 
+        batch = [
+            tuple(val(linha, c) for c in colunas_insert) + (fonte,)
+            for linha, fonte in registros.values()
+        ]
+
+        psycopg2.extras.execute_batch(cur, sql_upsert, batch, page_size=500)
         conn.commit()
 
-        cur.execute("SELECT MAX(criado_em) as ultima FROM gestao_financeira.back_empenhos")
+        cur.execute("SELECT MAX(COALESCE(atualizado_em, criado_em)) as ultima FROM gestao_financeira.back_empenhos")
         result = cur.fetchone()
         data_atual = result[0] if result and result[0] else None
-        cur.close()
 
         data_fmt = data_atual.strftime('%d/%m/%Y') if data_atual else None
 
         return jsonify({
             'success': True,
             'message': 'Empenhos importados com sucesso!',
-            'total_importados': total_importados,
+            'total_importados': len(batch),
             'data_atualizacao': data_fmt
         })
 
     except ValueError as e:
+        conn.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
+        conn.rollback()
         print(f"[ERRO] api_importar_empenhos: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            cur.execute("RESET statement_timeout")
+        except Exception:
+            pass
+        cur.close()
 
 
 @gestao_financeira_bp.route('/api/importar-todos', methods=['POST'])

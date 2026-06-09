@@ -122,7 +122,7 @@ def obter_proximo_numero():
 @pesquisa_parcerias_bp.route('/api/oscs')
 @agente_dac_required
 def listar_oscs():
-    """Retorna lista única de OSCs da tabela public.parcerias"""
+    """Retorna lista única de OSCs da tabela public.parcerias (apenas termos celebrados)"""
     try:
         query = """
             SELECT DISTINCT osc
@@ -130,22 +130,22 @@ def listar_oscs():
             WHERE osc IS NOT NULL
             ORDER BY osc
         """
-        
+
         cur = get_cursor()
         if cur is None:
             return jsonify({'erro': 'Erro ao conectar com banco de dados'}), 500
-        
+
         cur.execute(query)
         resultados = cur.fetchall()
         cur.close()
-        
+
         oscs = [row['osc'] for row in resultados]
-        
+
         return jsonify({
             'sucesso': True,
             'oscs': oscs
         })
-        
+
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
@@ -153,12 +153,12 @@ def listar_oscs():
 @pesquisa_parcerias_bp.route('/api/cnpj/<nome_osc>')
 @agente_dac_required
 def buscar_cnpj(nome_osc):
-    """Retorna o CNPJ de uma OSC específica"""
+    """Retorna o CNPJ de uma OSC específica (apenas termos celebrados)"""
     try:
         print(f"\n🔍 [BACKEND DEBUG] Buscando CNPJ para OSC: '{nome_osc}'")
         print(f"🔍 [BACKEND DEBUG] Comprimento: {len(nome_osc)}")
         print(f"🔍 [BACKEND DEBUG] Bytes: {nome_osc.encode('utf-8')}")
-        
+
         # Primeiro: buscar exatamente
         query_exata = """
             SELECT cnpj, osc
@@ -166,14 +166,14 @@ def buscar_cnpj(nome_osc):
             WHERE osc = %s
             LIMIT 1
         """
-        
+
         cur = get_cursor()
         if cur is None:
             return jsonify({'erro': 'Erro ao conectar com banco de dados'}), 500
-        
+
         cur.execute(query_exata, (nome_osc,))
         resultados = cur.fetchall()
-        
+
         if len(resultados) > 0:
             print(f"✅ [BACKEND DEBUG] Match exato encontrado!")
             cur.close()
@@ -181,39 +181,38 @@ def buscar_cnpj(nome_osc):
                 'sucesso': True,
                 'cnpj': resultados[0]['cnpj']
             })
-        
+
         print(f"⚠️ [BACKEND DEBUG] Match exato não encontrado. Buscando variações...")
-        
+
         # Se não encontrou, buscar variações similares
         query_similar = """
-            SELECT cnpj, osc, 
+            SELECT cnpj, osc,
                    LENGTH(osc) as tamanho,
                    ENCODE(osc::bytea, 'hex') as hex
             FROM public.parcerias
             WHERE LOWER(TRIM(osc)) LIKE LOWER(%s)
             LIMIT 5
         """
-        
+
         cur.execute(query_similar, (f'%{nome_osc}%',))
         similares = cur.fetchall()
-        
+
         if len(similares) > 0:
             print(f"📋 [BACKEND DEBUG] Encontradas {len(similares)} OSCs similares:")
             for s in similares:
                 print(f"   - '{s['osc']}' (len={s['tamanho']}, hex={s['hex'][:50]}...)")
-            
-            # Retornar a primeira similar (pode ajustar lógica depois)
+
             cur.close()
             return jsonify({
                 'sucesso': True,
                 'cnpj': similares[0]['cnpj'],
                 'aviso': f"Match aproximado: '{similares[0]['osc']}'"
             })
-        
+
         print(f"❌ [BACKEND DEBUG] Nenhuma OSC similar encontrada")
         cur.close()
         return jsonify({'erro': 'OSC não encontrada'}), 404
-        
+
     except Exception as e:
         print(f"💥 [BACKEND DEBUG] Erro: {e}")
         import traceback

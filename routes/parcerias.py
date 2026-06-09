@@ -5812,6 +5812,19 @@ def dgp_kanban():
 
         cur.close()
         status_label_map = {s['alt_status']: s['alt_status_label'] for s in status_list}
+        # Distritos para o editor de endereços (Localização do projeto)
+        try:
+            cur2 = get_cursor()
+            cur2.execute("""
+                SELECT codigo_distrital, distrito, subprefeitura, regiao
+                FROM categoricas.c_geral_regionalizacao
+                ORDER BY distrito
+            """)
+            distritos_list = [dict(r) for r in cur2.fetchall()]
+            cur2.close()
+        except Exception:
+            distritos_list = []
+
         return render_template(
             'dgp_kanban.html',
             status_list=status_list,
@@ -5823,6 +5836,7 @@ def dgp_kanban():
             instrumentos=instrumentos,
             analistas_ativos=analistas_ativos,
             analistas_inativos=analistas_inativos,
+            distritos_list=distritos_list,
         )
     except Exception as e:
         import traceback; traceback.print_exc()

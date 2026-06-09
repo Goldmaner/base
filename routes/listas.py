@@ -873,18 +873,20 @@ TABELAS_CONFIG = {
     'c_geral_vereadores': {
         'nome': 'Geral: Vereadores e Legislaturas',
         'schema': 'categoricas',
-        'colunas_editaveis': ['vereador_nome', 'partido', 'legislatura_inicio', 'legislatura_fim', 'legislatura_numero', 'situacao'],
+        'colunas_editaveis': ['vereador_nome', 'partido', 'dotacao_orcamentaria', 'legislatura_inicio', 'legislatura_fim', 'legislatura_numero', 'situacao'],
         'labels': {
             'vereador_nome': 'Nome do Vereador',
             'partido': 'Partido',
+            'dotacao_orcamentaria': 'Dotação Orçamentária',
             'legislatura_inicio': 'Início da Legislatura',
             'legislatura_fim': 'Fim da Legislatura',
             'legislatura_numero': 'Nº Legislatura',
             'situacao': 'Situação'
         },
-        'colunas_filtro': ['vereador_nome', 'partido', 'situacao', 'legislatura_numero'],
+        'colunas_filtro': ['vereador_nome', 'partido', 'dotacao_orcamentaria', 'situacao', 'legislatura_numero'],
         'ordem': 'legislatura_numero DESC NULLS LAST, vereador_nome',
         'tipos_campo': {
+            'dotacao_orcamentaria': 'text',
             'legislatura_inicio': 'date',
             'legislatura_fim': 'date',
             'legislatura_numero': 'select',

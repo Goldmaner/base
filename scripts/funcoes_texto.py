@@ -668,11 +668,11 @@ def obter_setor_sei(coordenacao_sigla, numero_termo=None):
 
 def verificar_osc_existe(osc_nome):
     """
-    Verifica se uma OSC existe na tabela public.parcerias
-    
+    Verifica se uma OSC existe na tabela public.parcerias (termos celebrados).
+
     Parâmetros:
     - osc_nome: Nome da OSC
-    
+
     Retorna:
     - True se existe, False caso contrário
     """
@@ -683,17 +683,17 @@ def verificar_osc_existe(osc_nome):
             WHERE osc = %s
             LIMIT 1
         """
-        
+
         cur = get_cursor()
         if cur is None:
             return False
-        
+
         cur.execute(query, (osc_nome,))
         resultado = cur.fetchone()
         cur.close()
-        
+
         return resultado['total'] > 0
-        
+
     except Exception as e:
         print(f"[ERRO verificar_osc_existe] {e}")
         return False

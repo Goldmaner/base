@@ -777,7 +777,7 @@
         
         input.id = `campo_${col}`;
         // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto, oculto, solucao e status_secundario
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim', 'status_secundario', 'contrato_inicio', 'contrato_fim'];
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim', 'status_secundario', 'contrato_inicio', 'contrato_fim', 'dotacao_orcamentaria'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
@@ -1039,7 +1039,7 @@
         
         input.id = `campo_${col}`;
         // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, categoria_texto, oculto, solucao e status_secundario
-        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim', 'status_secundario', 'contrato_inicio', 'contrato_fim'];
+        const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'categoria_texto', 'oculto', 'solucao', 'partido', 'legislatura_inicio', 'legislatura_fim', 'status_secundario', 'contrato_inicio', 'contrato_fim', 'dotacao_orcamentaria'];
         if (!camposOpcionais.includes(col)) {
           input.required = true;
         }
@@ -1080,7 +1080,7 @@
           dados[col] = valores.join(';');
         } else {
           // Campos opcionais: e-mail, número RF, setor, e-mail de coordenador, descrição, correspondente, aplicacao, categoria_texto, oculto e status_secundario
-          const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'aplicacao', 'categoria_texto', 'oculto', 'status_secundario', 'contrato_inicio', 'contrato_fim'];
+          const camposOpcionais = ['email_pg', 'numero_rf', 'setor', 'e_mail_c', 'descricao', 'correspondente', 'aplicacao', 'categoria_texto', 'oculto', 'status_secundario', 'contrato_inicio', 'contrato_fim', 'dotacao_orcamentaria'];
           if (!input.value.trim() && !camposOpcionais.includes(col)) {
             alert(`O campo ${configAtual.labels[col]} é obrigatório`);
             return;

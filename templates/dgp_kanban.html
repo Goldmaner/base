@@ -857,6 +857,11 @@ const tiposAlteracao = {{ tipos_alteracao|tojson if tipos_alteracao else '[]' }}
 const instrumentos   = {{ instrumentos|tojson if instrumentos else '[]' }};
 const analistasAtivos   = {{ analistas_ativos|tojson if analistas_ativos else '[]' }};
 const analistasInativos = {{ analistas_inativos|tojson if analistas_inativos else '[]' }};
+// Distritos para o editor de endereços: [{codigo_distrital, distrito, subprefeitura, regiao}]
+const distritosMap = {};
+{{ distritos_list|tojson if distritos_list else '[]' }}.forEach(function(d) {
+  distritosMap[d.codigo_distrital] = d;
+});
 const statusList = {{ status_list|tojson if status_list else '[]' }};
 const ocultosPorStatus = {{ ocultos_by_status|tojson if ocultos_by_status else '{}' }};
 
@@ -1430,10 +1435,21 @@ $('#numero_termo').on('select2:select', function() {
 // ====================================================
 let _enderecoCounter = 0;
 
+function _buildDistritosOptions(selected) {
+  const opts = ['<option value="">— Selecione o Distrito —</option>'];
+  Object.values(distritosMap).sort((a,b) => a.distrito.localeCompare(b.distrito)).forEach(function(d) {
+    const sel = d.codigo_distrital === selected ? ' selected' : '';
+    opts.push(`<option value="${escAttr(d.codigo_distrital)}"${sel}>${escHtml(d.distrito)}</option>`);
+  });
+  return opts.join('');
+}
+
 function _htmlEnderecoRow(index, dado) {
   _enderecoCounter++;
   const rid = `end-row-${index}-${_enderecoCounter}`;
   const endId = dado && dado.id ? dado.id : '';
+  const codDistrito = dado?.parceria_distrito || '';
+  const reg = distritosMap[codDistrito] || {};
   return `
     <div class="card mb-2 p-2 endereco-row" id="${rid}" data-endereco-id="${endId}" style="font-size:.83rem;">
       <div class="d-flex justify-content-between align-items-start mb-1">
@@ -1470,12 +1486,24 @@ function _htmlEnderecoRow(index, dado) {
                     title="Buscar CEP"><i class="bi bi-search"></i></button>
           </div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label mb-0" style="font-size:.73rem;">Distrito / Cód.</label>
-          <input type="text" class="form-control form-control-sm end-distrito"
-                 placeholder="Código do distrito" value="${escAttr(dado?.parceria_distrito||'')}">
+        <div class="col-md-4">
+          <label class="form-label mb-0" style="font-size:.73rem;">Distrito</label>
+          <select class="form-select form-select-sm end-distrito"
+                  onchange="atualizarDerivadosDistrito(this)">
+            ${_buildDistritosOptions(codDistrito)}
+          </select>
         </div>
-        <div class="col-md-9">
+        <div class="col-md-4">
+          <label class="form-label mb-0" style="font-size:.73rem;">Subprefeitura</label>
+          <input type="text" class="form-control form-control-sm end-subprefeitura bg-light"
+                 readonly value="${escAttr(reg.subprefeitura||dado?.subprefeitura||'')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label mb-0" style="font-size:.73rem;">Região</label>
+          <input type="text" class="form-control form-control-sm end-regiao bg-light"
+                 readonly value="${escAttr(reg.regiao||dado?.regiao||'')}">
+        </div>
+        <div class="col-md-12">
           <label class="form-label mb-0" style="font-size:.73rem;">Observação</label>
           <input type="text" class="form-control form-control-sm end-observacao"
                  placeholder="Observações sobre o endereço" value="${escAttr(dado?.observacao||'')}">
@@ -1499,6 +1527,22 @@ function removerEnderecoRow(rowId, index) {
   serializarEnderecos(index);
 }
 
+function atualizarDerivadosDistrito(sel) {
+  const row = sel.closest('.endereco-row');
+  const cod = sel.value;
+  const reg = distritosMap[cod] || {};
+  const sub = row.querySelector('.end-subprefeitura');
+  const reg2 = row.querySelector('.end-regiao');
+  if (sub) sub.value = reg.subprefeitura || '';
+  if (reg2) reg2.value = reg.regiao || '';
+  // dispara serialização
+  const editor = sel.closest('[id^="enderecos-editor-"]');
+  if (editor) {
+    const m = editor.id.match(/enderecos-editor-(\d+)/);
+    if (m) serializarEnderecos(parseInt(m[1]));
+  }
+}
+
 function serializarEnderecos(index) {
   const list = document.getElementById(`enderecos-list-${index}`);
   const hidden = document.getElementById(`alt_info_enderecos_${index}`);
@@ -1506,13 +1550,15 @@ function serializarEnderecos(index) {
   const enderecos = [];
   list.querySelectorAll('.endereco-row').forEach(function(row) {
     const endId = row.dataset.enderecoId;
+    // end-distrito é agora um <select> que armazena codigo_distrital
+    const codDistrito = row.querySelector('.end-distrito')?.value || '';
     const obj = {
-      parceria_logradouro: row.querySelector('.end-logradouro')?.value || '',
-      parceria_numero:     row.querySelector('.end-numero')?.value || '',
-      parceria_complemento:row.querySelector('.end-complemento')?.value || '',
-      parceria_cep:        row.querySelector('.end-cep')?.value || '',
-      parceria_distrito:   row.querySelector('.end-distrito')?.value || '',
-      observacao:          row.querySelector('.end-observacao')?.value || '',
+      parceria_logradouro:  row.querySelector('.end-logradouro')?.value  || '',
+      parceria_numero:      row.querySelector('.end-numero')?.value       || '',
+      parceria_complemento: row.querySelector('.end-complemento')?.value  || '',
+      parceria_cep:         row.querySelector('.end-cep')?.value          || '',
+      parceria_distrito:    codDistrito,
+      observacao:           row.querySelector('.end-observacao')?.value   || '',
     };
     if (endId) obj.id = parseInt(endId);
     enderecos.push(obj);
@@ -1567,8 +1613,8 @@ function serializarTodosEnderecos() {
   });
 }
 
-// Auto-atualizar serialização ao digitar nos campos de endereço
-$(document).on('input change', '#tipos-alteracao-container .end-logradouro, #tipos-alteracao-container .end-numero, #tipos-alteracao-container .end-complemento, #tipos-alteracao-container .end-cep, #tipos-alteracao-container .end-distrito, #tipos-alteracao-container .end-observacao', function() {
+// Auto-atualizar serialização ao digitar/alterar nos campos de endereço
+$(document).on('input change', '#tipos-alteracao-container .end-logradouro, #tipos-alteracao-container .end-numero, #tipos-alteracao-container .end-complemento, #tipos-alteracao-container .end-cep, #tipos-alteracao-container .end-observacao', function() {
   const editor = $(this).closest('[id^="enderecos-editor-"]');
   if (!editor.length) return;
   const m = editor.attr('id').match(/enderecos-editor-(\d+)/);
