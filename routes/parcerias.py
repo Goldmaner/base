@@ -5423,7 +5423,7 @@ def editar_lote():
             SELECT t.id, t.numero_termo, t.alt_tipo, t.alt_info,
                    t.alt_status, t.alt_responsavel, t.alt_observacao,
                    t.alt_prioridade, t.alt_data_inicio, t.alt_data_conclusao,
-                   t.alt_marcadores,
+                   t.alt_marcadores, t.data_assinatura, t.termo_sei_doc,
                    p.sei_celeb
             FROM public.termos_alteracoes t
             LEFT JOIN public.parcerias p ON t.numero_termo = p.numero_termo
@@ -5437,24 +5437,27 @@ def editar_lote():
         first = rows[0]
         di = first['alt_data_inicio']
         dc = first['alt_data_conclusao']
+        da = first['data_assinatura']
         registros = []
         for r in rows:
             registros.append({
-                'id':          r['id'],
+                'id':           r['id'],
                 'numero_termo': r['numero_termo'],
-                'sei_celeb':   r['sei_celeb'] or '',
-                'alt_tipo':    r['alt_tipo'] or '',
-                'alt_info':    r['alt_info'] or '',
+                'sei_celeb':    r['sei_celeb'] or '',
+                'alt_tipo':     r['alt_tipo'] or '',
+                'alt_info':     r['alt_info'] or '',
+                'termo_sei_doc': r['termo_sei_doc'] or '',
             })
         return jsonify({
-            'status':         first['alt_status'] or '',
-            'responsavel':    first['alt_responsavel'] or '',
-            'observacao':     first['alt_observacao'] or '',
-            'prioridade':     first['alt_prioridade'] or '',
-            'data_inicio':    di.strftime('%Y-%m-%d') if di else '',
-            'data_conclusao': dc.strftime('%Y-%m-%d') if dc else '',
-            'marcadores':     first['alt_marcadores'] or '',
-            'registros':      registros,
+            'status':           first['alt_status'] or '',
+            'responsavel':      first['alt_responsavel'] or '',
+            'observacao':       first['alt_observacao'] or '',
+            'prioridade':       first['alt_prioridade'] or '',
+            'data_inicio':      di.strftime('%Y-%m-%d') if di else '',
+            'data_conclusao':   dc.strftime('%Y-%m-%d') if dc else '',
+            'data_assinatura':  da.strftime('%Y-%m-%d') if da else '',
+            'marcadores':       first['alt_marcadores'] or '',
+            'registros':        registros,
         })
     except Exception as e:
         cur.close()
@@ -5523,6 +5526,7 @@ def adicionar_ao_lote():
                 'sei_celeb': sei_celeb or '',
                 'alt_tipo': alt_tipo,
                 'alt_info': alt_info or '',
+                'termo_sei_doc': '',
             }
         })
     except Exception as e:
@@ -5584,19 +5588,23 @@ def deletar_registro_lote():
 @requires_write_access('dgp_alteracoes')
 def atualizar_lote():
     """Atualiza os campos compartilhados de todos os registros de um lote."""
+    import json as _json
     lote_id = request.args.get('lote_id', type=int)
     if not lote_id:
         return jsonify({'success': False, 'message': 'lote_id obrigatório'}), 400
-    alt_status       = request.form.get('alt_status', '').strip()
-    alt_responsavel  = ';'.join(request.form.getlist('alt_responsavel[]'))
-    alt_prioridade   = request.form.get('alt_prioridade', '') or None
-    alt_data_inicio  = request.form.get('alt_data_inicio') or None
+    alt_status         = request.form.get('alt_status', '').strip()
+    alt_responsavel    = ';'.join(request.form.getlist('alt_responsavel[]'))
+    alt_prioridade     = request.form.get('alt_prioridade', '') or None
+    alt_data_inicio    = request.form.get('alt_data_inicio') or None
     alt_data_conclusao = request.form.get('alt_data_conclusao') or None
-    alt_observacao   = request.form.get('alt_observacao', '').strip() or None
-    alt_marcadores   = request.form.get('alt_marcadores', '') or None
+    alt_observacao     = request.form.get('alt_observacao', '').strip() or None
+    alt_marcadores     = request.form.get('alt_marcadores', '') or None
+    alt_data_assinatura = request.form.get('alt_data_assinatura') or None
+    lote_seis_json     = request.form.get('lote_seis_json', '{}')
     cur = get_cursor()
     try:
         data_fim_expr = 'NOW()' if alt_status == 'Concluído' else 'NULL'
+        data_assinatura_salvar = alt_data_assinatura if alt_status == 'Concluído' else None
         cur.execute(f"""
             UPDATE public.termos_alteracoes
             SET alt_status         = %s,
@@ -5606,11 +5614,44 @@ def atualizar_lote():
                 alt_data_conclusao = %s,
                 alt_data_cadastro_fim = {data_fim_expr},
                 alt_observacao     = %s,
-                alt_marcadores     = %s
+                alt_marcadores     = %s,
+                data_assinatura    = %s
             WHERE alt_lote_id = %s
         """, (alt_status, alt_responsavel, alt_prioridade,
               alt_data_inicio, alt_data_conclusao,
-              alt_observacao, alt_marcadores, lote_id))
+              alt_observacao, alt_marcadores,
+              data_assinatura_salvar, lote_id))
+        # Atualizar termo_sei_doc individualmente por registro
+        try:
+            seis = _json.loads(lote_seis_json) if lote_seis_json and lote_seis_json not in ('{}', '') else {}
+            for reg_id, sei_val in seis.items():
+                sei_val = (sei_val or '').strip() or None
+                cur.execute(
+                    "UPDATE public.termos_alteracoes SET termo_sei_doc = %s WHERE id = %s AND alt_lote_id = %s",
+                    (sei_val, int(reg_id), lote_id)
+                )
+        except Exception as e_sei:
+            print(f"[AVISO] Falha ao atualizar SEI por registro no lote: {e_sei}")
+        # Propagar mudanças para tabelas originais quando status = Concluído
+        if alt_status == 'Concluído':
+            cur.execute("""
+                SELECT numero_termo, alt_tipo, alt_info, instrumento_alteracao
+                FROM public.termos_alteracoes
+                WHERE alt_lote_id = %s AND alt_info IS NOT NULL AND alt_info <> ''
+            """, (lote_id,))
+            registros_lote = cur.fetchall()
+            for reg in registros_lote:
+                try:
+                    _atualizar_tabela_original(
+                        cur,
+                        reg['numero_termo'],
+                        reg['alt_tipo'],
+                        reg['alt_info'],
+                        0,
+                        reg['instrumento_alteracao']
+                    )
+                except Exception as e_orig:
+                    print(f"[AVISO] Falha ao atualizar tabela original para {reg['numero_termo']}: {e_orig}")
         get_db().commit()
         cur.close()
         is_xhr = request.headers.get('X-Requested-With') == 'XMLHttpRequest'

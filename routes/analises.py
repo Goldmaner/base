@@ -729,7 +729,9 @@ def editar_por_termo():
     else:  # POST
         try:
             # Receber dados do formulário (JSON com array de análises)
-            data = request.get_json()
+            data = request.get_json(silent=True)
+            if data is None:
+                return jsonify({'erro': 'Requisição inválida. Recarregue a página e tente novamente.'}), 400
             analises_atualizadas = data.get('analises', [])
             
             cur = get_cursor()

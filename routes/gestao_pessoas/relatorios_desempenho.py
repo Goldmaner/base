@@ -86,7 +86,11 @@ def _ensure_tables():
             pass
 
 
-_ensure_tables()
+@relatorios_desempenho_bp.record_once
+def _setup(state):
+    """Garante tabelas apenas quando o blueprint for registrado na app (tem application context)."""
+    with state.app.app_context():
+        _ensure_tables()
 
 
 def _tem_permissao_total():

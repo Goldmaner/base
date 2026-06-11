@@ -604,7 +604,8 @@
             <i class="bi bi-info-circle-fill"></i>
             <strong>Importante:</strong> Você pode cadastrar múltiplos tipos de alteração para um mesmo termo.
           </div>
-          <form method="POST" action="{{ url_for('parcerias.salvar_alteracao') }}" id="formAlteracao">
+          <form method="POST" action="{{ url_for('parcerias.salvar_alteracao') }}" id="formAlteracao" novalidate>
+            <input type="hidden" id="lote_seis_json" name="lote_seis_json" value="{}">
 
             <!-- SEÇÃO 1: Dados Gerais -->
             <div class="mb-3">
@@ -786,11 +787,12 @@
                 <table class="table table-sm table-bordered align-middle" id="lote-registros-table">
                   <thead class="table-light">
                     <tr>
-                      <th>Nº do Termo</th>
-                      <th>SEI Celebração</th>
-                      <th>Tipo</th>
-                      <th>Nova Info</th>
-                      <th style="width:90px;"></th>
+                      <th style="min-width:160px;">Nº do Termo</th>
+                      <th style="min-width:140px;">SEI Celebração</th>
+                      <th style="min-width:160px;">Tipo</th>
+                      <th style="min-width:120px;">Nova Info</th>
+                      <th style="min-width:150px;">SEI Documento</th>
+                      <th style="width:80px;"></th>
                     </tr>
                   </thead>
                   <tbody id="lote-registros-tbody"></tbody>
@@ -1042,8 +1044,8 @@ $(document).on('change', '#alt_status', function() {
   const isLote = $('#modo_lote').is(':checked');
   if ($(this).val() === 'Concluído') {
     $('#campo-sei-documento-container').show();
-    if (isLote) {
-      // Em modo lote: SEI é por linha na tabela; mantém só data de assinatura
+    if (isLote || _loteIdAtual) {
+      // Em modo lote (criar ou editar): SEI é por linha na tabela; só data de assinatura é compartilhada
       $('#alt_sei_documento').prop('required', false).closest('.col-md-6').hide();
       $('#alt_data_assinatura').prop('required', true);
     } else {
@@ -1251,8 +1253,19 @@ $('#formAlteracao').submit(function(e) {
     return;
   }
 
-  // ---- MODO NORMAL ----
+  // ---- MODO NORMAL / EDITAR LOTE ----
   serializarTodosEnderecos();  // garante JSON nos hidden inputs de endereços
+
+  // Se for edição de lote, serializar SEI por registro antes de montar FormData
+  if (_loteIdAtual) {
+    const seis = {};
+    $('.lote-reg-sei').each(function() {
+      const id = $(this).data('reg-id');
+      if (id) seis[id] = $(this).val().trim();
+    });
+    $('#lote_seis_json').val(JSON.stringify(seis));
+  }
+
   const inst = $('#instrumento_alteracao').val();
   let num = 0;
   if (['Termo de Aditamento','Termo de Apostilamento'].includes(inst)) {
@@ -1844,6 +1857,9 @@ function editarLote(loteId) {
       $('#alt_observacao').val(data.observacao || '');
       setMarcadoresSelecionados(data.marcadores || '');
 
+      // Preencher data de assinatura (compartilhada) após trigger do status
+      if (data.data_assinatura) $('#alt_data_assinatura').val(data.data_assinatura);
+
       // Popular tabela de registros individuais
       const tbody = $('#lote-registros-tbody').empty();
       (data.registros || []).forEach(function(r) {
@@ -1851,6 +1867,7 @@ function editarLote(loteId) {
         const termo = escHtml(r.numero_termo || '');
         const tipo = escHtml(r.alt_tipo || '');
         const info = escHtml(r.alt_info || '');
+        const seiDoc = escHtml(r.termo_sei_doc || '');
         tbody.append(`
           <tr id="lote-reg-${r.id}">
             <td>
@@ -1860,6 +1877,12 @@ function editarLote(loteId) {
             <td><small class="font-monospace">${sei}</small></td>
             <td><small>${tipo}</small></td>
             <td><small>${info}</small></td>
+            <td>
+              <input type="text" class="form-control form-control-sm lote-reg-sei"
+                     data-reg-id="${r.id}" value="${seiDoc}"
+                     placeholder="Ex: 12345678901"
+                     style="min-width:130px;font-size:.78rem;">
+            </td>
             <td class="text-center">
               <button type="button" class="btn btn-xs btn-outline-secondary" style="font-size:.7rem;padding:2px 6px;"
                 title="Desagrupar — vira card individual"
@@ -1933,6 +1956,12 @@ function adicionarAoLote() {
           <td><small class="font-monospace">${sei}</small></td>
           <td><small>${escHtml(reg.alt_tipo)}</small></td>
           <td><small>${escHtml(reg.alt_info)}</small></td>
+          <td>
+            <input type="text" class="form-control form-control-sm lote-reg-sei"
+                   data-reg-id="${reg.id}" value=""
+                   placeholder="Ex: 12345678901"
+                   style="min-width:130px;font-size:.78rem;">
+          </td>
           <td class="text-center">
             <button type="button" class="btn btn-xs btn-outline-secondary" style="font-size:.7rem;padding:2px 6px;"
               title="Desagrupar" onclick="desagruparDoLote(${reg.id}, ${_loteIdAtual})">

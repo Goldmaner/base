@@ -2,7 +2,7 @@
 Funções utilitárias e decoradores
 """
 
-from flask import session, redirect, url_for
+from flask import session, redirect, url_for, g
 from functools import wraps
 from db import get_cursor, get_db
 
@@ -44,13 +44,16 @@ def login_required(f):
             user_id = session.get("user_id")
             if user_id:
                 cur = get_cursor()
-                cur.execute("""
-                    UPDATE gestao_pessoas.usuarios 
-                    SET ultima_atividade = NOW() 
-                    WHERE id = %s
-                """, (user_id,))
-                get_db().commit()
-                cur.close()
+                if cur is not None:
+                    cur.execute("""
+                        UPDATE gestao_pessoas.usuarios 
+                        SET ultima_atividade = NOW() 
+                        WHERE id = %s
+                    """, (user_id,))
+                    get_db().commit()
+                    cur.close()
+                else:
+                    print("[AVISO] Falha ao obter cursor para atualizar ultima_atividade")
         except Exception as e:
             # Não interromper a execução se falhar atualizar atividade
             print(f"[AVISO] Falha ao atualizar ultima_atividade: {e}")

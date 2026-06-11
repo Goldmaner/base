@@ -54,8 +54,9 @@
       </small>
     </div>
 
-    <form id="formEditarAnalises">
+    <form id="formEditarAnalises" method="post">
       {% for analise in analises %}
+      {% set idx = loop.index %}
       <div class="card analise-card">
         <div class="card-header bg-primary text-white">
           <h5 class="mb-0">
@@ -110,9 +111,9 @@
                     ] %}
                     <div class="form-check mb-0">
                       <input class="form-check-input" type="checkbox"
-                             id="{{ campo }}_{{ loop.index }}" name="{{ campo }}_{{ loop.index }}"
+                             id="{{ campo }}_{{ idx }}" name="{{ campo }}_{{ idx }}"
                              {{ 'checked' if analise[campo] else '' }}>
-                      <label class="form-check-label small" for="{{ campo }}_{{ loop.index }}">{{ label }}</label>
+                      <label class="form-check-label small" for="{{ campo }}_{{ idx }}">{{ label }}</label>
                     </div>
                     {% endfor %}
                   </div>
@@ -341,7 +342,7 @@
         <a href="{{ url_for('analises.listar') }}" class="btn btn-secondary btn-lg">
           <i class="bi bi-x-circle me-2"></i>Cancelar
         </a>
-        <button type="submit" class="btn btn-success btn-lg">
+        <button type="button" id="btnSalvarAnalises" class="btn btn-success btn-lg">
           <i class="bi bi-check-circle me-2"></i>Salvar Todas as Alterações
         </button>
       </div>
@@ -360,14 +361,16 @@
       
       for (let i = 1; i <= totalAnalises; i++) {
         // Marcar checkboxes
-        document.getElementById(`e_notificacao_${i}`).checked = true;
-        document.getElementById(`e_parecer_${i}`).checked = true;
-        document.getElementById(`e_fase_recursal_${i}`).checked = true;
-        document.getElementById(`e_encerramento_${i}`).checked = true;
+        ['e_notificacao', 'e_parecer', 'e_fase_recursal', 'e_encerramento'].forEach(campo => {
+          const el = document.getElementById(`${campo}_${i}`);
+          if (el) el.checked = true;
+        });
         
         // Zerar valores de devolução
-        document.getElementById(`valor_devolucao_${i}`).value = '0.00';
-        document.getElementById(`valor_devolvido_${i}`).value = '0.00';
+        const vdEl = document.getElementById(`valor_devolucao_${i}`);
+        if (vdEl) vdEl.value = '0.00';
+        const vvEl = document.getElementById(`valor_devolvido_${i}`);
+        if (vvEl) vvEl.value = '0.00';
       }
       
       alert('Todas as prestações foram marcadas como encerradas com valores zerados!');
@@ -410,9 +413,7 @@
       }
     });
     
-    document.getElementById('formEditarAnalises').addEventListener('submit', async function(e) {
-      e.preventDefault();
-
+    async function salvarAnalises() {
       // Coletar dados de todas as análises
       const analises = [];
       const inputs = document.querySelectorAll('[name^="id_"]');
@@ -512,7 +513,14 @@
         console.error('Erro:', error);
         alert('Erro ao salvar: ' + error.message);
       }
-    });
+    }
+
+    // Vincular botão de salvar à função
+    document.getElementById('btnSalvarAnalises').addEventListener('click', salvarAnalises);
+
+    // Bloquear qualquer submissão nativa do formulário (ex: Enter em campo de texto)
+    document.getElementById('formEditarAnalises').addEventListener('submit', e => e.preventDefault());
+
     // =====================================================================
     // Chips — multi-responsável
     // =====================================================================
