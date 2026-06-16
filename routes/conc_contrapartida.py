@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, jsonify, session
 from functools import wraps
 from decorators import requires_access, requires_write_access
 from db import get_cursor, get_db
+from routes.conc_termo_permissions import ensure_can_edit_termo
 
 bp = Blueprint('conc_contrapartida', __name__, url_prefix='/conc_contrapartida')
 
@@ -103,6 +104,10 @@ def salvar_contrapartidas():
             return jsonify({'erro': 'Termo não informado'}), 400
         
         cur = get_cursor()
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
+
         ids_salvos = []
         
         for c in contrapartidas:
@@ -207,15 +212,29 @@ def salvar_contrapartidas():
 def excluir_contrapartida(id):
     """Exclui uma contrapartida"""
     try:
+        data = request.get_json(silent=True) or {}
+        numero_termo = (data.get('numero_termo') or request.args.get('numero_termo') or '').strip()
+        if not numero_termo:
+            return jsonify({'erro': 'numero_termo e obrigatorio'}), 400
+
         cur = get_cursor()
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
         
         # Verificar se existe antes de excluir
-        cur.execute("SELECT id FROM analises_pc.conc_contrapartida WHERE id = %s", (id,))
+        cur.execute(
+            "SELECT id FROM analises_pc.conc_contrapartida WHERE id = %s AND numero_termo = %s",
+            (id, numero_termo)
+        )
         if not cur.fetchone():
             return jsonify({'erro': 'Contrapartida não encontrada'}), 404
         
         # Excluir
-        cur.execute("DELETE FROM analises_pc.conc_contrapartida WHERE id = %s", (id,))
+        cur.execute(
+            "DELETE FROM analises_pc.conc_contrapartida WHERE id = %s AND numero_termo = %s",
+            (id, numero_termo)
+        )
         
         get_db().commit()
         cur.close()

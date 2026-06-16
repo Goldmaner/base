@@ -5,11 +5,12 @@ Rotas para Exportação e Importação de Conciliação Bancária
 from flask import Blueprint, request, jsonify, session, Response
 from db import get_cursor
 from functools import wraps
+from decorators import requires_access
 import csv
 import io
 from datetime import datetime
 
-bp = Blueprint('conc_exportacao', __name__, url_prefix='/conc_bancaria')
+bp = Blueprint('conc_exportacao', __name__, url_prefix='/conc_banc')
 
 def login_required(f):
     @wraps(f)
@@ -22,6 +23,7 @@ def login_required(f):
 
 @bp.route('/api/exportar-csv', methods=['GET'])
 @login_required
+@requires_access('conc_bancaria')
 def exportar_csv():
     """Exportar dados da conciliação bancária em formato CSV"""
     try:
@@ -133,6 +135,8 @@ def exportar_csv():
 
 
 @bp.route('/api/modelo-importacao', methods=['GET'])
+@login_required
+@requires_access('conc_bancaria')
 def modelo_importacao():
     """Baixar modelo de importação com instruções"""
     import zipfile
@@ -353,8 +357,6 @@ contato com a equipe de suporte.
         return jsonify({'erro': str(e)}), 500
 
 
-@bp.route('/api/exportar-pdf', methods=['GET'])
-@login_required
 def exportar_pdf():
     """Exportar dados da conciliação bancária em formato PDF panorâmico"""
     try:

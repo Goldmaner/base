@@ -1,38 +1,79 @@
 """
-Módulo de gerenciamento de conexão com o banco de dados PostgreSQL LOCAL
+Modulo de gerenciamento de conexao com o banco de dados PostgreSQL.
 """
 
-from flask import g, request as _flask_request
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2.pool import ThreadedConnectionPool, PoolError
-from config import DB_CONFIG
 import time
 
-# Queries que demorem mais que este valor (em segundos) serão logadas
+import psycopg2
+from config import DB_CONFIG
+from flask import g, request as _flask_request
+from psycopg2.extras import RealDictCursor
+from psycopg2.pool import PoolError, ThreadedConnectionPool
+
+
 SLOW_QUERY_THRESHOLD = 1.0
 
-# ---------------------------------------------------------------------------
-# Connection Pool (criado uma única vez por processo)
-# ---------------------------------------------------------------------------
+
+class DatabaseUnavailable(Exception):
+    """Banco indisponivel ou conexao perdida durante a requisicao."""
+
+
 _pool: ThreadedConnectionPool = None
 
 
 def _get_pool() -> ThreadedConnectionPool:
-    """Retorna o pool de conexões, inicializando-o na primeira chamada."""
+    """Retorna o pool de conexoes, inicializando-o na primeira chamada."""
     global _pool
     if _pool is None:
         _pool = ThreadedConnectionPool(minconn=2, maxconn=20, **DB_CONFIG)
     return _pool
 
 
+def _is_connection_error(exc):
+    msg = str(exc).lower()
+    return (
+        isinstance(exc, (psycopg2.OperationalError, PoolError))
+        or "ssl" in msg
+        or "connection" in msg
+        or "server closed" in msg
+        or "terminating connection" in msg
+    )
+
+
+def _discard_current_connection():
+    db = g.pop("db", None)
+    if db is None:
+        return
+    try:
+        _get_pool().putconn(db, close=True)
+    except Exception:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+def _return_connection(db, close=False):
+    if db is None:
+        return
+    try:
+        _get_pool().putconn(db, close=close)
+    except Exception:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
 def get_cursor():
     """
-    Retorna um cursor instrumentado que loga queries lentas (> SLOW_QUERY_THRESHOLD segundos).
+    Retorna um cursor instrumentado que loga queries lentas.
+
+    Importante: se a conexao cair no meio da requisicao, nao reconectamos
+    dentro do mesmo execute. Reconectar nesse ponto troca a transacao por baixo
+    do codigo chamador e invalida savepoints.
     """
     db = get_db()
-    if db is None:
-        return None
     raw_cursor = db.cursor(cursor_factory=RealDictCursor)
 
     class TimedCursor:
@@ -44,59 +85,54 @@ def get_cursor():
             try:
                 self._cur.execute(query, params)
             except psycopg2.OperationalError as e:
-                # Conexão SSL caiu — reconectar e repetir com backoff
-                if 'SSL' in str(e) or 'connection' in str(e).lower():
-                    print(f"[DB] Reconectando após queda SSL: {e}")
-                    last_err = e
-                    for tentativa, espera in enumerate([0.3, 1.0, 2.0], start=1):
-                        try:
-                            time.sleep(espera)
-                            # Descarta a conexão corrompida do pool
-                            try:
-                                _get_pool().putconn(g.db, close=True)
-                            except Exception:
-                                pass
-                            new_conn = _get_pool().getconn()
-                            new_conn.autocommit = False
-                            g.db = new_conn
-                            self._cur = g.db.cursor(cursor_factory=RealDictCursor)
-                            self._cur.execute(query, params)
-                            print(f"[DB] Reconexão bem-sucedida na tentativa {tentativa}")
-                            last_err = None
-                            break
-                        except Exception as e2:
-                            print(f"[DB] Tentativa {tentativa} falhou: {e2}")
-                            last_err = e2
-                    if last_err is not None:
-                        raise last_err
-                else:
-                    raise
+                if _is_connection_error(e):
+                    _discard_current_connection()
+                    raise DatabaseUnavailable(
+                        f"Conexao com o banco perdida durante a query: {e}"
+                    ) from e
+                raise
             elapsed = time.time() - t0
             if elapsed >= SLOW_QUERY_THRESHOLD:
-                print(f"[SLOW QUERY {elapsed:.2f}s] {str(query)[:200]}")
+                query_text = str(query)
+                is_advisory_lock = 'pg_advisory_xact_lock' in query_text
+                log_label = 'LOCK WAIT' if is_advisory_lock else 'SLOW QUERY'
+                mensagem = (
+                    f"Espera de lock do termo: {elapsed:.2f}s"
+                    if is_advisory_lock
+                    else f"Query lenta: {elapsed:.2f}s"
+                )
+                print(f"[{log_label} {elapsed:.2f}s] {query_text[:200]}")
                 try:
                     from decorators import registrar_erro
-                    # Capturar rota que originou a query (contexto de request)
+
                     try:
-                        _endpoint = _flask_request.path
-                        _metodo   = _flask_request.method
+                        endpoint = _flask_request.path
+                        metodo = _flask_request.method
                     except RuntimeError:
-                        _endpoint = None
-                        _metodo   = None
+                        endpoint = None
+                        metodo = None
                     registrar_erro(
-                        tipo_erro='query_lenta',
+                        tipo_erro="query_lenta",
                         duracao_ms=int(elapsed * 1000),
-                        query_preview=str(query),  # query completa, sem truncamento
-                        endpoint=_endpoint,
-                        metodo=_metodo,
-                        mensagem=f'Query lenta: {elapsed:.2f}s',
+                        query_preview=query_text,
+                        endpoint=endpoint,
+                        metodo=metodo,
+                        mensagem=mensagem,
                     )
                 except Exception:
                     pass
 
         def executemany(self, query, params_list):
             t0 = time.time()
-            self._cur.executemany(query, params_list)
+            try:
+                self._cur.executemany(query, params_list)
+            except psycopg2.OperationalError as e:
+                if _is_connection_error(e):
+                    _discard_current_connection()
+                    raise DatabaseUnavailable(
+                        f"Conexao com o banco perdida durante batch: {e}"
+                    ) from e
+                raise
             elapsed = time.time() - t0
             if elapsed >= SLOW_QUERY_THRESHOLD:
                 print(f"[SLOW QUERY BATCH {elapsed:.2f}s] {str(query)[:200]}")
@@ -112,18 +148,17 @@ def get_cursor():
 
 def get_db():
     """
-    Obtém a conexão com o banco de dados LOCAL.
-    Cria uma nova conexão se não existir uma no contexto da aplicação.
-    Reconecta automaticamente se a conexão foi encerrada pelo servidor (ex: timeout SSL).
-    """
-    db = g.get('db', None)
+    Obtem a conexao com o banco.
 
-    # Verificar se conexão está fechada ou inválida
+    Falhas de pool/conexao agora geram DatabaseUnavailable. Isso evita que
+    rotas recebam None e quebrem mais tarde com AttributeError em cur.execute.
+    """
+    db = g.get("db", None)
+
     if db is None or db.closed != 0:
         db = None
     else:
         try:
-            # poll() não envia dados — apenas verifica o estado do socket
             db.poll()
         except Exception:
             try:
@@ -133,119 +168,111 @@ def get_db():
             db = None
 
     if db is None:
-        try:
-            db = _get_pool().getconn()
-            db.autocommit = False
-            # Garantir que a sessão use o fuso horário de Brasília
-            with db.cursor() as _cur:
-                _cur.execute("SET timezone = 'America/Sao_Paulo'")
-            g.db = db
-        except PoolError:
-            print("[ERRO] Pool de conexões esgotado — tente novamente em instantes")
-            g.db = None
-            return None
-        except Exception as e:
-            print(f"[ERRO] Falha ao obter conexão do pool: {e}")
-            g.db = None
-            return None
+        last_error = None
+        for tentativa in range(1, 4):
+            db = None
+            try:
+                db = _get_pool().getconn()
+                db.autocommit = False
+                with db.cursor() as cur:
+                    cur.execute("SET timezone = 'America/Sao_Paulo'")
+                db.rollback()
+                g.db = db
+                break
+            except PoolError as e:
+                print("[ERRO] Pool de conexoes esgotado - tente novamente em instantes")
+                g.db = None
+                raise DatabaseUnavailable("Pool de conexoes esgotado") from e
+            except Exception as e:
+                last_error = e
+                _return_connection(db, close=True)
+                g.db = None
+                if tentativa < 3 and _is_connection_error(e):
+                    print(f"[DB] Conexao stale descartada no checkout (tentativa {tentativa}/3): {e}")
+                    time.sleep(0.15 * tentativa)
+                    continue
+                print(f"[ERRO] Falha ao obter conexao do pool: {e}")
+                raise DatabaseUnavailable(f"Falha ao obter conexao do banco: {e}") from e
+
+        if g.get("db") is None:
+            raise DatabaseUnavailable(f"Falha ao obter conexao do banco: {last_error}")
 
     return db
 
 
 def execute_query(query, params=None):
     """
-    Executa uma operação de escrita (INSERT/UPDATE/DELETE).
-    
-    Args:
-        query: String SQL a ser executada
-        params: Parâmetros para a query (tuple ou dict)
-    
+    Executa uma operacao de escrita (INSERT/UPDATE/DELETE).
+
     Returns:
-        bool: True se sucesso, False se erro
+        bool: True se sucesso, False se erro.
     """
-    cur = get_cursor()
-    db = get_db()
-    
-    if not cur or not db:
-        print(f"[ERRO execute_query] Falha ao obter conexão com banco")
-        return False
-    
     try:
+        cur = get_cursor()
+        db = get_db()
+
         print(f"[DEBUG execute_query] Executando query: {query[:100]}...")
-        print(f"[DEBUG execute_query] Parâmetros (primeiros 5): {params[:5] if params and len(params) > 5 else params}")
-        
+        print(
+            "[DEBUG execute_query] Parametros (primeiros 5): "
+            f"{params[:5] if params and len(params) > 5 else params}"
+        )
+
         cur.execute(query, params)
-        
-        print(f"[DEBUG execute_query] Query executada, fazendo commit...")
+
+        print("[DEBUG execute_query] Query executada, fazendo commit...")
         db.commit()
-        
-        print(f"[DEBUG execute_query] Commit bem-sucedido! Retornando True")
+
+        print("[DEBUG execute_query] Commit bem-sucedido! Retornando True")
         return True
     except Exception as e:
         print(f"[ERRO execute_query] Falha ao executar query: {type(e).__name__}: {str(e)}")
         import traceback
+
         traceback.print_exc()
         try:
-            print(f"[DEBUG execute_query] Fazendo rollback...")
-            db.rollback()
-        except:
+            get_db().rollback()
+        except Exception:
             pass
         return False
 
 
 def execute_batch(query, params_list):
     """
-    Executa uma operação de escrita em LOTE (INSERT/UPDATE/DELETE).
-    Usa executemany para melhor performance com múltiplos registros.
-    
-    Args:
-        query: String SQL a ser executada
-        params_list: Lista de tuplas com os parâmetros para cada execução
-    
+    Executa uma operacao de escrita em lote (INSERT/UPDATE/DELETE).
+
     Returns:
         dict: {'success': bool, 'count': int}
     """
     if not params_list:
-        return {'success': False, 'count': 0}
-    
+        return {"success": False, "count": 0}
+
     count = len(params_list)
-    cur = get_cursor()
-    db = get_db()
-    
-    if not cur or not db:
-        print(f"[ERRO] Falha ao obter conexão com banco")
-        return {'success': False, 'count': 0}
-    
     try:
+        cur = get_cursor()
+        db = get_db()
         cur.executemany(query, params_list)
         db.commit()
         print(f"[OK] {count} registros inseridos em batch")
-        return {
-            'success': True,
-            'count': count
-        }
+        return {"success": True, "count": count}
     except Exception as e:
         print(f"[ERRO] Falha ao executar batch: {e}")
         try:
-            db.rollback()
-        except:
+            get_db().rollback()
+        except Exception:
             pass
-        return {
-            'success': False,
-            'count': 0
-        }
+        return {"success": False, "count": 0}
 
 
 def close_db(e=None):
     """
-    Devolve a conexão ao pool ao final do contexto da aplicação.
+    Devolve a conexao ao pool ao final do contexto da aplicacao.
     """
     db = g.pop("db", None)
     if db is not None:
-        try:
-            _get_pool().putconn(db)
-        except Exception:
+        close = bool(getattr(db, "closed", 0))
+        if not close:
             try:
-                db.close()
+                db.rollback()
             except Exception:
-                pass
+                close = True
+        _return_connection(db, close=close)

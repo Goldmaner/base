@@ -6,7 +6,8 @@ Geração de tabelas de cálculos para diferentes tipos de responsabilidade
 from flask import Blueprint, render_template, request, jsonify, session, Response
 from db import get_cursor, get_db
 from functools import wraps
-from decorators import requires_access
+from decorators import requires_access, requires_write_access
+from routes.conc_termo_permissions import ensure_can_edit_termo
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import csv
@@ -1106,6 +1107,7 @@ def get_descontos_realizados():
 @bp.route('/api/descontos-realizados', methods=['POST'])
 @login_required
 @requires_access('conc_relatorio')
+@requires_write_access('conc_relatorio')
 def save_descontos_realizados():
     """Salva o valor de Descontos já Realizados para um termo"""
     conn = None
@@ -1119,6 +1121,10 @@ def save_descontos_realizados():
         
         conn = get_db()
         cursor = get_cursor()
+
+        ok, resposta = ensure_can_edit_termo(cursor, numero_termo)
+        if not ok:
+            return resposta
         
         # Atualizar valor na tabela conc_banco
         cursor.execute("""

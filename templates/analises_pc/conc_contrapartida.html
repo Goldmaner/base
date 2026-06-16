@@ -400,7 +400,10 @@
         if (c.id) {
             // Linha salva no banco - excluir via API
             try {
-                const response = await fetch(`/conc_contrapartida/api/contrapartidas/${c.id}`, { method: 'DELETE' });
+                const response = await fetch(
+                    `/conc_contrapartida/api/contrapartidas/${c.id}?numero_termo=${encodeURIComponent(numeroTermo)}`,
+                    { method: 'DELETE' }
+                );
                 if (!response.ok) throw new Error('Erro ao excluir');
             } catch (error) {
                 alert('Erro ao excluir linha: ' + error.message);

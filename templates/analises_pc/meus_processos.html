@@ -97,7 +97,7 @@
                     <a href="{{ url_for('analises_pc.index') }}" class="btn btn-light me-2">
                         <i class="bi bi-plus-circle me-2"></i>Novo Checklist
                     </a>
-                    <a href="{{ url_for('analises_pc.index') }}" class="btn btn-outline-light">
+                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-light">
                         <i class="bi bi-arrow-left me-2"></i>Voltar
                     </a>
                     {% endif %}
@@ -396,14 +396,21 @@
                                 <!-- Botão Ações -->
                                 <td class="text-center">
                                     {% if modo_gerenciar %}
-                                    <!-- Botão Editar Analistas no modo gerenciar -->
-                                    <button class="btn btn-sm btn-warning btn-editar-analistas" 
-                                            data-termo="{{ processo.numero_termo }}"
-                                            data-meses="{{ processo.meses_analisados }}"
-                                            data-analistas='{{ processo.analistas_arr | tojson }}'
-                                            title="Editar Analistas">
-                                        <i class="bi bi-pencil-fill"></i> Editar
-                                    </button>
+                                    <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                        <button class="btn btn-sm btn-warning btn-editar-analistas"
+                                                data-termo="{{ processo.numero_termo }}"
+                                                data-meses="{{ processo.meses_analisados }}"
+                                                data-analistas='{{ processo.analistas_arr | tojson }}'
+                                                title="Editar analistas e período">
+                                            <i class="bi bi-pencil-fill"></i> Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-danger btn-excluir-atribuicao"
+                                                data-termo="{{ processo.numero_termo }}"
+                                                data-meses="{{ processo.meses_analisados }}"
+                                                title="Excluir esta atribuição/período">
+                                            <i class="bi bi-trash-fill"></i> Excluir
+                                        </button>
+                                    </div>
                                     {% elif mostrar_nao_atribuidos and is_admin %}
                                     <!-- Botão Atribuir para processos não atribuídos -->
                                     <button class="btn btn-sm btn-success" 
@@ -413,12 +420,29 @@
                                     </button>
                                     {% else %}
                                     <!-- Botão Abrir para processos atribuídos -->
-                                    <button class="btn btn-sm btn-primary" 
-                                            id="btnAbrir{{ loop.index }}"
-                                            onclick="abrirChecklist('{{ processo.numero_termo }}', '{{ processo.meses_analisados }}', {{ loop.index }})"
-                                            title="Abrir Checklist">
-                                        <i class="bi bi-box-arrow-up-right"></i> Abrir
-                                    </button>
+                                    <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                        <button class="btn btn-sm btn-primary"
+                                                id="btnAbrir{{ loop.index }}"
+                                                onclick="abrirChecklist('{{ processo.numero_termo }}', '{{ processo.meses_analisados }}', {{ loop.index }})"
+                                                title="Abrir Checklist">
+                                            <i class="bi bi-box-arrow-up-right"></i> Abrir
+                                        </button>
+                                        {% if is_admin %}
+                                        <button class="btn btn-sm btn-warning btn-editar-analistas"
+                                                data-termo="{{ processo.numero_termo }}"
+                                                data-meses="{{ processo.meses_analisados }}"
+                                                data-analistas='{{ processo.analistas_arr | default([]) | tojson }}'
+                                                title="Editar analistas e período">
+                                            <i class="bi bi-pencil-fill"></i> Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-danger btn-excluir-atribuicao"
+                                                data-termo="{{ processo.numero_termo }}"
+                                                data-meses="{{ processo.meses_analisados }}"
+                                                title="Excluir esta atribuição/período">
+                                            <i class="bi bi-trash-fill"></i> Excluir
+                                        </button>
+                                        {% endif %}
+                                    </div>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -448,8 +472,8 @@
                 Você ainda não possui processos de análise de prestação de contas atribuídos.<br>
                 Entre em contato com o coordenador para ser incluído como analista em um processo.
             </p>
-            <a href="{{ url_for('analises_pc.index') }}" class="btn btn-primary mt-3">
-                <i class="bi bi-plus-circle me-2"></i>Criar Novo Checklist
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary mt-3">
+                <i class="bi bi-house-door me-2"></i>Voltar para a Home
             </a>
         </div>
         {% endif %}
@@ -519,9 +543,11 @@
                         <input type="hidden" id="gerenciarNumeroTermo">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label"><strong>Período:</strong></label>
-                        <input type="text" class="form-control" id="gerenciarMesesDisplay" readonly>
-                        <input type="hidden" id="gerenciarMeses">
+                        <label for="gerenciarMeses" class="form-label"><strong>Período / Meses analisados *</strong></label>
+                        <input type="text" class="form-control" id="gerenciarMeses"
+                               placeholder="Ex: 1-12, 13-24, 1-7" required>
+                        <input type="hidden" id="gerenciarMesesOriginal">
+                        <small class="form-text text-muted">Altere aqui se precisar corrigir o período do processo.</small>
                     </div>
                     <div class="mb-3">
                         <label for="gerenciarAnalistas" class="form-label"><strong>Analistas *</strong></label>
@@ -683,11 +709,17 @@
             abrirGerenciarAnalistas(termo, meses, analistasAtuais);
         });
 
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-excluir-atribuicao');
+            if (!btn) return;
+            excluirAtribuicao(btn.dataset.termo, btn.dataset.meses, btn);
+        });
+
         function abrirGerenciarAnalistas(numeroTermo, meses, analistasAtuais) {
             document.getElementById('gerenciarNumeroTermo').value = numeroTermo;
             document.getElementById('gerenciarNumeroTermoDisplay').value = numeroTermo;
             document.getElementById('gerenciarMeses').value = meses;
-            document.getElementById('gerenciarMesesDisplay').value = meses;
+            document.getElementById('gerenciarMesesOriginal').value = meses;
             // Pré-selecionar analistas atuais
             $('#gerenciarAnalistas').val(analistasAtuais).trigger('change');
             const modal = new bootstrap.Modal(document.getElementById('modalGerenciarAnalistas'));
@@ -751,8 +783,14 @@
 
         async function confirmarGerenciarAnalistas() {
             const numeroTermo = document.getElementById('gerenciarNumeroTermo').value;
-            const meses = document.getElementById('gerenciarMeses').value;
+            const mesesOriginal = document.getElementById('gerenciarMesesOriginal').value.trim();
+            const meses = document.getElementById('gerenciarMeses').value.trim();
             const analistas = $('#gerenciarAnalistas').val();
+
+            if (!meses) {
+                alert('Por favor, informe o período/meses analisados.');
+                return;
+            }
 
             if (!analistas || analistas.length === 0) {
                 alert('Por favor, selecione pelo menos um analista!');
@@ -765,6 +803,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         numero_termo: numeroTermo,
+                        meses_analisados_original: mesesOriginal,
                         meses_analisados: meses,
                         analistas: analistas
                     })
@@ -782,6 +821,46 @@
             } catch (error) {
                 console.error('Erro:', error);
                 alert('Erro ao atualizar analistas!');
+            }
+        }
+
+        async function excluirAtribuicao(numeroTermo, meses, btn) {
+            const confirmacao = prompt(
+                `Esta ação vai excluir a atribuição/checklist do período "${meses}" para o termo:\n\n${numeroTermo}\n\n` +
+                'A conciliação bancária do termo não será apagada.\n\nDigite EXCLUIR para confirmar:'
+            );
+
+            if (confirmacao !== 'EXCLUIR') return;
+
+            const htmlOriginal = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Excluindo...';
+
+            try {
+                const response = await fetch('/analises_pc/api/excluir_atribuicao', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        meses_analisados: meses
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✓ ' + data.message);
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + (data.error || 'Erro desconhecido'));
+                    btn.disabled = false;
+                    btn.innerHTML = htmlOriginal;
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao excluir atribuição!');
+                btn.disabled = false;
+                btn.innerHTML = htmlOriginal;
             }
         }
     </script>

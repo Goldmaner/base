@@ -11,6 +11,7 @@ import core.audit_log as audit_log  # Módulo de auditoria
 import os
 from werkzeug.utils import secure_filename
 import re
+import unicodedata
 from io import BytesIO
 from datetime import datetime, timedelta
 from reportlab.lib.pagesizes import A4
@@ -41,6 +42,17 @@ def normalizar_rf(rf):
     digitos = re.sub(r'[^\d]', '', rf_str)
     # Retorna apenas os primeiros 6 dígitos (ignora dígito verificador)
     return digitos[:6] if len(digitos) >= 6 else digitos
+
+
+def _normalizar_texto_comparacao(valor):
+    if not valor:
+        return ''
+    texto = unicodedata.normalize('NFD', str(valor).strip().lower())
+    return ''.join(ch for ch in texto if unicodedata.category(ch) != 'Mn')
+
+
+def _usuario_e_admin(user_data):
+    return _normalizar_texto_comparacao(user_data.get('tipo_usuario') if user_data else '') == 'agente publico'
 
 
 @analises_pc_bp.route('/')
@@ -86,7 +98,7 @@ def meus_processos():
         """, (session['email'],))
         
         user_data = cur.fetchone()
-        is_admin = user_data and user_data['tipo_usuario'] == 'Agente Público'
+        is_admin = _usuario_e_admin(user_data)
         
         # Buscar todos os analistas para o filtro (se for admin)
         cur.execute("""
@@ -318,7 +330,7 @@ def meus_processos():
                 query_conditions.append("UPPER(SUBSTRING(ct.numero_termo FROM '/([^/]+)$')) = %s")
                 query_params.append(filtro_area_tematica.upper())
             
-            where_clause = f"WHERE ca.nome_analista IN ({placeholders})"
+            where_clause = f"WHERE ca_filtro.nome_analista IN ({placeholders})"
             if query_conditions:
                 where_clause += " AND " + " AND ".join(query_conditions)
             
@@ -328,14 +340,18 @@ def meus_processos():
                     ct.meses_analisados,
                     STRING_AGG(DISTINCT ca.nome_analista, ', ' ORDER BY ca.nome_analista) as analistas,
                     COUNT(DISTINCT ca.nome_analista) as total_analistas,
+                    ARRAY_AGG(DISTINCT ca.nome_analista ORDER BY ca.nome_analista) as analistas_arr,
                     BOOL_OR(COALESCE(pa_final.e_notificacao, false)) as documentos_sei_1,
                     BOOL_OR(COALESCE(pa_final.e_parecer, false)) as emissao_parecer,
                     BOOL_OR(COALESCE(pa_final.e_encerramento, false)) as encaminhamento_encerramento,
                     MAX(p.sei_pc) as sei_pc,
                     MAX(p.tipo_termo) as tipo_termo
                 FROM analises_pc.checklist_termo ct
-                INNER JOIN analises_pc.checklist_analista ca 
-                    ON ct.numero_termo = ca.numero_termo 
+                INNER JOIN analises_pc.checklist_analista ca_filtro
+                    ON ct.numero_termo = ca_filtro.numero_termo
+                    AND ct.meses_analisados = ca_filtro.meses_analisados
+                LEFT JOIN analises_pc.checklist_analista ca
+                    ON ct.numero_termo = ca.numero_termo
                     AND ct.meses_analisados = ca.meses_analisados
                 LEFT JOIN public.parcerias p ON ct.numero_termo = p.numero_termo
                 LEFT JOIN public.parcerias_analises pa_final 
@@ -355,6 +371,8 @@ def meus_processos():
             
             for proc in processos_raw:
                 proc_dict = dict(proc)
+                arr = proc_dict.get('analistas_arr') or []
+                proc_dict['analistas_arr'] = [a for a in arr if a is not None]
                 
                 # Contar etapas concluídas
                 etapas_concluidas = sum(1 for etapa in etapas_principais if proc_dict.get(etapa, False))
@@ -417,16 +435,17 @@ def atualizar_analistas():
     try:
         cur.execute("SELECT tipo_usuario FROM gestao_pessoas.usuarios WHERE email = %s", (session['email'],))
         user_data = cur.fetchone()
-        if not user_data or user_data['tipo_usuario'] != 'Agente Público':
+        if not _usuario_e_admin(user_data):
             cur.close()
             return jsonify({'error': 'Acesso negado. Apenas administradores podem gerenciar atribuições.'}), 403
 
         data = request.get_json()
         numero_termo = data.get('numero_termo')
-        meses_analisados = data.get('meses_analisados')
+        meses_analisados_original = (data.get('meses_analisados_original') or data.get('meses_analisados') or '').strip()
+        meses_analisados = (data.get('meses_analisados') or '').strip()
         analistas = data.get('analistas', [])
 
-        if not numero_termo or not meses_analisados:
+        if not numero_termo or not meses_analisados_original or not meses_analisados:
             cur.close()
             return jsonify({'error': 'Dados incompletos'}), 400
 
@@ -434,18 +453,43 @@ def atualizar_analistas():
             cur.close()
             return jsonify({'error': 'É necessário ao menos um analista'}), 400
 
+        cur.execute("""
+            SELECT id FROM analises_pc.checklist_termo
+            WHERE numero_termo = %s AND meses_analisados = %s
+        """, (numero_termo, meses_analisados_original))
+        if not cur.fetchone():
+            cur.close()
+            return jsonify({'error': 'Checklist original nao encontrado'}), 404
+
+        if meses_analisados != meses_analisados_original:
+            cur.execute("""
+                SELECT id FROM analises_pc.checklist_termo
+                WHERE numero_termo = %s AND meses_analisados = %s
+            """, (numero_termo, meses_analisados))
+            if cur.fetchone():
+                cur.close()
+                return jsonify({'error': f'Ja existe checklist para o periodo {meses_analisados}.'}), 409
+
         # Buscar analistas atuais para auditoria
         cur.execute("""
             SELECT nome_analista FROM analises_pc.checklist_analista
             WHERE numero_termo = %s AND meses_analisados = %s
-        """, (numero_termo, meses_analisados))
+        """, (numero_termo, meses_analisados_original))
         analistas_antigos = [r['nome_analista'] for r in cur.fetchall()]
+
+        if meses_analisados != meses_analisados_original:
+            for tabela in ('checklist_termo', 'checklist_recursos'):
+                cur.execute(
+                    f"UPDATE analises_pc.{tabela} SET meses_analisados = %s "
+                    f"WHERE numero_termo = %s AND meses_analisados = %s",
+                    (meses_analisados, numero_termo, meses_analisados_original)
+                )
 
         # Deletar e reinserir
         cur.execute("""
             DELETE FROM analises_pc.checklist_analista
             WHERE numero_termo = %s AND meses_analisados = %s
-        """, (numero_termo, meses_analisados))
+        """, (numero_termo, meses_analisados_original))
 
         values_placeholders = ','.join(['(%s, %s, %s)'] * len(analistas))
         params = []
@@ -464,6 +508,85 @@ def atualizar_analistas():
         conn.commit()
         cur.close()
         return jsonify({'success': True, 'message': f'Analistas de {numero_termo} ({meses_analisados}) atualizados com sucesso!'})
+
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/excluir_atribuicao', methods=['DELETE'])
+def excluir_atribuicao():
+    """Exclui o checklist/atribuição de um termo em um período específico (somente admin)."""
+    if 'email' not in session:
+        return jsonify({'error': 'Nao autenticado'}), 401
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    try:
+        cur.execute("SELECT tipo_usuario FROM gestao_pessoas.usuarios WHERE email = %s", (session['email'],))
+        user_data = cur.fetchone()
+        if not _usuario_e_admin(user_data):
+            cur.close()
+            return jsonify({'error': 'Acesso negado. Apenas administradores podem excluir atribuicoes.'}), 403
+
+        data = request.get_json(silent=True) or {}
+        numero_termo = (data.get('numero_termo') or '').strip()
+        meses_analisados = (data.get('meses_analisados') or '').strip()
+
+        if not numero_termo or not meses_analisados:
+            cur.close()
+            return jsonify({'error': 'Dados incompletos'}), 400
+
+        cur.execute("""
+            SELECT id FROM analises_pc.checklist_termo
+            WHERE numero_termo = %s AND meses_analisados = %s
+        """, (numero_termo, meses_analisados))
+        if not cur.fetchone():
+            cur.close()
+            return jsonify({'error': 'Atribuicao nao encontrada'}), 404
+
+        cur.execute("""
+            SELECT nome_analista FROM analises_pc.checklist_analista
+            WHERE numero_termo = %s AND meses_analisados = %s
+        """, (numero_termo, meses_analisados))
+        analistas_antigos = [r['nome_analista'] for r in cur.fetchall()]
+
+        cur.execute("""
+            DELETE FROM analises_pc.checklist_recursos
+            WHERE numero_termo = %s AND meses_analisados = %s
+        """, (numero_termo, meses_analisados))
+        recursos_excluidos = cur.rowcount
+
+        cur.execute("""
+            DELETE FROM analises_pc.checklist_analista
+            WHERE numero_termo = %s AND meses_analisados = %s
+        """, (numero_termo, meses_analisados))
+        analistas_excluidos = cur.rowcount
+
+        cur.execute("""
+            DELETE FROM analises_pc.checklist_termo
+            WHERE numero_termo = %s AND meses_analisados = %s
+        """, (numero_termo, meses_analisados))
+        termos_excluidos = cur.rowcount
+
+        try:
+            audit_log.audit_checklist_analistas(conn, numero_termo, meses_analisados, analistas_antigos, [])
+        except Exception as audit_e:
+            print(f"[AVISO] Auditoria de exclusao falhou (nao critico): {audit_e}")
+
+        conn.commit()
+        cur.close()
+        return jsonify({
+            'success': True,
+            'message': f'Atribuicao {numero_termo} ({meses_analisados}) excluida com sucesso.',
+            'contadores': {
+                'checklist_termo': termos_excluidos,
+                'checklist_analista': analistas_excluidos,
+                'checklist_recursos': recursos_excluidos
+            }
+        })
 
     except Exception as e:
         conn.rollback()
@@ -589,7 +712,7 @@ def atribuir_processo():
         cur.execute("SELECT tipo_usuario FROM gestao_pessoas.usuarios WHERE email = %s", (session['email'],))
         user_data = cur.fetchone()
         
-        if not user_data or user_data['tipo_usuario'] != 'Agente Público':
+        if not _usuario_e_admin(user_data):
             cur.close()
             return jsonify({'error': 'Acesso negado. Apenas administradores podem atribuir processos.'}), 403
         
@@ -910,6 +1033,28 @@ def salvar_checklist():
         # 🔄 RENOMEAÇÃO DE PERÍODO: se o usuário mudou o campo período, atualizar meses_analisados
         # nas 3 tabelas antes de prosseguir com o save normal.
         if periodo_anterior and periodo_anterior != meses_analisados:
+            cur.execute("""
+                SELECT id FROM analises_pc.checklist_termo
+                WHERE numero_termo = %s AND meses_analisados = %s
+            """, (numero_termo, periodo_anterior))
+            if not cur.fetchone():
+                conn.rollback()
+                cur.close()
+                return jsonify({
+                    'error': f'Periodo original {periodo_anterior} nao encontrado. Recarregue a pagina antes de salvar.'
+                }), 404
+
+            cur.execute("""
+                SELECT id FROM analises_pc.checklist_termo
+                WHERE numero_termo = %s AND meses_analisados = %s
+            """, (numero_termo, meses_analisados))
+            if cur.fetchone():
+                conn.rollback()
+                cur.close()
+                return jsonify({
+                    'error': f'Ja existe checklist para o periodo {meses_analisados}. Use o botao Editar em Meus Processos para alterar a atribuicao existente.'
+                }), 409
+
             for tabela in ('checklist_termo', 'checklist_analista', 'checklist_recursos'):
                 cur.execute(
                     f"UPDATE analises_pc.{tabela} SET meses_analisados = %s "

@@ -270,6 +270,24 @@
       </select>
     </div>
     <div>
+      <label class="form-label mb-1" style="font-size:.78rem;">Instrumento</label>
+      <select class="form-select form-select-sm" id="filtroInstrumento" onchange="aplicarFiltros()" style="width:180px">
+        <option value="">— Todos —</option>
+        {% for inst in instrumentos %}
+          <option value="{{ inst }}">{{ inst }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label mb-1" style="font-size:.78rem;">Tipo</label>
+      <select class="form-select form-select-sm" id="filtroTipo" onchange="aplicarFiltros()" style="width:220px">
+        <option value="">— Todos —</option>
+        {% for t in tipos_alteracao|unique(attribute='alt_tipo')|sort(attribute='alt_tipo') %}
+          <option value="{{ t.alt_tipo }}">{{ t.alt_tipo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
       <button class="btn btn-outline-secondary btn-sm" onclick="limparFiltros()">
         <i class="bi bi-x-circle"></i> Limpar
       </button>
@@ -442,9 +460,101 @@
     {% endfor %}
   </div>
 
+  {% macro tabela_row(card, oculto=False) %}
+    <tr class="table-row-filterable{% if oculto %} table-row-oculta{% endif %}"
+        data-numero="{{ card.numero_termo }}"
+        data-instrumento="{{ card.instrumento_alteracao }}"
+        data-alt-numero="{{ card.alt_numero }}"
+        data-responsavel="{{ card.responsavel or '' }}"
+        data-prioridade="{{ card.alt_prioridade or '' }}"
+        data-marcadores="{{ card.alt_marcadores or '' }}"
+        data-osc="{{ card.osc or '' }}"
+        data-tipos="{{ card.tipos_alteracao or '' }}"
+        data-status="{{ card.alt_status }}"
+        data-lote-id="{{ card.alt_lote_id or '' }}"
+        {% if oculto %}style="opacity:.6;"{% endif %}>
+      <td>
+        {% if card.alt_lote_id %}
+          <span class="badge bg-warning text-dark me-1"><i class="bi bi-stack"></i> LOTE #{{ card.alt_lote_id }}</span>
+          <strong>{{ card.lote_count }} termo{{ 's' if card.lote_count != 1 else '' }}</strong>
+        {% else %}
+          <strong>{{ card.numero_termo }}</strong>
+        {% endif %}
+        {% if oculto %}<span class="badge bg-secondary ms-1" style="font-size:.6rem;">Oculto</span>{% endif %}
+      </td>
+      <td>{{ card.instrumento_alteracao }}</td>
+      <td class="text-center">
+        {% if card.alt_numero == 0 %}<span class="badge bg-secondary">N/A</span>
+        {% elif card.alt_numero >= 100 %}<span class="badge bg-info">{{ card.alt_numero // 100 }}/{{ card.alt_numero % 100 }}</span>
+        {% else %}<span class="badge bg-primary">{{ card.alt_numero }}</span>{% endif %}
+      </td>
+      <td>
+        {% if card.tipos_alteracao %}
+          {% for tipo in card.tipos_alteracao.split(', ') %}
+            <span class="badge bg-success me-1" style="font-size:.65rem;">{{ tipo }}</span>
+          {% endfor %}
+        {% endif %}
+      </td>
+      <td><span class="badge bg-secondary">{{ status_label_map.get(card.alt_status, card.alt_status) }}</span></td>
+      <td>
+        {% if card.alt_prioridade %}
+          <span class="prio-badge prio-{{ card.alt_prioridade|replace(' ','') }}">{{ card.alt_prioridade }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if card.responsavel %}
+          {% for r in card.responsavel.split(';') %}
+            <span class="badge bg-info me-1" style="font-size:.65rem;">{{ r.strip() }}</span>
+          {% endfor %}
+        {% endif %}
+      </td>
+      <td>{% if card.alt_data_inicio %}{{ card.alt_data_inicio.strftime('%d/%m/%Y') }}{% else %}—{% endif %}</td>
+      <td>{% if card.alt_data_conclusao %}{{ card.alt_data_conclusao.strftime('%d/%m/%Y') }}{% else %}—{% endif %}</td>
+      <td>
+        {% if card.alt_marcadores %}
+          {% for m in card.alt_marcadores.split(',') %}
+            {% if m.strip() %}<span class="marcador-pill">{{ m.strip() }}</span>{% endif %}
+          {% endfor %}
+        {% endif %}
+      </td>
+      <td class="text-center">
+        {% if card.alt_lote_id %}
+          <button class="btn btn-sm btn-warning" onclick='editarLote({{ card.alt_lote_id }})' title="Editar lote">
+            <i class="bi bi-pencil"></i>
+          </button>
+        {% else %}
+          <button class="btn btn-sm btn-warning" onclick='editarAlteracao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})' title="Editar">
+            <i class="bi bi-pencil"></i>
+          </button>
+        {% endif %}
+        {% if oculto %}
+          <button class="btn btn-sm btn-success" onclick='ocultarCard("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }}, false{% if card.alt_lote_id %}, {{ card.alt_lote_id }}{% endif %})' title="Reexibir">
+            <i class="bi bi-eye"></i>
+          </button>
+        {% else %}
+          <button class="btn btn-sm btn-secondary" onclick='ocultarCard("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }}, true{% if card.alt_lote_id %}, {{ card.alt_lote_id }}{% endif %})' title="Ocultar">
+            <i class="bi bi-eye-slash"></i>
+          </button>
+        {% endif %}
+        {% if card.alt_lote_id %}
+          <button class="btn btn-sm btn-danger" onclick='confirmarExclusaoLote({{ card.alt_lote_id }}, {{ card.lote_count }})' title="Excluir lote">
+            <i class="bi bi-trash"></i>
+          </button>
+        {% else %}
+          <button class="btn btn-sm btn-danger" onclick='confirmarExclusao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})' title="Excluir">
+            <i class="bi bi-trash"></i>
+          </button>
+        {% endif %}
+      </td>
+    </tr>
+  {% endmacro %}
+
   <!-- ===== TABLE VIEW (hidden by default) ===== -->
   <div id="table-view" style="display:none;">
     <div style="background:#fff; border-radius:8px; padding:20px; box-shadow:0 2px 4px rgba(0,0,0,.1);">
+      <div class="alert alert-secondary py-2 px-3 mb-3" style="font-size:.8rem;">
+        <i class="bi bi-info-circle"></i> Esta tabela também exibe os cards ocultos do board (marcados com a etiqueta <span class="badge bg-secondary" style="font-size:.6rem;">Oculto</span>), garantindo que a busca e os filtros encontrem qualquer registro.
+      </div>
       <div class="table-responsive">
         <table class="table table-hover table-striped table-sm" id="tabela-kanban">
           <thead>
@@ -465,65 +575,11 @@
           <tbody>
             {% for status in status_list %}
               {% for card in cards_by_status[status.alt_status] %}
-              <tr class="table-row-filterable"
-                  data-numero="{{ card.numero_termo }}"
-                  data-instrumento="{{ card.instrumento_alteracao }}"
-                  data-alt-numero="{{ card.alt_numero }}"
-                  data-responsavel="{{ card.responsavel or '' }}"
-                  data-prioridade="{{ card.alt_prioridade or '' }}"
-                  data-marcadores="{{ card.alt_marcadores or '' }}"
-                  data-osc="{{ card.osc or '' }}"
-                  data-tipos="{{ card.tipos_alteracao or '' }}"
-                  data-status="{{ card.alt_status }}">
-                <td><strong>{{ card.numero_termo }}</strong></td>
-                <td>{{ card.instrumento_alteracao }}</td>
-                <td class="text-center">
-                  {% if card.alt_numero == 0 %}<span class="badge bg-secondary">N/A</span>
-                  {% elif card.alt_numero >= 100 %}<span class="badge bg-info">{{ card.alt_numero // 100 }}/{{ card.alt_numero % 100 }}</span>
-                  {% else %}<span class="badge bg-primary">{{ card.alt_numero }}</span>{% endif %}
-                </td>
-                <td>
-                  {% if card.tipos_alteracao %}
-                    {% for tipo in card.tipos_alteracao.split(', ') %}
-                      <span class="badge bg-success me-1" style="font-size:.65rem;">{{ tipo }}</span>
-                    {% endfor %}
-                  {% endif %}
-                </td>
-                <td><span class="badge bg-secondary">{{ status_label_map.get(card.alt_status, card.alt_status) }}</span></td>
-                <td>
-                  {% if card.alt_prioridade %}
-                    <span class="prio-badge prio-{{ card.alt_prioridade|replace(' ','') }}">{{ card.alt_prioridade }}</span>
-                  {% else %}—{% endif %}
-                </td>
-                <td>
-                  {% if card.responsavel %}
-                    {% for r in card.responsavel.split(';') %}
-                      <span class="badge bg-info me-1" style="font-size:.65rem;">{{ r.strip() }}</span>
-                    {% endfor %}
-                  {% endif %}
-                </td>
-                <td>{% if card.alt_data_inicio %}{{ card.alt_data_inicio.strftime('%d/%m/%Y') }}{% else %}—{% endif %}</td>
-                <td>{% if card.alt_data_conclusao %}{{ card.alt_data_conclusao.strftime('%d/%m/%Y') }}{% else %}—{% endif %}</td>
-                <td>
-                  {% if card.alt_marcadores %}
-                    {% for m in card.alt_marcadores.split(',') %}
-                      {% if m.strip() %}<span class="marcador-pill">{{ m.strip() }}</span>{% endif %}
-                    {% endfor %}
-                  {% endif %}
-                </td>
-                <td class="text-center">
-                  <button class="btn btn-sm btn-warning" onclick='editarAlteracao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})'>
-                    <i class="bi bi-pencil"></i>
-                  </button>
-                  <button class="btn btn-sm btn-secondary" onclick='ocultarCard("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }}, true)'>
-                    <i class="bi bi-eye-slash"></i>
-                  </button>
-                  <button class="btn btn-sm btn-danger" onclick='confirmarExclusao("{{ card.numero_termo|e }}", "{{ card.instrumento_alteracao|e }}", {{ card.alt_numero }})'>
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </td>
-              </tr>
+                {{ tabela_row(card, oculto=False) }}
               {% endfor %}
+            {% endfor %}
+            {% for card in ocultos %}
+              {{ tabela_row(card, oculto=True) }}
             {% endfor %}
           </tbody>
         </table>
@@ -2551,6 +2607,8 @@ function aplicarFiltros() {
   const texto      = (document.getElementById('filtroTexto').value || '').toLowerCase();
   const resp       = (document.getElementById('filtroResponsavel').value || '').toLowerCase();
   const prio       = (document.getElementById('filtroPrioridade').value || '').toLowerCase();
+  const inst       = (document.getElementById('filtroInstrumento').value || '').toLowerCase();
+  const tipo       = (document.getElementById('filtroTipo').value || '').toLowerCase();
 
   // Board view: filter cards
   document.querySelectorAll('.kanban-card').forEach(function(card) {
@@ -2559,27 +2617,33 @@ function aplicarFiltros() {
     const tipos  = (card.dataset.tipos || '').toLowerCase();
     const cardResp = (card.dataset.responsavel || '').toLowerCase();
     const cardPrio = (card.dataset.prioridade || '').toLowerCase();
+    const cardInst = (card.dataset.instrumento || '').toLowerCase();
 
     const textMatch = !texto || num.includes(texto) || osc.includes(texto) || tipos.includes(texto);
     const respMatch = !resp  || cardResp.includes(resp);
     const prioMatch = !prio  || cardPrio === prio;
+    const instMatch = !inst  || cardInst === inst;
+    const tipoMatch = !tipo  || tipos.includes(tipo);
 
-    card.style.display = (textMatch && respMatch && prioMatch) ? '' : 'none';
+    card.style.display = (textMatch && respMatch && prioMatch && instMatch && tipoMatch) ? '' : 'none';
   });
 
-  // Table view: filter rows
+  // Table view: filter rows (inclui linhas ocultas — sempre renderizadas na tabela)
   document.querySelectorAll('.table-row-filterable').forEach(function(row) {
     const num    = (row.dataset.numero || '').toLowerCase();
     const osc    = (row.dataset.osc || '').toLowerCase();
     const tipos  = (row.dataset.tipos || '').toLowerCase();
     const rowResp = (row.dataset.responsavel || '').toLowerCase();
     const rowPrio = (row.dataset.prioridade || '').toLowerCase();
+    const rowInst = (row.dataset.instrumento || '').toLowerCase();
 
     const textMatch = !texto || num.includes(texto) || osc.includes(texto) || tipos.includes(texto);
     const respMatch = !resp  || rowResp.includes(resp);
     const prioMatch = !prio  || rowPrio === prio;
+    const instMatch = !inst  || rowInst === inst;
+    const tipoMatch = !tipo  || tipos.includes(tipo);
 
-    row.style.display = (textMatch && respMatch && prioMatch) ? '' : 'none';
+    row.style.display = (textMatch && respMatch && prioMatch && instMatch && tipoMatch) ? '' : 'none';
   });
 
   // Update badge counts after filter
@@ -2590,6 +2654,8 @@ function limparFiltros() {
   document.getElementById('filtroTexto').value = '';
   document.getElementById('filtroResponsavel').value = '';
   document.getElementById('filtroPrioridade').value = '';
+  document.getElementById('filtroInstrumento').value = '';
+  document.getElementById('filtroTipo').value = '';
   aplicarFiltros();
 }
 

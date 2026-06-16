@@ -143,6 +143,15 @@
         color: #dc3545;
         margin-top: 0.25rem;
     }
+
+    .categoria-invalida {
+        background-color: #fff3cd !important;
+        box-shadow: inset 0 0 0 2px #ffc107;
+    }
+
+    .categoria-invalida .cell-input {
+        background-color: #fff8db;
+    }
     
     /* Células mescladas */
     .cell-merged {
@@ -558,8 +567,8 @@
                                     </div>
                                 </a>
                             </div>
-                            <!-- Contrapartida (condicional) -->
-                            <div class="col-6" id="cardContrapartida" style="display: none;">
+                            <!-- Contrapartida -->
+                            <div class="col-6" id="cardContrapartida">
                                 <a href="#" id="btnContrapartidaCard" onmousedown="atualizarHrefContrapartida()" onclick="abrirContrapartida(event)" class="text-decoration-none">
                                     <div class="card border-warning h-100 hover-shadow">
                                         <div class="card-body p-3">
@@ -572,16 +581,30 @@
                                     </div>
                                 </a>
                             </div>
-                            <!-- Relatório -->
+                            <!-- Análise Financeira -->
                             <div class="col-6">
                                 <a href="#" id="btnRelatorio" onmousedown="atualizarHrefRelatorio()" onclick="abrirRelatorio(event)" class="text-decoration-none">
                                     <div class="card border-primary h-100 hover-shadow">
                                         <div class="card-body p-3">
                                             <div class="d-flex align-items-center mb-2">
-                                                <i class="bi bi-file-text fs-4 text-primary me-2"></i>
-                                                <h6 class="mb-0 text-primary">Relatório</h6>
+                                                <i class="bi bi-bar-chart-line fs-4 text-primary me-2"></i>
+                                                <h6 class="mb-0 text-primary">Análise Financeira</h6>
                                             </div>
-                                            <small class="text-muted">Relatório completo de conciliação bancária</small>
+                                            <small class="text-muted">Consolidação financeira do termo, com saldos, glosas e contrapartida</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            <!-- Glosas -->
+                            <div class="col-6">
+                                <a href="#" id="btnGlosas" onmousedown="atualizarHrefGlosas()" onclick="abrirGlosas(event)" class="text-decoration-none">
+                                    <div class="card border-danger h-100 hover-shadow">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-x-circle-fill fs-4 text-danger me-2"></i>
+                                                <h6 class="mb-0 text-danger">Glosas</h6>
+                                            </div>
+                                            <small class="text-muted">Despesas marcadas como glosa, organizadas por mês</small>
                                         </div>
                                     </div>
                                 </a>
@@ -675,20 +698,6 @@
                                     </div>
                                 </a>
                             </div>
-                            <!-- Relação de Glosas -->
-                            <div class="col-6">
-                                <a href="#" id="btnGlosas" onmousedown="atualizarHrefGlosas()" onclick="abrirGlosas(event)" class="text-decoration-none">
-                                    <div class="card border-danger h-100 hover-shadow">
-                                        <div class="card-body p-3">
-                                            <div class="d-flex align-items-center mb-2">
-                                                <i class="bi bi-x-circle-fill fs-4 text-danger me-2"></i>
-                                                <h6 class="mb-0 text-danger">Relação de Glosas</h6>
-                                            </div>
-                                            <small class="text-muted">Despesas marcadas como Glosar, organizadas por mês</small>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
                         </div>
 
                     </div>
@@ -702,7 +711,7 @@
                 <i class="bi bi-arrow-counterclockwise me-1"></i>Desfazer
             </button>
             <div class="btn-group me-2">
-                <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="btn btn-outline-light btn-sm dropdown-toggle acao-escrita" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-pencil-square me-1"></i>Adicionar ou Excluir Linhas
                 </button>
                 <ul class="dropdown-menu p-3" style="min-width: 320px;">
@@ -712,13 +721,13 @@
                     </li>
                     <li class="px-2 mb-3">
                         <div class="input-group input-group-sm">
-                            <input type="number" 
-                                   class="form-control" 
-                                   id="inputAdicionarLinhas" 
+                            <input type="number"
+                                   class="form-control acao-escrita"
+                                   id="inputAdicionarLinhas"
                                    placeholder="Quantidade"
                                    min="1"
                                    value="1">
-                            <button class="btn btn-primary" onclick="adicionarLinhasEmLote()">
+                            <button class="btn btn-primary acao-escrita" onclick="adicionarLinhasEmLote()">
                                 <i class="bi bi-plus-lg me-1"></i>Adicionar
                             </button>
                         </div>
@@ -733,11 +742,11 @@
                     </li>
                     <li class="px-2">
                         <div class="input-group input-group-sm">
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="inputExcluirLinhas" 
+                            <input type="text"
+                                   class="form-control acao-escrita"
+                                   id="inputExcluirLinhas"
                                    placeholder="Ex: 114-120 ou 5,10,15">
-                            <button class="btn btn-danger" onclick="excluirLinhasPorIntervalo()">
+                            <button class="btn btn-danger acao-escrita" onclick="excluirLinhasPorIntervalo()">
                                 <i class="bi bi-trash me-1"></i>Excluir
                             </button>
                         </div>
@@ -745,10 +754,10 @@
                     </li>
                 </ul>
             </div>
-                <button class="btn-parc danger btn-sm" onclick="limparTabela()">
+                <button class="btn-parc danger btn-sm acao-escrita" id="btnLimparTabela" onclick="limparTabela()">
                     <i class="bi bi-trash"></i>Limpar
                 </button>
-                <button class="btn-parc warning btn-sm" id="btnAtualizarGuias" onclick="atualizarGuiasAutomaticamente()" style="display: none;" title="Atualizar Guias e preencher Competências automaticamente">
+                <button class="btn-parc warning btn-sm acao-escrita" id="btnAtualizarGuias" onclick="atualizarGuiasAutomaticamente()" style="display: none;" title="Atualizar Guias e preencher Competências automaticamente">
                     <i class="bi bi-magic"></i>Auto-preencher
                 </button>
                 <a href="/analises_pc" id="btnVoltar" class="btn-parc outline btn-sm" onclick="voltarParaAnalises(event)">
@@ -822,7 +831,7 @@
                 </button>
             </div>
             <div class="col-auto d-flex flex-column align-items-stretch gap-1">
-                <button class="btn-parc btn-save-top" onclick="salvarConciliacao()" id="btnSalvar" style="display:none; justify-content:center; white-space:nowrap;">
+                <button class="btn-parc btn-save-top acao-escrita" onclick="salvarConciliacao()" id="btnSalvar" style="display:none; justify-content:center; white-space:nowrap;">
                     <i class="bi bi-save me-1"></i>Salvar
                 </button>
                 <div class="btn-group btn-group-sm" role="group" title="Utilitários">
@@ -842,6 +851,11 @@
                 <div id="badgeEstadoSave" style="display:none; font-size:0.65rem; text-align:center; white-space:nowrap;"></div>
             </div>
         </div>
+    </div>
+
+    <div id="alertaPermissaoTermo" class="alert alert-warning d-none mt-3" role="alert">
+        <strong>Somente leitura.</strong>
+        Este termo não está atribuído a você. Você pode visualizar, mas não editar.
     </div>
 
     <!-- Menu de Seções -->
@@ -1372,6 +1386,94 @@
     let proximoIndice = 1;
     let historicoAlteracoes = []; // Histórico para Undo (máximo 20 estados)
     const MAX_HISTORICO = 20;
+    const META_CACHE_TTL_MS = 2 * 60 * 1000;
+    const metaCache = {
+        categoriasAnalise: null,
+        categoriasAplicabilidade: null,
+        categoriasDespesas: new Map(),
+        categoriasRubricas: new Map(),
+        periodoTermo: new Map()
+    };
+    let termoPodeEditar = true;
+    let termoPermissaoMotivo = '';
+
+    function obterMetaCache(cacheKey, subKey = null) {
+        const bucket = metaCache[cacheKey];
+        const entrada = bucket instanceof Map ? bucket.get(subKey) : bucket;
+        if (!entrada) return null;
+        if ((Date.now() - entrada.ts) > META_CACHE_TTL_MS) {
+            if (bucket instanceof Map) bucket.delete(subKey);
+            else metaCache[cacheKey] = null;
+            return null;
+        }
+        return entrada.value;
+    }
+
+    function salvarMetaCache(cacheKey, value, subKey = null) {
+        const payload = { value, ts: Date.now() };
+        const bucket = metaCache[cacheKey];
+        if (bucket instanceof Map) bucket.set(subKey, payload);
+        else metaCache[cacheKey] = payload;
+    }
+
+    function aplicarEstadoPermissaoTermo(podeEditar, motivo = '') {
+        termoPodeEditar = !!podeEditar;
+        termoPermissaoMotivo = motivo || '';
+
+        const alerta = document.getElementById('alertaPermissaoTermo');
+        if (alerta) {
+            alerta.classList.toggle('d-none', termoPodeEditar);
+            if (!termoPodeEditar && motivo) {
+                alerta.innerHTML = `<strong>Somente leitura.</strong> ${motivo}`;
+            }
+        }
+
+        document.querySelectorAll('.acao-escrita').forEach(el => {
+            el.disabled = !termoPodeEditar;
+            el.classList.toggle('disabled', !termoPodeEditar);
+            if (!termoPodeEditar) {
+                el.setAttribute('aria-disabled', 'true');
+                el.setAttribute('title', 'Este termo nao esta atribuido a voce.');
+            } else {
+                el.removeAttribute('aria-disabled');
+            }
+        });
+
+        ['bancoExtrato', 'contaEspecifica', 'contaExecucao', 'inputVinculacaoFile'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = !termoPodeEditar;
+        });
+
+        document.querySelectorAll('#tabelaConciliacao input, #tabelaConciliacao select, #tabelaConciliacao textarea, #tabelaConciliacao button').forEach(el => {
+            el.disabled = !termoPodeEditar;
+            el.classList.toggle('disabled', !termoPodeEditar);
+        });
+    }
+
+    async function verificarPermissaoTermo(numeroTermo) {
+        if (!numeroTermo) {
+            aplicarEstadoPermissaoTermo(true);
+            return true;
+        }
+
+        try {
+            const response = await fetch(`/conc_banc/api/permissao-termo?numero_termo=${encodeURIComponent(numeroTermo)}`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.erro || 'Erro ao verificar permissao');
+            aplicarEstadoPermissaoTermo(data.pode_editar, data.motivo);
+            return !!data.pode_editar;
+        } catch (error) {
+            console.warn('[PERMISSAO TERMO] Falha ao verificar:', error);
+            aplicarEstadoPermissaoTermo(false, 'Nao foi possivel confirmar sua permissao de edicao. A tela foi protegida em modo somente leitura.');
+            return false;
+        }
+    }
+
+    function bloquearSeSomenteLeitura() {
+        if (termoPodeEditar) return false;
+        showToast(termoPermissaoMotivo || 'Este termo esta em modo somente leitura para voce.', 'warning', 5000);
+        return true;
+    }
     
     // ============================================================
     // SISTEMA DE PROFILING DE PERFORMANCE
@@ -1604,7 +1706,9 @@
     
     let categoriasDespesas = [];
     let categoriasAnalise = [];
+    let categoriasValidasNormalizadasCache = { credito: null, debito: null, ambos: null };
     let periodoTermo = { inicio: null, final: null }; // Período do projeto
+    let seiPcTermo = '';
     let bancoAtual = ''; // Banco do extrato
     let origensDestinosUnicos = new Set(); // Lista dinâmica de origens/destinos já utilizados
     let observacoesUnicas = new Set(); // Lista dinâmica de observações já utilizadas
@@ -2189,6 +2293,7 @@
     }
 
     async function uploadVinculacaoFiles(files) {
+        if (bloquearSeSomenteLeitura()) return;
         if (!files || files.length === 0) return;
         const numeroTermo = document.getElementById('numeroTermo').value;
         const progress = document.getElementById('vinculacaoUploadProgress');
@@ -2222,9 +2327,14 @@
     }
 
     async function excluirDocumentoVinculacao(docId, extratoId) {
+        if (bloquearSeSomenteLeitura()) return;
         if (!confirm('Excluir este documento permanentemente? Não é possível desfazer.')) return;
         try {
-            const r = await fetch(`/conc_banc/api/vinculacao-docs/${docId}`, { method: 'DELETE' });
+            const numeroTermo = document.getElementById('numeroTermo').value;
+            const r = await fetch(
+                `/conc_banc/api/vinculacao-docs/${docId}?numero_termo=${encodeURIComponent(numeroTermo)}`,
+                { method: 'DELETE' }
+            );
             const json = await r.json();
             if (!r.ok) throw new Error(json.erro || 'Erro');
 
@@ -2410,18 +2520,8 @@
         console.log('%c  Ctrl+Shift+↓  %c- Ir para próxima linha alterada', 'color: #e74c3c; font-weight: bold;', 'color: #95a5a6;');
         console.log('');
         
-        carregarTermos().then(() => {
-            // v2: pré-selecionar termo se vier via ?termo= na URL (link do v1)
-            const params = new URLSearchParams(window.location.search);
-            const termoParam = params.get('termo');
-            if (termoParam) {
-                const input = document.getElementById('numeroTermo');
-                if (input) {
-                    input.value = termoParam;
-                    carregarExtrato();
-                }
-            }
-        });
+        sincronizarModoVisualizacaoInicial();
+        carregarTermos();
 
         // Restaurar estado do cabeçalho de configurações
         restaurarEstadoHeaderConfigs();
@@ -2442,6 +2542,20 @@
     });
 
     let todosOsTermos = []; // Lista completa de termos
+
+    function sincronizarModoVisualizacaoInicial() {
+        const selectModo = document.getElementById('selectModoVisualizacao');
+        const divNavegacao = document.getElementById('divNavegacaoMes');
+        if (!selectModo) return;
+
+        modoVisualizacao = selectModo.value || modoVisualizacao;
+        if (divNavegacao) {
+            divNavegacao.style.display = (modoVisualizacao === 'paginas') ? 'block' : 'none';
+        }
+        if (modoVisualizacao === 'todas') {
+            mesesSelecionados = [];
+        }
+    }
 
     async function carregarTermos() {
         try {
@@ -2585,16 +2699,13 @@
             linhas = [];
             renderizarTabela();
             document.getElementById('btnSalvar').style.display = 'none';
-            const cardContrapartida = document.getElementById('cardContrapartida');
-            if (cardContrapartida) cardContrapartida.style.display = 'none';
+            aplicarEstadoPermissaoTermo(true);
             return;
         }
 
         try {
             document.getElementById('loadingIndicator').style.display = 'block';
-            
-            // Verificar se termo tem contrapartida
-            verificarContrapartida(numeroTermo);
+            await verificarPermissaoTermo(numeroTermo);
             
             // Se estiver no modo páginas, carregar todas as linhas para ter todos os meses
             const limiteParaCarregar = modoVisualizacao === 'paginas' ? 'todas' : limiteAtual;
@@ -2809,7 +2920,10 @@
 
             // Atualizar subtítulo do page-header
             const subtitulo = document.getElementById('subtituloTermo');
-            if (subtitulo) subtitulo.textContent = `Análise de Prestação de Contas — ${numeroTermo} — ${linhas.length} linha(s)`;
+            if (subtitulo) {
+                const seiPc = seiPcTermo ? ` — SEI PC: ${seiPcTermo}` : '';
+                subtitulo.textContent = `Análise de Prestação de Contas — ${numeroTermo}${seiPc} — ${linhas.length} linha(s)`;
+            }
 
         } catch (error) {
             console.error('Erro ao carregar extrato:', error);
@@ -3001,9 +3115,15 @@
     
     async function carregarCategoriasDespesas(numeroTermo) {
         try {
+            const cached = obterMetaCache('categoriasDespesas', numeroTermo);
+            if (cached) {
+                categoriasDespesas = cached;
+                return;
+            }
             const response = await fetch(`/conc_banc/api/categorias-despesas?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar categorias de despesas');
             categoriasDespesas = await response.json();
+            salvarMetaCache('categoriasDespesas', categoriasDespesas, numeroTermo);
         } catch (error) {
             console.error('Erro ao carregar categorias de despesas:', error);
             categoriasDespesas = [];
@@ -3012,9 +3132,15 @@
     
     async function carregarCategoriasAnalise() {
         try {
+            const cached = obterMetaCache('categoriasAnalise');
+            if (cached) {
+                categoriasAnalise = cached;
+                return;
+            }
             const response = await fetch('/conc_banc/api/categorias-analise');
             if (!response.ok) throw new Error('Erro ao carregar categorias de análise');
             categoriasAnalise = await response.json();
+            salvarMetaCache('categoriasAnalise', categoriasAnalise);
         } catch (error) {
             console.error('Erro ao carregar categorias de análise:', error);
             categoriasAnalise = [];
@@ -3066,13 +3192,20 @@
         dlCredito.replaceChildren(fragCredito);
         dlDebito.replaceChildren(fragDebito);
         dlAmbos.replaceChildren(fragAmbos);
+        categoriasValidasNormalizadasCache = { credito: null, debito: null, ambos: null };
     }
 
     async function carregarCategoriasAplicabilidade() {
         try {
+            const cached = obterMetaCache('categoriasAplicabilidade');
+            if (cached) {
+                categoriasAplicabilidade = cached;
+                return;
+            }
             const response = await fetch('/conc_banc/api/categorias-aplicabilidade');
             if (!response.ok) throw new Error('Erro ao carregar aplicabilidade');
             categoriasAplicabilidade = await response.json();
+            salvarMetaCache('categoriasAplicabilidade', categoriasAplicabilidade);
             console.log('Aplicabilidade carregada:', categoriasAplicabilidade);
         } catch (error) {
             console.error('Erro ao carregar aplicabilidade:', error);
@@ -3082,9 +3215,15 @@
     
     async function carregarCategoriasRubricas(numeroTermo) {
         try {
+            const cached = obterMetaCache('categoriasRubricas', numeroTermo);
+            if (cached) {
+                categoriasRubricas = cached;
+                return;
+            }
             const response = await fetch(`/conc_banc/api/categorias-rubricas?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar rubricas');
             categoriasRubricas = await response.json();
+            salvarMetaCache('categoriasRubricas', categoriasRubricas, numeroTermo);
             console.log('Rubricas carregadas:', categoriasRubricas);
         } catch (error) {
             console.error('Erro ao carregar rubricas:', error);
@@ -3245,16 +3384,94 @@
             index === self.findIndex(c => c.valor === cat.valor)
         );
     }
+
+    function normalizarCategoria(valor) {
+        return (valor || '')
+            .toString()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim()
+            .toLowerCase();
+    }
+
+    function categoriaCompativelComLista(linha) {
+        const valor = normalizarCategoria(linha.cat_transacao);
+        if (!valor) return true;
+        const tipoLinha = linha.credito ? 'credito' : linha.debito ? 'debito' : 'ambos';
+
+        if (!categoriasValidasNormalizadasCache[tipoLinha]) {
+            let valoresValidos;
+            if (tipoLinha === 'ambos') {
+                valoresValidos = [
+                    ...categoriasDespesas.map(cat => cat.categoria_despesa),
+                    ...categoriasAnalise.map(cat => cat.categoria_extra)
+                ];
+            } else {
+                const linhaReferencia = {
+                    credito: tipoLinha === 'credito' ? 1 : null,
+                    debito: tipoLinha === 'debito' ? 1 : null
+                };
+                valoresValidos = obterCategoriasFiltradas(linhaReferencia).map(cat => cat.valor);
+            }
+
+            categoriasValidasNormalizadasCache[tipoLinha] = new Set(
+                valoresValidos.map(normalizarCategoria).filter(Boolean)
+            );
+        }
+
+        return categoriasValidasNormalizadasCache[tipoLinha].has(valor);
+    }
+
+    function mensagemCategoriaInvalida(linha) {
+        const tipo = linha.credito ? 'credito' : linha.debito ? 'debito' : 'credito/debito';
+        return `Categoria nao encontrada nas opcoes validas para esta linha (${tipo}). Revise o valor ou selecione uma categoria da lista suspensa.`;
+    }
+
+    function escapeHtmlAttr(valor) {
+        return (valor || '').toString()
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function atualizarEstadoCategoriaCelula(index) {
+        const linha = linhas[index];
+        if (!linha) return;
+        const input = document.querySelector(`tr[data-index="${index}"] input[list^="datalistCategorias"]`);
+        const td = input ? input.closest('td') : null;
+        if (!td) return;
+
+        const invalida = !categoriaCompativelComLista(linha);
+        td.classList.toggle('categoria-invalida', invalida);
+        if (invalida) {
+            const mensagem = mensagemCategoriaInvalida(linha);
+            td.setAttribute('title', mensagem);
+            input.setAttribute('title', mensagem);
+        } else {
+            td.removeAttribute('title');
+            input.removeAttribute('title');
+        }
+    }
     
     async function carregarPeriodoTermo(numeroTermo) {
         try {
+            const cached = obterMetaCache('periodoTermo', numeroTermo);
+            if (cached) {
+                periodoTermo = cached;
+                seiPcTermo = cached.sei_pc || '';
+                return;
+            }
             const response = await fetch(`/conc_banc/api/periodo-termo?numero_termo=${encodeURIComponent(numeroTermo)}`);
             if (!response.ok) throw new Error('Erro ao carregar período do termo');
             const dados = await response.json();
             periodoTermo = dados;
+            seiPcTermo = dados.sei_pc || '';
+            salvarMetaCache('periodoTermo', dados, numeroTermo);
         } catch (error) {
             console.error('Erro ao carregar período do termo:', error);
             periodoTermo = { inicio: null, final: null };
+            seiPcTermo = '';
         }
     }
     
@@ -3995,6 +4212,14 @@
             const _listIdCat = linha.credito ? 'datalistCategoriasCredito'
                              : linha.debito  ? 'datalistCategoriasDebito'
                              : 'datalistCategoriasAmbos';
+            const categoriaInvalida = !categoriaCompativelComLista(linha);
+            const classesCategoria = [
+                linha._auto_campos && linha._auto_campos.has('cat_transacao') ? 'cell-auto-applied' : '',
+                categoriaInvalida ? 'categoria-invalida' : ''
+            ].filter(Boolean).join(' ');
+            const tooltipCategoria = categoriaInvalida
+                ? ` title="${escapeHtmlAttr(mensagemCategoriaInvalida(linha))}"`
+                : '';
             const htmlCategoria = `
                 <input type="text"
                        class="form-control form-control-sm cell-input"
@@ -4004,6 +4229,7 @@
                        onblur="blurCondicionalCategoria(${index})"
                        onkeydown="navegarCelula(event, ${index}, 4)"
                        placeholder="Digite para buscar..."
+                       ${tooltipCategoria}
                        autocomplete="off">`;
             
             //  Continuar construindo htmlParts com as células restantes
@@ -4015,7 +4241,7 @@
                            onblur="blurCondicional(${index}, this)"
                            onkeydown="navegarCelula(event, ${index}, 3)">
                 </td>
-                <td class="${linha._auto_campos && linha._auto_campos.has('cat_transacao') ? 'cell-auto-applied' : ''}">${htmlCategoria}</td>
+                <td class="${classesCategoria}"${tooltipCategoria}>${htmlCategoria}</td>
                 <td>
                     <input type="text" 
                            class="cell-input competencia-input ${linha.competencia_valida === false ? 'is-invalid' : ''}" 
@@ -4266,6 +4492,8 @@
             }).length;
             console.log(`%c📊 [RENDER] Comprovantes renderizados: ${comprovantesRenderizados} de ${linhasFiltradas.length} linhas`, 'color: #e74c3c; font-weight: bold');
         }
+
+        aplicarEstadoPermissaoTermo(termoPodeEditar, termoPermissaoMotivo);
         
         console.log(`%c[RENDER] ${linhasFiltradas.length} linhas renderizadas`, 'color: purple; font-weight: bold');
     }
@@ -4635,6 +4863,10 @@
                 // Usuário preencheu - remover flag
                 delete linhas[index]._competencia_deletada;
             }
+        }
+
+        if (campo === 'cat_transacao') {
+            atualizarEstadoCategoriaCelula(index);
         }
         
         agendarAutosave();
@@ -5118,6 +5350,10 @@
                 linhas[index].discriminacao = valorNumerico;
                 console.log(`Auto-preenchimento: composição = ${valorNumerico}`);
             }
+        }
+
+        if (campo === 'credito' || campo === 'debito') {
+            atualizarEstadoCategoriaCelula(index);
         }
         
         // Não renderizar toda tabela no onchange, apenas no onblur
@@ -6089,6 +6325,7 @@
     }
 
     async function limparTabela() {
+        if (bloquearSeSomenteLeitura()) return;
         const numeroTermo = document.getElementById('numeroTermo').value;
 
         if (!numeroTermo) {
@@ -6312,7 +6549,7 @@
         const numeroTermo = document.getElementById('numeroTermo').value;
         if (!numeroTermo) {
             event.preventDefault();
-            alert('Selecione um termo primeiro!');
+            showToast('Selecione um termo primeiro!', 'warning');
             return false;
         }
         const url = `/conc_glosas/?termo=${encodeURIComponent(numeroTermo)}`;
@@ -6484,37 +6721,11 @@
         return true;
     }
 
-    async function verificarContrapartida(numeroTermo) {
-        try {
-            const response = await fetch(`/conc_contrapartida/api/verificar-contrapartida/${encodeURIComponent(numeroTermo)}`);
-            const result = await response.json();
-            
-            if (response.ok && result.tem_contrapartida) {
-                // Mostrar card no dropdown (não há mais botão standalone)
-                const cardContrapartida = document.getElementById('cardContrapartida');
-                if (cardContrapartida) {
-                    cardContrapartida.style.display = 'block';
-                }
-            } else {
-                // Ocultar card no dropdown
-                const cardContrapartida = document.getElementById('cardContrapartida');
-                if (cardContrapartida) {
-                    cardContrapartida.style.display = 'none';
-                }
-            }
-        } catch (error) {
-            console.error('Erro ao verificar contrapartida:', error);
-            const cardContrapartida = document.getElementById('cardContrapartida');
-            if (cardContrapartida) {
-                cardContrapartida.style.display = 'none';
-            }
-        }
-    }
-
     // 🔒 Re-entrancy guard: previne salvamentos concorrentes (duplo-clique, autosave em paralelo)
     let _salvandoConciliacao = false;
 
     async function salvarConciliacao(modoCompleto = false) {
+        if (bloquearSeSomenteLeitura()) return;
         // ============================================================
         // DEBUG: Estado inicial do salvamento
         // ============================================================
@@ -6697,7 +6908,38 @@
 
             if (!response.ok) {
                 const error = await response.json();
+                if (response.status === 409 && error.codigo === 'termo_em_salvamento') {
+                    atualizarBadgeEstado('pendente');
+                    showToast(error.erro || 'Outro salvamento esta em andamento. Tente novamente em alguns segundos.', 'warning', 5000);
+                    console.groupEnd();
+                    return;
+                }
                 throw new Error(error.erro || 'Erro ao salvar extrato');
+            }
+
+            const resultado = await response.json();
+            // Tratar erros parciais de linhas (savepoints por linha no backend)
+            const errosLinhas = resultado.erros || [];
+            const indiceFalhou = new Set(errosLinhas.map(e => e.indice));
+            const idsFalhos = new Set(errosLinhas.map(e => parseInt(e.id)).filter(id => Number.isFinite(id)));
+
+            // Atualizar IDs das linhas inseridas antes de salvar NFs/documentos.
+            // O mapa por indice evita atribuir ID novo a uma linha sem ID que falhou.
+            if (resultado.ids_inseridos_map && resultado.ids_inseridos_map.length > 0) {
+                const idsPorIndice = new Map(resultado.ids_inseridos_map.map(item => [item.indice, item.id]));
+                linhas.forEach(linha => {
+                    if (!linha.id && idsPorIndice.has(linha.indice)) {
+                        linha.id = idsPorIndice.get(linha.indice);
+                    }
+                });
+            } else if (resultado.ids_inseridos && resultado.ids_inseridos.length > 0) {
+                let indexId = 0;
+                linhas.forEach(linha => {
+                    if (!linha.id && !indiceFalhou.has(linha.indice) && indexId < resultado.ids_inseridos.length) {
+                        linha.id = resultado.ids_inseridos[indexId];
+                        indexId++;
+                    }
+                });
             }
 
             // Salvar banco e conta (se preenchidos ou sujos)
@@ -6717,20 +6959,20 @@
                 });
 
                 if (!bancResponse.ok) {
+                    const bancoErro = await bancResponse.json().catch(() => ({}));
+                    if (bancResponse.status === 409) throw new Error(bancoErro.erro || 'Outro salvamento deste termo esta em andamento.');
                     console.warn('Aviso: Não foi possível salvar banco/conta');
                 } else {
                     bancoDirty = false;
                 }
             }
 
-            const resultado = await response.json();
-            // Tratar erros parciais de linhas (savepoints por linha no backend)
-            const errosLinhas = resultado.erros || [];
-            const indiceFalhou = new Set(errosLinhas.map(e => e.indice));
+            let idsNfInvalidos = [];
+            let idsDocsInvalidos = [];
 
             // Salvar Notas Fiscais
             // Dirty: apenas IDs em notasFiscaisDirty (sem gate de seção — paste/edit deve persistir)
-            // Completo: todas as NFs com numero_nota preenchido
+            // Completo: todas as NFs com algum conteudo; dirty envia ate numero_nota vazio para deletar no backend
             const temNFsParaSalvar = modoCompleto
                 ? Object.keys(notasFiscais).length > 0
                 : notasFiscaisDirty.size > 0;
@@ -6738,8 +6980,10 @@
                 const notasParaSalvar = Object.entries(notasFiscais)
                     .filter(([concExtratoId, nf]) => {
                         // Em modo dirty, só enviar NFs marcadas
-                        if (!modoCompleto && !notasFiscaisDirty.has(parseInt(concExtratoId))) return false;
-                        return !!nf.numero_nota; // Só salvar se tiver número da nota
+                        const idExtrato = parseInt(concExtratoId);
+                        if (!Number.isFinite(idExtrato) || idsFalhos.has(idExtrato)) return false;
+                        if (!modoCompleto) return notasFiscaisDirty.has(idExtrato);
+                        return !!(nf.numero_nota || nf.chave_acesso || nf.cnpj_nota);
                     })
                     .map(([concExtratoId, nf]) => ({
                         conc_extrato_id: parseInt(concExtratoId),
@@ -6759,7 +7003,12 @@
                     });
                     
                     if (!nfResponse.ok) {
+                        const nfErro = await nfResponse.json().catch(() => ({}));
+                        if (nfResponse.status === 409) throw new Error(nfErro.erro || 'Outro salvamento deste termo esta em andamento.');
                         console.warn('Aviso: Não foi possível salvar notas fiscais');
+                    } else {
+                        const nfResultado = await nfResponse.json();
+                        idsNfInvalidos = nfResultado.ids_invalidos || [];
                     }
                 }
             }
@@ -6771,8 +7020,8 @@
             // Nota: secaoDocumentosAtiva controla EXIBIÇÃO, não persistência
             // ============================================================
             const linhasParaDocs = modoCompleto
-                ? linhas.filter(l => l.id)
-                : linhas.filter(l => l.id && documentosAnaliseDirty.has(l.id));
+                ? linhas.filter(l => l.id && !indiceFalhou.has(l.indice) && !idsFalhos.has(l.id))
+                : linhas.filter(l => l.id && !indiceFalhou.has(l.indice) && !idsFalhos.has(l.id) && documentosAnaliseDirty.has(l.id));
             
             if (linhasParaDocs.length > 0) {
                 const documentosParaSalvar = linhasParaDocs.map(linha => {
@@ -6810,7 +7059,12 @@
                 });
                 
                 if (!docResponse.ok) {
+                    const docErro = await docResponse.json().catch(() => ({}));
+                    if (docResponse.status === 409) throw new Error(docErro.erro || 'Outro salvamento deste termo esta em andamento.');
                     console.warn('Aviso: Não foi possível salvar documentos de análise');
+                } else {
+                    const docResultado = await docResponse.json();
+                    idsDocsInvalidos = docResultado.ids_invalidos || [];
                 }
             }
             
@@ -6819,24 +7073,15 @@
             console.log('✅ Salvamento concluído com sucesso');
             console.groupEnd();
             
-            // Atualizar IDs das linhas inseridas (novas linhas sem ID)
-            // Backend retorna ids_inseridos: apenas IDs de INSERTs (não UPDATEs)
-            if (resultado.ids_inseridos && resultado.ids_inseridos.length > 0) {
-                let indexId = 0;
-                linhas.forEach(linha => {
-                    if (!linha.id && indexId < resultado.ids_inseridos.length) {
-                        linha.id = resultado.ids_inseridos[indexId];
-                        indexId++;
-                    }
-                });
-            }
-            
             // v2: Bulk delete — 1 request em vez de N (DELETE /api/extrato/bulk)
             if (linhasExcluidasIds.size > 0) {
                 await fetch('/conc_banc/api/extrato/bulk', {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids: [...linhasExcluidasIds] })
+                    body: JSON.stringify({
+                        numero_termo: numeroTermo,
+                        ids: [...linhasExcluidasIds]
+                    })
                 }).catch(e => console.warn('Falha ao excluir linhas em bulk:', e));
                 linhasExcluidasIds.clear();
             }
@@ -6855,6 +7100,8 @@
             });
             documentosAnaliseDirty.clear();
             notasFiscaisDirty.clear();
+            idsDocsInvalidos.forEach(id => documentosAnaliseDirty.add(id));
+            idsNfInvalidos.forEach(id => notasFiscaisDirty.add(id));
             // Limpar highlights de automação nos documentos de análise
             Object.values(documentosAnalise).forEach(d => { delete d._auto_campos; });
             
@@ -6875,6 +7122,12 @@
                 const sufixo = errosLinhas.length > 5 ? ` e mais ${errosLinhas.length - 5}` : '';
                 showToast(
                     `⚠️ ${resultado.ids.length} linhas salvas · ${errosLinhas.length} com erro (${listaLinhas}${sufixo})`,
+                    'warning', 8000
+                );
+                atualizarBadgeEstado('pendente');
+            } else if (idsDocsInvalidos.length > 0 || idsNfInvalidos.length > 0) {
+                showToast(
+                    `Salvo, mas ${idsDocsInvalidos.length + idsNfInvalidos.length} item(ns) dependente(s) precisam recarregar o extrato`,
                     'warning', 8000
                 );
                 atualizarBadgeEstado('pendente');

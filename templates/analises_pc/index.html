@@ -949,14 +949,17 @@
         // ── Inicialização ────────────────────────────────────────────────────
         $(document).ready(function() {
             // Pré-preencher campo de período com mês atual
-            const inputMeses = document.getElementById('mesesAnalisados');
-            if (inputMeses && !inputMeses.value) inputMeses.value = _mesAtual();
-
             // Auto-load a partir de URL ?termo=
             const urlParams = new URLSearchParams(window.location.search);
             const termoParam  = urlParams.get('termo');
             const _mesesParam = urlParams.get('meses');
             const _autoLoad   = urlParams.get('autoload') === 'true';
+            const inputMeses = document.getElementById('mesesAnalisados');
+            if (inputMeses && _mesesParam) {
+                inputMeses.value = _mesesParam;
+            } else if (inputMeses && !inputMeses.value && !termoParam) {
+                inputMeses.value = _mesAtual();
+            }
             if (termoParam) {
                 document.getElementById('numeroTermo').value = termoParam;
                 // Só auto-carrega aqui se não houver autoload via meses (evita duplo load)
@@ -1028,12 +1031,41 @@
             }
         }
 
+        async function resolverPeriodoChecklist(numeroTermo) {
+            const inputMeses = document.getElementById('mesesAnalisados');
+            const periodoInformado = inputMeses.value.trim();
+            if (periodoInformado) return periodoInformado;
+
+            try {
+                const response = await fetch('/analises_pc/api/buscar_meses', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numero_termo: numeroTermo })
+                });
+                const data = await response.json();
+                const periodoExistente = data.meses && data.meses.length > 0 ? data.meses[0] : '';
+                if (periodoExistente) {
+                    inputMeses.value = periodoExistente;
+                    return periodoExistente;
+                }
+            } catch (error) {
+                console.warn('Nao foi possivel buscar periodos existentes do checklist:', error);
+            }
+
+            const novoPeriodo = _mesAtual();
+            inputMeses.value = novoPeriodo;
+            return novoPeriodo;
+        }
+
         async function carregarChecklist() {
             const numeroTermo = document.getElementById('numeroTermo').value.trim();
-            const mesesAnalisados = (document.getElementById('mesesAnalisados').value.trim()) || _mesAtual();
+            let mesesAnalisados = document.getElementById('mesesAnalisados').value.trim();
             const analistas = Array.from(document.getElementById('analistas').selectedOptions).map(o => o.value);
 
             if (!numeroTermo) return;
+            if (!mesesAnalisados) {
+                mesesAnalisados = await resolverPeriodoChecklist(numeroTermo);
+            }
             // meses e analistas são opcionais para carregar — apenas necessários ao salvar
 
             try {
@@ -1059,8 +1091,12 @@
                 // Registrar período efetivamente carregado (para detectar renomeação ao salvar)
                 periodoCarregado = mesesAnalisados;
 
-                // Persistir termo na URL (Sugestão D)
-                history.replaceState(null, '', `?termo=${encodeURIComponent(numeroTermo)}`);
+                // Persistir termo e período na URL para refresh não cair no mês atual.
+                const paramsUrl = new URLSearchParams();
+                paramsUrl.set('termo', numeroTermo);
+                if (mesesAnalisados) paramsUrl.set('meses', mesesAnalisados);
+                paramsUrl.set('autoload', 'true');
+                history.replaceState(null, '', `?${paramsUrl.toString()}`);
 
                 // Resetar dados de instrução para o novo termo (lazy reload)
                 dadosInstrucao = { instrucao: null, sei_celeb: null, instrucao_pc: null, sei_pc: null, _carregando: false };

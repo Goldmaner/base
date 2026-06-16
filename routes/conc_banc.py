@@ -4,10 +4,11 @@ Rotas para Conciliação Bancária - Análise de Prestação de Contas
 """
 
 from flask import Blueprint, render_template, request, jsonify, session
-from db import get_cursor, get_db
+from db import get_cursor, get_db, DatabaseUnavailable
 from functools import wraps
 from datetime import datetime, date
 from decorators import requires_access, requires_write_access
+from routes.conc_termo_permissions import ensure_can_edit_termo, get_termo_permission
 import os
 import uuid
 import boto3
@@ -15,6 +16,50 @@ from botocore.client import Config
 from werkzeug.utils import secure_filename
 
 bp = Blueprint('conc_banc', __name__, url_prefix='/conc_banc')
+
+
+def _rollback_quietly(db):
+    if db is None:
+        return
+    try:
+        db.rollback()
+    except Exception:
+        pass
+
+
+def _try_lock_termo(cur, numero_termo):
+    cur.execute("SELECT pg_try_advisory_xact_lock(hashtext(%s)) AS locked", (numero_termo,))
+    row = cur.fetchone()
+    return bool(row and row.get('locked'))
+
+
+def _resposta_termo_em_save():
+    return jsonify({
+        'erro': 'Outro salvamento deste termo esta em andamento. Tente novamente em alguns segundos.',
+        'codigo': 'termo_em_salvamento'
+    }), 409
+
+
+def _ids_extrato_validos(cur, numero_termo, ids):
+    ids = [int(i) for i in ids if i]
+    if not ids:
+        return set()
+    cur.execute("""
+        SELECT id
+        FROM analises_pc.conc_extrato
+        WHERE numero_termo = %s AND id = ANY(%s)
+    """, (numero_termo, ids))
+    return {row['id'] for row in cur.fetchall()}
+
+
+def _request_numero_termo():
+    data = request.get_json(silent=True) or {}
+    return (
+        data.get('numero_termo')
+        or request.args.get('numero_termo')
+        or request.form.get('numero_termo')
+        or ''
+    ).strip()
 
 def login_required(f):
     @wraps(f)
@@ -133,15 +178,34 @@ def api_listar_extrato():
         return jsonify({'erro': str(e)}), 500
 
 
+@bp.route('/api/permissao-termo', methods=['GET'])
+@login_required
+@requires_access('conc_bancaria')
+def api_permissao_termo():
+    """Informa se o usuario logado pode editar o termo selecionado."""
+    numero_termo = request.args.get('numero_termo', '').strip()
+    if not numero_termo:
+        return jsonify({'erro': 'numero_termo e obrigatorio'}), 400
+
+    try:
+        cur = get_cursor()
+        return jsonify(get_termo_permission(cur, numero_termo)), 200
+    except Exception as e:
+        print(f"[ERRO] ao verificar permissao do termo: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
 @bp.route('/api/extrato', methods=['POST'])
 @login_required
 @requires_access('conc_bancaria')
 @requires_write_access('conc_bancaria')
 def api_salvar_extrato():
     """API para salvar múltiplas linhas do extrato de uma vez"""
+    db = None
     try:
         import time
         inicio = time.time()
+        timings = {}
 
         dados = request.get_json()
         linhas = dados.get('linhas', [])
@@ -154,10 +218,22 @@ def api_salvar_extrato():
         cur = get_cursor()
         db = get_db()
 
+        t_perm = time.time()
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        timings['permissao_ms'] = (time.time() - t_perm) * 1000
+        if not ok:
+            return resposta
+
+        t_lock = time.time()
+        if not _try_lock_termo(cur, numero_termo):
+            return _resposta_termo_em_save()
+        timings['lock_wait_ms'] = (time.time() - t_lock) * 1000
+
         # Coletar IDs das linhas enviadas
         ids_enviados = [linha.get('id') for linha in linhas if linha.get('id')]
 
         # DELETAR apenas se modo_completo = True (garantia de que temos todas as linhas)
+        t_delete = time.time()
         if modo_completo:
             if ids_enviados:
                 placeholders = ','.join(['%s'] * len(ids_enviados))
@@ -168,10 +244,13 @@ def api_salvar_extrato():
             else:
                 # Se não há IDs (todas linhas novas), deletar tudo do termo
                 cur.execute("DELETE FROM analises_pc.conc_extrato WHERE numero_termo = %s", (numero_termo,))
+        timings['delete_ausentes_ms'] = (time.time() - t_delete) * 1000
 
         # UPSERT com savepoints: cada linha é isolada — erro em 1 não cancela as demais
+        t_upsert = time.time()
         ids_processados = []
         ids_inseridos = []   # apenas INSERTs
+        ids_inseridos_map = []
         erros_linhas = []    # linhas que falharam: [{indice, id, mensagem}]
 
         for i, linha in enumerate(linhas):
@@ -228,9 +307,15 @@ def api_salvar_extrato():
                     novo_id = cur.fetchone()['id']
                     ids_processados.append(novo_id)
                     ids_inseridos.append(novo_id)
+                    ids_inseridos_map.append({
+                        'indice': linha.get('indice'),
+                        'id': novo_id
+                    })
 
                 cur.execute(f'RELEASE SAVEPOINT {sp}')
 
+            except DatabaseUnavailable:
+                raise
             except Exception as linha_err:
                 cur.execute(f'ROLLBACK TO SAVEPOINT {sp}')
                 erros_linhas.append({
@@ -239,6 +324,9 @@ def api_salvar_extrato():
                     'mensagem': str(linha_err)
                 })
                 print(f'[SAVE] Linha {linha.get("indice")} falhou (savepoint revertido): {linha_err}')
+
+        timings['upsert_linhas_ms'] = (time.time() - t_upsert) * 1000
+        t_auto = time.time()
 
         # ============================================================
         # AUTOMAÇÃO: Destinatário Identificado/Não Identificado
@@ -290,12 +378,12 @@ def api_salvar_extrato():
                 cur.execute("""
                     SELECT id, competencia, origem_destino, cat_transacao, credito, debito
                     FROM analises_pc.conc_extrato
-                    WHERE id = ANY(%s)
-                """, (ids_processados,))
+                    WHERE numero_termo = %s AND id = ANY(%s)
+                """, (numero_termo, ids_processados))
                 linhas_map = {row['id']: row for row in cur.fetchall()}
 
-                # Coletar pares (id, nova_categoria) para batch UPDATE
-                atualizacoes = []  # lista de (nova_categoria, linha_id)
+                # Coletar pares (categoria, id, termo) para batch UPDATE
+                atualizacoes = []
 
                 for linha_id in ids_processados:
                     linha_data = linhas_map.get(linha_id)
@@ -325,7 +413,7 @@ def api_salvar_extrato():
                     else:
                         nova_categoria = 'Destinatário não Identificado'
 
-                    atualizacoes.append((nova_categoria, linha_id))
+                    atualizacoes.append((nova_categoria, linha_id, numero_termo))
 
                 # OTIMIZAÇÃO: Batch UPDATE único em vez de N queries individuais
                 if atualizacoes:
@@ -334,8 +422,9 @@ def api_salvar_extrato():
                         UPDATE analises_pc.conc_extrato AS e
                         SET cat_transacao = v.nova_categoria,
                             cat_avaliacao = 'Avaliado'
-                        FROM (VALUES %s) AS v(nova_categoria, id)
+                        FROM (VALUES %s) AS v(nova_categoria, id, numero_termo)
                         WHERE e.id = v.id::integer
+                          AND e.numero_termo = v.numero_termo
                     """, atualizacoes)
                     print(f"[AUTOMAÇÃO] ✅ {len(atualizacoes)} linhas categorizadas automaticamente")
 
@@ -362,11 +451,12 @@ def api_salvar_extrato():
                     FROM analises_pc.conc_extrato ce
                     WHERE ca.conc_extrato_id = ce.id
                       AND ce.id = ANY(%s)
+                      AND ce.numero_termo = %s
                       AND ce.cat_avaliacao = 'Glosar'
                       AND LOWER(ce.avaliacao_analista) LIKE LOWER(%s)
                       AND (ca.avaliacao_comprovante IS NULL
                            OR TRIM(ca.avaliacao_comprovante) = '')
-                """, (valor_comprovante, ids_processados, padrao))
+                """, (valor_comprovante, ids_processados, numero_termo, padrao))
                 n_upd = cur.rowcount
 
                 # 2. INSERT: extrato com critério mas sem registro em conc_analise
@@ -376,13 +466,14 @@ def api_salvar_extrato():
                     SELECT ce.id, ce.numero_termo, %s
                     FROM analises_pc.conc_extrato ce
                     WHERE ce.id = ANY(%s)
+                      AND ce.numero_termo = %s
                       AND ce.cat_avaliacao = 'Glosar'
                       AND LOWER(ce.avaliacao_analista) LIKE LOWER(%s)
                       AND NOT EXISTS (
                           SELECT 1 FROM analises_pc.conc_analise ca
                           WHERE ca.conc_extrato_id = ce.id
                       )
-                """, (valor_comprovante, ids_processados, padrao))
+                """, (valor_comprovante, ids_processados, numero_termo, padrao))
                 n_ins = cur.rowcount
 
                 total = n_upd + n_ins
@@ -390,10 +481,23 @@ def api_salvar_extrato():
                     print(f"[AUTO COMPROVANTE] '{palavra}' → '{valor_comprovante}': "
                           f"{n_upd} atualizados, {n_ins} inseridos")
 
+        timings['automacoes_ms'] = (time.time() - t_auto) * 1000
+
+        t_commit = time.time()
         db.commit()
+        timings['commit_ms'] = (time.time() - t_commit) * 1000
 
         tempo_total = (time.time() - inicio) * 1000
-        print(f"\n[SAVE] Tempo total: {tempo_total:.2f}ms | Linhas: {len(ids_processados)}")
+        timings['total_ms'] = tempo_total
+        print(
+            f"\n[SAVE] Total: {tempo_total:.2f}ms | Linhas: {len(ids_processados)} | "
+            f"Permissao: {timings['permissao_ms']:.2f}ms | "
+            f"Lock wait: {timings['lock_wait_ms']:.2f}ms | "
+            f"Delete: {timings['delete_ausentes_ms']:.2f}ms | "
+            f"Upsert: {timings['upsert_linhas_ms']:.2f}ms | "
+            f"Automacoes: {timings['automacoes_ms']:.2f}ms | "
+            f"Commit: {timings['commit_ms']:.2f}ms"
+        )
 
         tem_erros = len(erros_linhas) > 0
         return jsonify({
@@ -401,13 +505,16 @@ def api_salvar_extrato():
                          if tem_erros else f'{len(ids_processados)} linhas salvas com sucesso'),
             'ids': ids_processados,
             'ids_inseridos': ids_inseridos,
+            'ids_inseridos_map': ids_inseridos_map,
             'erros': erros_linhas   # [{indice, id, mensagem}] — linhas que falharam
         }), 200
 
+    except DatabaseUnavailable:
+        _rollback_quietly(db)
+        raise
     except Exception as e:
         print(f"[ERRO] ao salvar extrato: {e}")
-        if get_db():
-            get_db().rollback()
+        _rollback_quietly(db)
         return jsonify({'erro': str(e)}), 500
 
 
@@ -418,10 +525,24 @@ def api_salvar_extrato():
 def api_excluir_extrato(extrato_id):
     """API para excluir uma linha do extrato"""
     try:
+        numero_termo = _request_numero_termo()
+        if not numero_termo:
+            return jsonify({'erro': 'numero_termo e obrigatorio'}), 400
+
         cur = get_cursor()
         db = get_db()
 
-        cur.execute("DELETE FROM analises_pc.conc_extrato WHERE id = %s", (extrato_id,))
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
+
+        cur.execute(
+            "DELETE FROM analises_pc.conc_extrato WHERE id = %s AND numero_termo = %s",
+            (extrato_id, numero_termo)
+        )
+        if cur.rowcount == 0:
+            db.rollback()
+            return jsonify({'erro': 'Linha nao encontrada neste termo'}), 404
         db.commit()
 
         return jsonify({'mensagem': 'Linha excluída com sucesso'}), 200
@@ -443,8 +564,12 @@ def api_excluir_extrato_bulk():
     Body JSON: {"ids": [1, 2, 3, ...]}
     """
     try:
-        dados = request.get_json()
-        ids = dados.get('ids', []) if dados else []
+        dados = request.get_json() or {}
+        ids = dados.get('ids', [])
+        numero_termo = (dados.get('numero_termo') or '').strip()
+
+        if not numero_termo:
+            return jsonify({'erro': 'numero_termo e obrigatorio'}), 400
 
         if not ids:
             return jsonify({'mensagem': '0 linhas excluídas'}), 200
@@ -457,9 +582,13 @@ def api_excluir_extrato_bulk():
         cur = get_cursor()
         db = get_db()
 
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
+
         cur.execute(
-            "DELETE FROM analises_pc.conc_extrato WHERE id = ANY(%s)",
-            (ids_int,)
+            "DELETE FROM analises_pc.conc_extrato WHERE id = ANY(%s) AND numero_termo = %s",
+            (ids_int, numero_termo)
         )
         deletados = cur.rowcount
         db.commit()
@@ -596,7 +725,7 @@ def api_periodo_termo():
             return jsonify({'erro': 'numero_termo é obrigatório'}), 400
 
         query = """
-            SELECT inicio, final
+            SELECT inicio, final, sei_pc
             FROM public.parcerias
             WHERE numero_termo = %s
         """
@@ -708,6 +837,10 @@ def api_save_banco():
         cur = get_cursor()
         db = get_db()
 
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
+
         # Salvar banco_extrato e conta_execucao em analises_pc.conc_banco
         if banco_extrato is not None or conta_execucao is not None:
             # Verificar se já existe
@@ -802,6 +935,7 @@ def api_listar_notas_fiscais():
 @requires_write_access('conc_bancaria')
 def api_salvar_notas_fiscais():
     """API para salvar notas fiscais com UPSERT (UPDATE prioritário)"""
+    db = None
     try:
         import time
         inicio = time.time()
@@ -816,13 +950,26 @@ def api_salvar_notas_fiscais():
         cur = get_cursor()
         db = get_db()
 
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
+
+        if not _try_lock_termo(cur, numero_termo):
+            return _resposta_termo_em_save()
+
         ids_processados = []
+        ids_candidatos = [nota.get('conc_extrato_id') for nota in notas if nota.get('conc_extrato_id')]
+        ids_validos = _ids_extrato_validos(cur, numero_termo, ids_candidatos)
+        ids_invalidos = sorted({int(i) for i in ids_candidatos if int(i) not in ids_validos})
 
         for nota in notas:
             conc_extrato_id = nota.get('conc_extrato_id')
 
             if not conc_extrato_id:
                 continue  # Pular se não tiver FK
+            conc_extrato_id = int(conc_extrato_id)
+            if conc_extrato_id not in ids_validos:
+                continue
 
             # Verificar se tem dados preenchidos (não salvar linha vazia)
             numero_nota = nota.get('numero_nota')
@@ -893,13 +1040,16 @@ def api_salvar_notas_fiscais():
 
         return jsonify({
             'mensagem': f'{len(ids_processados)} notas fiscais salvas',
-            'ids': ids_processados
+            'ids': ids_processados,
+            'ids_invalidos': ids_invalidos
         }), 200
 
+    except DatabaseUnavailable:
+        _rollback_quietly(db)
+        raise
     except Exception as e:
         print(f"[ERRO] ao salvar notas fiscais: {e}")
-        if get_db():
-            get_db().rollback()
+        _rollback_quietly(db)
         return jsonify({'erro': str(e)}), 500
 
 
@@ -1015,6 +1165,7 @@ def api_listar_documentos_analise():
 @requires_write_access('conc_bancaria')
 def api_salvar_documentos_analise():
     """API para salvar documentos de análise com UPSERT e auto-marcação"""
+    db = None
     try:
         import time
         inicio = time.time()
@@ -1029,15 +1180,37 @@ def api_salvar_documentos_analise():
         cur = get_cursor()
         db = get_db()
 
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
+
+        if not _try_lock_termo(cur, numero_termo):
+            return _resposta_termo_em_save()
+
         ids_processados = []
 
         # Filtrar documentos válidos
         docs_validos = [doc for doc in documentos if doc.get('conc_extrato_id')]
         if not docs_validos:
             db.commit()
-            return jsonify({'mensagem': '0 documentos salvos', 'ids': []}), 200
+            return jsonify({'mensagem': '0 documentos salvos', 'ids': [], 'ids_invalidos': []}), 200
 
-        conc_ids = [doc['conc_extrato_id'] for doc in docs_validos]
+        conc_ids = [int(doc['conc_extrato_id']) for doc in docs_validos]
+        ids_validos = _ids_extrato_validos(cur, numero_termo, conc_ids)
+        ids_invalidos = sorted({i for i in conc_ids if i not in ids_validos})
+        docs_validos = [
+            doc for doc in docs_validos
+            if int(doc['conc_extrato_id']) in ids_validos
+        ]
+        conc_ids = [int(doc['conc_extrato_id']) for doc in docs_validos]
+
+        if not docs_validos:
+            db.commit()
+            return jsonify({
+                'mensagem': '0 documentos salvos',
+                'ids': [],
+                'ids_invalidos': ids_invalidos
+            }), 200
 
         # OTIMIZAÇÃO: Buscar dados do extrato + aplicabilidade em UMA query
         cur.execute("""
@@ -1047,8 +1220,8 @@ def api_salvar_documentos_analise():
                 ca.aplicacao
             FROM analises_pc.conc_extrato e
             LEFT JOIN categoricas.c_dac_despesas_analise ca ON e.cat_transacao = ca.categoria_extra
-            WHERE e.id = ANY(%s)
-        """, (conc_ids,))
+            WHERE e.numero_termo = %s AND e.id = ANY(%s)
+        """, (numero_termo, conc_ids))
         extrato_map = {row['id']: row for row in cur.fetchall()}
 
         # OTIMIZAÇÃO: Verificar registros existentes em UMA query
@@ -1059,7 +1232,7 @@ def api_salvar_documentos_analise():
         existentes_map = {row['conc_extrato_id']: row['id'] for row in cur.fetchall()}
 
         for doc in docs_validos:
-            conc_extrato_id = doc['conc_extrato_id']
+            conc_extrato_id = int(doc['conc_extrato_id'])
 
             avaliacao_guia = doc.get('avaliacao_guia', '')
             avaliacao_comprovante = doc.get('avaliacao_comprovante', '')
@@ -1146,13 +1319,16 @@ def api_salvar_documentos_analise():
 
         return jsonify({
             'mensagem': f'{len(ids_processados)} documentos salvos',
-            'ids': ids_processados
+            'ids': ids_processados,
+            'ids_invalidos': ids_invalidos
         }), 200
 
+    except DatabaseUnavailable:
+        _rollback_quietly(db)
+        raise
     except Exception as e:
         print(f"[ERRO] ao salvar documentos de análise: {e}")
-        if get_db():
-            get_db().rollback()
+        _rollback_quietly(db)
         return jsonify({'erro': str(e)}), 500
 
 
@@ -1174,6 +1350,10 @@ def api_limpar_termo():
         db = get_db()
         cur = get_cursor()
 
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
+
         # Contar registros antes da exclusão
         cur.execute("SELECT COUNT(*) as total FROM analises_pc.conc_extrato WHERE numero_termo = %s", (numero_termo,))
         total_extrato = cur.fetchone()['total']
@@ -1187,7 +1367,32 @@ def api_limpar_termo():
         cur.execute("SELECT COUNT(*) as total FROM analises_pc.conc_contrapartida WHERE numero_termo = %s", (numero_termo,))
         total_contrapartida = cur.fetchone()['total']
 
+        cur.execute("SELECT COUNT(*) as total FROM analises_pc.conc_analise WHERE numero_termo = %s", (numero_termo,))
+        total_analise = cur.fetchone()['total']
+
+        cur.execute("""
+            SELECT id, nome_armazenado
+            FROM analises_pc.conc_vinculacao_docs
+            WHERE numero_termo = %s
+        """, (numero_termo,))
+        vinculacoes = cur.fetchall()
+        total_vinculacoes = len(vinculacoes)
+
+        if vinculacoes:
+            try:
+                s3 = _r2_prestacao_client()
+                for doc in vinculacoes:
+                    if doc.get('nome_armazenado'):
+                        try:
+                            s3.delete_object(Bucket=_R2_PRESTACAO_BUCKET, Key=doc['nome_armazenado'])
+                        except Exception as r2_item_err:
+                            print(f"[AVISO] Falha ao excluir R2 {doc['nome_armazenado']}: {r2_item_err}")
+            except Exception as r2_err:
+                print(f"[AVISO] Falha ao inicializar R2 na limpeza do termo: {r2_err}")
+
         # Deletar todos os dados do termo
+        cur.execute("DELETE FROM analises_pc.conc_vinculacao_docs WHERE numero_termo = %s", (numero_termo,))
+        cur.execute("DELETE FROM analises_pc.conc_analise WHERE numero_termo = %s", (numero_termo,))
         cur.execute("DELETE FROM analises_pc.conc_extrato_notas_fiscais WHERE numero_termo = %s", (numero_termo,))
         cur.execute("DELETE FROM analises_pc.conc_rendimentos WHERE numero_termo = %s", (numero_termo,))
         cur.execute("DELETE FROM analises_pc.conc_contrapartida WHERE numero_termo = %s", (numero_termo,))
@@ -1200,6 +1405,8 @@ def api_limpar_termo():
         print(f"  - Rendimentos: {total_rendimentos} registros deletados")
         print(f"  - Notas Fiscais: {total_notas} registros deletados")
         print(f"  - Contrapartida: {total_contrapartida} registros deletados")
+        print(f"  - Analise: {total_analise} registros deletados")
+        print(f"  - Vinculacoes: {total_vinculacoes} registros deletados")
 
         return jsonify({
             'mensagem': 'Dados do termo limpos com sucesso',
@@ -1209,7 +1416,12 @@ def api_limpar_termo():
                 'rendimentos': total_rendimentos,
                 'notas_fiscais': total_notas,
                 'contrapartida': total_contrapartida,
-                'total': total_extrato + total_rendimentos + total_notas + total_contrapartida
+                'documentos_analise': total_analise,
+                'vinculacao_docs': total_vinculacoes,
+                'total': (
+                    total_extrato + total_rendimentos + total_notas +
+                    total_contrapartida + total_analise + total_vinculacoes
+                )
             }
         }), 200
 
@@ -1554,6 +1766,14 @@ def api_upload_vinculacao_doc():
     except ValueError:
         return jsonify({'erro': 'extrato_id inválido'}), 400
 
+    cur = get_cursor()
+    db = get_db()
+    ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+    if not ok:
+        return resposta
+    if extrato_id_int not in _ids_extrato_validos(cur, numero_termo, [extrato_id_int]):
+        return jsonify({'erro': 'extrato_id nao pertence ao termo informado'}), 403
+
     nome_original = secure_filename(arquivo.filename or 'arquivo')
     if not nome_original:
         nome_original = 'arquivo'
@@ -1572,8 +1792,6 @@ def api_upload_vinculacao_doc():
         )
         url_publica = f'{_R2_PRESTACAO_PUBLIC_BASE}/{nome_armazenado}'
 
-        cur = get_cursor()
-        db = get_db()
         cur.execute("""
             INSERT INTO analises_pc.conc_vinculacao_docs
                 (extrato_id, numero_termo, nome_original, nome_armazenado,
@@ -1611,11 +1829,20 @@ def api_upload_vinculacao_doc():
 def api_excluir_vinculacao_doc(doc_id):
     """Exclui documento do R2 e do banco."""
     try:
+        numero_termo = _request_numero_termo()
+        if not numero_termo:
+            return jsonify({'erro': 'numero_termo e obrigatorio'}), 400
+
         cur = get_cursor()
         db = get_db()
+
+        ok, resposta = ensure_can_edit_termo(cur, numero_termo)
+        if not ok:
+            return resposta
+
         cur.execute(
-            "SELECT nome_armazenado FROM analises_pc.conc_vinculacao_docs WHERE id = %s",
-            (doc_id,)
+            "SELECT nome_armazenado FROM analises_pc.conc_vinculacao_docs WHERE id = %s AND numero_termo = %s",
+            (doc_id, numero_termo)
         )
         row = cur.fetchone()
         if not row:
@@ -1628,7 +1855,10 @@ def api_excluir_vinculacao_doc(doc_id):
         except Exception as r2_err:
             print(f"[AVISO] Erro ao excluir do R2 (continuando): {r2_err}")
 
-        cur.execute("DELETE FROM analises_pc.conc_vinculacao_docs WHERE id = %s", (doc_id,))
+        cur.execute(
+            "DELETE FROM analises_pc.conc_vinculacao_docs WHERE id = %s AND numero_termo = %s",
+            (doc_id, numero_termo)
+        )
         db.commit()
         return jsonify({'mensagem': 'Documento excluído'}), 200
 

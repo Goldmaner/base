@@ -4,9 +4,9 @@ Aplicação Flask - FParcerias (Ferramenta de Parcerias)
 Arquivo principal que inicializa a aplicação e registra os blueprints.
 """
 
-from flask import Flask, request, session, g, current_app
+from flask import Flask, request, session, g, current_app, jsonify
 from config import SECRET_KEY, DEBUG
-from db import close_db, get_db
+from db import close_db, get_db, DatabaseUnavailable
 from utils import format_sei
 import time
 import json
@@ -237,6 +237,13 @@ def create_app():
     app.config["DEBUG"] = DEBUG
     app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB — uploads R2
     app.json.sort_keys = False  # preservar ordem de inserção das chaves JSON
+
+    @app.errorhandler(DatabaseUnavailable)
+    def handle_database_unavailable(error):
+        print(f"[ERRO DB] {error}")
+        return jsonify({
+            "erro": "Banco de dados indisponivel. Tente novamente em instantes."
+        }), 503
     
     # Registrar função de limpeza do banco de dados
     app.teardown_appcontext(close_db)
