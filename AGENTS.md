@@ -191,6 +191,96 @@ Não:
 
 ---
 
+## Central de Páginas — `sistema.mapa_paginas`
+
+A Central de Páginas (`/central-paginas`) é um mapa visual em árvore de todas as páginas do sistema. Ela é alimentada pela tabela `sistema.mapa_paginas`.
+
+### Estrutura da tabela
+
+```sql
+sistema.mapa_paginas (
+    id          SERIAL  PRIMARY KEY,
+    nome_pagina TEXT    NOT NULL,
+    rota        TEXT,                    -- URL da página (ex: /parcerias)
+    area        TEXT,                    -- Área visual (ex: 'Gestão de Parcerias')
+    descricao   TEXT,
+    responsavel TEXT,                    -- Ex: 'DGP', 'DAC', 'Admin'
+    icone       TEXT,                    -- Bootstrap Icon (ex: 'bi-handshake')
+    ordem       INTEGER DEFAULT 0,
+    ativo       BOOLEAN DEFAULT TRUE,
+    parent_id   INTEGER REFERENCES sistema.mapa_paginas(id),  -- subpágina
+    modulo_acesso TEXT,                  -- chave de módulo (ex: 'parcerias', 'listas')
+    CONSTRAINT mapa_paginas_nome_parent_uq
+        UNIQUE NULLS NOT DISTINCT (nome_pagina, parent_id)
+)
+```
+
+### Convenção de `modulo_acesso`
+
+O campo `modulo_acesso` deve corresponder a uma chave de módulo presente em `session['acessos']` ou em `ACESSOS_BASICOS` (`config.py`). Exemplos:
+
+| modulo_acesso      | Quem acessa                                  |
+|--------------------|----------------------------------------------|
+| `NULL`             | Todos os usuários logados                    |
+| `'parcerias'`      | Usuários com acesso ao módulo parcerias      |
+| `'listas'`         | Usuários com acesso ao módulo listas         |
+| `'central_paginas'`| Todos (está em `ACESSOS_BASICOS`)            |
+
+Admins (`'Agente Público'`) sempre têm acesso a tudo, independente de `modulo_acesso`.
+
+### Como registrar uma nova página na árvore
+
+1. Inserir diretamente via script (`scripts/criar_mapa_paginas.py`) ou via Supabase MCP no projeto `myhxxxjjqlzxikaitmhe`:
+   ```sql
+   INSERT INTO sistema.mapa_paginas (nome_pagina, rota, area, descricao, responsavel, icone, ordem, modulo_acesso)
+   VALUES ('Minha Página', '/minha-pagina', 'Gestão de Parcerias', 'Descrição curta.', 'DGP', 'bi-file-text', 10, 'parcerias')
+   ON CONFLICT ON CONSTRAINT mapa_paginas_nome_parent_uq DO NOTHING;
+   ```
+2. Para subpáginas (ex: uma aba específica de Listas), usar `parent_id`:
+   ```sql
+   WITH pai AS (SELECT id FROM sistema.mapa_paginas WHERE nome_pagina = 'Listas' AND parent_id IS NULL LIMIT 1)
+   INSERT INTO sistema.mapa_paginas (nome_pagina, rota, area, descricao, responsavel, icone, ordem, parent_id, modulo_acesso)
+   SELECT 'Nova Lista', '/listas?tabela=c_nova', 'Apoio / Outros', 'Descrição.', 'DAC', 'bi-table', 99, pai.id, 'listas'
+   FROM pai
+   ON CONFLICT ON CONSTRAINT mapa_paginas_nome_parent_uq DO NOTHING;
+   ```
+
+### Áreas válidas
+
+| Valor exato                | Classe CSS             | Cor        |
+|----------------------------|------------------------|------------|
+| `'Gestão de Parcerias'`    | `cp-area--parcerias`   | Índigo     |
+| `'Gestão Financeira'`      | `cp-area--financeiro`  | Verde      |
+| `'Análises'`               | `cp-area--analises`    | Âmbar      |
+| `'Administração'`          | `cp-area--admin`       | Vermelho   |
+| `'Apoio / Outros'`         | `cp-area--apoio`       | Ardósia    |
+
+### Blueprints registrados no sistema (inventário atual)
+
+| Blueprint                  | Prefixo                          | `modulo_acesso` sugerido  |
+|----------------------------|----------------------------------|---------------------------|
+| `auth_bp`                  | `/`                              | —                         |
+| `admin_bp`                 | `/admin` (aprox.)                | admin                     |
+| `parcerias_bp`             | `/parcerias`                     | `parcerias`               |
+| `pesquisa_parcerias_bp`    | `/pesquisa-parcerias`            | `parcerias`               |
+| `editais_bp`               | `/editais`                       | `parcerias`               |
+| `certidoes_bp`             | `/certidoes`                     | `parcerias`               |
+| `gestao_financeira_bp`     | `/gestao_financeira`             | `financeiro`              |
+| `gestao_orcamentaria_bp`   | `/gestao_orcamentaria`           | `financeiro`              |
+| `analises_bp`              | `/analises`                      | `analises`                |
+| `conc_banc_bp`             | `/conc_banc`                     | `analises`                |
+| `gestao_pessoas_bp`        | `/gestao_pessoas`                | admin                     |
+| `ferias_bp`                | `/ferias`                        | `ferias`                  |
+| `instrucoes_bp`            | `/instrucoes`                    | —                         |
+| `listas_bp`                | `/listas`                        | `listas`                  |
+| `manuais_bp`               | `/manuais`                       | `manuais`                 |
+| `central_paginas_bp`       | `/central-paginas`               | `central_paginas`         |
+| `gestao_monitoramento_bp`  | (a confirmar)                    | `monitoramento`           |
+
+Ao criar um novo blueprint, adicionar uma linha nesta tabela e inserir a página correspondente em `sistema.mapa_paginas`.
+
+---
+
 ## Como responder às tarefas
 
 Sempre que receber uma tarefa, o agente deve:

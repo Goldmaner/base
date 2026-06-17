@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Páginas — FParcerias</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/central_paginas.css') }}">
+</head>
+<body>
+
+{# ── Mapeamentos visuais por área ── #}
+{% set area_classe = {
+    'Gestão de Parcerias': 'cp-area--parcerias',
+    'Gestão Financeira':   'cp-area--financeiro',
+    'Análises':            'cp-area--analises',
+    'Administração':       'cp-area--admin',
+    'Apoio / Outros':      'cp-area--apoio'
+} %}
+{% set area_icone = {
+    'Gestão de Parcerias': 'bi-handshake',
+    'Gestão Financeira':   'bi-cash-stack',
+    'Análises':            'bi-graph-up',
+    'Administração':       'bi-gear',
+    'Apoio / Outros':      'bi-tools'
+} %}
+
+{# ── Cabeçalho ── #}
+<div class="cp-header">
+    <div class="container">
+        <i class="bi bi-grid-3x3-gap-fill cp-header-icon"></i>
+        <h1>Central de Páginas</h1>
+        <p>Encontre com facilidade as principais páginas e funcionalidades do FParcerias.</p>
+    </div>
+</div>
+
+<div class="container">
+
+    {# ── Barra de busca ── #}
+    <div class="cp-search-wrap">
+        <i class="bi bi-search cp-search-icon"></i>
+        <input type="text" id="cp-busca" class="cp-search"
+               placeholder="Buscar por nome, área, responsável ou descrição..."
+               autocomplete="off" spellcheck="false">
+    </div>
+
+    {# ── Pílulas de navegação por área ── #}
+    {% if areas %}
+    <div class="cp-area-nav">
+        {% for area in areas.keys() %}
+        <a class="cp-area-pill {{ area_classe.get(area, 'cp-area--apoio') }}"
+           href="#area-{{ loop.index }}">
+            <i class="bi {{ area_icone.get(area, 'bi-grid') }}"></i>
+            {{ area }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Árvore principal ── #}
+    <div id="cp-tree">
+
+        {% if areas %}
+
+        {% for area, paginas in areas.items() %}
+        {%- set cls = area_classe.get(area, 'cp-area--apoio') -%}
+        {%- set ico = area_icone.get(area, 'bi-grid') -%}
+
+        <section class="cp-area {{ cls }}" id="area-{{ loop.index }}">
+
+            {# Cabeçalho da área #}
+            <div class="cp-area-header">
+                <div class="cp-area-label">
+                    <span class="cp-area-label-icon"><i class="bi {{ ico }}"></i></span>
+                    {{ area }}
+                </div>
+                <div class="cp-area-hr"></div>
+                <span class="cp-area-count">
+                    {{ paginas|length }}
+                    {{ 'página' if paginas|length == 1 else 'páginas' }}
+                </span>
+            </div>
+
+            {# Páginas #}
+            {% for p in paginas %}
+            {%- set tem_filhos = p.filhos|length > 0 -%}
+            <div class="cp-node {{ 'has-children' if tem_filhos else '' }}"
+                 data-id="{{ p.id }}"
+                 data-nome="{{ p.nome_pagina|lower }}"
+                 data-area="{{ (p.area or '')|lower }}"
+                 data-descricao="{{ (p.descricao or '')|lower }}"
+                 data-responsavel="{{ (p.responsavel or '')|lower }}">
+
+                {# Linha da página #}
+                <div class="cp-page-row {{ 'cp-has-children' if tem_filhos else '' }}
+                            {{ 'cp-sem-acesso' if not p.tem_acesso else '' }}">
+
+                    {% if tem_filhos %}
+                    <button class="cp-toggle" type="button" aria-label="Expandir">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    {% else %}
+                    <span class="cp-toggle-spacer"></span>
+                    {% endif %}
+
+                    <div class="cp-page-icon">
+                        <i class="bi {{ p.icone or 'bi-file-text' }}"></i>
+                    </div>
+
+                    <div class="cp-page-info">
+                        <span class="cp-page-nome">{{ p.nome_pagina }}</span>
+                        {% if p.descricao %}
+                        <span class="cp-page-desc">{{ p.descricao }}</span>
+                        {% endif %}
+                    </div>
+
+                    {# Responsável (com edição inline para admin) #}
+                    <div class="cp-resp-wrap d-none d-sm-flex">
+                        <span class="cp-resp cp-resp-display" data-id="{{ p.id }}">
+                            {{ p.responsavel or '—' }}
+                        </span>
+                        {% if is_admin %}
+                        <button class="cp-edit-resp-btn" title="Editar responsável"
+                                data-id="{{ p.id }}" data-valor="{{ p.responsavel or '' }}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    {# Badge de acesso #}
+                    <div class="cp-acesso-wrap d-none d-md-flex">
+                        {% if p.tem_acesso %}
+                        <span class="cp-acesso cp-acesso--sim" title="Você tem acesso a esta página">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </span>
+                        {% else %}
+                        <span class="cp-acesso cp-acesso--nao" title="Você não tem acesso a esta página">
+                            <i class="bi bi-lock-fill"></i>
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    {# Ações: info + acessar #}
+                    <div class="cp-node-actions">
+                        {% if p.descricao %}
+                        <button type="button" class="cp-info-btn"
+                                data-bs-toggle="popover"
+                                data-bs-trigger="hover focus"
+                                data-bs-placement="top"
+                                data-bs-title="{{ p.nome_pagina }}"
+                                data-bs-content="{{ p.descricao }}"
+                                aria-label="Info">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                        {% endif %}
+                        {% if p.rota %}
+                        <a href="{{ p.rota if p.tem_acesso else '#' }}"
+                           class="cp-btn-go {{ 'cp-btn-go--bloqueado' if not p.tem_acesso else '' }}"
+                           {% if not p.tem_acesso %}
+                               title="Sem acesso — solicite ao administrador"
+                               aria-disabled="true" onclick="return false;"
+                           {% endif %}>
+                            <i class="bi {{ 'bi-lock' if not p.tem_acesso else 'bi-box-arrow-up-right' }}"></i>
+                            <span class="d-none d-md-inline">{{ 'Bloqueado' if not p.tem_acesso else 'Acessar' }}</span>
+                        </a>
+                        {% endif %}
+                    </div>
+
+                </div>{# /cp-page-row #}
+
+                {# Filhos #}
+                {% if tem_filhos %}
+                <div class="cp-children-wrap" style="display:none">
+                    {% for filho in p.filhos %}
+                    <div class="cp-child-node"
+                         data-id="{{ filho.id }}"
+                         data-nome="{{ filho.nome_pagina|lower }}"
+                         data-area="{{ (filho.area or '')|lower }}"
+                         data-descricao="{{ (filho.descricao or '')|lower }}"
+                         data-responsavel="{{ (filho.responsavel or '')|lower }}">
+
+                        <div class="cp-child-row {{ 'cp-sem-acesso' if not filho.tem_acesso else '' }}">
+                            <div class="cp-child-icon">
+                                <i class="bi {{ filho.icone or 'bi-file-text' }}"></i>
+                            </div>
+                            <span class="cp-child-nome">{{ filho.nome_pagina }}</span>
+
+                            <div class="cp-resp-wrap d-none d-sm-flex ms-auto me-2">
+                                <span class="cp-child-resp cp-resp-display" data-id="{{ filho.id }}">
+                                    {{ filho.responsavel or '—' }}
+                                </span>
+                                {% if is_admin %}
+                                <button class="cp-edit-resp-btn" title="Editar"
+                                        data-id="{{ filho.id }}" data-valor="{{ filho.responsavel or '' }}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+
+                            {# Badge de acesso #}
+                            {% if filho.tem_acesso %}
+                            <span class="cp-acesso cp-acesso--sim d-none d-md-flex me-2" title="Acesso liberado">
+                                <i class="bi bi-check-circle-fill"></i>
+                            </span>
+                            {% else %}
+                            <span class="cp-acesso cp-acesso--nao d-none d-md-flex me-2" title="Sem acesso">
+                                <i class="bi bi-lock-fill"></i>
+                            </span>
+                            {% endif %}
+
+                            <div class="cp-node-actions">
+                                {% if filho.descricao %}
+                                <button type="button" class="cp-info-btn"
+                                        data-bs-toggle="popover"
+                                        data-bs-trigger="hover focus"
+                                        data-bs-placement="top"
+                                        data-bs-title="{{ filho.nome_pagina }}"
+                                        data-bs-content="{{ filho.descricao }}"
+                                        aria-label="Info">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                                {% endif %}
+                                {% if filho.rota %}
+                                <a href="{{ filho.rota if filho.tem_acesso else '#' }}"
+                                   class="cp-btn-go-sm {{ 'cp-btn-go--bloqueado' if not filho.tem_acesso else '' }}"
+                                   {% if not filho.tem_acesso %}
+                                       title="Sem acesso" aria-disabled="true" onclick="return false;"
+                                   {% endif %}>
+                                    <i class="bi {{ 'bi-lock' if not filho.tem_acesso else 'bi-box-arrow-up-right' }}"></i>
+                                    <span class="d-none d-sm-inline">{{ 'Bloqueado' if not filho.tem_acesso else 'Acessar' }}</span>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                    </div>{# /cp-child-node #}
+                    {% endfor %}
+                </div>{# /cp-children-wrap #}
+                {% endif %}
+
+            </div>{# /cp-node #}
+            {% endfor %}
+
+        </section>
+        {% endfor %}
+
+        {% else %}
+        <div class="cp-empty">
+            <i class="bi bi-database-x"></i>
+            <p class="fw-medium">Nenhuma página cadastrada ainda.</p>
+            <small class="text-muted">Execute <code>python scripts/criar_mapa_paginas.py</code>.</small>
+        </div>
+        {% endif %}
+
+    </div>{# /cp-tree #}
+
+    <div id="cp-no-results" class="cp-no-results">
+        <i class="bi bi-search"></i>
+        <p>Nenhuma página encontrada para "<strong><span id="cp-term"></span></strong>"</p>
+        <button id="cp-clear" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-x-circle me-1"></i>Limpar busca
+        </button>
+    </div>
+
+</div>{# /container #}
+
+{# Modal de edição do responsável #}
+{% if is_admin %}
+<div class="modal fade" id="modalEditResp" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2 px-3" style="background:linear-gradient(135deg,#1a237e,#0288d1);">
+                <h6 class="modal-title text-white mb-0">
+                    <i class="bi bi-pencil me-1"></i> Editar Responsável
+                </h6>
+                <button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body px-3 py-3">
+                <input type="hidden" id="editRespId">
+                <label class="form-label small fw-medium">Responsável</label>
+                <input type="text" id="editRespValor" class="form-control form-control-sm"
+                       placeholder="Ex: DGP, DAC, Admin...">
+            </div>
+            <div class="modal-footer py-2 px-3">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-sm btn-primary" id="editRespSalvar">
+                    <i class="bi bi-check-lg me-1"></i>Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/central_paginas.js') }}"></script>
+</body>
+</html>

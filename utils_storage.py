@@ -14,6 +14,10 @@ Mapeamento de paths (local ↔ Supabase):
 """
 
 import os
+import socket
+import subprocess
+import tempfile
+from urllib.parse import quote
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BUCKET = 'documentos'
@@ -38,6 +42,92 @@ def _get_client():
     return _client
 
 
+def _get_supabase_credentials():
+    url = os.environ.get('SUPABASE_URL', '').rstrip('/')
+    key = os.environ.get('SUPABASE_SERVICE_KEY', '')
+    if not url or not key:
+        raise RuntimeError(
+            'SUPABASE_URL e SUPABASE_SERVICE_KEY devem estar definidos no .env'
+        )
+    return url, key
+
+
+def _upload_via_http(storage_path: str, file_data, content_type: str) -> None:
+    """
+    Fallback direto em HTTP para uploads no Supabase Storage.
+
+    Em alguns ambientes o client do pacote `supabase` falha de forma
+    intermitente na resolução/conexão de upload; este caminho usa o endpoint
+    REST do Storage com upsert explícito.
+    """
+    import httpx
+
+    url, key = _get_supabase_credentials()
+    encoded_path = quote(storage_path, safe='/')
+    endpoint = f'{url}/storage/v1/object/{BUCKET}/{encoded_path}'
+    headers = {
+        'Authorization': f'Bearer {key}',
+        'apikey': key,
+        'x-upsert': 'true',
+        'Content-Type': content_type,
+    }
+    response = httpx.post(endpoint, headers=headers, content=file_data, timeout=60.0)
+    response.raise_for_status()
+
+
+def _upload_via_curl_resolve(storage_path: str, file_data, content_type: str) -> None:
+    """
+    Fallback final usando curl com --resolve para contornar DNS instável.
+
+    Mantém o hostname do Supabase no TLS/Host, mas fixa um IP já resolvido.
+    """
+    url, key = _get_supabase_credentials()
+    host = url.replace('https://', '').split('/')[0]
+    ip = socket.getaddrinfo(host, 443)[0][4][0]
+    encoded_path = quote(storage_path, safe='/')
+    endpoint = f'{url}/storage/v1/object/{BUCKET}/{encoded_path}'
+
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(file_data)
+        tmp_path = tmp.name
+
+    try:
+        result = subprocess.run(
+            [
+                'curl.exe',
+                '--silent',
+                '--show-error',
+                '--resolve',
+                f'{host}:443:{ip}',
+                '-X',
+                'POST',
+                endpoint,
+                '-H',
+                f'Authorization: Bearer {key}',
+                '-H',
+                f'apikey: {key}',
+                '-H',
+                'x-upsert: true',
+                '-H',
+                f'Content-Type: {content_type}',
+                '--data-binary',
+                f'@{tmp_path}',
+            ],
+            capture_output=True,
+            text=True,
+            timeout=90,
+            check=False,
+        )
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or 'curl upload falhou')
+
+
 def _normalize(storage_path: str) -> str:
     """Garante que o storage_path usa barras normais e sem barra inicial."""
     return storage_path.replace('\\', '/').lstrip('/')
@@ -47,6 +137,30 @@ def _local_path(storage_path: str) -> str:
     """Converte storage_path em caminho absoluto local: {BASE}/modelos/{path}"""
     parts = _normalize(storage_path).split('/')
     return os.path.join(_BASE_DIR, 'modelos', *parts)
+
+
+def _list_all_supabase_items(prefix: str, page_size: int = 1000) -> list:
+    """
+    Lista todos os itens de um prefixo no Supabase Storage com paginação.
+
+    O endpoint de listagem retorna lotes limitados; sem paginação, diretórios com
+    mais de 100 itens podem parecer incompletos e quebrar detecções de existência.
+    """
+    client = _get_client()
+    offset = 0
+    items = []
+
+    while True:
+        batch = client.storage.from_(BUCKET).list(
+            prefix,
+            {"limit": page_size, "offset": offset},
+        ) or []
+        items.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    return items
 
 
 # ─────────────────────────────────────────────────────────────
@@ -74,9 +188,15 @@ def upload_file(storage_path: str, file_data, content_type: str = 'application/o
                 file_options={"content-type": content_type, "upsert": "true"},
             )
         except Exception as exc:
-            raise RuntimeError(
-                f'Erro no upload Supabase ({storage_path}): {exc}'
-            ) from exc
+            try:
+                _upload_via_http(storage_path, file_data, content_type)
+            except Exception as fallback_exc:
+                try:
+                    _upload_via_curl_resolve(storage_path, file_data, content_type)
+                except Exception as curl_exc:
+                    raise RuntimeError(
+                        f'Erro no upload Supabase ({storage_path}): {exc} | fallback HTTP: {fallback_exc} | fallback curl: {curl_exc}'
+                    ) from curl_exc
     else:
         local = _local_path(storage_path)
         os.makedirs(os.path.dirname(local), exist_ok=True)
@@ -119,9 +239,8 @@ def list_files(prefix: str) -> list:
     prefix = _normalize(prefix)
 
     if _use_supabase():
-        client = _get_client()
         try:
-            items = client.storage.from_(BUCKET).list(prefix)
+            items = _list_all_supabase_items(prefix)
             # Arquivos têm 'id' != None; pastas têm id == None
             return [item['name'] for item in (items or []) if item.get('id') is not None]
         except Exception:
@@ -146,9 +265,8 @@ def list_folders(prefix: str) -> list:
     prefix = _normalize(prefix)
 
     if _use_supabase():
-        client = _get_client()
         try:
-            items = client.storage.from_(BUCKET).list(prefix)
+            items = _list_all_supabase_items(prefix)
             # Pastas têm id == None
             return [item['name'] for item in (items or []) if item.get('id') is None]
         except Exception:
@@ -195,7 +313,9 @@ def ensure_folder(prefix: str) -> None:
         return
 
     if _use_supabase():
-        upload_file(f'{prefix}/.keep', b'', 'application/octet-stream')
+        # Marcador não vazio: alguns backends do Storage ignoram objetos vazios
+        # em listagens, o que quebra a detecção de diretórios virtualizados.
+        upload_file(f'{prefix}/.keep', b'keep', 'text/plain')
     else:
         os.makedirs(_local_path(prefix), exist_ok=True)
 

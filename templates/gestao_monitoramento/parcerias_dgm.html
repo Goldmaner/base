@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Escopo DGM - FAF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f4f3f8; padding: 20px; }
+    .page-header {
+      background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+      color: #fff; padding: 22px 28px; border-radius: 12px;
+      margin-bottom: 20px; box-shadow: 0 4px 18px rgba(124, 58, 237, .28);
+    }
+    .page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    .page-header p { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+    .btn-parc {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border: none; border-radius: 8px; padding: 7px 16px;
+      font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; cursor: pointer; font-size: .875rem;
+    }
+    .btn-parc:hover { opacity: .88; color: #fff; }
+    .btn-parc.outline {
+      background: transparent; border: 1.5px solid rgba(255,255,255,.7); color: #fff;
+    }
+    .btn-parc.outline:hover { background: rgba(255,255,255,.15); opacity: 1; }
+    .filter-section {
+      background: #fff; padding: 20px; border-radius: 10px; margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07); border-left: 4px solid #7c3aed;
+    }
+    .metric {
+      background: #fff; border-radius: 10px; padding: 16px 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07); border: 1px solid #eee;
+    }
+    .metric span { display:block; color:#64748b; font-size:.78rem; font-weight:700; text-transform:uppercase; }
+    .metric strong { color:#4c1d95; font-size:1.55rem; line-height:1.1; }
+    .content-card {
+      background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      overflow: hidden;
+    }
+    .content-card-header {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; padding: 14px 20px; display: flex; justify-content: space-between;
+      align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
+    .content-card-body { padding: 16px; }
+    #tabelaEscopo th {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff; border: none; white-space: nowrap;
+    }
+    #tabelaEscopo tbody tr:hover { background-color: #f5f0ff; }
+    .action-form { display:inline-flex; margin: 0; }
+    .equipamentos-modal .modal-dialog { max-width: min(1180px, calc(100vw - 32px)); }
+    .equipamentos-modal textarea {
+      min-height: 150px;
+      resize: vertical;
+      border-color: #d8b4fe;
+      font-size: .95rem;
+    }
+    .equipamentos-modal .modal-header {
+      background: linear-gradient(135deg, #4c1d95, #7c3aed);
+      color: #fff;
+    }
+    .equipamentos-modal .btn-close { filter: invert(1); }
+    .equipamento-edit-input { min-width: 420px; }
+    .chip-editor {
+      border: 1px solid #d8b4fe;
+      border-radius: 10px;
+      padding: 12px;
+      background: #fff;
+      min-height: 84px;
+    }
+    .chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .chip-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      font-size: .92rem;
+      line-height: 1.1;
+    }
+    .chip-item button {
+      border: 0;
+      background: transparent;
+      color: #1d4ed8;
+      padding: 0;
+      line-height: 1;
+      font-size: .95rem;
+    }
+    .chip-input-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .chip-input-row input {
+      flex: 1 1 auto;
+      min-height: 48px;
+      border-color: #d8b4fe;
+      font-size: .95rem;
+    }
+    .chip-help {
+      color: #64748b;
+      font-size: .82rem;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2><i class="bi bi-bullseye me-2"></i>Escopo DGM</h2>
+        <p>Termos de colaboração acompanhados pela Divisão de Gestão e Monitoramento</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('parcerias.listar') }}" class="btn-parc outline">
+          <i class="bi bi-arrow-left"></i> Voltar para Parcerias
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3 col-sm-6"><div class="metric"><span>Ativos</span><strong>{{ resumo.total_ativos or 0 }}</strong></div></div>
+    <div class="col-md-3 col-sm-6"><div class="metric"><span>No escopo DGM</span><strong>{{ resumo.no_escopo or 0 }}</strong></div></div>
+    <div class="col-md-3 col-sm-6"><div class="metric"><span>Colaboração fora do escopo</span><strong>{{ resumo.fora_escopo or 0 }}</strong></div></div>
+    <div class="col-md-3 col-sm-6"><div class="metric"><span>Desativados</span><strong>{{ resumo.inativos or 0 }}</strong></div></div>
+  </div>
+
+  <div class="filter-section">
+    <form method="post" action="{{ url_for('gestao_monitoramento.criar_escopo') }}" class="row g-3 align-items-end">
+      <div class="col-lg-7">
+        <label class="form-label fw-semibold">Incluir termo de colaboração</label>
+        <input type="text" class="form-control" name="numero_termo" list="termos-colaboracao"
+               placeholder="Digite ou selecione o número do termo" autocomplete="off" required>
+        <datalist id="termos-colaboracao">
+          {% for termo in termos_options %}
+            <option value="{{ termo.numero_termo }}">{{ termo.osc or '' }}{% if termo.projeto %} - {{ termo.projeto }}{% endif %}</option>
+          {% endfor %}
+        </datalist>
+      </div>
+      <div class="col-lg-3">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch" id="novoEscopoDgm" name="dgm_escopo_termo" checked>
+          <label class="form-check-label fw-semibold" for="novoEscopoDgm">Está no escopo DGM</label>
+        </div>
+      </div>
+      <div class="col-lg-2">
+        <button type="submit" class="btn-parc w-100 justify-content-center">
+          <i class="bi bi-plus-circle"></i> Incluir
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="filter-section">
+    <form method="get" action="{{ url_for('gestao_monitoramento.parcerias_dgm') }}" class="row g-2 align-items-end">
+      <div class="col-xl-4 col-lg-5">
+        <label class="form-label fw-semibold">Busca</label>
+        <input type="text" class="form-control" name="q" value="{{ q or '' }}" placeholder="Termo, OSC ou projeto">
+      </div>
+      <div class="col-xl-2 col-lg-3">
+        <label class="form-label fw-semibold">Escopo</label>
+        <select name="escopo" class="form-select">
+          <option value="todos" {% if escopo == 'todos' %}selected{% endif %}>Todos</option>
+          <option value="sim" {% if escopo == 'sim' %}selected{% endif %}>No escopo DGM</option>
+          <option value="nao" {% if escopo == 'nao' %}selected{% endif %}>Fora do escopo DGM</option>
+        </select>
+      </div>
+      <div class="col-xl-2 col-lg-2">
+        <label class="form-label fw-semibold">Vigência</label>
+        <select name="vigencia" class="form-select">
+          <option value="todos" {% if vigencia == 'todos' %}selected{% endif %}>Todas</option>
+          <option value="vigente" {% if vigencia == 'vigente' %}selected{% endif %}>Vigentes</option>
+          <option value="encerrado" {% if vigencia == 'encerrado' %}selected{% endif %}>Encerrados</option>
+          <option value="nao_iniciado" {% if vigencia == 'nao_iniciado' %}selected{% endif %}>Não iniciados</option>
+          <option value="sem_datas" {% if vigencia == 'sem_datas' %}selected{% endif %}>Sem datas</option>
+        </select>
+      </div>
+      <div class="col-xl-2 col-lg-2">
+        <label class="form-label fw-semibold">Registro</label>
+        <select name="ativo" class="form-select">
+          <option value="ativos" {% if ativo == 'ativos' %}selected{% endif %}>Ativos</option>
+          <option value="inativos" {% if ativo == 'inativos' %}selected{% endif %}>Desativados</option>
+          <option value="todos" {% if ativo == 'todos' %}selected{% endif %}>Todos</option>
+        </select>
+      </div>
+      <div class="col-xl-2 col-lg-12 d-flex gap-2">
+        <button type="submit" class="btn-parc flex-fill justify-content-center"><i class="bi bi-search"></i></button>
+        <a href="{{ url_for('gestao_monitoramento.parcerias_dgm') }}" class="btn btn-outline-secondary" title="Limpar filtros">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <div class="content-card">
+    <div class="content-card-header">
+      <h5><i class="bi bi-list-check me-2"></i>Termos cadastrados</h5>
+      <span>{{ escopos|length }} registro(s)</span>
+    </div>
+    <div class="content-card-body">
+      {% if escopos %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle" id="tabelaEscopo">
+          <thead>
+            <tr>
+              <th>Termo</th>
+              <th>OSC / Projeto</th>
+              <th class="text-center">Vigência</th>
+              <th class="text-center">Escopo DGM</th>
+              <th class="text-center">Equipamentos</th>
+              <th class="text-center">Registro</th>
+              <th class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in escopos %}
+            <tr>
+              <td><strong>{{ item.numero_termo }}</strong><div class="text-muted small">{{ item.tipo_termo or '-' }}</div></td>
+              <td>
+                <div>{{ item.osc or '-' }}</div>
+                <div class="text-muted small">{{ item.projeto or '-' }}</div>
+              </td>
+              <td class="text-center">
+                <span class="badge {% if item.status_vigencia == 'Vigente' %}bg-success{% elif item.status_vigencia == 'Encerrado' %}bg-secondary{% else %}bg-info{% endif %}">
+                  {{ item.status_vigencia }}
+                </span>
+                <div class="text-muted small">
+                  {{ item.inicio.strftime('%d/%m/%Y') if item.inicio else '-' }} a {{ item.final.strftime('%d/%m/%Y') if item.final else '-' }}
+                </div>
+              </td>
+              <td class="text-center">
+                <form method="post" action="{{ url_for('gestao_monitoramento.editar_escopo', escopo_id=item.id) }}" class="action-form">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="dgm_escopo_termo"
+                           {% if item.dgm_escopo_termo %}checked{% endif %}
+                           {% if not has_write_access('parcerias') %}disabled{% else %}onchange="this.form.submit()"{% endif %}>
+                  </div>
+                </form>
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#equipamentosModal{{ item.id }}">
+                  <i class="bi bi-buildings"></i> Equipamentos
+                  <span class="badge text-bg-light">{{ item.equipamentos_count or 0 }}</span>
+                </button>
+              </td>
+              <td class="text-center">
+                {% if item.ativo %}
+                  <span class="badge bg-success">Ativo</span>
+                {% else %}
+                  <span class="badge bg-secondary">Desativado</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                {% if has_write_access('parcerias') %}
+                  {% if item.ativo %}
+                    <form method="post" action="{{ url_for('gestao_monitoramento.desativar_escopo', escopo_id=item.id) }}" class="action-form">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Desativar este termo do painel DGM?')">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="{{ url_for('gestao_monitoramento.reativar_escopo', escopo_id=item.id) }}" class="action-form">
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted small">Somente leitura</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% for item in escopos %}
+      <div class="modal fade equipamentos-modal" id="equipamentosModal{{ item.id }}" tabindex="-1" aria-labelledby="equipamentosModalLabel{{ item.id }}" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <div>
+                <h5 class="modal-title" id="equipamentosModalLabel{{ item.id }}">
+                  <i class="bi bi-buildings me-2"></i>Equipamentos
+                </h5>
+                <div class="small opacity-75">{{ item.numero_termo }} - {{ item.osc or 'OSC não informada' }}</div>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3 p-3 bg-light rounded">
+                <div class="fw-semibold">{{ item.projeto or '-' }}</div>
+                <div class="text-muted small">
+                  {{ item.tipo_termo or '-' }} |
+                  {{ item.inicio.strftime('%d/%m/%Y') if item.inicio else '-' }} a {{ item.final.strftime('%d/%m/%Y') if item.final else '-' }}
+                </div>
+              </div>
+
+              {% if has_write_access('parcerias') %}
+              <form method="post" action="{{ url_for('gestao_monitoramento.equipamentos', escopo_id=item.id) }}" class="mb-4 equipamentos-batch-form" data-escopo-id="{{ item.id }}">
+                <label class="form-label fw-semibold">Adicionar equipamentos</label>
+                <div class="chip-editor">
+                  <div class="chip-list" data-chip-list></div>
+                  <div class="chip-input-row">
+                    <input type="text" class="form-control" data-chip-input placeholder="Digite o nome do equipamento e pressione Enter">
+                    <button type="button" class="btn btn-outline-primary" data-chip-add>
+                      <i class="bi bi-plus-lg"></i> Adicionar
+                    </button>
+                  </div>
+                  <div class="chip-help">Aceita Enter, vírgula, ponto e vírgula e colagem de várias linhas.</div>
+                </div>
+                <input type="hidden" name="termo_equipamento" data-chip-hidden required>
+                <div class="d-flex justify-content-end mt-3">
+                  <button type="submit" class="btn-parc">
+                    <i class="bi bi-plus-circle"></i> Incluir equipamentos
+                  </button>
+                </div>
+              </form>
+              {% endif %}
+
+              <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                  <thead>
+                    <tr>
+                      <th>Equipamento</th>
+                      <th class="text-center">Status</th>
+                      <th class="text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for equipamento in item.equipamentos %}
+                    <tr>
+                      <td>
+                        {% if has_write_access('parcerias') %}
+                        <form method="post" action="{{ url_for('gestao_monitoramento.editar_equipamento', escopo_id=item.id, equipamento_id=equipamento.id) }}" class="d-flex gap-2">
+                          <input type="text" class="form-control equipamento-edit-input" name="termo_equipamento"
+                                 value="{{ equipamento.termo_equipamento }}" maxlength="300" required>
+                          <button type="submit" class="btn btn-outline-primary" title="Salvar edição">
+                            <i class="bi bi-check-lg"></i>
+                          </button>
+                        </form>
+                        {% else %}
+                          {{ equipamento.termo_equipamento }}
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        {% if equipamento.ativo %}
+                          <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                          <span class="badge bg-secondary">Desativado</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        {% if has_write_access('parcerias') %}
+                          {% if equipamento.ativo %}
+                          <form method="post" action="{{ url_for('gestao_monitoramento.desativar_equipamento', escopo_id=item.id, equipamento_id=equipamento.id) }}" class="action-form">
+                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Desativar este equipamento?')">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          </form>
+                          {% else %}
+                          <form method="post" action="{{ url_for('gestao_monitoramento.reativar_equipamento', escopo_id=item.id, equipamento_id=equipamento.id) }}" class="action-form">
+                            <button type="submit" class="btn btn-outline-success">
+                              <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                          </form>
+                          {% endif %}
+                        {% else %}
+                          <span class="text-muted small">Somente leitura</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                      <td colspan="3">
+                        <div class="alert alert-info mb-0">
+                          <i class="bi bi-info-circle"></i> Nenhum equipamento cadastrado para este termo.
+                        </div>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+        <div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> Nenhum termo encontrado.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  (function () {
+    function normalizeItems(raw) {
+      return raw
+        .split(/\r?\n|,|;/)
+        .map(item => item.trim())
+        .filter(Boolean);
+    }
+
+    function mountChipEditor(form) {
+      const list = form.querySelector('[data-chip-list]');
+      const input = form.querySelector('[data-chip-input]');
+      const hidden = form.querySelector('[data-chip-hidden]');
+      const addButton = form.querySelector('[data-chip-add]');
+      let values = [];
+
+      function sync() {
+        hidden.value = values.join('\n');
+        list.innerHTML = '';
+        values.forEach((value, index) => {
+          const chip = document.createElement('span');
+          chip.className = 'chip-item';
+
+          const label = document.createElement('span');
+          label.textContent = value;
+          chip.appendChild(label);
+
+          const removeButton = document.createElement('button');
+          removeButton.type = 'button';
+          removeButton.setAttribute('aria-label', 'Remover');
+          removeButton.innerHTML = '&times;';
+          removeButton.addEventListener('click', function () {
+            values.splice(index, 1);
+            sync();
+          });
+          chip.appendChild(removeButton);
+
+          list.appendChild(chip);
+        });
+      }
+
+      function addRaw(raw) {
+        const items = normalizeItems(raw);
+        let changed = false;
+        items.forEach(item => {
+          if (!values.includes(item)) {
+            values.push(item);
+            changed = true;
+          }
+        });
+        if (changed) {
+          sync();
+        }
+      }
+
+      addButton.addEventListener('click', function () {
+        addRaw(input.value);
+        input.value = '';
+        input.focus();
+      });
+
+      input.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ',' || event.key === ';') {
+          event.preventDefault();
+          addRaw(input.value);
+          input.value = '';
+        }
+      });
+
+      input.addEventListener('paste', function (event) {
+        const pasted = event.clipboardData && event.clipboardData.getData('text');
+        if (!pasted) {
+          return;
+        }
+        if (pasted.includes('\n') || pasted.includes(',') || pasted.includes(';')) {
+          event.preventDefault();
+          addRaw(pasted);
+          input.value = '';
+        }
+      });
+
+      form.addEventListener('submit', function (event) {
+        if (input.value.trim()) {
+          addRaw(input.value);
+          input.value = '';
+        }
+        if (!hidden.value.trim()) {
+          event.preventDefault();
+          input.focus();
+        }
+      });
+
+      sync();
+    }
+
+    document.querySelectorAll('.equipamentos-batch-form').forEach(mountChipEditor);
+
+    const escopoId = {{ abrir_equipamentos|tojson }};
+    if (escopoId) {
+      const modalEl = document.getElementById('equipamentosModal' + escopoId);
+      if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+      }
+    }
+  })();
+</script>
+</body>
+</html>

@@ -53,6 +53,8 @@ from routes.relatos import relatos_bp
 from routes.escalas import escalas_bp
 from routes.gestao_pessoas.relatorios_desempenho import relatorios_desempenho_bp
 from routes.smdhc_pendencias import smdhc_pendencias_bp
+from routes.central_paginas import central_paginas_bp
+from routes.gestao_monitoramento import gestao_monitoramento_bp
 
 
 # ============================================================================
@@ -318,6 +320,8 @@ def create_app():
     app.register_blueprint(escalas_bp)
     app.register_blueprint(relatorios_desempenho_bp)
     app.register_blueprint(smdhc_pendencias_bp)
+    app.register_blueprint(central_paginas_bp)
+    app.register_blueprint(gestao_monitoramento_bp)
     
     # ========================================================================
     # HOOKS GLOBAIS PARA LOGGING AUTOMÁTICO

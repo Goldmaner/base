@@ -1,0 +1,610 @@
+/* ================================================================
+   Central de Páginas — FParcerias  (tree layout)
+   ================================================================ */
+
+body {
+    background: #f0f4f8;
+    padding-bottom: 64px;
+}
+
+/* ── Header ────────────────────────────────────────────────────── */
+.cp-header {
+    background: linear-gradient(135deg, #1a237e 0%, #1565c0 55%, #0288d1 100%);
+    color: white;
+    padding: 48px 0 64px;
+    margin-bottom: -32px;
+    position: relative;
+}
+.cp-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 32px;
+    background: #f0f4f8;
+    border-radius: 32px 32px 0 0;
+}
+.cp-header-icon {
+    font-size: 2.8rem;
+    opacity: 0.82;
+    display: block;
+    margin-bottom: 10px;
+}
+.cp-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+.cp-header p {
+    font-size: 0.97rem;
+    opacity: 0.88;
+    margin: 0;
+}
+
+/* ── Search bar ────────────────────────────────────────────────── */
+.cp-search-wrap {
+    position: relative;
+    max-width: 680px;
+    margin: 0 auto 16px;
+    padding-top: 40px;
+}
+.cp-search-wrap .cp-search-icon {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(calc(-50% + 20px));
+    color: #94a3b8;
+    font-size: 1.05rem;
+    pointer-events: none;
+}
+.cp-search {
+    width: 100%;
+    padding: 14px 20px 14px 48px;
+    border-radius: 50px;
+    border: 2px solid #e2e8f0;
+    font-size: 0.95rem;
+    background: white;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.07);
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+}
+.cp-search:focus {
+    border-color: #1565c0;
+    box-shadow: 0 4px 22px rgba(21,101,192,0.16);
+}
+.cp-search::placeholder { color: #94a3b8; }
+
+/* ── Area quick-nav pills ──────────────────────────────────────── */
+.cp-area-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    padding: 6px 0 32px;
+}
+.cp-area-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 5px 14px;
+    border-radius: 50px;
+    border: 1.5px solid #e2e8f0;
+    background: white;
+    color: #475569;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all .18s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.cp-area-pill:hover {
+    background: #f8fafc;
+    color: #1e293b;
+    border-color: #cbd5e1;
+}
+
+/* ── Area section ──────────────────────────────────────────────── */
+.cp-area {
+    margin-bottom: 40px;
+    position: relative;
+}
+.cp-area-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-left: 4px;
+}
+.cp-area-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1e293b;
+    background: white;
+    padding: 7px 16px;
+    border-radius: 50px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+    white-space: nowrap;
+}
+.cp-area-label-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: white;
+    flex-shrink: 0;
+}
+.cp-area-hr {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, #e2e8f0, transparent);
+    min-width: 20px;
+}
+.cp-area-count {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    background: white;
+    border: 1px solid #e2e8f0;
+    padding: 3px 10px;
+    border-radius: 50px;
+    white-space: nowrap;
+}
+
+/* ── Page nodes (top-level rows) ───────────────────────────────── */
+.cp-node {
+    margin-bottom: 4px;
+}
+
+.cp-page-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    background: white;
+    border: 1.5px solid #e8ecf0;
+    border-radius: 12px;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+    cursor: default;
+}
+.cp-page-row:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.07);
+}
+.cp-page-row.cp-has-children {
+    cursor: pointer;
+    user-select: none;
+}
+.cp-page-row.cp-has-children:hover {
+    background: #fafbff;
+}
+.cp-page-row.cp-expanded {
+    border-radius: 12px 12px 4px 4px;
+    border-bottom-color: transparent;
+}
+
+/* toggle chevron */
+.cp-toggle {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    font-size: 0.8rem;
+    transition: transform .2s, color .15s, background .15s;
+    padding: 0;
+    pointer-events: none;
+}
+.cp-page-row.cp-has-children .cp-toggle {
+    pointer-events: auto;
+    cursor: pointer;
+}
+.cp-page-row.cp-expanded .cp-toggle {
+    transform: rotate(90deg);
+    color: #64748b;
+    background: #f1f5f9;
+}
+.cp-toggle-spacer {
+    width: 28px;
+    flex-shrink: 0;
+}
+
+/* page icon */
+.cp-page-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: white;
+}
+
+/* page text */
+.cp-page-info {
+    flex: 1;
+    min-width: 0;
+}
+.cp-page-nome {
+    display: block;
+    font-size: 0.93rem;
+    font-weight: 600;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cp-page-desc {
+    display: block;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+/* responsible badge */
+.cp-resp {
+    flex-shrink: 0;
+    font-size: 0.73rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 50px;
+}
+
+/* responsible wrapper + edit btn */
+.cp-resp-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.cp-edit-resp-btn {
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: none;
+    color: #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: color .15s, background .15s;
+    flex-shrink: 0;
+}
+.cp-edit-resp-btn:hover {
+    color: #475569;
+    background: #f1f5f9;
+}
+
+/* ── Access badge ──────────────────────────────────────────────── */
+.cp-acesso-wrap {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.cp-acesso {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-size: 0.85rem;
+}
+.cp-acesso--sim {
+    color: #16a34a;
+    background: rgba(22, 163, 74, 0.1);
+}
+.cp-acesso--nao {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+}
+
+/* ── No-access row dim ─────────────────────────────────────────── */
+.cp-page-row.cp-sem-acesso .cp-page-icon,
+.cp-child-row.cp-sem-acesso .cp-child-icon {
+    opacity: 0.4;
+    filter: grayscale(1);
+}
+.cp-page-row.cp-sem-acesso .cp-page-nome,
+.cp-child-row.cp-sem-acesso .cp-child-nome {
+    color: #94a3b8;
+}
+
+/* blocked button override — grey out regardless of area color */
+.cp-btn-go--bloqueado,
+.cp-btn-go--bloqueado:hover {
+    background: #94a3b8 !important;
+    color: white !important;
+    cursor: not-allowed;
+    opacity: 0.85;
+    transform: none !important;
+    pointer-events: auto;
+}
+
+/* actions */
+.cp-node-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.cp-info-btn {
+    width: 30px;
+    height: 30px;
+    background: none;
+    border: none;
+    border-radius: 7px;
+    color: #cbd5e1;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color .15s, background .15s;
+    padding: 0;
+}
+.cp-info-btn:hover {
+    color: #64748b;
+    background: #f1f5f9;
+}
+.cp-btn-go {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 8px;
+    color: white;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: opacity .15s, transform .15s;
+}
+.cp-btn-go:hover {
+    color: white;
+    opacity: 0.88;
+    transform: scale(1.03);
+}
+
+/* ── Children tree ─────────────────────────────────────────────── */
+.cp-children-wrap {
+    margin-left: 28px;
+    padding: 4px 0 6px 16px;
+    border-left: 2px solid #e8ecf0;
+    border-radius: 0 0 10px 10px;
+    background: white;
+    border-top: none;
+    border-right: 1.5px solid #e8ecf0;
+    border-bottom: 1.5px solid #e8ecf0;
+    border-radius: 0 0 10px 0;
+    overflow: hidden;
+    animation: cp-slide-down .2s ease;
+}
+
+@keyframes cp-slide-down {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.cp-child-node {
+    position: relative;
+    margin: 3px 0;
+}
+
+/* horizontal connector line */
+.cp-child-node::before {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 50%;
+    width: 14px;
+    height: 2px;
+    background: #e8ecf0;
+    transform: translateY(-50%);
+}
+
+.cp-child-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px 8px 8px;
+    border-radius: 8px;
+    background: #f8fafc;
+    transition: background .15s, box-shadow .15s;
+}
+.cp-child-row:hover {
+    background: #f1f5f9;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.cp-child-icon {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: white;
+    opacity: 0.85;
+}
+
+.cp-child-nome {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.cp-child-resp {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 50px;
+}
+
+.cp-btn-go-sm {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 7px;
+    color: white;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: opacity .15s;
+}
+.cp-btn-go-sm:hover {
+    color: white;
+    opacity: 0.85;
+}
+
+/* ── Search: matched highlight + hidden items ──────────────────── */
+.cp-node.cp-hidden  { display: none; }
+.cp-child-node.cp-hidden { display: none; }
+
+.cp-node.cp-match > .cp-page-row {
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+.cp-child-node.cp-match > .cp-child-row {
+    background: #eff6ff;
+    box-shadow: 0 0 0 1px #93c5fd;
+}
+
+/* ── No results ────────────────────────────────────────────────── */
+.cp-no-results {
+    display: none;
+    text-align: center;
+    padding: 72px 20px;
+    color: #94a3b8;
+}
+.cp-no-results i {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 16px;
+    color: #cbd5e1;
+}
+
+/* ── Empty state ───────────────────────────────────────────────── */
+.cp-empty {
+    text-align: center;
+    padding: 72px 20px;
+    color: #94a3b8;
+}
+.cp-empty i {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 16px;
+    color: #cbd5e1;
+}
+
+/* ================================================================
+   Cores por área
+   ================================================================ */
+
+/* Gestão de Parcerias — índigo */
+.cp-area--parcerias .cp-area-label-icon { background: linear-gradient(135deg,#6366f1,#8b5cf6); }
+.cp-area--parcerias .cp-area-pill       { border-color: #c7d2fe; color: #4338ca; }
+.cp-area--parcerias .cp-area-pill:hover { background: #eef2ff; }
+.cp-area--parcerias .cp-page-icon,
+.cp-area--parcerias .cp-child-icon      { background: linear-gradient(135deg,#6366f1,#8b5cf6); box-shadow: 0 3px 8px rgba(99,102,241,.25); }
+.cp-area--parcerias .cp-page-row.cp-has-children:hover,
+.cp-area--parcerias .cp-page-row.cp-expanded { border-color: #a5b4fc; }
+.cp-area--parcerias .cp-children-wrap   { border-color: #c7d2fe; }
+.cp-area--parcerias .cp-resp            { color: #4338ca; background: rgba(99,102,241,.1); }
+.cp-area--parcerias .cp-child-resp      { color: #4338ca; background: rgba(99,102,241,.1); }
+.cp-area--parcerias .cp-btn-go,
+.cp-area--parcerias .cp-btn-go-sm       { background: linear-gradient(135deg,#6366f1,#8b5cf6); }
+
+/* Gestão Financeira — verde */
+.cp-area--financeiro .cp-area-label-icon { background: linear-gradient(135deg,#10b981,#059669); }
+.cp-area--financeiro .cp-area-pill        { border-color: #a7f3d0; color: #065f46; }
+.cp-area--financeiro .cp-area-pill:hover  { background: #ecfdf5; }
+.cp-area--financeiro .cp-page-icon,
+.cp-area--financeiro .cp-child-icon       { background: linear-gradient(135deg,#10b981,#059669); box-shadow: 0 3px 8px rgba(16,185,129,.25); }
+.cp-area--financeiro .cp-page-row.cp-has-children:hover,
+.cp-area--financeiro .cp-page-row.cp-expanded { border-color: #6ee7b7; }
+.cp-area--financeiro .cp-children-wrap    { border-color: #a7f3d0; }
+.cp-area--financeiro .cp-resp,
+.cp-area--financeiro .cp-child-resp       { color: #065f46; background: rgba(16,185,129,.1); }
+.cp-area--financeiro .cp-btn-go,
+.cp-area--financeiro .cp-btn-go-sm        { background: linear-gradient(135deg,#10b981,#059669); }
+
+/* Análises — âmbar */
+.cp-area--analises .cp-area-label-icon { background: linear-gradient(135deg,#f59e0b,#d97706); }
+.cp-area--analises .cp-area-pill       { border-color: #fde68a; color: #92400e; }
+.cp-area--analises .cp-area-pill:hover { background: #fffbeb; }
+.cp-area--analises .cp-page-icon,
+.cp-area--analises .cp-child-icon      { background: linear-gradient(135deg,#f59e0b,#d97706); box-shadow: 0 3px 8px rgba(245,158,11,.25); }
+.cp-area--analises .cp-page-row.cp-has-children:hover,
+.cp-area--analises .cp-page-row.cp-expanded { border-color: #fcd34d; }
+.cp-area--analises .cp-children-wrap   { border-color: #fde68a; }
+.cp-area--analises .cp-resp,
+.cp-area--analises .cp-child-resp      { color: #92400e; background: rgba(245,158,11,.12); }
+.cp-area--analises .cp-btn-go,
+.cp-area--analises .cp-btn-go-sm       { background: linear-gradient(135deg,#f59e0b,#d97706); }
+
+/* Administração — vermelho */
+.cp-area--admin .cp-area-label-icon { background: linear-gradient(135deg,#ef4444,#dc2626); }
+.cp-area--admin .cp-area-pill       { border-color: #fecaca; color: #991b1b; }
+.cp-area--admin .cp-area-pill:hover { background: #fef2f2; }
+.cp-area--admin .cp-page-icon,
+.cp-area--admin .cp-child-icon      { background: linear-gradient(135deg,#ef4444,#dc2626); box-shadow: 0 3px 8px rgba(239,68,68,.25); }
+.cp-area--admin .cp-page-row.cp-has-children:hover,
+.cp-area--admin .cp-page-row.cp-expanded { border-color: #fca5a5; }
+.cp-area--admin .cp-children-wrap   { border-color: #fecaca; }
+.cp-area--admin .cp-resp,
+.cp-area--admin .cp-child-resp      { color: #991b1b; background: rgba(239,68,68,.1); }
+.cp-area--admin .cp-btn-go,
+.cp-area--admin .cp-btn-go-sm       { background: linear-gradient(135deg,#ef4444,#dc2626); }
+
+/* Apoio / Outros — ardósia */
+.cp-area--apoio .cp-area-label-icon { background: linear-gradient(135deg,#64748b,#475569); }
+.cp-area--apoio .cp-area-pill       { border-color: #cbd5e1; color: #334155; }
+.cp-area--apoio .cp-area-pill:hover { background: #f8fafc; }
+.cp-area--apoio .cp-page-icon,
+.cp-area--apoio .cp-child-icon      { background: linear-gradient(135deg,#64748b,#475569); box-shadow: 0 3px 8px rgba(100,116,139,.25); }
+.cp-area--apoio .cp-page-row.cp-has-children:hover,
+.cp-area--apoio .cp-page-row.cp-expanded { border-color: #94a3b8; }
+.cp-area--apoio .cp-children-wrap   { border-color: #cbd5e1; }
+.cp-area--apoio .cp-resp,
+.cp-area--apoio .cp-child-resp      { color: #334155; background: rgba(100,116,139,.1); }
+.cp-area--apoio .cp-btn-go,
+.cp-area--apoio .cp-btn-go-sm       { background: linear-gradient(135deg,#64748b,#475569); }
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .cp-header { padding: 32px 0 52px; }
+    .cp-header h1 { font-size: 1.6rem; }
+    .cp-page-desc { display: none; }
+    .cp-area-nav { gap: 6px; }
+    .cp-page-row { gap: 8px; padding: 10px 12px; }
+    .cp-children-wrap { margin-left: 16px; }
+}

@@ -82,6 +82,15 @@ def _normalize_list(values: list[Any]) -> list[str]:
     return result
 
 
+def _extract_int_multi(source: Any, key: str, label: str, errors: list[str], *, minimum: int = 1) -> list[int]:
+    values: list[int] = []
+    for raw in _extract_multi(source, key):
+        parsed = _as_int(raw, label, errors, minimum=minimum)
+        if parsed is not None and parsed not in values:
+            values.append(parsed)
+    return values
+
+
 def _extract_multi_raw(source: Any, key: str) -> list[str]:
     values: list[Any] = []
 
@@ -129,10 +138,10 @@ def pendencia_form_values(request) -> dict[str, Any]:
 @dataclass(slots=True)
 class PendenciaFiltersForm:
     q: str | None = None
-    status: str | None = None
-    tipo: str | None = None
-    area_demandante: str | None = None
-    area_responsavel: list[str] = field(default_factory=list)
+    status: int | None = None
+    tipo: int | None = None
+    area_demandante: int | None = None
+    area_responsavel: list[int] = field(default_factory=list)
     situacao: str | None = None
     somente_sem_prazo: bool = False
     somente_vencidas: bool = False
@@ -140,12 +149,13 @@ class PendenciaFiltersForm:
 
     @classmethod
     def from_args(cls, args) -> "PendenciaFiltersForm":
+        errors: list[str] = []
         return cls(
             q=_clean_text(args.get("q")),
-            status=_clean_text(args.get("status")),
-            tipo=_clean_text(args.get("tipo")),
-            area_demandante=_clean_text(args.get("area_demandante")),
-            area_responsavel=_extract_multi(args, "area_responsavel"),
+            status=_as_int(args.get("status"), "Filtro status", errors, minimum=1),
+            tipo=_as_int(args.get("tipo"), "Filtro tipo", errors, minimum=1),
+            area_demandante=_as_int(args.get("area_demandante"), "Filtro area demandante", errors, minimum=1),
+            area_responsavel=_extract_int_multi(args, "area_responsavel", "Filtro area responsavel", errors),
             situacao=_clean_text(args.get("situacao")),
             somente_sem_prazo=args.get("somente_sem_prazo") in {"1", "true", "True", "on"},
             somente_vencidas=args.get("somente_vencidas") in {"1", "true", "True", "on"},
@@ -156,12 +166,12 @@ class PendenciaFiltersForm:
 @dataclass(slots=True)
 class PendenciaFormData:
     tema_nome: str
-    tema_tipo: str | None
+    tema_tipo: int | None
     tema_descricao: str | None
-    tema_area_demandante: str | None
-    tema_area_responsavel: list[str]
-    tema_area_correlata: list[str]
-    tema_status: str | None
+    tema_area_demandante: int | None
+    tema_area_responsavel: list[int]
+    tema_area_correlata: list[int]
+    tema_status: int | None
     tema_prazo_estimado: Any
     tema_observacoes: str | None
     situacao_automatica: str | None
@@ -184,12 +194,12 @@ class PendenciaFormData:
 
         data = cls(
             tema_nome=tema_nome or "",
-            tema_tipo=_clean_text(payload.get("tema_tipo")),
+            tema_tipo=_as_int(payload.get("tema_tipo"), "Tipo", errors, minimum=1),
             tema_descricao=_clean_text(payload.get("tema_descricao")),
-            tema_area_demandante=_clean_text(payload.get("tema_area_demandante")),
-            tema_area_responsavel=_extract_multi(payload or request.form, "tema_area_responsavel"),
-            tema_area_correlata=_extract_multi(payload or request.form, "tema_area_correlata"),
-            tema_status=_clean_text(payload.get("tema_status")),
+            tema_area_demandante=_as_int(payload.get("tema_area_demandante"), "Area demandante", errors, minimum=1),
+            tema_area_responsavel=_extract_int_multi(payload or request.form, "tema_area_responsavel", "Area responsavel", errors),
+            tema_area_correlata=_extract_int_multi(payload or request.form, "tema_area_correlata", "Area correlata", errors),
+            tema_status=_as_int(payload.get("tema_status"), "Status", errors, minimum=1),
             tema_prazo_estimado=_as_date(payload.get("tema_prazo_estimado"), "Prazo estimado", errors),
             tema_observacoes=_clean_text(payload.get("tema_observacoes")),
             situacao_automatica=_clean_text(payload.get("situacao_automatica")),
@@ -206,7 +216,7 @@ class PendenciaFormData:
 class AtualizacaoFormData:
     tema_atualizacao: str
     tema_atualizacao_data: Any
-    tema_atualizacao_tipo: str | None
+    tema_atualizacao_tipo: int | None
     tema_acao_subsequente: str | None
     participantes_usuario_ids: list[int]
     participantes_externos: list[dict[str, str]]
@@ -221,7 +231,7 @@ class AtualizacaoFormData:
         if not tema_atualizacao:
             errors.append("Atualizacao: campo obrigatorio.")
 
-        tema_atualizacao_tipo = _clean_text(payload.get("tema_atualizacao_tipo")) or "Outros"
+        tema_atualizacao_tipo = _as_int(payload.get("tema_atualizacao_tipo"), "Tipo de atualizacao", errors, minimum=1)
 
         participantes_usuario_ids: list[int] = []
         for raw in _extract_multi(payload or request.form, "participante_usuario_ids"):
@@ -245,10 +255,6 @@ class AtualizacaoFormData:
                 errors.append(f"Participante externo #{idx + 1}: informe o setor.")
                 continue
             participantes_externos.append({"nome": nome, "setor": setor})
-
-        tipo_norm = (tema_atualizacao_tipo or "").strip().lower()
-        if tipo_norm.startswith("reuni") and not participantes_usuario_ids and not participantes_externos:
-            errors.append("Reuniao: informe ao menos um participante interno ou externo.")
 
         data = cls(
             tema_atualizacao=tema_atualizacao or "",

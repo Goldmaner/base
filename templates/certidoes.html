@@ -188,8 +188,8 @@
             </div>
             <div class="col-md-4">
                 <div class="stat-box">
-                    <div class="stat-number text-success" id="stat-pastas">{{ total_oscs }}</div>
-                    <div class="stat-label">Pastas Ativas</div>
+                    <div class="stat-number text-success" id="stat-pastas">{{ total_pastas_ativas }}</div>
+                    <div class="stat-label">Pastas Existentes</div>
                 </div>
             </div>
         </div>
@@ -264,7 +264,19 @@
                                     </span>
                                 </div>
                                 {% endif %}
-                                
+
+                                <div class="mb-2">
+                                    {% if osc.pasta_existe %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-folder-check me-1"></i>Pasta existente
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-folder-plus me-1"></i>Pasta pendente
+                                        </span>
+                                    {% endif %}
+                                </div>
+
                                 <!-- Status das Certidões -->
                                 <div class="mt-2 mb-2">
                                     {% if osc.total_certidoes_db > 0 %}
@@ -713,7 +725,7 @@
                     document.getElementById('resumo-pastas-novas').textContent = result.total_pastas_novas;
                     document.getElementById('resumo-pastas-existentes').textContent = result.total_pastas_existentes;
                     document.getElementById('resumo-celebracao').textContent = result.total_celebracao || 0;
-                    document.getElementById('mostrar-pastas-existentes').checked = result.total_pastas_novas === 0;
+                    document.getElementById('mostrar-pastas-existentes').checked = false;
                     
                     // Calcular valor total
                     const valorTotal = result.oscs.reduce((sum, osc) => sum + osc.total_valor, 0);
@@ -838,6 +850,14 @@
                     
                     if (result.oscs.length === 0) {
                         html = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Nenhuma OSC com parcelas futuras não pagas encontrada.</div>';
+                    } else if (result.total_pastas_novas === 0) {
+                        html = `
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Todas as OSCs elegíveis já possuem pasta cadastrada.
+                                Marque <strong>Mostrar OSCs com pastas existentes</strong> para revisar a lista completa.
+                            </div>
+                        ` + html;
                     }
                     
                     document.getElementById('relatorio-conteudo').innerHTML = html;

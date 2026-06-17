@@ -40,6 +40,42 @@ def _garantir_pasta_certidoes(nome_pasta):
     storage.ensure_folder(_prefixo_pasta_certidoes(nome_pasta))
 
 
+def _listar_pastas_certidoes_existentes(cur=None, nomes_pasta_candidatos=None):
+    """
+    Lista as pastas de certidões conhecidas.
+
+    Usa o storage como fonte principal e complementa com os prefixes já
+    registrados na tabela public.certidoes para cobrir arquivos antigos.
+
+    Para pastas materializadas apenas com `.keep`, o listamento de topo do
+    Supabase pode não expor o diretório virtual; nesses casos validamos os
+    candidatos restantes consultando o prefixo diretamente.
+    """
+    pastas = set(storage.list_folders('Certidoes'))
+    cursor = cur or get_cursor()
+    cursor.execute("""
+        SELECT DISTINCT
+            split_part(REPLACE(certidao_path, chr(92), '/'), '/', 1) AS nome_pasta
+        FROM public.certidoes
+        WHERE certidao_path IS NOT NULL
+          AND certidao_path <> ''
+    """)
+    pastas.update(
+        row['nome_pasta']
+        for row in cursor.fetchall()
+        if row.get('nome_pasta')
+    )
+
+    if nomes_pasta_candidatos:
+        for nome_pasta in nomes_pasta_candidatos:
+            if not nome_pasta or nome_pasta in pastas:
+                continue
+            if storage.list_files(_prefixo_pasta_certidoes(nome_pasta)):
+                pastas.add(nome_pasta)
+
+    return pastas
+
+
 @certidoes_bp.route("/", methods=["GET"])
 @login_required
 @requires_access('certidoes')
@@ -224,6 +260,13 @@ def index():
 
     print(f"⏱️ [PERF] Buscar OSCs em celebração: {(time.time() - t4b)*1000:.0f}ms")
 
+    nomes_pasta_candidatos = {
+        osc_data.get('nome_pasta')
+        for osc_data in oscs_map.values()
+        if osc_data.get('nome_pasta')
+    }
+    pastas_existentes = _listar_pastas_certidoes_existentes(cur, nomes_pasta_candidatos)
+
     # Aplicar contadores de certidões ao conjunto final
     t5 = time.time()
     oscs_com_pastas = list(oscs_map.values())
@@ -233,6 +276,7 @@ def index():
         osc_data['certidoes_em_dia'] = certidoes.get('em_dia', 0)
         osc_data['certidoes_atrasadas'] = certidoes.get('atrasadas', 0)
         osc_data['total_certidoes_db'] = certidoes.get('total', 0)
+        osc_data['pasta_existe'] = osc_data.get('nome_pasta') in pastas_existentes
 
     print(f"⏱️ [PERF] Aplicar dados: {(time.time() - t5)*1000:.0f}ms")
 
@@ -240,7 +284,8 @@ def index():
         oscs_com_pastas = [osc for osc in oscs_com_pastas if osc.get('parcelas_pendentes', 0) > 0]
 
     oscs_com_pastas.sort(key=lambda x: x['nome_exibicao'])
-    
+    total_pastas_ativas = sum(1 for osc in oscs_com_pastas if osc.get('pasta_existe'))
+
     tempo_total = (time.time() - start_total) * 1000
     print(f"✅ [PERF] TEMPO TOTAL: {tempo_total:.0f}ms ({len(oscs_com_pastas)} OSCs carregadas)")
     
@@ -249,7 +294,8 @@ def index():
         oscs_com_pastas=oscs_com_pastas,
         filtro_busca=filtro_busca,
         filtro_data_parcela=filtro_data_parcela,
-        total_oscs=len(oscs_com_pastas)
+        total_oscs=len(oscs_com_pastas),
+        total_pastas_ativas=total_pastas_ativas
     )
 
 
@@ -432,7 +478,27 @@ def listar_oscs_ativas():
     
     cur.execute(query)
     parcelas = cur.fetchall()
-    
+
+    cur.execute("""
+        SELECT DISTINCT osc, cnpj
+        FROM celebracao.celebracao_parcerias
+        WHERE status_generico = 'Em celebração'
+        ORDER BY osc
+    """)
+    oscs_celebracao = cur.fetchall()
+
+    nomes_pasta_candidatos = {
+        _nome_pasta_osc(parcela['osc'])
+        for parcela in parcelas
+        if parcela.get('osc')
+    }
+    nomes_pasta_candidatos.update(
+        _nome_pasta_osc(osc_celeb['osc'])
+        for osc_celeb in oscs_celebracao
+        if osc_celeb.get('osc')
+    )
+    pastas_existentes = _listar_pastas_certidoes_existentes(cur, nomes_pasta_candidatos)
+
     # Agrupar por OSC
     oscs_detalhadas = {}
     for parcela in parcelas:
@@ -441,7 +507,7 @@ def listar_oscs_ativas():
         if osc_nome not in oscs_detalhadas:
             # Verificar se pasta já existe
             nome_pasta = _nome_pasta_osc(osc_nome)
-            pasta_existe = _pasta_certidoes_existe(nome_pasta)
+            pasta_existe = nome_pasta in pastas_existentes
             
             oscs_detalhadas[osc_nome] = {
                 'osc': osc_nome,
@@ -470,14 +536,6 @@ def listar_oscs_ativas():
         oscs_detalhadas[osc_nome]['meses'].add(parcela['mes_referencia'])
 
     # Adicionar OSCs em processo de celebração
-    cur.execute("""
-        SELECT DISTINCT osc, cnpj
-        FROM celebracao.celebracao_parcerias
-        WHERE status_generico = 'Em celebração'
-        ORDER BY osc
-    """)
-    oscs_celebracao = cur.fetchall()
-
     cnpjs_existentes = {data['cnpj'] for data in oscs_detalhadas.values() if data.get('cnpj')}
     nomes_existentes = set(oscs_detalhadas.keys())
 
@@ -490,7 +548,7 @@ def listar_oscs_ativas():
         if cnpj_celeb and cnpj_celeb != 'N/A' and cnpj_celeb in cnpjs_existentes:
             continue
         nome_pasta = _nome_pasta_osc(osc_nome)
-        pasta_existe = _pasta_certidoes_existe(nome_pasta)
+        pasta_existe = nome_pasta in pastas_existentes
         oscs_detalhadas[osc_nome] = {
             'osc': osc_nome,
             'cnpj': cnpj_celeb,
@@ -545,7 +603,6 @@ def gerar_pastas_oscs():
     """
     try:
         cur = get_cursor()
-        
         # Buscar OSCs ativas
         query = """
             SELECT DISTINCT
@@ -571,6 +628,18 @@ def gerar_pastas_oscs():
         """)
         oscs_celebracao = cur.fetchall()
 
+        nomes_pasta_candidatos = {
+            _nome_pasta_osc(osc['osc'])
+            for osc in oscs
+            if osc.get('osc')
+        }
+        nomes_pasta_candidatos.update(
+            _nome_pasta_osc(osc_celeb['osc'])
+            for osc_celeb in oscs_celebracao
+            if osc_celeb.get('osc')
+        )
+        pastas_existentes_set = _listar_pastas_certidoes_existentes(cur, nomes_pasta_candidatos)
+
         # Combinar listas evitando duplicatas por nome ou CNPJ
         oscs_combinadas = [{'osc': o['osc'], 'cnpj': o['cnpj']} for o in oscs]
         cnpjs_existentes = {o['cnpj'] for o in oscs_combinadas if o.get('cnpj')}
@@ -594,8 +663,9 @@ def gerar_pastas_oscs():
             nome_pasta = _nome_pasta_osc(nome_osc)
             
             try:
-                if not _pasta_certidoes_existe(nome_pasta):
+                if nome_pasta not in pastas_existentes_set:
                     _garantir_pasta_certidoes(nome_pasta)
+                    pastas_existentes_set.add(nome_pasta)
                     pastas_criadas.append({
                         'osc': nome_osc,
                         'cnpj': cnpj,

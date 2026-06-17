@@ -11,6 +11,11 @@ CATALOGO_AREA_RESPONSAVEL = "pendencias.smdhc_pendencias.tema_area_responsavel"
 CATALOGO_AREA_CORRELATA = "pendencias.smdhc_pendencias.tema_area_correlata"
 CATALOGO_STATUS = "pendencias.smdhc_pendencias.tema_status"
 CATALOGO_ATUALIZACAO_TIPO = "pendencias.smdhc_pendencias_atualizacoes.tema_atualizacao_tipo"
+STATUS_ORDEM_NAO_INICIADO = 10
+STATUS_ORDEM_INICIADO = 20
+STATUS_ORDEM_AGUARDANDO_APROVACAO = 30
+STATUS_ORDEM_CONCLUIDO = 40
+ATUALIZACAO_TIPO_ORDEM_REUNIAO = 10
 
 
 def _fetchall(query: str, params: tuple | list | None = None) -> list[dict[str, Any]]:
@@ -60,17 +65,63 @@ def _execute_returning_id(query: str, params: tuple | list | None = None) -> int
         cur.close()
 
 
-def _catalogo_status(schema_table_coluna_r: str) -> list[dict[str, Any]]:
+def _catalogo_status(schema_table_coluna_r: str, *, ativo_only: bool = True) -> list[dict[str, Any]]:
+    filtro_ativo = "AND ativo = TRUE" if ativo_only else ""
     return _fetchall(
-        """
-        SELECT id, status, descricao, ativo, nome_item_fantasia
+        f"""
+        SELECT id, status, descricao, ordem, ativo, nome_item_fantasia
         FROM categoricas.c_geral_status
         WHERE schema_table_coluna_r = %s
-          AND ativo = TRUE
-        ORDER BY id
+          {filtro_ativo}
+        ORDER BY ordem NULLS LAST, id
         """,
         (schema_table_coluna_r,),
     )
+
+
+def _catalogo_item_por_id(schema_table_coluna_r: str, item_id: int | None, *, ativo_only: bool = True) -> dict[str, Any] | None:
+    if not item_id:
+        return None
+    filtro_ativo = "AND ativo = TRUE" if ativo_only else ""
+    return _fetchone(
+        f"""
+        SELECT id, status, descricao, ordem, ativo, nome_item_fantasia
+        FROM categoricas.c_geral_status
+        WHERE schema_table_coluna_r = %s
+          AND id = %s
+          {filtro_ativo}
+        """,
+        (schema_table_coluna_r, item_id),
+    )
+
+
+def _catalogo_itens_por_ids(schema_table_coluna_r: str, item_ids: list[int], *, ativo_only: bool = True) -> list[dict[str, Any]]:
+    ids = [int(item_id) for item_id in item_ids if item_id]
+    if not ids:
+        return []
+    filtro_ativo = "AND ativo = TRUE" if ativo_only else ""
+    rows = _fetchall(
+        f"""
+        SELECT id, status, descricao, ordem, ativo, nome_item_fantasia
+        FROM categoricas.c_geral_status
+        WHERE schema_table_coluna_r = %s
+          AND id = ANY(%s)
+          {filtro_ativo}
+        ORDER BY ordem NULLS LAST, id
+        """,
+        (schema_table_coluna_r, ids),
+    )
+    by_id = {int(row["id"]): row for row in rows}
+    return [by_id[item_id] for item_id in ids if item_id in by_id]
+
+
+def _catalogo_labels_por_ids(schema_table_coluna_r: str, item_ids: list[int], *, ativo_only: bool = True) -> list[str]:
+    return [str(item["status"]) for item in _catalogo_itens_por_ids(schema_table_coluna_r, item_ids, ativo_only=ativo_only)]
+
+
+def _catalogo_label_por_id(schema_table_coluna_r: str, item_id: int | None, *, ativo_only: bool = True) -> str | None:
+    item = _catalogo_item_por_id(schema_table_coluna_r, item_id, ativo_only=ativo_only)
+    return str(item["status"]) if item else None
 
 
 def _build_list_query(filters, *, select_sql: str) -> tuple[str, list[Any]]:
@@ -93,19 +144,19 @@ def _build_list_query(filters, *, select_sql: str) -> tuple[str, list[Any]]:
         params.extend([like, like, like, like, like])
 
     if filters.status:
-        where.append("p.tema_status = %s")
+        where.append("p.tema_status_id = %s")
         params.append(filters.status)
 
     if filters.tipo:
-        where.append("p.tema_tipo = %s")
+        where.append("p.tema_tipo_id = %s")
         params.append(filters.tipo)
 
     if filters.area_demandante:
-        where.append("p.tema_area_demandante = %s")
+        where.append("p.tema_area_demandante_id = %s")
         params.append(filters.area_demandante)
 
     if filters.area_responsavel:
-        where.append("p.tema_area_responsavel && %s::text[]")
+        where.append("p.tema_area_responsavel_ids && %s::integer[]")
         params.append(filters.area_responsavel)
 
     if filters.situacao:
@@ -128,33 +179,42 @@ def _build_list_query(filters, *, select_sql: str) -> tuple[str, list[Any]]:
         FROM pendencias.smdhc_pendencias p
         LEFT JOIN pendencias.vw_smdhc_pendencias_priorizacao v
           ON v.pendencia_id = p.id
+        LEFT JOIN categoricas.c_geral_status status_cat
+          ON status_cat.id = p.tema_status_id
         WHERE {' AND '.join(where)}
     """
     return sql, params
 
 
-def listar_status_options() -> list[str]:
-    return [row["status"] for row in _catalogo_status(CATALOGO_STATUS)]
+def listar_status_options() -> list[dict[str, Any]]:
+    return _catalogo_status(CATALOGO_STATUS)
 
 
-def listar_tema_tipos() -> list[str]:
-    return [row["status"] for row in _catalogo_status(CATALOGO_TEMA_TIPO)]
+def listar_tema_tipos() -> list[dict[str, Any]]:
+    return _catalogo_status(CATALOGO_TEMA_TIPO)
 
 
-def listar_area_demandante() -> list[str]:
-    return [row["status"] for row in _catalogo_status(CATALOGO_AREA_DEMANDANTE)]
+def listar_area_demandante() -> list[dict[str, Any]]:
+    return _catalogo_status(CATALOGO_AREA_DEMANDANTE)
 
 
-def listar_area_responsavel() -> list[str]:
-    return [row["status"] for row in _catalogo_status(CATALOGO_AREA_RESPONSAVEL)]
+def listar_area_responsavel() -> list[dict[str, Any]]:
+    return _catalogo_status(CATALOGO_AREA_RESPONSAVEL)
 
 
-def listar_area_correlata() -> list[str]:
-    return [row["status"] for row in _catalogo_status(CATALOGO_AREA_CORRELATA)]
+def listar_area_correlata() -> list[dict[str, Any]]:
+    return _catalogo_status(CATALOGO_AREA_CORRELATA)
 
 
-def listar_atualizacao_tipos() -> list[str]:
-    return [row["status"] for row in _catalogo_status(CATALOGO_ATUALIZACAO_TIPO)]
+def listar_atualizacao_tipos() -> list[dict[str, Any]]:
+    return _catalogo_status(CATALOGO_ATUALIZACAO_TIPO)
+
+
+def tipo_atualizacao_requer_participantes(tipo_id: int | None) -> bool:
+    item = _catalogo_item_por_id(CATALOGO_ATUALIZACAO_TIPO, tipo_id, ativo_only=False)
+    if not item:
+        return False
+    return int(item.get("ordem") or 0) == ATUALIZACAO_TIPO_ORDEM_REUNIAO
 
 
 def listar_usuarios_infos() -> list[dict[str, Any]]:
@@ -237,12 +297,13 @@ def listar_pendencias(filters) -> list[dict[str, Any]]:
         SELECT
             p.id,
             p.tema_nome,
-            p.tema_tipo,
+            v.tema_tipo,
             p.tema_descricao,
-            p.tema_area_demandante,
-            p.tema_area_responsavel,
-            p.tema_area_correlata,
-            p.tema_status,
+            v.tema_area_demandante,
+            v.tema_area_responsavel,
+            v.tema_area_correlata,
+            v.tema_status,
+            v.tema_status_ordem,
             p.tema_prazo_estimado,
             p.tema_observacoes,
             p.prioridade_manual,
@@ -272,7 +333,30 @@ def obter_pendencia(pendencia_id: int) -> dict[str, Any] | None:
     pendencia = _fetchone(
         """
         SELECT
-            p.*,
+            p.id,
+            p.tema_nome,
+            p.tema_tipo_id,
+            v.tema_tipo,
+            p.tema_descricao,
+            p.tema_area_demandante_id,
+            v.tema_area_demandante,
+            p.tema_area_responsavel_ids,
+            v.tema_area_responsavel,
+            p.tema_area_correlata_ids,
+            v.tema_area_correlata,
+            p.tema_status_id,
+            v.tema_status,
+            v.tema_status_ordem,
+            p.tema_prazo_estimado,
+            p.tema_observacoes,
+            p.situacao_automatica,
+            p.prioridade_manual,
+            p.prioridade_observacao,
+            p.ativo,
+            p.criado_por,
+            p.criado_em,
+            p.atualizado_por,
+            p.atualizado_em,
             COALESCE(v.nota_proximidade, 0) AS nota_proximidade,
             COALESCE(v.nota_enem, 0) AS nota_enem,
             COALESCE(v.nota_instabilidade, 0) AS nota_instabilidade,
@@ -360,16 +444,26 @@ def obter_pendencia(pendencia_id: int) -> dict[str, Any] | None:
 
 
 def criar_pendencia(data, usuario: str) -> int:
+    tema_tipo = _catalogo_label_por_id(CATALOGO_TEMA_TIPO, data.tema_tipo)
+    tema_area_demandante = _catalogo_label_por_id(CATALOGO_AREA_DEMANDANTE, data.tema_area_demandante)
+    tema_area_responsavel = _catalogo_labels_por_ids(CATALOGO_AREA_RESPONSAVEL, data.tema_area_responsavel)
+    tema_area_correlata = _catalogo_labels_por_ids(CATALOGO_AREA_CORRELATA, data.tema_area_correlata)
+    tema_status = _catalogo_label_por_id(CATALOGO_STATUS, data.tema_status)
     return _execute_returning_id(
         """
         INSERT INTO pendencias.smdhc_pendencias (
             tema_nome,
             tema_tipo,
+            tema_tipo_id,
             tema_descricao,
             tema_area_demandante,
+            tema_area_demandante_id,
             tema_area_responsavel,
+            tema_area_responsavel_ids,
             tema_area_correlata,
+            tema_area_correlata_ids,
             tema_status,
+            tema_status_id,
             tema_prazo_estimado,
             tema_observacoes,
             situacao_automatica,
@@ -378,16 +472,21 @@ def criar_pendencia(data, usuario: str) -> int:
             criado_por,
             atualizado_por
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
             data.tema_nome,
+            tema_tipo,
             data.tema_tipo,
             data.tema_descricao,
+            tema_area_demandante,
             data.tema_area_demandante,
+            tema_area_responsavel,
             data.tema_area_responsavel,
+            tema_area_correlata,
             data.tema_area_correlata,
+            tema_status,
             data.tema_status,
             data.tema_prazo_estimado,
             data.tema_observacoes,
@@ -401,16 +500,26 @@ def criar_pendencia(data, usuario: str) -> int:
 
 
 def atualizar_pendencia(pendencia_id: int, data, usuario: str) -> None:
+    tema_tipo = _catalogo_label_por_id(CATALOGO_TEMA_TIPO, data.tema_tipo)
+    tema_area_demandante = _catalogo_label_por_id(CATALOGO_AREA_DEMANDANTE, data.tema_area_demandante)
+    tema_area_responsavel = _catalogo_labels_por_ids(CATALOGO_AREA_RESPONSAVEL, data.tema_area_responsavel)
+    tema_area_correlata = _catalogo_labels_por_ids(CATALOGO_AREA_CORRELATA, data.tema_area_correlata)
+    tema_status = _catalogo_label_por_id(CATALOGO_STATUS, data.tema_status)
     _execute(
         """
         UPDATE pendencias.smdhc_pendencias
         SET tema_nome = %s,
             tema_tipo = %s,
+            tema_tipo_id = %s,
             tema_descricao = %s,
             tema_area_demandante = %s,
+            tema_area_demandante_id = %s,
             tema_area_responsavel = %s,
+            tema_area_responsavel_ids = %s,
             tema_area_correlata = %s,
+            tema_area_correlata_ids = %s,
             tema_status = %s,
+            tema_status_id = %s,
             tema_prazo_estimado = %s,
             tema_observacoes = %s,
             situacao_automatica = %s,
@@ -423,11 +532,16 @@ def atualizar_pendencia(pendencia_id: int, data, usuario: str) -> None:
         """,
         (
             data.tema_nome,
+            tema_tipo,
             data.tema_tipo,
             data.tema_descricao,
+            tema_area_demandante,
             data.tema_area_demandante,
+            tema_area_responsavel,
             data.tema_area_responsavel,
+            tema_area_correlata,
             data.tema_area_correlata,
+            tema_status,
             data.tema_status,
             data.tema_prazo_estimado,
             data.tema_observacoes,
@@ -494,6 +608,7 @@ def _salvar_participantes_atualizacao(cur, atualizacao_id: int, data, usuario: s
 
 
 def registrar_atualizacao(pendencia_id: int, data, usuario: str) -> int:
+    tema_atualizacao_tipo = _catalogo_label_por_id(CATALOGO_ATUALIZACAO_TIPO, data.tema_atualizacao_tipo)
     db = get_db()
     cur = get_cursor()
     try:
@@ -504,17 +619,19 @@ def registrar_atualizacao(pendencia_id: int, data, usuario: str) -> int:
                 tema_atualizacao,
                 tema_atualizacao_data,
                 tema_atualizacao_tipo,
+                tema_atualizacao_tipo_id,
                 tema_acao_subsequente,
                 criado_por,
                 atualizado_por
             )
-            VALUES (%s, %s, COALESCE(%s, CURRENT_DATE), %s, %s, %s, %s)
+            VALUES (%s, %s, COALESCE(%s, CURRENT_DATE), %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (
                 pendencia_id,
                 data.tema_atualizacao,
                 data.tema_atualizacao_data,
+                tema_atualizacao_tipo,
                 data.tema_atualizacao_tipo,
                 data.tema_acao_subsequente,
                 usuario,
@@ -533,6 +650,7 @@ def registrar_atualizacao(pendencia_id: int, data, usuario: str) -> int:
 
 
 def atualizar_atualizacao(pendencia_id: int, atualizacao_id: int, data, usuario: str) -> bool:
+    tema_atualizacao_tipo = _catalogo_label_por_id(CATALOGO_ATUALIZACAO_TIPO, data.tema_atualizacao_tipo)
     db = get_db()
     cur = get_cursor()
     try:
@@ -557,6 +675,7 @@ def atualizar_atualizacao(pendencia_id: int, atualizacao_id: int, data, usuario:
             SET tema_atualizacao = %s,
                 tema_atualizacao_data = COALESCE(%s, CURRENT_DATE),
                 tema_atualizacao_tipo = %s,
+                tema_atualizacao_tipo_id = %s,
                 tema_acao_subsequente = %s,
                 atualizado_por = %s,
                 atualizado_em = NOW()
@@ -567,6 +686,7 @@ def atualizar_atualizacao(pendencia_id: int, atualizacao_id: int, data, usuario:
             (
                 data.tema_atualizacao,
                 data.tema_atualizacao_data,
+                tema_atualizacao_tipo,
                 data.tema_atualizacao_tipo,
                 data.tema_acao_subsequente,
                 usuario,
@@ -1125,23 +1245,75 @@ def obter_alertas_dashboard(filters) -> list[dict[str, Any]]:
     return _fetchall(sql, params)
 
 
+def obter_resumo_dashboard(filters) -> dict[str, Any]:
+    select_sql = """
+        SELECT
+            COUNT(*) AS total_ativas,
+            COUNT(*) FILTER (WHERE COALESCE(status_cat.ordem, 0) = 20) AS iniciadas,
+            COUNT(*) FILTER (WHERE COALESCE(status_cat.ordem, 0) = 10) AS nao_iniciadas,
+            COUNT(*) FILTER (WHERE COALESCE(status_cat.ordem, 0) = 30) AS aguardando_aprovacao,
+            COUNT(*) FILTER (WHERE COALESCE(status_cat.ordem, 0) = 40) AS concluidas,
+            COUNT(*) FILTER (WHERE p.tema_prazo_estimado IS NULL AND COALESCE(status_cat.ordem, 0) <> 40) AS sem_prazo,
+            COUNT(*) FILTER (WHERE p.tema_prazo_estimado < CURRENT_DATE AND COALESCE(status_cat.ordem, 0) <> 40) AS vencidas,
+            COUNT(*) FILTER (WHERE COALESCE(v.situacao_automatica, '') = 'Parado') AS paradas,
+            COUNT(*) FILTER (WHERE COALESCE(v.ordem_prioridade, 999999) <= 5) AS alta_prioridade
+    """
+    sql, params = _build_list_query(filters, select_sql=select_sql)
+    return _fetchone(sql, params) or {
+        "total_ativas": 0,
+        "iniciadas": 0,
+        "nao_iniciadas": 0,
+        "aguardando_aprovacao": 0,
+        "concluidas": 0,
+        "sem_prazo": 0,
+        "vencidas": 0,
+        "paradas": 0,
+        "alta_prioridade": 0,
+    }
+
+
+def obter_alertas_dashboard(filters) -> list[dict[str, Any]]:
+    select_sql = """
+        SELECT
+            p.id,
+            p.tema_nome,
+            v.tema_status,
+            v.tema_status_ordem,
+            p.tema_prazo_estimado,
+            v.situacao_automatica,
+            v.ordem_prioridade,
+            v.responsavel
+    """
+    sql, params = _build_list_query(filters, select_sql=select_sql)
+    sql += """
+        AND COALESCE(v.situacao_automatica, '') IN ('Sem prazo', 'Vencido', 'Parado', 'Aguardando validacao')
+        ORDER BY COALESCE(v.ordem_prioridade, 999999), p.id
+        LIMIT 8
+    """
+    return _fetchall(sql, params)
+
+
 def obter_timeline_pendencia(pendencia_id: int) -> list[dict[str, Any]]:
     atualizacoes = _fetchall(
         """
         SELECT
-            id,
-            tema_atualizacao,
-            tema_atualizacao_data,
-            tema_atualizacao_tipo,
-            tema_acao_subsequente,
-            criado_por,
-            criado_em,
-            atualizado_por,
-            atualizado_em
-        FROM pendencias.smdhc_pendencias_atualizacoes
-        WHERE pendencia_id = %s
-          AND ativo = TRUE
-        ORDER BY tema_atualizacao_data DESC NULLS LAST, atualizado_em DESC NULLS LAST, criado_em DESC NULLS LAST, id DESC
+            a.id,
+            a.tema_atualizacao,
+            a.tema_atualizacao_data,
+            a.tema_atualizacao_tipo_id,
+            COALESCE(cat.status, a.tema_atualizacao_tipo) AS tema_atualizacao_tipo,
+            cat.ordem AS tema_atualizacao_tipo_ordem,
+            a.tema_acao_subsequente,
+            a.criado_por,
+            a.criado_em,
+            a.atualizado_por,
+            a.atualizado_em
+        FROM pendencias.smdhc_pendencias_atualizacoes a
+        LEFT JOIN categoricas.c_geral_status cat
+          ON cat.id = a.tema_atualizacao_tipo_id
+        WHERE a.pendencia_id = %s
+          AND a.ativo = TRUE
+        ORDER BY a.tema_atualizacao_data DESC NULLS LAST, a.atualizado_em DESC NULLS LAST, a.criado_em DESC NULLS LAST, a.id DESC
         """,
         (pendencia_id,),
     )

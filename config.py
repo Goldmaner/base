@@ -29,7 +29,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-padrao')
 # Módulos liberados automaticamente para todo usuário cadastrado (pack básico).
 # Esses módulos não precisam de permissão explícita — são garantidos pelo decorator
 # e adicionados à sessão no login, para que os botões da home apareçam corretamente.
-ACESSOS_BASICOS = ['ferias', 'manuais']
+ACESSOS_BASICOS = ['ferias', 'manuais', 'central_paginas']
 
 # Tipos de usuário com suas propriedades.
 # Para adicionar um novo tipo no futuro: insira uma entrada aqui + adicione ao dropdown do template.

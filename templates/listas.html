@@ -226,6 +226,20 @@
     document.addEventListener('DOMContentLoaded', function() {
       modalFormulario = new bootstrap.Modal(document.getElementById('modalFormulario'));
 
+      // Suporte a ?tabela= na URL (links diretos da Central de Páginas)
+      const urlParam = new URLSearchParams(window.location.search).get('tabela');
+      if (urlParam) {
+        const nomeParam = Object.keys(tabelasPorNome).find(n => tabelasPorNome[n] === urlParam);
+        if (nomeParam) {
+          document.getElementById('inputSeletorTabela').value = nomeParam;
+          document.getElementById('seletorTabela').value = urlParam;
+          localStorage.setItem('listas_tabela_selecionada_chave', urlParam);
+          localStorage.setItem('listas_tabela_selecionada_nome', nomeParam);
+          carregarTabela();
+          return;
+        }
+      }
+
       // Restaurar tabela selecionada do localStorage
       const chaveSalva = localStorage.getItem('listas_tabela_selecionada_chave');
       const nomeSalvo  = localStorage.getItem('listas_tabela_selecionada_nome');
