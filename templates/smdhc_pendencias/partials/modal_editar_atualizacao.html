@@ -1,0 +1,23 @@
+<div class="modal fade" id="modalEditarAtualizacaoPendencia" tabindex="-1" aria-labelledby="modalEditarAtualizacaoPendenciaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalEditarAtualizacaoPendenciaLabel">
+          <i class="bi bi-pencil-square me-2"></i>Editar atualização
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form method="post" action="{{ url_for('smdhc_pendencias.editar_atualizacao', id=pendencia.id, atualizacao_id=0) }}" data-ajax-form="true" data-edit-atualizacao-form="true">
+        <div class="modal-body">
+          {% include 'smdhc_pendencias/partials/form_atualizacao_fields.html' %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i> Salvar edição
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

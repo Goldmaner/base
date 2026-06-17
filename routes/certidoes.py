@@ -16,13 +16,28 @@ import utils_storage as storage
 
 certidoes_bp = Blueprint('certidoes', __name__, url_prefix='/certidoes')
 
-# Configuração de upload
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'modelos', 'Certidoes')
 ALLOWED_EXTENSIONS = {'pdf'}  # Apenas PDF permitido
 
 def allowed_file(filename):
     """Verifica se a extensão do arquivo é permitida"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _nome_pasta_osc(nome_osc):
+    """Converte o nome da OSC para o padrão de pasta usado no storage."""
+    return secure_filename((nome_osc or '').replace(' ', '_'))
+
+
+def _prefixo_pasta_certidoes(nome_pasta):
+    return f"Certidoes/{nome_pasta}"
+
+
+def _pasta_certidoes_existe(nome_pasta):
+    return storage.folder_exists(_prefixo_pasta_certidoes(nome_pasta))
+
+
+def _garantir_pasta_certidoes(nome_pasta):
+    storage.ensure_folder(_prefixo_pasta_certidoes(nome_pasta))
 
 
 @certidoes_bp.route("/", methods=["GET"])
@@ -50,8 +65,7 @@ def index():
         current_app.logger.info(f"📋 Carregando sem filtro de data")
     
     t1 = time.time()
-    # Carregar OSCs com certidões direto do banco — zero chamadas ao Storage
-    hoje = date.today()
+    # Carregar certidões já cadastradas
     cur.execute("""
         SELECT
             c.osc,
@@ -68,133 +82,163 @@ def index():
     """)
     oscs_db = cur.fetchall()
 
-    oscs_com_pastas   = []
-    oscs_nomes_reais  = []
+    oscs_map = {}
     certidoes_por_osc = {}
 
     for row in oscs_db:
         osc_nome = row['osc']
         if filtro_busca and filtro_busca not in osc_nome.lower():
             continue
-        pasta = secure_filename(osc_nome.replace(' ', '_'))
-        oscs_com_pastas.append({
-            'nome_pasta':     pasta,
-            'nome_exibicao':  osc_nome,
+
+        oscs_map[osc_nome] = {
+            'nome_pasta': _nome_pasta_osc(osc_nome),
+            'nome_exibicao': osc_nome,
             'osc_nome_banco': osc_nome,
-            'cnpj':           row['cnpj'] or 'N/A',
+            'cnpj': row['cnpj'] or 'N/A',
             'total_certidoes': row['total_certidoes'],
-        })
-        oscs_nomes_reais.append(osc_nome)
+            'parcelas_pendentes': 0,
+            'mes_parcela': None,
+            'tipo_origem': 'certidao'
+        }
         certidoes_por_osc[osc_nome] = {
-            'em_dia':    row['em_dia'],
+            'em_dia': row['em_dia'],
             'atrasadas': row['atrasadas'],
-            'total':     row['total_certidoes'],
+            'total': row['total_certidoes'],
         }
 
-    print(f"⏱️ [PERF] Listar OSCs (DB): {(time.time() - t1)*1000:.0f}ms ({len(oscs_com_pastas)} OSCs)")
+    print(f"⏱️ [PERF] Listar certidões (DB): {(time.time() - t1)*1000:.0f}ms ({len(oscs_map)} OSCs)")
 
-    # Query 2: Buscar TODAS as parcelas pendentes de uma vez
+    # Buscar OSCs com parcelas pendentes, mesmo quando ainda não há certidões cadastradas
     t4 = time.time()
     parcelas_por_osc = {}
-    
-    if oscs_nomes_reais:
-        placeholders = ','.join(['%s'] * len(oscs_nomes_reais))
-        if filtro_data_parcela:
-            # Filtro específico por data
-            data_ref = datetime.strptime(filtro_data_parcela, '%Y-%m-%d').date()
-            primeiro_dia = data_ref.replace(day=1)
-            ultimo_dia = (primeiro_dia + relativedelta(months=1)) - relativedelta(days=1)
-            
-            cur.execute(f"""
-                SELECT 
+    busca_sql = ""
+    busca_params = []
+
+    if filtro_busca:
+        busca_sql = " AND unaccent(LOWER(p.osc)) LIKE unaccent(%s)"
+        busca_params.append(f'%{filtro_busca}%')
+
+    if filtro_data_parcela:
+        data_ref = datetime.strptime(filtro_data_parcela, '%Y-%m-%d').date()
+        primeiro_dia = data_ref.replace(day=1)
+        ultimo_dia = (primeiro_dia + relativedelta(months=1)) - relativedelta(days=1)
+
+        cur.execute(f"""
+            SELECT
+                p.osc,
+                COALESCE(MAX(p.cnpj), 'N/A') AS cnpj,
+                COUNT(*)::int               AS total,
+                TO_CHAR(%s, 'MM/YY')        AS mes_ref
+            FROM gestao_financeira.ultra_liquidacoes ul
+            INNER JOIN public.parcerias p ON ul.numero_termo = p.numero_termo
+            WHERE ul.vigencia_inicial >= %s
+              AND ul.vigencia_inicial <= %s
+              AND ul.parcela_tipo IN ('Programada', 'Projetada')
+              AND ul.parcela_status = 'Não Pago'
+              {busca_sql}
+            GROUP BY p.osc
+        """, [data_ref, primeiro_dia, ultimo_dia] + busca_params)
+    else:
+        cur.execute(f"""
+            WITH parcelas_agrupadas AS (
+                SELECT
                     p.osc,
-                    COUNT(*) as total,
-                    TO_CHAR(%s, 'MM/YY') as mes_ref
+                    COALESCE(MAX(p.cnpj), 'N/A')                     AS cnpj,
+                    TO_CHAR(ul.vigencia_inicial, 'MM/YY')            AS mes_ref,
+                    COUNT(*)::int                                    AS total,
+                    MIN(ul.vigencia_inicial)                         AS primeira_vigencia,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY p.osc
+                        ORDER BY MIN(ul.vigencia_inicial) DESC
+                    )                                                AS rn
                 FROM gestao_financeira.ultra_liquidacoes ul
                 INNER JOIN public.parcerias p ON ul.numero_termo = p.numero_termo
-                WHERE p.osc IN ({placeholders})
-                  AND ul.vigencia_inicial >= %s
-                  AND ul.vigencia_inicial <= %s
+                WHERE ul.vigencia_inicial <= CURRENT_DATE
                   AND ul.parcela_tipo IN ('Programada', 'Projetada')
                   AND ul.parcela_status = 'Não Pago'
-                GROUP BY p.osc
-            """, [data_ref] + oscs_nomes_reais + [primeiro_dia, ultimo_dia])
-            
-            for row in cur.fetchall():
-                parcelas_por_osc[row['osc']] = {
-                    'total': row['total'],
-                    'mes_ref': row['mes_ref']
-                }
-        else:
-            # Parcelas no mês atual ou passadas não pagas
-            cur.execute(f"""
-                WITH parcelas_agrupadas AS (
-                    SELECT 
-                        p.osc,
-                        TO_CHAR(ul.vigencia_inicial, 'MM/YY') as mes_ref,
-                        COUNT(*) as total,
-                        MIN(ul.vigencia_inicial) as primeira_vigencia,
-                        ROW_NUMBER() OVER (PARTITION BY p.osc ORDER BY MIN(ul.vigencia_inicial) DESC) as rn
-                    FROM gestao_financeira.ultra_liquidacoes ul
-                    INNER JOIN public.parcerias p ON ul.numero_termo = p.numero_termo
-                    WHERE p.osc IN ({placeholders})
-                      AND ul.vigencia_inicial <= CURRENT_DATE
-                      AND ul.parcela_tipo IN ('Programada', 'Projetada')
-                      AND ul.parcela_status = 'Não Pago'
-                    GROUP BY p.osc, TO_CHAR(ul.vigencia_inicial, 'MM/YY')
-                )
-                SELECT osc, mes_ref, total
-                FROM parcelas_agrupadas
-                WHERE rn = 1
-            """, oscs_nomes_reais)
-            
-            for row in cur.fetchall():
-                parcelas_por_osc[row['osc']] = {
-                    'total': row['total'],
-                    'mes_ref': row['mes_ref']
-                }
-        
-        print(f"⏱️ [PERF] Buscar parcelas (bulk): {(time.time() - t4)*1000:.0f}ms")
-    
-    # Aplicar dados agrupados aos objetos OSC
+                  {busca_sql}
+                GROUP BY p.osc, TO_CHAR(ul.vigencia_inicial, 'MM/YY')
+            )
+            SELECT osc, cnpj, mes_ref, total
+            FROM parcelas_agrupadas
+            WHERE rn = 1
+        """, busca_params)
+
+    for row in cur.fetchall():
+        parcelas_por_osc[row['osc']] = {
+            'total': row['total'],
+            'mes_ref': row['mes_ref']
+        }
+
+        osc_data = oscs_map.setdefault(row['osc'], {
+            'nome_pasta': _nome_pasta_osc(row['osc']),
+            'nome_exibicao': row['osc'],
+            'osc_nome_banco': row['osc'],
+            'cnpj': row['cnpj'] or 'N/A',
+            'total_certidoes': 0,
+            'parcelas_pendentes': 0,
+            'mes_parcela': None,
+            'tipo_origem': 'parcela'
+        })
+        if not osc_data.get('cnpj') or osc_data['cnpj'] == 'N/A':
+            osc_data['cnpj'] = row['cnpj'] or 'N/A'
+        osc_data['parcelas_pendentes'] = row['total']
+        osc_data['mes_parcela'] = row['mes_ref']
+        if osc_data.get('tipo_origem') != 'certidao':
+            osc_data['tipo_origem'] = 'parcela'
+
+    print(f"⏱️ [PERF] Buscar parcelas elegíveis: {(time.time() - t4)*1000:.0f}ms ({len(parcelas_por_osc)} OSCs)")
+
+    # Complementar com OSCs em celebração, que também podem precisar de pasta antes das certidões
+    t4b = time.time()
+    busca_sql_celebracao = ""
+    busca_params_celebracao = []
+
+    if filtro_busca:
+        busca_sql_celebracao = " AND unaccent(LOWER(osc)) LIKE unaccent(%s)"
+        busca_params_celebracao.append(f'%{filtro_busca}%')
+
+    cur.execute(f"""
+        SELECT DISTINCT osc, cnpj
+        FROM celebracao.celebracao_parcerias
+        WHERE status_generico = 'Em celebração'
+          {busca_sql_celebracao}
+        ORDER BY osc
+    """, busca_params_celebracao)
+
+    for row in cur.fetchall():
+        osc_data = oscs_map.setdefault(row['osc'], {
+            'nome_pasta': _nome_pasta_osc(row['osc']),
+            'nome_exibicao': row['osc'],
+            'osc_nome_banco': row['osc'],
+            'cnpj': row['cnpj'] or 'N/A',
+            'total_certidoes': 0,
+            'parcelas_pendentes': 0,
+            'mes_parcela': None,
+            'tipo_origem': 'celebracao'
+        })
+        if osc_data.get('tipo_origem') not in ('parcela', 'certidao'):
+            osc_data['tipo_origem'] = 'celebracao'
+        if not osc_data.get('cnpj') or osc_data['cnpj'] == 'N/A':
+            osc_data['cnpj'] = row['cnpj'] or 'N/A'
+
+    print(f"⏱️ [PERF] Buscar OSCs em celebração: {(time.time() - t4b)*1000:.0f}ms")
+
+    # Aplicar contadores de certidões ao conjunto final
     t5 = time.time()
+    oscs_com_pastas = list(oscs_map.values())
     for osc_data in oscs_com_pastas:
         nome_banco = osc_data.get('osc_nome_banco')
-        
-        if nome_banco:
-            # Certidões
-            if nome_banco in certidoes_por_osc:
-                osc_data['certidoes_em_dia'] = certidoes_por_osc[nome_banco]['em_dia']
-                osc_data['certidoes_atrasadas'] = certidoes_por_osc[nome_banco]['atrasadas']
-                osc_data['total_certidoes_db'] = certidoes_por_osc[nome_banco]['total']
-            else:
-                osc_data['certidoes_em_dia'] = 0
-                osc_data['certidoes_atrasadas'] = 0
-                osc_data['total_certidoes_db'] = 0
-            
-            # Parcelas
-            if nome_banco in parcelas_por_osc:
-                osc_data['parcelas_pendentes'] = parcelas_por_osc[nome_banco]['total']
-                osc_data['mes_parcela'] = parcelas_por_osc[nome_banco]['mes_ref']
-            else:
-                osc_data['parcelas_pendentes'] = 0
-                osc_data['mes_parcela'] = None
-        else:
-            osc_data['certidoes_em_dia'] = 0
-            osc_data['certidoes_atrasadas'] = 0
-            osc_data['total_certidoes_db'] = 0
-            osc_data['parcelas_pendentes'] = 0
-            osc_data['mes_parcela'] = None
-    
+        certidoes = certidoes_por_osc.get(nome_banco, {})
+        osc_data['certidoes_em_dia'] = certidoes.get('em_dia', 0)
+        osc_data['certidoes_atrasadas'] = certidoes.get('atrasadas', 0)
+        osc_data['total_certidoes_db'] = certidoes.get('total', 0)
+
     print(f"⏱️ [PERF] Aplicar dados: {(time.time() - t5)*1000:.0f}ms")
-    
-    print(f"⏱️ [PERF] Aplicar dados: {(time.time() - t5)*1000:.0f}ms")
-    
-    # Filtrar por data de parcela se necessário
+
     if filtro_data_parcela:
         oscs_com_pastas = [osc for osc in oscs_com_pastas if osc.get('parcelas_pendentes', 0) > 0]
-    
-    # Ordenar por nome
+
     oscs_com_pastas.sort(key=lambda x: x['nome_exibicao'])
     
     tempo_total = (time.time() - start_total) * 1000
@@ -396,9 +440,8 @@ def listar_oscs_ativas():
         
         if osc_nome not in oscs_detalhadas:
             # Verificar se pasta já existe
-            nome_pasta = secure_filename(osc_nome.replace(' ', '_'))
-            caminho_pasta = os.path.join(UPLOAD_FOLDER, nome_pasta)
-            pasta_existe = os.path.exists(caminho_pasta)
+            nome_pasta = _nome_pasta_osc(osc_nome)
+            pasta_existe = _pasta_certidoes_existe(nome_pasta)
             
             oscs_detalhadas[osc_nome] = {
                 'osc': osc_nome,
@@ -446,9 +489,8 @@ def listar_oscs_ativas():
             continue
         if cnpj_celeb and cnpj_celeb != 'N/A' and cnpj_celeb in cnpjs_existentes:
             continue
-        nome_pasta = secure_filename(osc_nome.replace(' ', '_'))
-        caminho_pasta = os.path.join(UPLOAD_FOLDER, nome_pasta)
-        pasta_existe = os.path.exists(caminho_pasta)
+        nome_pasta = _nome_pasta_osc(osc_nome)
+        pasta_existe = _pasta_certidoes_existe(nome_pasta)
         oscs_detalhadas[osc_nome] = {
             'osc': osc_nome,
             'cnpj': cnpj_celeb,
@@ -549,12 +591,11 @@ def gerar_pastas_oscs():
             cnpj = osc['cnpj']
             
             # Sanitizar nome para usar como nome de pasta
-            nome_pasta = secure_filename(nome_osc.replace(' ', '_'))
-            caminho_pasta = os.path.join(UPLOAD_FOLDER, nome_pasta)
+            nome_pasta = _nome_pasta_osc(nome_osc)
             
             try:
-                if not os.path.exists(caminho_pasta):
-                    os.makedirs(caminho_pasta)
+                if not _pasta_certidoes_existe(nome_pasta):
+                    _garantir_pasta_certidoes(nome_pasta)
                     pastas_criadas.append({
                         'osc': nome_osc,
                         'cnpj': cnpj,
@@ -682,7 +723,7 @@ def upload_certidao_individual():
         nome_arquivo = f"{certidao_nome_resumido}_{timestamp}_{nome_arquivo_original}"
         
         # Caminho relativo para salvar no banco (barras normais para compatibilidade)
-        nome_pasta_osc = secure_filename(osc.replace(' ', '_'))
+        nome_pasta_osc = _nome_pasta_osc(osc)
         caminho_relativo = f"{nome_pasta_osc}/{nome_arquivo}"
         
         # Ler bytes e enviar ao storage (local ou Supabase conforme USE_SUPABASE_STORAGE)
@@ -809,22 +850,15 @@ def criar_certidao():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         nome_arquivo = f"{timestamp}_{nome_arquivo_original}"
         
-        # Criar pasta da OSC se não existir
-        nome_pasta_osc = secure_filename(osc.replace(' ', '_'))
-        caminho_pasta_osc = os.path.join(UPLOAD_FOLDER, nome_pasta_osc)
-        
-        if not os.path.exists(caminho_pasta_osc):
-            os.makedirs(caminho_pasta_osc)
-        
-        # Salvar arquivo
-        caminho_completo = os.path.join(caminho_pasta_osc, nome_arquivo)
-        arquivo.save(caminho_completo)
-        
-        # Obter tamanho do arquivo
-        tamanho_arquivo = os.path.getsize(caminho_completo)
-        
-        # Caminho relativo para salvar no banco
-        caminho_relativo = os.path.join(nome_pasta_osc, nome_arquivo)
+        nome_pasta_osc = _nome_pasta_osc(osc)
+        _garantir_pasta_certidoes(nome_pasta_osc)
+
+        caminho_relativo = f"{nome_pasta_osc}/{nome_arquivo}"
+
+        arquivo.seek(0)
+        file_bytes = arquivo.read()
+        tamanho_arquivo = len(file_bytes)
+        storage.upload_file(f"Certidoes/{caminho_relativo}", file_bytes, 'application/pdf')
         
         # Obter usuário logado
         usuario = session.get('email', 'Sistema')

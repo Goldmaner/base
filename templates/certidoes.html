@@ -171,7 +171,7 @@
             <div class="col-md-4">
                 <div class="stat-box">
                     <div class="stat-number" id="stat-oscs">{{ total_oscs }}</div>
-                    <div class="stat-label">OSCs Cadastradas</div>
+                    <div class="stat-label">OSCs na Central</div>
                 </div>
             </div>
             <div class="col-md-4">
@@ -257,6 +257,13 @@
                                 <p class="card-text text-muted small mb-2">
                                     <i class="bi bi-card-text me-1"></i>{{ osc.cnpj }}
                                 </p>
+                                {% if osc.tipo_origem == 'celebracao' %}
+                                <div class="mb-2">
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-pen me-1"></i>Em celebração
+                                    </span>
+                                </div>
+                                {% endif %}
                                 
                                 <!-- Status das Certidões -->
                                 <div class="mt-2 mb-2">
@@ -305,7 +312,7 @@
                 <div class="alert alert-info text-center mt-4">
                     <i class="bi bi-info-circle me-2" style="font-size: 2rem;"></i>
                     <h4>Nenhuma OSC encontrada</h4>
-                    <p class="mb-3">{% if filtro_busca %}Nenhuma OSC corresponde à sua busca. Tente outro termo.{% else %}Ainda não há pastas de OSCs criadas.{% endif %}</p>
+                    <p class="mb-3">{% if filtro_busca %}Nenhuma OSC corresponde à sua busca. Tente outro termo.{% else %}Ainda não há OSCs com certidões cadastradas ou elegíveis pelas regras atuais.{% endif %}</p>
                     {% if has_write_access('certidoes') %}
                     <button class="btn btn-success btn-lg" onclick="gerarPastasOSCs()">
                         <i class="bi bi-folder-plus me-2"></i>Gerar Pastas de OSCs Ativas
@@ -706,6 +713,7 @@
                     document.getElementById('resumo-pastas-novas').textContent = result.total_pastas_novas;
                     document.getElementById('resumo-pastas-existentes').textContent = result.total_pastas_existentes;
                     document.getElementById('resumo-celebracao').textContent = result.total_celebracao || 0;
+                    document.getElementById('mostrar-pastas-existentes').checked = result.total_pastas_novas === 0;
                     
                     // Calcular valor total
                     const valorTotal = result.oscs.reduce((sum, osc) => sum + osc.total_valor, 0);
@@ -713,6 +721,7 @@
                     
                     // Gerar conteúdo detalhado
                     let html = '';
+                    const mostrarPastasExistentes = document.getElementById('mostrar-pastas-existentes').checked;
                     
                     result.oscs.forEach((osc, index) => {
                         const ehCelebracao = osc.tipo_origem === 'celebracao';
@@ -727,7 +736,7 @@
 
                         // Classe para controlar visibilidade: ocultar pastas existentes por padrão
                         const visibilidadeClass = osc.pasta_existe ? 'osc-existente' : 'osc-nova';
-                        const displayStyle = osc.pasta_existe ? 'display: none;' : '';
+                        const displayStyle = osc.pasta_existe && !mostrarPastasExistentes ? 'display: none;' : '';
 
                         // Cor de fundo: azul claro para celebração, verde para pasta existente, amarelo para nova
                         const headerBg = ehCelebracao ? '#e3f2fd' : (osc.pasta_existe ? '#e8f5e9' : '#fff3cd');

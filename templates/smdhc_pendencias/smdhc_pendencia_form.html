@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ titulo_pagina }} - SMDHC</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background: #f1f5f9; font-family: 'Segoe UI', sans-serif; }
+    .page-header {
+      background: linear-gradient(135deg, #164e63 0%, #0f766e 100%);
+      color: #fff; padding: 22px 30px; margin-bottom: 24px;
+    }
+    .page-header h2 { margin: 0; font-size: 1.35rem; font-weight: 800; }
+    .page-header p { margin: 6px 0 0; opacity: .88; }
+    .content-card {
+      background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.06);
+      max-width: 1100px; margin: 0 auto 30px; overflow: hidden;
+    }
+    .content-card-body { padding: 24px; }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <div class="container-fluid">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+          <h2><i class="bi bi-pencil-square me-2"></i>{{ titulo_pagina }}</h2>
+          <p>Cadastro inicial da pendência com campos operacionais e listas controladas do módulo.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('smdhc_pendencias.index') }}" class="btn btn-outline-light">
+            <i class="bi bi-arrow-left"></i> Voltar
+          </a>
+          {% if pendencia %}
+            <a href="{{ url_for('smdhc_pendencias.detalhe', id=pendencia.id) }}" class="btn btn-light">
+              <i class="bi bi-eye"></i> Ver detalhe
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-fluid px-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="content-card">
+      <div class="content-card-body">
+        <form method="post">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Tema <span class="text-danger">*</span></label>
+              <input type="text" name="tema_nome" class="form-control" required value="{{ form_values.get('tema_nome', '') }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Status</label>
+              <select class="form-select" name="tema_status">
+                <option value="">Selecione</option>
+                {% for status in status_options %}
+                  <option value="{{ status }}" {% if form_values.get('tema_status') == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tipo</label>
+              <select class="form-select" name="tema_tipo">
+                <option value="">Selecione</option>
+                {% for tipo in tema_tipos %}
+                  <option value="{{ tipo }}" {% if form_values.get('tema_tipo') == tipo %}selected{% endif %}>{{ tipo }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Área demandante</label>
+              <select class="form-select" name="tema_area_demandante">
+                <option value="">Selecione</option>
+                {% for area in areas_demandantes %}
+                  <option value="{{ area }}" {% if form_values.get('tema_area_demandante') == area %}selected{% endif %}>{{ area }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Prazo estimado</label>
+              <input type="date" name="tema_prazo_estimado" class="form-control" value="{{ form_values.get('tema_prazo_estimado', '') }}">
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Prioridade manual</label>
+              <input type="number" name="prioridade_manual" class="form-control" min="1" value="{{ form_values.get('prioridade_manual', '') }}">
+            </div>
+            <div class="col-md-9">
+              <label class="form-label fw-semibold">Observação da prioridade</label>
+              <input type="text" name="prioridade_observacao" class="form-control" value="{{ form_values.get('prioridade_observacao', '') }}">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Descrição</label>
+              <textarea name="tema_descricao" class="form-control" rows="4">{{ form_values.get('tema_descricao', '') }}</textarea>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Área responsável</label>
+              <div class="border rounded p-3 bg-light">
+                <div class="row g-2">
+                  {% for area in areas_responsaveis %}
+                    <div class="col-sm-6">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="tema_area_responsavel" id="responsavel-{{ loop.index }}" value="{{ area }}" {% if area in form_values.get('tema_area_responsavel', []) %}checked{% endif %}>
+                        <label class="form-check-label" for="responsavel-{{ loop.index }}">{{ area }}</label>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Área correlata</label>
+              <div class="border rounded p-3 bg-light" style="max-height: 220px; overflow:auto;">
+                <div class="row g-2">
+                  {% for area in areas_correlatas %}
+                    <div class="col-sm-6">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="tema_area_correlata" id="correlata-{{ loop.index }}" value="{{ area }}" {% if area in form_values.get('tema_area_correlata', []) %}checked{% endif %}>
+                        <label class="form-check-label" for="correlata-{{ loop.index }}">{{ area }}</label>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Observações gerais</label>
+              <textarea name="tema_observacoes" class="form-control" rows="4">{{ form_values.get('tema_observacoes', '') }}</textarea>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{{ url_for('smdhc_pendencias.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-check-circle"></i> {{ 'Salvar alterações' if modo == 'editar' else 'Criar pendência' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

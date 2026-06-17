@@ -1,0 +1,61 @@
+<div class="modal fade" id="modalDocumentoPendencia" tabindex="-1" aria-labelledby="modalDocumentoPendenciaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalDocumentoPendenciaLabel" data-default-title="Novo documento relacionado" data-edit-title="Editar documento relacionado">
+          <i class="bi bi-paperclip me-2"></i>Novo documento relacionado
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form
+        method="post"
+        action="{{ url_for('smdhc_pendencias.registrar_documento', id=pendencia.id) }}"
+        enctype="multipart/form-data"
+        data-ajax-form="true"
+        data-default-action="{{ url_for('smdhc_pendencias.registrar_documento', id=pendencia.id) }}"
+        data-edit-action-template="{{ url_for('smdhc_pendencias.editar_documento', id=pendencia.id, documento_id=0) }}"
+      >
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12 d-none" data-documento-atual-shell>
+              <div class="alert alert-light border mb-0">
+                <div class="small text-uppercase text-muted fw-semibold mb-1">Arquivo atual</div>
+                <strong data-documento-atual-nome>-</strong>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Arquivo</label>
+              <input
+                type="file"
+                name="documento_arquivo"
+                class="form-control"
+                required
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.odt,.ods"
+              >
+              <small
+                class="text-muted"
+                data-default-helper="Limite de 30 MB por arquivo. O envio sera armazenado no bucket configurado no Supabase Storage."
+                data-edit-helper="Envie um novo arquivo apenas se quiser substituir o atual. Limite de 30 MB por arquivo."
+                data-documento-helper
+              >Limite de 30 MB por arquivo. O envio sera armazenado no bucket configurado no Supabase Storage.</small>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Titulo</label>
+              <input type="text" name="documento_titulo" class="form-control" placeholder="Ex.: Minuta, oficio, parecer, planilha de apoio">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Observacao</label>
+              <textarea name="documento_descricao" class="form-control" rows="3" placeholder="Descreva rapidamente o conteudo ou a finalidade do documento"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" data-default-label="Enviar documento" data-edit-label="Salvar documento">
+            <i class="bi bi-cloud-upload me-1"></i> Enviar documento
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

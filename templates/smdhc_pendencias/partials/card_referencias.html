@@ -1,0 +1,131 @@
+<div class="content-card" id="section-referencias">
+  <div class="content-card-header">
+    <div>
+      <h6 class="mb-1"><i class="bi bi-link-45deg me-2"></i>Referências e documentos</h6>
+      <small class="text-muted">Links úteis e anexos de apoio vinculados a esta pendência.</small>
+    </div>
+    {% if has_write_access('smdhc_pendencias') %}
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalLinkPendencia">
+          <i class="bi bi-link-45deg me-1"></i> Link
+        </button>
+        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalDocumentoPendencia">
+          <i class="bi bi-paperclip me-1"></i> Documento
+        </button>
+      </div>
+    {% endif %}
+  </div>
+  <div class="content-card-body">
+    <div class="upload-note mb-3">
+      <i class="bi bi-cloud-arrow-up me-1"></i>
+      Documentos são enviados para o bucket configurado no Supabase Storage, com limite de <strong>30 MB</strong> por arquivo.
+    </div>
+
+    <div class="mb-4">
+      <div class="small text-uppercase text-muted fw-semibold mb-2">Links</div>
+      {% if pendencia.links_relacionados %}
+        <div class="resource-list">
+          {% for link in pendencia.links_relacionados %}
+            <div class="resource-item">
+              <div class="resource-title">{{ link.tema_link_titulo or link.tema_link_url }}</div>
+              {% if link.tema_link_descricao %}
+                <div class="small text-muted mt-1">{{ link.tema_link_descricao }}</div>
+              {% endif %}
+              <div class="resource-actions">
+                <a href="{{ link.tema_link_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-box-arrow-up-right me-1"></i> Abrir link
+                </a>
+                {% if has_write_access('smdhc_pendencias') %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalLinkPendencia"
+                    data-editar-link-id="{{ link.id }}"
+                    data-editar-link-titulo="{{ link.tema_link_titulo or '' }}"
+                    data-editar-link-url="{{ link.tema_link_url or '' }}"
+                    data-editar-link-descricao="{{ link.tema_link_descricao or '' }}"
+                  >
+                    <i class="bi bi-pencil me-1"></i> Editar
+                  </button>
+                  <form method="post" action="{{ url_for('smdhc_pendencias.excluir_link', id=pendencia.id, link_id=link.id) }}" class="m-0" data-ajax-form="true" onsubmit="return confirm('Remover este link relacionado?');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-trash me-1"></i> Remover
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+              <div class="resource-meta">
+                {{ link.criado_por or 'sistema' }}
+                {% if link.criado_em %} · {{ link.criado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state py-3">
+          <i class="bi bi-link-45deg fs-3 d-block mb-2"></i>
+          Nenhum link relacionado cadastrado.
+        </div>
+      {% endif %}
+    </div>
+
+    <div>
+      <div class="small text-uppercase text-muted fw-semibold mb-2">Documentos</div>
+      {% if pendencia.documentos_relacionados %}
+        <div class="resource-list">
+          {% for documento in pendencia.documentos_relacionados %}
+            <div class="resource-item">
+              <div class="resource-title">{{ documento.documento_titulo or documento.documento_nome_original }}</div>
+              <div class="small text-muted mt-1">{{ documento.documento_nome_original }}</div>
+              {% if documento.documento_descricao %}
+                <div class="small text-muted mt-2">{{ documento.documento_descricao }}</div>
+              {% endif %}
+              <div class="resource-actions">
+                <a href="{{ url_for('smdhc_pendencias.baixar_documento', id=pendencia.id, documento_id=documento.id) }}" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-download me-1"></i> Baixar
+                </a>
+                {% if has_write_access('smdhc_pendencias') %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalDocumentoPendencia"
+                    data-editar-documento-id="{{ documento.id }}"
+                    data-editar-documento-titulo="{{ documento.documento_titulo or '' }}"
+                    data-editar-documento-descricao="{{ documento.documento_descricao or '' }}"
+                    data-editar-documento-nome="{{ documento.documento_nome_original or '' }}"
+                  >
+                    <i class="bi bi-pencil me-1"></i> Editar
+                  </button>
+                  <form method="post" action="{{ url_for('smdhc_pendencias.excluir_documento', id=pendencia.id, documento_id=documento.id) }}" class="m-0" data-ajax-form="true" onsubmit="return confirm('Remover este documento relacionado?');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-trash me-1"></i> Remover
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+              <div class="resource-meta">
+                {% if documento.documento_tamanho_bytes %}
+                  {% if documento.documento_tamanho_bytes >= 1048576 %}
+                    {{ '%.1f'|format(documento.documento_tamanho_bytes / 1048576) }} MB
+                  {% else %}
+                    {{ '%.0f'|format(documento.documento_tamanho_bytes / 1024) }} KB
+                  {% endif %}
+                  ·
+                {% endif %}
+                {{ documento.criado_por or 'sistema' }}
+                {% if documento.criado_em %} · {{ documento.criado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state py-3">
+          <i class="bi bi-paperclip fs-3 d-block mb-2"></i>
+          Nenhum documento relacionado cadastrado.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>

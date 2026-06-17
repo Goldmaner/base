@@ -298,13 +298,13 @@
       {% endif %}
 
       <!-- ── DEPARTAMENTO DE PARCERIAS (Teal) ── -->
-      {% if is_admin or 'editais' in user_acessos or 'gestao_orcamentaria' in user_acessos %}
+      {% if is_admin or 'editais' in user_acessos or 'gestao_orcamentaria' in user_acessos or 'smdhc_pendencias' in user_acessos %}
       <div class="faf-acc-item s-dp">
         <button class="faf-acc-header collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDP">
           <i class="bi bi-megaphone-fill s-icon" style="font-size:1.05rem;"></i>
           <span>Departamento de Parcerias</span>
           <span class="s-spacer"></span>
-          <span class="s-count">2</span>
+          <span class="s-count">3</span>
           <i class="bi bi-chevron-down s-chev"></i>
         </button>
         <div id="collapseDP" class="accordion-collapse collapse" data-bs-parent="#accordionModulos">
@@ -317,6 +317,11 @@
             {% if is_admin or 'gestao_orcamentaria' in user_acessos %}
             <a href="{{ url_for('gestao_orcamentaria.index') }}" class="faf-btn">
               <i class="bi bi-calculator"></i> Gestão Orçamentária
+            </a>
+            {% endif %}
+            {% if is_admin or 'smdhc_pendencias' in user_acessos %}
+            <a href="/smdhc-pendencias" class="faf-btn">
+              <i class="bi bi-exclamation-diamond"></i> Gestão de Pendências
             </a>
             {% endif %}
           </div>

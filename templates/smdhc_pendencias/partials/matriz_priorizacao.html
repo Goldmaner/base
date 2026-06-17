@@ -1,0 +1,268 @@
+{% from 'smdhc_pendencias/partials/badges_pendencia.html' import tone_for_badge %}
+
+{% if matriz_contexto == 'dashboard' %}
+  {% set top_ranking = pendencias[:8] %}
+  <div class="content-card" id="section-matriz">
+    <div class="content-card-header">
+      <div>
+        <h6 class="mb-1"><i class="bi bi-grid-1x2-fill me-2"></i>Matriz visual de priorização</h6>
+        <small class="text-muted">A ordem respeita a sequência Proximidade → ENEM → Instabilidade → Nº de Riscos → Prazo.</small>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        <span class="badge rounded-pill bg-light text-dark border">Top {{ top_ranking|length }}</span>
+        <button
+          class="btn btn-sm btn-outline-secondary section-toggle-btn"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#matriz-dashboard-collapse"
+          data-collapse-control="#matriz-dashboard-collapse"
+          data-label-expanded="Recolher"
+          data-label-collapsed="Expandir"
+          aria-expanded="true"
+          aria-controls="matriz-dashboard-collapse"
+        >
+          <i class="bi bi-chevron-down"></i>
+          <span data-collapse-label>Recolher</span>
+        </button>
+      </div>
+    </div>
+    <div class="collapse show" id="matriz-dashboard-collapse" data-collapse-persist="matriz">
+      <div class="content-card-body">
+        {% if top_ranking %}
+          <div class="row g-3">
+            {% for pendencia in top_ranking %}
+              <div class="col-lg-6">
+                <div class="matrix-rank-card">
+                  <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                    <div class="rank-pill">
+                      <small>Ordem</small>
+                      <strong>#{{ pendencia.prioridade_manual or pendencia.ordem_prioridade or '—' }}</strong>
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <h6 class="mb-0">{{ pendencia.tema_nome }}</h6>
+                        {% if pendencia.situacao_automatica %}
+                          <span class="badge rounded-pill {{ tone_for_badge(pendencia.situacao_automatica)|trim }}">{{ pendencia.situacao_automatica }}</span>
+                        {% endif %}
+                        {% if pendencia.ordem_prioridade and pendencia.ordem_prioridade <= 5 %}
+                          <span class="badge rounded-pill bg-warning text-dark">Alta prioridade</span>
+                        {% endif %}
+                      </div>
+                      <div class="text-muted small">
+                        {{ pendencia.tema_tipo or 'Sem tipo' }}
+                        {% if pendencia.tema_status %} · {{ pendencia.tema_status }}{% endif %}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="factor-line">
+                    <span>Proximidade</span>
+                    <div class="factor-track">
+                      <div class="factor-fill fill-proximidade" style="width: {{ ((pendencia.nota_proximidade or 0) / 3 * 100)|round|int }}%;"></div>
+                    </div>
+                    <strong>{{ pendencia.nota_proximidade or 0 }}</strong>
+                  </div>
+                  <div class="factor-line">
+                    <span>ENEM</span>
+                    <div class="factor-track">
+                      <div class="factor-fill fill-enem" style="width: {{ ((pendencia.nota_enem or 0) / 3 * 100)|round|int }}%;"></div>
+                    </div>
+                    <strong>{{ pendencia.nota_enem or 0 }}</strong>
+                  </div>
+                  <div class="factor-line">
+                    <span>Instabilidade</span>
+                    <div class="factor-track">
+                      <div class="factor-fill fill-instabilidade" style="width: {{ ((pendencia.nota_instabilidade or 0) / 2 * 100)|round|int }}%;"></div>
+                    </div>
+                    <strong>{{ pendencia.nota_instabilidade or 0 }}</strong>
+                  </div>
+                  <div class="factor-line mb-0">
+                    <span>Nº de Riscos</span>
+                    <div class="factor-track">
+                      <div class="factor-fill fill-riscos" style="width: {{ ((pendencia.nota_riscos or 0) / 7 * 100)|round|int }}%;"></div>
+                    </div>
+                    <strong>{{ pendencia.nota_riscos or 0 }}</strong>
+                  </div>
+
+                  <div class="soft-divider"></div>
+
+                  <div class="d-flex flex-wrap justify-content-between gap-2 small text-muted">
+                    <span><strong>Prazo:</strong> {{ pendencia.tema_prazo_estimado.strftime('%d/%m/%Y') if pendencia.tema_prazo_estimado else 'Sem prazo' }}</span>
+                    <span><strong>Responsável:</strong> {{ pendencia.responsavel or 'Não definido' }}</span>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+
+          <div class="matrix-rule-box mt-4">
+            <div class="fw-semibold mb-2"><i class="bi bi-signpost-split me-2"></i>Como a fila é resolvida</div>
+            <div class="row g-2 small text-muted">
+              <div class="col-md-6">1. A maior nota em <strong>Proximidade</strong> abre a fila.</div>
+              <div class="col-md-6">2. Empates seguem para <strong>ENEM</strong> e depois <strong>Instabilidade</strong>.</div>
+              <div class="col-md-6">3. Persistindo empate, entra o <strong>Nº de Riscos</strong>.</div>
+              <div class="col-md-6">4. Prazo mais próximo e menor ID resolvem o desempate final.</div>
+            </div>
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <i class="bi bi-grid-3x3-gap fs-2 d-block mb-2"></i>
+            Ainda não há pendências suficientes para montar a matriz visual.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="content-card">
+    <div class="content-card-header">
+      <div>
+        <h6 class="mb-1"><i class="bi bi-diagram-3-fill me-2"></i>Matriz de priorização</h6>
+        <small class="text-muted">Registre os fatores da pendência e mantenha a posição operacional sempre recalculada.</small>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge rounded-pill bg-dark">Posição #{{ pendencia.prioridade_manual or pendencia.ordem_prioridade or '—' }}</span>
+        {% if pendencia.prioridade_manual %}
+          <span class="badge rounded-pill bg-warning text-dark">Prioridade manual ativa</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="content-card-body">
+      <div class="matrix-rule-box mb-4">
+        <div class="fw-semibold mb-2"><i class="bi bi-compass me-2"></i>Sequência de decisão</div>
+        <div class="row g-2 small text-muted">
+          <div class="col-md-6">1. A leitura começa pela nota de <strong>Proximidade</strong>.</div>
+          <div class="col-md-6">2. Se houver empate, compara-se <strong>ENEM</strong>.</div>
+          <div class="col-md-6">3. Depois entram <strong>Instabilidade</strong> e <strong>Nº de Riscos</strong>.</div>
+          <div class="col-md-6">4. Prazo estimado e ID resolvem o desempate operacional.</div>
+        </div>
+      </div>
+
+      <form method="post" action="{{ url_for('smdhc_pendencias.salvar_matriz', id=pendencia.id) }}" data-ajax-form="true">
+        <div class="row g-3 mb-4">
+          {% for principio in pendencia.matriz %}
+            {% if principio.tema_principios == 'Proximidade' %}
+              {% set max_valor = 3 %}
+            {% elif principio.tema_principios == 'ENEM' %}
+              {% set max_valor = 3 %}
+            {% elif principio.tema_principios == 'Instabilidade' %}
+              {% set max_valor = 2 %}
+            {% else %}
+              {% set max_valor = 7 %}
+            {% endif %}
+            <div class="col-md-6 col-xl-3">
+              <div class="matrix-score-card">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <span class="text-muted small">Critério {{ loop.index }}</span>
+                  <span class="badge bg-light text-dark border">Ordem {{ principio.tema_principios_ordem }}</span>
+                </div>
+                <div class="matrix-score">{{ principio.tema_principios_nota if principio.tema_principios_nota is not none else 0 }}</div>
+                <div class="fw-semibold mb-1">{{ principio.tema_principios }}</div>
+                <div class="small text-muted mb-3">{{ principio.tema_principios_descricao or 'Sem descrição cadastrada.' }}</div>
+                <div class="factor-track">
+                  {% if principio.tema_principios == 'Proximidade' %}
+                    <div class="factor-fill fill-proximidade" style="width: {{ (((principio.tema_principios_nota or 0) / max_valor) * 100)|round|int }}%;"></div>
+                  {% elif principio.tema_principios == 'ENEM' %}
+                    <div class="factor-fill fill-enem" style="width: {{ (((principio.tema_principios_nota or 0) / max_valor) * 100)|round|int }}%;"></div>
+                  {% elif principio.tema_principios == 'Instabilidade' %}
+                    <div class="factor-fill fill-instabilidade" style="width: {{ (((principio.tema_principios_nota or 0) / max_valor) * 100)|round|int }}%;"></div>
+                  {% else %}
+                    <div class="factor-fill fill-riscos" style="width: {{ (((principio.tema_principios_nota or 0) / max_valor) * 100)|round|int }}%;"></div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="row g-3">
+          {% for principio in pendencia.matriz %}
+            {% set is_risco = principio.tema_principios_ordem == 40 %}
+            <div class="col-lg-6">
+              <div class="matrix-editor-card">
+                <input type="hidden" name="principio_ids" value="{{ principio.principio_id }}">
+                {% set ns = namespace(has_selected=false) %}
+                {% for nota in principio.notas %}
+                  {% if nota.selecionado %}
+                    {% set ns.has_selected = true %}
+                  {% endif %}
+                {% endfor %}
+                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                  <div>
+                    <div class="fw-semibold">{{ principio.tema_principios }}</div>
+                    <div class="small text-muted">{{ principio.tema_principios_calculo or 'Sem regra de cálculo cadastrada.' }}</div>
+                  </div>
+                  <span class="badge bg-light text-dark border">Nota atual {{ principio.tema_principios_nota if principio.tema_principios_nota is not none else 0 }}</span>
+                </div>
+
+                <div class="mb-3">
+                  <input
+                    type="hidden"
+                    name="tema_principios_nota_{{ principio.principio_id }}"
+                    value="{{ principio.tema_principios_nota if principio.tema_principios_nota is not none else 0 }}"
+                    data-matrix-note-input
+                    data-principio-id="{{ principio.principio_id }}"
+                  >
+                  <div class="matrix-note-box">
+                    <span class="matrix-note-label">Nota calculada</span>
+                    <div
+                      class="matrix-note-display"
+                      data-matrix-note-display
+                      data-principio-id="{{ principio.principio_id }}"
+                    >
+                      {{ principio.tema_principios_nota if principio.tema_principios_nota is not none else 0 }}
+                    </div>
+                  </div>
+                  <div class="form-text">
+                    {% if is_risco %}
+                      Resultado somado automaticamente a partir dos riscos marcados.
+                    {% else %}
+                      Resultado automático da opção exclusiva selecionada.
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="matrix-option-grid">
+                  {% for nota in principio.notas %}
+                    {% set is_checked = nota.selecionado or (not is_risco and not ns.has_selected and principio.tema_principios_nota == nota.tema_principios_nota_valor) %}
+                    <label class="matrix-option {% if is_checked %}selected{% endif %}">
+                      <input
+                        class="form-check-input"
+                        type="{{ 'checkbox' if is_risco else 'radio' }}"
+                        name="principio_nota_ids_{{ principio.principio_id }}"
+                        value="{{ nota.id }}"
+                        data-matrix-factor-input
+                        data-principio-id="{{ principio.principio_id }}"
+                        data-nota-valor="{{ nota.tema_principios_nota_valor }}"
+                        data-is-risco="{{ 'true' if is_risco else 'false' }}"
+                        {% if is_checked %}checked{% endif %}
+                        {% if not has_write_access('smdhc_pendencias') %}disabled{% endif %}
+                      >
+                      <span>
+                        <strong>{{ nota.tema_principios_nota_nome }}</strong>
+                        {% if nota.tema_principios_nota_descricao %}
+                          <small class="d-block text-muted">{{ nota.tema_principios_nota_descricao }}</small>
+                        {% endif %}
+                      </span>
+                      <span class="matrix-option-value">{{ nota.tema_principios_nota_valor }}</span>
+                    </label>
+                  {% else %}
+                    <div class="text-muted small">Sem fatores cadastrados para este princípio.</div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        {% if has_write_access('smdhc_pendencias') %}
+          <div class="d-flex justify-content-end mt-4">
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-check-circle me-1"></i> Atualizar matriz
+            </button>
+          </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+{% endif %}

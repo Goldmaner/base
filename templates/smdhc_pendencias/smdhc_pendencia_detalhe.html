@@ -1,0 +1,1373 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ pendencia.tema_nome }} - Pendência</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body {
+      background: linear-gradient(180deg, #eef6f7 0, #f8fbfc 260px, #eef2f7 100%);
+      font-family: 'Segoe UI', sans-serif;
+      color: #0f172a;
+    }
+    .page-header {
+      background: linear-gradient(135deg, #164e63 0%, #0f766e 100%);
+      color: #fff;
+      padding: 22px 30px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 18px rgba(15, 118, 110, .22);
+    }
+    .page-header h2 { margin: 0; font-size: 1.4rem; font-weight: 800; }
+    .page-header p { margin: 6px 0 0; opacity: .88; max-width: 760px; }
+    .btn-parc {
+      background: linear-gradient(135deg, #164e63, #0f766e);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-parc:hover { color: #fff; opacity: .92; }
+    .btn-parc.outline {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, .65);
+    }
+    .faf-content {
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 0 24px 40px;
+    }
+    .content-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(15, 23, 42, .06);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .content-card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .content-card-body { padding: 20px; }
+    .hero-card {
+      border: 1px solid #dbe7ee;
+      border-radius: 16px;
+      padding: 18px;
+      background: linear-gradient(180deg, #fff, #fbfeff);
+    }
+    .mini-stat {
+      background: linear-gradient(180deg, #fff, #f4fbfb);
+      border: 1px solid #dbeff0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      height: 100%;
+    }
+    .mini-stat h3 {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #164e63;
+    }
+    .mini-stat span {
+      display: block;
+      margin-top: 4px;
+      color: #475569;
+      font-size: .84rem;
+    }
+    .detail-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .detail-meta-card {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 14px 16px;
+      height: 100%;
+    }
+    .detail-meta-card span {
+      display: block;
+      font-size: .73rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+    .detail-meta-card strong {
+      display: block;
+      color: #0f172a;
+      font-size: .95rem;
+    }
+    .detail-block {
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      background: #f8fafc;
+      padding: 16px 18px;
+      height: 100%;
+    }
+    .detail-block h6 { margin-bottom: 10px; }
+    .detail-block p:last-child { margin-bottom: 0; }
+    .formatted-text {
+      white-space: pre-line;
+      line-height: 1.7;
+      color: #334155;
+      margin: 0;
+      word-break: break-word;
+    }
+    .pendencia-badge { font-size: .78rem; }
+    .next-action-banner {
+      border: 1px solid #bae6fd;
+      background: linear-gradient(135deg, #ecfeff, #f8fafc);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .timeline-shell {
+      position: relative;
+      padding-left: 20px;
+    }
+    .timeline-shell::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 4px;
+      bottom: 4px;
+      width: 2px;
+      background: linear-gradient(180deg, #99f6e4, #0f766e);
+    }
+    .timeline-entry {
+      position: relative;
+      padding-left: 18px;
+      margin-bottom: 18px;
+    }
+    .timeline-entry:last-child { margin-bottom: 0; }
+    .timeline-dot {
+      position: absolute;
+      left: -1px;
+      top: 6px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #0f766e;
+      box-shadow: 0 0 0 5px rgba(15, 118, 110, .12);
+    }
+    .timeline-panel {
+      border: 1px solid #dbe7ee;
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #fff;
+    }
+    .side-stack {
+      display: grid;
+      gap: 12px;
+    }
+    .side-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #f8fafc;
+    }
+    .current-owner-card {
+      border: 1px solid #dbe7ee;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #fff, #f8fbfc);
+      padding: 16px;
+    }
+    .person-tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .person-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #ecfeff;
+      border: 1px solid #bae6fd;
+      color: #164e63;
+      font-size: .8rem;
+      font-weight: 600;
+    }
+    .history-row {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+    .history-row:first-child {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+    .history-toggle {
+      font-size: .85rem;
+    }
+    .resource-list {
+      display: grid;
+      gap: 12px;
+    }
+    .resource-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px;
+      background: #f8fafc;
+    }
+    .resource-title {
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .resource-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .resource-meta {
+      color: #64748b;
+      font-size: .82rem;
+      margin-top: 8px;
+    }
+    .upload-note {
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: .82rem;
+    }
+    .matrix-rule-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .matrix-score-card,
+    .matrix-editor-card {
+      border: 1px solid #dbe7ee;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #fff, #f8fbfc);
+      padding: 16px;
+      height: 100%;
+    }
+    .matrix-score {
+      font-size: 1.9rem;
+      line-height: 1;
+      font-weight: 800;
+      color: #164e63;
+      margin: 10px 0 8px;
+    }
+    .factor-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .factor-fill { height: 100%; border-radius: 999px; }
+    .fill-proximidade { background: linear-gradient(90deg, #0f766e, #14b8a6); }
+    .fill-enem { background: linear-gradient(90deg, #0369a1, #38bdf8); }
+    .fill-instabilidade { background: linear-gradient(90deg, #b45309, #f59e0b); }
+    .fill-riscos { background: linear-gradient(90deg, #991b1b, #ef4444); }
+    .matrix-option-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .matrix-option {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 10px;
+      align-items: start;
+      border: 1px solid #dbe7ee;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    .matrix-option.selected {
+      border-color: #0f766e;
+      background: #ecfeff;
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, .08);
+    }
+    .matrix-option input { margin-top: 4px; }
+    .matrix-option-value {
+      font-weight: 700;
+      color: #164e63;
+      white-space: nowrap;
+    }
+    .matrix-note-box {
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 12px 14px;
+    }
+    .matrix-note-label {
+      display: block;
+      font-size: .74rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .matrix-note-display {
+      font-size: 1.35rem;
+      line-height: 1;
+      font-weight: 800;
+      color: #164e63;
+    }
+    .people-chip-search {
+      border: 1px solid #dbe7ee;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 12px;
+    }
+    .people-chip-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      max-height: 240px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .people-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #dbe7ee;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+    .people-chip:hover {
+      border-color: #0f766e;
+      background: #f0fdfa;
+    }
+    .people-chip.selected {
+      border-color: #0f766e;
+      background: #ecfeff;
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, .08);
+    }
+    .people-chip input { margin: 0; }
+    .people-chip small {
+      display: block;
+      color: #64748b;
+      font-size: .75rem;
+    }
+    .meeting-participants-shell {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 18px;
+    }
+    .meeting-participants-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .meeting-external-box {
+      border: 1px solid #dbe7ee;
+      border-radius: 14px;
+      background: #f8fafc;
+      padding: 14px;
+      height: 100%;
+    }
+    .meeting-external-list {
+      display: grid;
+      gap: 10px;
+    }
+    .meeting-external-row {
+      border: 1px solid #dbe7ee;
+      border-radius: 12px;
+      background: #fff;
+      padding: 10px;
+    }
+    .external-participant-label {
+      font-size: .92rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .empty-state {
+      border: 1px dashed #cbd5e1;
+      border-radius: 14px;
+      padding: 24px;
+      text-align: center;
+      background: #f8fafc;
+      color: #64748b;
+    }
+    .modal-header {
+      background: linear-gradient(135deg, #164e63, #0f766e);
+      color: #fff;
+    }
+    .modal-header .btn-close { filter: invert(1); }
+    @media (max-width: 991.98px) {
+      .detail-meta-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 767.98px) {
+      .page-header { padding: 20px 18px; }
+      .faf-content { padding: 0 16px 32px; }
+    }
+  </style>
+</head>
+<body>
+  {% from 'smdhc_pendencias/partials/badges_pendencia.html' import render_badges, status_class %}
+
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h2><i class="bi bi-journal-text me-2"></i>{{ pendencia.tema_nome }}</h2>
+        <p>{{ pendencia.tema_tipo or 'Sem tipo definido' }} · {{ pendencia.tema_status or 'Sem status' }} · {{ pendencia.tema_area_demandante or 'Área demandante não informada' }}</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        {% if has_write_access('smdhc_pendencias') %}
+          <a href="{{ url_for('smdhc_pendencias.editar', id=pendencia.id) }}" class="btn-parc">
+            <i class="bi bi-pencil"></i> Editar
+          </a>
+        {% endif %}
+        <a href="{{ url_for('smdhc_pendencias.relatorio') }}" class="btn-parc outline">
+          <i class="bi bi-file-earmark-text"></i> Relatório
+        </a>
+        <a href="{{ url_for('smdhc_pendencias.index') }}" class="btn-parc outline">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="faf-content">
+    <div id="ajax-feedback"></div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="content-card" id="section-hero">
+      <div class="content-card-body">
+        <div class="hero-card">
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            {{ render_badges(pendencia.badges) }}
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-3">
+              <div class="mini-stat">
+                <h3>#{{ pendencia.prioridade_manual or pendencia.ordem_prioridade or '—' }}</h3>
+                <span>Prioridade operacional</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mini-stat">
+                <h3>{{ pendencia.responsavel or 'Não definido' }}</h3>
+                <span>Responsável atual</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mini-stat">
+                <h3>{{ pendencia.tema_prazo_estimado.strftime('%d/%m/%Y') if pendencia.tema_prazo_estimado else 'Sem prazo' }}</h3>
+                <span>Prazo estimado</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mini-stat">
+                <h3>{{ pendencia.situacao_automatica_view or pendencia.situacao_automatica or 'Sem sinal' }}</h3>
+                <span>Situação automática</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-lg-7">
+              <div class="detail-block">
+                <h6><i class="bi bi-card-text me-2"></i>Descrição</h6>
+                <div class="formatted-text mb-3">{{ pendencia.tema_descricao or 'Sem descrição registrada.' }}</div>
+                <h6><i class="bi bi-journal-richtext me-2"></i>Observações</h6>
+                <div class="formatted-text">{{ pendencia.tema_observacoes or 'Sem observações registradas.' }}</div>
+              </div>
+            </div>
+            <div class="col-lg-5">
+              <div class="detail-meta-grid">
+                <div class="detail-meta-card">
+                  <span>Status</span>
+                  <strong><span class="badge rounded-pill {{ status_class(pendencia.tema_status)|trim }}">{{ pendencia.tema_status or 'Sem status' }}</span></strong>
+                </div>
+                <div class="detail-meta-card">
+                  <span>Área demandante</span>
+                  <strong>{{ pendencia.tema_area_demandante or 'Não informada' }}</strong>
+                </div>
+                <div class="detail-meta-card">
+                  <span>Áreas responsáveis</span>
+                  <strong>{{ pendencia.tema_area_responsavel|join(', ') if pendencia.tema_area_responsavel else 'Não informadas' }}</strong>
+                </div>
+                <div class="detail-meta-card">
+                  <span>Áreas correlatas</span>
+                  <strong>{{ pendencia.tema_area_correlata|join(', ') if pendencia.tema_area_correlata else 'Não informadas' }}</strong>
+                </div>
+                <div class="detail-meta-card">
+                  <span>Última atualização</span>
+                  <strong>{{ pendencia.ultima_atualizacao or 'Sem atualização consolidada' }}</strong>
+                </div>
+                <div class="detail-meta-card">
+                  <span>Atualizado em</span>
+                  <strong>{{ pendencia.atualizado_em.strftime('%d/%m/%Y %H:%M') if pendencia.atualizado_em else 'Sem registro' }}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-8">
+        {% include 'smdhc_pendencias/partials/timeline_atualizacoes.html' %}
+      </div>
+
+      <div class="col-lg-4">
+        <div class="content-card" id="section-sei">
+          <div class="content-card-header">
+            <div>
+              <h6 class="mb-1"><i class="bi bi-diagram-3 me-2"></i>Processos SEI</h6>
+              <small class="text-muted">Histórico de processos vinculados à pendência.</small>
+            </div>
+            {% if has_write_access('smdhc_pendencias') %}
+              <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalSeiPendencia">
+                <i class="bi bi-plus-circle me-1"></i> Vincular
+              </button>
+            {% endif %}
+          </div>
+          <div class="content-card-body">
+            {% if pendencia.processos_sei %}
+              <div class="side-stack">
+                {% for item in pendencia.processos_sei %}
+                  <div class="side-item">
+                    {% if has_write_access('smdhc_pendencias') %}
+                      <div class="d-flex justify-content-end mb-2">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalSeiPendencia"
+                          data-editar-sei-id="{{ item.id }}"
+                          data-editar-sei-processo="{{ item.tema_processo or '' }}"
+                          data-editar-sei-observacao="{{ item.tema_processo_observacao or '' }}"
+                        >
+                          <i class="bi bi-pencil me-1"></i> Editar
+                        </button>
+                      </div>
+                    {% endif %}
+                    <div class="fw-semibold">{{ item.tema_processo or 'Sem número informado' }}</div>
+                    <div class="small text-muted mt-1">{{ item.tema_processo_observacao or 'Sem observação registrada.' }}</div>
+                    <div class="small text-muted mt-2">
+                      {{ item.criado_por or 'sistema' }}
+                      {% if item.criado_em %} · {{ item.criado_em.strftime('%d/%m/%Y') }}{% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-state">
+                <i class="bi bi-diagram-3 fs-2 d-block mb-2"></i>
+                Nenhum processo SEI vinculado.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="content-card" id="section-responsaveis">
+          <div class="content-card-header">
+            <div>
+              <h6 class="mb-1"><i class="bi bi-people-fill me-2"></i>Responsáveis e envolvidos</h6>
+              <small class="text-muted">Responsável atual em destaque e histórico preservado sem poluir a leitura.</small>
+            </div>
+            {% if has_write_access('smdhc_pendencias') %}
+              <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalResponsaveisPendencia">
+                <i class="bi bi-pencil-square me-1"></i> Atualizar
+              </button>
+            {% endif %}
+          </div>
+          <div class="content-card-body">
+            {% set historico_responsaveis = pendencia.responsaveis_historico or [] %}
+            {% if pendencia.responsaveis_historico %}
+              {% set responsavel_atual_registro = historico_responsaveis[0] %}
+              <div class="current-owner-card mb-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
+                  <div>
+                    <div class="small text-uppercase text-muted fw-semibold mb-1">Responsável atual</div>
+                    <div class="fw-semibold fs-5">{{ responsavel_atual_registro.tema_responsavel or 'Responsável não informado' }}</div>
+                  </div>
+                  <span class="badge bg-light text-dark border">
+                    {% if responsavel_atual_registro.criado_em %}
+                      {{ responsavel_atual_registro.criado_em.strftime('%d/%m/%Y') }}
+                    {% else %}
+                      Registro atual
+                    {% endif %}
+                  </span>
+                  {% if has_write_access('smdhc_pendencias') %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalResponsaveisPendencia"
+                      data-editar-responsavel-id="{{ responsavel_atual_registro.id }}"
+                      data-editar-responsavel-principal="{{ responsavel_atual_registro.tema_responsavel or '' }}"
+                      data-editar-responsavel-envolvidos='{{ (responsavel_atual_registro.tema_envolvidos or []) | tojson | forceescape }}'
+                    >
+                      <i class="bi bi-pencil me-1"></i> Editar atual
+                    </button>
+                  {% endif %}
+                </div>
+
+                <div class="small text-muted mb-2">Envolvidos vinculados ao último registro</div>
+                {% if responsavel_atual_registro.tema_envolvidos %}
+                  <div class="person-tag-list">
+                    {% for envolvido in responsavel_atual_registro.tema_envolvidos %}
+                      <span class="person-tag">
+                        <i class="bi bi-person"></i>{{ envolvido }}
+                      </span>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="text-muted small">Sem envolvidos registrados no vínculo atual.</div>
+                {% endif %}
+
+                <div class="small text-muted mt-3">
+                  {{ responsavel_atual_registro.criado_por or 'sistema' }}
+                  {% if responsavel_atual_registro.criado_em %} · {{ responsavel_atual_registro.criado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+                </div>
+              </div>
+
+              {% if historico_responsaveis|length > 1 %}
+                <button class="btn btn-sm btn-outline-secondary history-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#historico-responsaveis" aria-expanded="false">
+                  <i class="bi bi-clock-history me-1"></i> Ver histórico de responsáveis ({{ historico_responsaveis|length - 1 }})
+                </button>
+                <div class="collapse mt-3" id="historico-responsaveis">
+                  <div class="side-item">
+                    {% for item in historico_responsaveis[1:] %}
+                      <div class="history-row">
+                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                          <div class="fw-semibold">{{ item.tema_responsavel or 'Responsável não informado' }}</div>
+                          <span class="small text-muted">
+                            {% if item.criado_em %}{{ item.criado_em.strftime('%d/%m/%Y') }}{% else %}Sem data{% endif %}
+                          </span>
+                        </div>
+                        {% if item.tema_envolvidos %}
+                          <div class="person-tag-list mt-2">
+                            {% for envolvido in item.tema_envolvidos %}
+                              <span class="person-tag">
+                                <i class="bi bi-person"></i>{{ envolvido }}
+                              </span>
+                            {% endfor %}
+                          </div>
+                        {% else %}
+                          <div class="text-muted small mt-2">Sem envolvidos registrados.</div>
+                        {% endif %}
+                        <div class="small text-muted mt-2">
+                          {{ item.criado_por or 'sistema' }}
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+            {% else %}
+              <div class="empty-state">
+                <i class="bi bi-person-lines-fill fs-2 d-block mb-2"></i>
+                Nenhum responsável registrado ainda.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        {% include 'smdhc_pendencias/partials/card_referencias.html' %}
+      </div>
+    </div>
+
+    {% set matriz_contexto = 'detalhe' %}
+    {% include 'smdhc_pendencias/partials/matriz_priorizacao.html' %}
+
+    <div class="content-card">
+      <div class="content-card-header">
+        <div>
+          <h6 class="mb-1"><i class="bi bi-tools me-2"></i>Ações da pendência</h6>
+          <small class="text-muted">Ações administrativas rápidas para continuidade da gestão.</small>
+        </div>
+      </div>
+      <div class="content-card-body d-flex flex-wrap gap-2">
+        <a href="{{ url_for('smdhc_pendencias.index') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i> Voltar à fila
+        </a>
+        {% if has_write_access('smdhc_pendencias') %}
+          <a href="{{ url_for('smdhc_pendencias.editar', id=pendencia.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil me-1"></i> Editar cadastro
+          </a>
+          <form method="post" action="{{ url_for('smdhc_pendencias.excluir', id=pendencia.id) }}" onsubmit="return confirm('Arquivar esta pendência?');" class="m-0">
+            <button type="submit" class="btn btn-outline-danger">
+              <i class="bi bi-archive me-1"></i> Arquivar pendência
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if has_write_access('smdhc_pendencias') %}
+    {% include 'smdhc_pendencias/partials/modal_atualizacao.html' %}
+    {% include 'smdhc_pendencias/partials/modal_editar_atualizacao.html' %}
+    {% include 'smdhc_pendencias/partials/modal_sei.html' %}
+    {% include 'smdhc_pendencias/partials/modal_responsaveis.html' %}
+    {% include 'smdhc_pendencias/partials/modal_link.html' %}
+    {% include 'smdhc_pendencias/partials/modal_documento.html' %}
+  {% endif %}
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (() => {
+      const REFRESH_SECTION_IDS = [
+        'section-hero',
+        'section-timeline',
+        'section-sei',
+        'section-responsaveis',
+        'section-referencias',
+        'section-matriz',
+      ];
+
+      const feedbackHost = () => document.getElementById('ajax-feedback');
+
+      const showAjaxFeedback = (message, category = 'success') => {
+        const host = feedbackHost();
+        if (!host || !message) {
+          return;
+        }
+
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${category} alert-dismissible fade show`;
+        alert.setAttribute('role', 'alert');
+        alert.innerHTML = `
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+        `;
+        host.innerHTML = '';
+        host.appendChild(alert);
+
+        window.setTimeout(() => {
+          if (alert.isConnected) {
+            bootstrap.Alert.getOrCreateInstance(alert).close();
+          }
+        }, 5000);
+      };
+
+      const getOpenCollapseIds = () =>
+        Array.from(document.querySelectorAll('.collapse.show'))
+          .map((element) => element.id)
+          .filter(Boolean);
+
+      const restoreOpenCollapses = (ids) => {
+        ids.forEach((id) => {
+          const element = document.getElementById(id);
+          if (element) {
+            bootstrap.Collapse.getOrCreateInstance(element, { toggle: false }).show();
+          }
+        });
+      };
+
+      const toggleChipState = (chip) => {
+        const input = chip.querySelector('input[type="checkbox"]');
+        chip.classList.toggle('selected', !!input?.checked);
+      };
+
+      const createExternalParticipantRow = (form, values = {}) => {
+        const template = form.querySelector('[data-externo-template]');
+        const list = form.querySelector('[data-externo-list]');
+        if (!(template instanceof HTMLTemplateElement) || !list) {
+          return;
+        }
+
+        const fragment = template.content.cloneNode(true);
+        const row = fragment.querySelector('.meeting-external-row');
+        if (!row) {
+          return;
+        }
+
+        const nomeInput = row.querySelector('[name="participante_externo_nome"]');
+        const setorInput = row.querySelector('[name="participante_externo_setor"]');
+        if (nomeInput instanceof HTMLInputElement) {
+          nomeInput.value = values.nome || '';
+        }
+        if (setorInput instanceof HTMLInputElement) {
+          setorInput.value = values.setor || '';
+        }
+
+        const removeButton = row.querySelector('[data-remove-externo-row]');
+        if (removeButton instanceof HTMLButtonElement) {
+          removeButton.addEventListener('click', () => row.remove());
+        }
+
+        list.appendChild(row);
+      };
+
+      const clearExternalParticipantRows = (form) => {
+        const list = form.querySelector('[data-externo-list]');
+        if (list) {
+          list.innerHTML = '';
+        }
+      };
+
+      const toggleMeetingFields = (form) => {
+        const select = form.querySelector('[data-atualizacao-tipo-select]');
+        const shell = form.querySelector('[data-reuniao-fields]');
+        if (!(select instanceof HTMLSelectElement) || !shell) {
+          return;
+        }
+        const isReuniao = select.value.trim().toLowerCase().startsWith('reuni');
+        shell.classList.toggle('d-none', !isReuniao);
+      };
+
+      const resetMeetingFormState = (form) => {
+        clearExternalParticipantRows(form);
+
+        form.querySelectorAll('.people-chip input[type="checkbox"]').forEach((input) => {
+          if (input instanceof HTMLInputElement) {
+            input.checked = false;
+            const chip = input.closest('.people-chip');
+            if (chip) {
+              chip.classList.remove('selected');
+              chip.style.display = '';
+            }
+          }
+        });
+
+        form.querySelectorAll('[data-participante-search]').forEach((input) => {
+          if (input instanceof HTMLInputElement) {
+            input.value = '';
+          }
+        });
+
+        toggleMeetingFields(form);
+      };
+
+      const setInternalParticipants = (form, ids = []) => {
+        const wanted = new Set((ids || []).map((value) => String(value)));
+        form.querySelectorAll('.people-chip').forEach((chip) => {
+          const input = chip.querySelector('input[type="checkbox"]');
+          if (input instanceof HTMLInputElement) {
+            input.checked = wanted.has(input.value);
+            toggleChipState(chip);
+          }
+        });
+      };
+
+      const populateExternalParticipants = (form, externos = []) => {
+        clearExternalParticipantRows(form);
+        (externos || []).forEach((item) => createExternalParticipantRow(form, item || {}));
+      };
+
+      const initAtualizacaoForm = (form) => {
+        if (!(form instanceof HTMLFormElement) || form.dataset.atualizacaoFormBound === 'true') {
+          return;
+        }
+        form.dataset.atualizacaoFormBound = 'true';
+
+        const select = form.querySelector('[data-atualizacao-tipo-select]');
+        if (select instanceof HTMLSelectElement) {
+          select.addEventListener('change', () => toggleMeetingFields(form));
+        }
+
+        form.querySelectorAll('.people-chip').forEach((chip) => {
+          const input = chip.querySelector('input[type="checkbox"]');
+          toggleChipState(chip);
+          if (input instanceof HTMLInputElement) {
+            input.addEventListener('change', () => toggleChipState(chip));
+          }
+        });
+
+        form.querySelectorAll('[data-participante-search]').forEach((searchInput) => {
+          if (!(searchInput instanceof HTMLInputElement)) {
+            return;
+          }
+          searchInput.addEventListener('input', () => {
+            const termo = searchInput.value.trim().toLowerCase();
+            form.querySelectorAll('[data-participante-grid] .people-chip').forEach((chip) => {
+              const texto = chip.getAttribute('data-usuario-label') || '';
+              chip.style.display = !termo || texto.includes(termo) ? '' : 'none';
+            });
+          });
+        });
+
+        form.querySelectorAll('[data-add-externo-row]').forEach((button) => {
+          if (button instanceof HTMLButtonElement) {
+            button.addEventListener('click', () => createExternalParticipantRow(form));
+          }
+        });
+
+        toggleMeetingFields(form);
+      };
+
+      const initAtualizacaoForms = () => {
+        document.querySelectorAll('#modalAtualizacaoPendencia form, #modalEditarAtualizacaoPendencia form').forEach((form) => {
+          initAtualizacaoForm(form);
+        });
+      };
+
+      const updateMatrixCardState = (principioId) => {
+        const inputs = Array.from(document.querySelectorAll(`[data-matrix-factor-input][data-principio-id="${principioId}"]`));
+        const hiddenInput = document.querySelector(`[data-matrix-note-input][data-principio-id="${principioId}"]`);
+        const display = document.querySelector(`[data-matrix-note-display][data-principio-id="${principioId}"]`);
+        if (!hiddenInput || !display || !inputs.length) {
+          return;
+        }
+
+        const isRisco = inputs[0].dataset.isRisco === 'true';
+        let score = 0;
+
+        if (isRisco) {
+          score = inputs
+            .filter((input) => input.checked)
+            .reduce((total, input) => total + Number(input.dataset.notaValor || 0), 0);
+        } else {
+          const selected = inputs.find((input) => input.checked);
+          score = selected ? Number(selected.dataset.notaValor || 0) : 0;
+        }
+
+        hiddenInput.value = String(score);
+        display.textContent = String(score);
+
+        inputs.forEach((input) => {
+          const option = input.closest('.matrix-option');
+          if (option) {
+            option.classList.toggle('selected', input.checked);
+          }
+        });
+      };
+
+      const initMatrixEditor = () => {
+        const allPrincipios = new Set(
+          Array.from(document.querySelectorAll('[data-matrix-factor-input]')).map((input) => input.dataset.principioId)
+        );
+
+        allPrincipios.forEach(updateMatrixCardState);
+
+        document.querySelectorAll('[data-matrix-factor-input]').forEach((input) => {
+          if (input.dataset.matrixBound === 'true') {
+            return;
+          }
+          input.dataset.matrixBound = 'true';
+          input.addEventListener('change', () => updateMatrixCardState(input.dataset.principioId));
+        });
+      };
+
+      const refreshDetailSections = async () => {
+        const response = await fetch(window.location.pathname, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          throw new Error('Não foi possível recarregar os blocos da pendência.');
+        }
+
+        const html = await response.text();
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+
+        REFRESH_SECTION_IDS.forEach((sectionId) => {
+          const current = document.getElementById(sectionId);
+          const fresh = parsed.getElementById(sectionId);
+          if (current && fresh) {
+            current.replaceWith(fresh);
+          }
+        });
+
+        initMatrixEditor();
+        initAtualizacaoForms();
+      };
+
+      const closeParentModal = (form) => {
+        const modalElement = form.closest('.modal');
+        if (!modalElement) {
+          return;
+        }
+        const instance = bootstrap.Modal.getInstance(modalElement);
+        if (instance) {
+          instance.hide();
+        }
+      };
+
+      const setElementLabel = (element, label) => {
+        if (!element || !label) {
+          return;
+        }
+        const icon = element.querySelector('i');
+        const iconHtml = icon ? `${icon.outerHTML} ` : '';
+        element.innerHTML = `${iconHtml}${label}`;
+      };
+
+      const buildEditActionUrl = (template, id) => {
+        if (!template) {
+          return '';
+        }
+        return template.replace('/0/editar', `/${id}/editar`);
+      };
+
+      const resetResponsaveisFormState = (form) => {
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+
+        form.reset();
+
+        const filtro = form.querySelector('#filtro-envolvidos-pendencia');
+        if (filtro instanceof HTMLInputElement) {
+          filtro.value = '';
+        }
+
+        form.querySelectorAll('.people-chip').forEach((chip) => {
+          chip.style.display = '';
+          toggleChipState(chip);
+        });
+      };
+
+      const setResponsaveisEnvolvidos = (form, envolvidos = []) => {
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+
+        const wanted = new Set((envolvidos || []).map((value) => String(value)));
+        form.querySelectorAll('input[name="tema_envolvidos"]').forEach((input) => {
+          if (!(input instanceof HTMLInputElement)) {
+            return;
+          }
+          input.checked = wanted.has(input.value);
+          const chip = input.closest('.people-chip');
+          if (chip) {
+            chip.style.display = '';
+            toggleChipState(chip);
+          }
+        });
+      };
+
+      const seiModal = document.getElementById('modalSeiPendencia');
+      if (seiModal) {
+        seiModal.addEventListener('show.bs.modal', (event) => {
+          const trigger = event.relatedTarget;
+          const form = seiModal.querySelector('form');
+          const title = seiModal.querySelector('.modal-title');
+          const submit = seiModal.querySelector('[type="submit"]');
+          if (!(form instanceof HTMLFormElement)) {
+            return;
+          }
+
+          form.reset();
+          form.action = form.dataset.defaultAction || form.action;
+          setElementLabel(title, title?.dataset.defaultTitle || 'Vincular processo SEI');
+          setElementLabel(submit, submit?.dataset.defaultLabel || 'Vincular processo');
+
+          if (!(trigger instanceof HTMLElement)) {
+            return;
+          }
+
+          const processoId = trigger.getAttribute('data-editar-sei-id') || '';
+          if (!processoId) {
+            return;
+          }
+
+          form.action = buildEditActionUrl(form.dataset.editActionTemplate || '', processoId);
+          setElementLabel(title, title?.dataset.editTitle || 'Editar processo SEI');
+          setElementLabel(submit, submit?.dataset.editLabel || 'Salvar processo');
+
+          const campoProcesso = form.querySelector('[name="tema_processo"]');
+          const campoObservacao = form.querySelector('[name="tema_processo_observacao"]');
+          if (campoProcesso instanceof HTMLInputElement) {
+            campoProcesso.value = trigger.getAttribute('data-editar-sei-processo') || '';
+          }
+          if (campoObservacao instanceof HTMLTextAreaElement) {
+            campoObservacao.value = trigger.getAttribute('data-editar-sei-observacao') || '';
+          }
+        });
+      }
+
+      const linkModal = document.getElementById('modalLinkPendencia');
+      if (linkModal) {
+        linkModal.addEventListener('show.bs.modal', (event) => {
+          const trigger = event.relatedTarget;
+          const form = linkModal.querySelector('form');
+          const title = linkModal.querySelector('.modal-title');
+          const submit = linkModal.querySelector('[type="submit"]');
+          if (!(form instanceof HTMLFormElement)) {
+            return;
+          }
+
+          form.reset();
+          form.action = form.dataset.defaultAction || form.action;
+          setElementLabel(title, title?.dataset.defaultTitle || 'Novo link relacionado');
+          setElementLabel(submit, submit?.dataset.defaultLabel || 'Salvar link');
+
+          if (!(trigger instanceof HTMLElement)) {
+            return;
+          }
+
+          const linkId = trigger.getAttribute('data-editar-link-id') || '';
+          if (!linkId) {
+            return;
+          }
+
+          form.action = buildEditActionUrl(form.dataset.editActionTemplate || '', linkId);
+          setElementLabel(title, title?.dataset.editTitle || 'Editar link relacionado');
+          setElementLabel(submit, submit?.dataset.editLabel || 'Salvar alteracoes');
+
+          const campoTitulo = form.querySelector('[name="tema_link_titulo"]');
+          const campoUrl = form.querySelector('[name="tema_link_url"]');
+          const campoDescricao = form.querySelector('[name="tema_link_descricao"]');
+          if (campoTitulo instanceof HTMLInputElement) {
+            campoTitulo.value = trigger.getAttribute('data-editar-link-titulo') || '';
+          }
+          if (campoUrl instanceof HTMLInputElement) {
+            campoUrl.value = trigger.getAttribute('data-editar-link-url') || '';
+          }
+          if (campoDescricao instanceof HTMLTextAreaElement) {
+            campoDescricao.value = trigger.getAttribute('data-editar-link-descricao') || '';
+          }
+        });
+      }
+
+      const documentoModal = document.getElementById('modalDocumentoPendencia');
+      if (documentoModal) {
+        documentoModal.addEventListener('show.bs.modal', (event) => {
+          const trigger = event.relatedTarget;
+          const form = documentoModal.querySelector('form');
+          const title = documentoModal.querySelector('.modal-title');
+          const submit = documentoModal.querySelector('[type="submit"]');
+          const fileInput = documentoModal.querySelector('input[name="documento_arquivo"]');
+          const helper = documentoModal.querySelector('[data-documento-helper]');
+          const atualShell = documentoModal.querySelector('[data-documento-atual-shell]');
+          const atualNome = documentoModal.querySelector('[data-documento-atual-nome]');
+          if (!(form instanceof HTMLFormElement)) {
+            return;
+          }
+
+          form.reset();
+          form.action = form.dataset.defaultAction || form.action;
+          setElementLabel(title, title?.dataset.defaultTitle || 'Novo documento relacionado');
+          setElementLabel(submit, submit?.dataset.defaultLabel || 'Enviar documento');
+          if (fileInput instanceof HTMLInputElement) {
+            fileInput.required = true;
+          }
+          if (helper) {
+            helper.textContent = helper.getAttribute('data-default-helper') || helper.textContent;
+          }
+          if (atualShell) {
+            atualShell.classList.add('d-none');
+          }
+          if (atualNome) {
+            atualNome.textContent = '-';
+          }
+
+          if (!(trigger instanceof HTMLElement)) {
+            return;
+          }
+
+          const documentoId = trigger.getAttribute('data-editar-documento-id') || '';
+          if (!documentoId) {
+            return;
+          }
+
+          form.action = buildEditActionUrl(form.dataset.editActionTemplate || '', documentoId);
+          setElementLabel(title, title?.dataset.editTitle || 'Editar documento relacionado');
+          setElementLabel(submit, submit?.dataset.editLabel || 'Salvar documento');
+
+          const campoTitulo = form.querySelector('[name="documento_titulo"]');
+          const campoDescricao = form.querySelector('[name="documento_descricao"]');
+          if (campoTitulo instanceof HTMLInputElement) {
+            campoTitulo.value = trigger.getAttribute('data-editar-documento-titulo') || '';
+          }
+          if (campoDescricao instanceof HTMLTextAreaElement) {
+            campoDescricao.value = trigger.getAttribute('data-editar-documento-descricao') || '';
+          }
+          if (fileInput instanceof HTMLInputElement) {
+            fileInput.required = false;
+          }
+          if (helper) {
+            helper.textContent = helper.getAttribute('data-edit-helper') || helper.textContent;
+          }
+          if (atualShell) {
+            atualShell.classList.remove('d-none');
+          }
+          if (atualNome) {
+            atualNome.textContent = trigger.getAttribute('data-editar-documento-nome') || '-';
+          }
+        });
+      }
+
+      const responsaveisModal = document.getElementById('modalResponsaveisPendencia');
+      if (responsaveisModal) {
+        responsaveisModal.addEventListener('show.bs.modal', (event) => {
+          const trigger = event.relatedTarget;
+          const form = responsaveisModal.querySelector('form');
+          const title = responsaveisModal.querySelector('.modal-title');
+          const submit = responsaveisModal.querySelector('[type="submit"]');
+          if (!(form instanceof HTMLFormElement)) {
+            return;
+          }
+
+          resetResponsaveisFormState(form);
+          form.action = form.dataset.defaultAction || form.action;
+          setElementLabel(title, title?.dataset.defaultTitle || 'Atualizar responsaveis');
+          setElementLabel(submit, submit?.dataset.defaultLabel || 'Salvar responsaveis');
+
+          if (!(trigger instanceof HTMLElement)) {
+            return;
+          }
+
+          const responsavelId = trigger.getAttribute('data-editar-responsavel-id') || '';
+          if (!responsavelId) {
+            return;
+          }
+
+          form.action = buildEditActionUrl(form.dataset.editActionTemplate || '', responsavelId);
+          setElementLabel(title, title?.dataset.editTitle || 'Editar responsavel atual');
+          setElementLabel(submit, submit?.dataset.editLabel || 'Salvar ajustes');
+
+          const campoResponsavel = form.querySelector('[name="tema_responsavel"]');
+          if (campoResponsavel instanceof HTMLInputElement) {
+            campoResponsavel.value = trigger.getAttribute('data-editar-responsavel-principal') || '';
+          }
+
+          let envolvidos = [];
+          try {
+            envolvidos = JSON.parse(trigger.getAttribute('data-editar-responsavel-envolvidos') || '[]');
+          } catch (error) {}
+          setResponsaveisEnvolvidos(form, envolvidos);
+        });
+      }
+
+      const submitAjaxForm = async (form) => {
+        const submitter = form.querySelector('[type="submit"]');
+        const originalDisabled = submitter ? submitter.disabled : false;
+        const scrollY = window.scrollY;
+        const openCollapseIds = getOpenCollapseIds();
+
+        if (submitter) {
+          submitter.disabled = true;
+        }
+
+        try {
+          const response = await fetch(form.action, {
+            method: form.method || 'POST',
+            body: new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const detalhes = Array.isArray(payload?.detalhes) ? payload.detalhes.join(' ') : '';
+            throw new Error(detalhes || payload?.erro || 'Não foi possível concluir a atualização.');
+          }
+
+          await refreshDetailSections();
+          restoreOpenCollapses(openCollapseIds);
+          closeParentModal(form);
+          form.reset();
+          resetMeetingFormState(form);
+          window.requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'auto' }));
+          showAjaxFeedback(payload?.mensagem || 'Atualização concluída sem recarregar a página.');
+        } catch (error) {
+          showAjaxFeedback(error.message || 'Erro ao atualizar a pendência.', 'warning');
+        } finally {
+          if (submitter) {
+            submitter.disabled = originalDisabled;
+          }
+        }
+      };
+
+      document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+        if (form.dataset.ajaxForm !== 'true') {
+          return;
+        }
+        if (event.defaultPrevented) {
+          return;
+        }
+
+        event.preventDefault();
+        submitAjaxForm(form);
+      });
+
+      const editModal = document.getElementById('modalEditarAtualizacaoPendencia');
+      if (editModal) {
+        editModal.addEventListener('show.bs.modal', (event) => {
+          const trigger = event.relatedTarget;
+          if (!(trigger instanceof HTMLElement)) {
+            return;
+          }
+
+          const atualizacaoId = trigger.getAttribute('data-editar-atualizacao-id') || '';
+          const texto = trigger.getAttribute('data-editar-atualizacao-texto') || '';
+          const data = trigger.getAttribute('data-editar-atualizacao-data') || '';
+          const tipo = trigger.getAttribute('data-editar-atualizacao-tipo') || 'Outros';
+          const acao = trigger.getAttribute('data-editar-atualizacao-acao') || '';
+          const internosRaw = trigger.getAttribute('data-editar-atualizacao-internos') || '[]';
+          const externosRaw = trigger.getAttribute('data-editar-atualizacao-externos') || '[]';
+          const form = editModal.querySelector('form[data-edit-atualizacao-form="true"]');
+          if (!(form instanceof HTMLFormElement) || !atualizacaoId) {
+            return;
+          }
+
+          const actionUrl = `{{ url_for('smdhc_pendencias.editar_atualizacao', id=pendencia.id, atualizacao_id=0) }}`.replace('/0/editar', `/${atualizacaoId}/editar`);
+          form.action = actionUrl;
+
+          const campoAtualizacao = form.querySelector('[name="tema_atualizacao"]');
+          const campoData = form.querySelector('[name="tema_atualizacao_data"]');
+          const campoTipo = form.querySelector('[name="tema_atualizacao_tipo"]');
+          const campoAcao = form.querySelector('[name="tema_acao_subsequente"]');
+
+          if (campoAtualizacao instanceof HTMLTextAreaElement || campoAtualizacao instanceof HTMLInputElement) {
+            campoAtualizacao.value = texto;
+          }
+          if (campoData instanceof HTMLInputElement) {
+            campoData.value = data;
+          }
+          if (campoTipo instanceof HTMLSelectElement) {
+            campoTipo.value = tipo;
+          }
+          if (campoAcao instanceof HTMLTextAreaElement || campoAcao instanceof HTMLInputElement) {
+            campoAcao.value = acao;
+          }
+
+          let internos = [];
+          let externos = [];
+          try {
+            internos = JSON.parse(internosRaw);
+          } catch (error) {}
+          try {
+            externos = JSON.parse(externosRaw);
+          } catch (error) {}
+
+          setInternalParticipants(form, internos);
+          populateExternalParticipants(form, externos);
+          toggleMeetingFields(form);
+        });
+      }
+
+      initAtualizacaoForms();
+      initMatrixEditor();
+    })();
+  </script>
+</body>
+</html>

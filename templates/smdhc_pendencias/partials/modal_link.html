@@ -1,0 +1,42 @@
+<div class="modal fade" id="modalLinkPendencia" tabindex="-1" aria-labelledby="modalLinkPendenciaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalLinkPendenciaLabel" data-default-title="Novo link relacionado" data-edit-title="Editar link relacionado">
+          <i class="bi bi-link-45deg me-2"></i>Novo link relacionado
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form
+        method="post"
+        action="{{ url_for('smdhc_pendencias.registrar_link', id=pendencia.id) }}"
+        data-ajax-form="true"
+        data-default-action="{{ url_for('smdhc_pendencias.registrar_link', id=pendencia.id) }}"
+        data-edit-action-template="{{ url_for('smdhc_pendencias.editar_link', id=pendencia.id, link_id=0) }}"
+      >
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Título</label>
+              <input type="text" name="tema_link_titulo" class="form-control" placeholder="Ex.: Pasta SEI, despacho, painel ou referência externa">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">URL</label>
+              <input type="url" name="tema_link_url" class="form-control" required placeholder="https://">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Observação</label>
+              <textarea name="tema_link_descricao" class="form-control" rows="3" placeholder="Contextualize por que esse link é importante para a pendência"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" data-default-label="Salvar link" data-edit-label="Salvar alteracoes">
+            <i class="bi bi-check-circle me-1"></i> Salvar link
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

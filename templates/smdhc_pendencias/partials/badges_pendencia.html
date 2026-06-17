@@ -1,0 +1,43 @@
+{% macro tone_for_badge(label) -%}
+  {%- set value = (label or '')|lower -%}
+  {%- if 'vencido' in value or 'crítico' in value or 'critico' in value or 'risco político' in value or 'risco politico' in value -%}
+    text-bg-danger
+  {%- elif 'alta prioridade' in value or 'prazo próximo' in value or 'prazo proximo' in value or 'risco material' in value -%}
+    bg-warning text-dark
+  {%- elif 'aguardando' in value -%}
+    bg-info text-dark
+  {%- elif 'concluído' in value or 'concluido' in value -%}
+    text-bg-success
+  {%- elif 'parado' in value or 'sem prazo' in value or 'risco legal' in value -%}
+    bg-secondary
+  {%- else -%}
+    bg-light text-dark border
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro status_class(status) -%}
+  {%- set value = (status or '')|lower -%}
+  {%- if 'concl' in value -%}
+    text-bg-success
+  {%- elif 'aguardando' in value -%}
+    bg-warning text-dark
+  {%- elif 'não iniciado' in value or 'nao iniciado' in value -%}
+    bg-secondary
+  {%- elif 'iniciado' in value -%}
+    bg-info text-dark
+  {%- else -%}
+    bg-light text-dark border
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro render_badges(badges, empty_text='Sem sinais automáticos no momento.') -%}
+  {% if badges %}
+    <div class="d-flex flex-wrap gap-2">
+      {% for badge in badges %}
+        <span class="badge rounded-pill {{ tone_for_badge(badge)|trim }} pendencia-badge">{{ badge }}</span>
+      {% endfor %}
+    </div>
+  {% elif empty_text %}
+    <span class="text-muted small">{{ empty_text }}</span>
+  {% endif %}
+{%- endmacro %}

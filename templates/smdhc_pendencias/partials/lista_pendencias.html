@@ -1,0 +1,198 @@
+{% from 'smdhc_pendencias/partials/badges_pendencia.html' import status_class, tone_for_badge %}
+
+<div class="content-card">
+  <div class="content-card-header">
+    <div>
+      <h6 class="mb-1"><i class="bi bi-list-task me-2"></i>Fila de pendências</h6>
+      <small class="text-muted">A visão principal privilegia leitura rápida, sinais e contexto. A tabela completa fica como apoio.</small>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#visao-tabular-apoio" aria-expanded="false">
+        <i class="bi bi-table me-1"></i> Visão tabular de apoio
+      </button>
+      <button
+        class="btn btn-sm btn-outline-secondary section-toggle-btn"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#fila-pendencias-collapse"
+        data-collapse-control="#fila-pendencias-collapse"
+        data-label-expanded="Recolher"
+        data-label-collapsed="Expandir"
+        aria-expanded="true"
+        aria-controls="fila-pendencias-collapse"
+      >
+        <i class="bi bi-chevron-down"></i>
+        <span data-collapse-label>Recolher</span>
+      </button>
+    </div>
+  </div>
+  <div class="collapse show" id="fila-pendencias-collapse" data-collapse-persist="fila">
+    <div class="content-card-body">
+      {% if pendencias %}
+        <div class="d-grid gap-3">
+          {% for pendencia in pendencias %}
+            <div class="pendencia-card">
+              <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                <div class="d-flex gap-3 flex-grow-1">
+                  <div class="pendencia-rank">
+                    <small>Ordem</small>
+                    <strong>#{{ pendencia.prioridade_manual or pendencia.ordem_prioridade or '—' }}</strong>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                      <h5 class="pendencia-title">{{ pendencia.tema_nome }}</h5>
+                      <span class="badge rounded-pill {{ status_class(pendencia.tema_status)|trim }}">{{ pendencia.tema_status or 'Sem status' }}</span>
+                      {% if pendencia.situacao_automatica %}
+                        <span class="badge rounded-pill {{ tone_for_badge(pendencia.situacao_automatica)|trim }}">{{ pendencia.situacao_automatica }}</span>
+                      {% endif %}
+                      {% if pendencia.ordem_prioridade and pendencia.ordem_prioridade <= 5 %}
+                        <span class="badge rounded-pill bg-warning text-dark">Alta prioridade</span>
+                      {% endif %}
+                    </div>
+                    <div class="text-muted small mb-2">
+                      {{ pendencia.tema_tipo or 'Sem tipo definido' }}
+                      {% if pendencia.tema_area_demandante %} · {{ pendencia.tema_area_demandante }}{% endif %}
+                      {% if pendencia.tema_area_responsavel %} · {{ pendencia.tema_area_responsavel|join(' · ') }}{% endif %}
+                    </div>
+                    <p class="pendencia-description">{{ pendencia.tema_descricao or 'Sem descrição registrada.' }}</p>
+                  </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                  <a href="{{ url_for('smdhc_pendencias.detalhe', id=pendencia.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye me-1"></i> Detalhe
+                  </a>
+                  {% if has_write_access('smdhc_pendencias') %}
+                    <a href="{{ url_for('smdhc_pendencias.editar', id=pendencia.id) }}" class="btn btn-sm btn-outline-secondary">
+                      <i class="bi bi-pencil me-1"></i> Editar
+                    </a>
+                  {% endif %}
+                  <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#pendencia-detalhes-{{ pendencia.id }}" aria-expanded="false">
+                    <i class="bi bi-chevron-down me-1"></i> Expandir
+                  </button>
+                </div>
+              </div>
+
+              <div class="quick-info-grid mt-3">
+                <div class="quick-info-item">
+                  <span>Prazo</span>
+                  <strong>{{ pendencia.tema_prazo_estimado.strftime('%d/%m/%Y') if pendencia.tema_prazo_estimado else 'Sem prazo' }}</strong>
+                </div>
+                <div class="quick-info-item">
+                  <span>Responsável</span>
+                  <strong>{{ pendencia.responsavel or 'Não definido' }}</strong>
+                </div>
+                <div class="quick-info-item">
+                  <span>Última atualização</span>
+                  <strong>
+                    {% if pendencia.ultima_atualizacao %}
+                      {{ pendencia.ultima_atualizacao[:90] }}{% if pendencia.ultima_atualizacao|length > 90 %}...{% endif %}
+                    {% else %}
+                      Sem registro
+                    {% endif %}
+                  </strong>
+                </div>
+                <div class="quick-info-item">
+                  <span>Próxima ação</span>
+                  <strong>
+                    {% if pendencia.proxima_acao %}
+                      {{ pendencia.proxima_acao[:90] }}{% if pendencia.proxima_acao|length > 90 %}...{% endif %}
+                    {% else %}
+                      Não definida
+                    {% endif %}
+                  </strong>
+                </div>
+                <div class="quick-info-item">
+                  <span>Matriz</span>
+                  <strong>{{ pendencia.nota_proximidade or 0 }} / {{ pendencia.nota_enem or 0 }} / {{ pendencia.nota_instabilidade or 0 }} / {{ pendencia.nota_riscos or 0 }}</strong>
+                </div>
+              </div>
+
+              <div class="collapse mt-3" id="pendencia-detalhes-{{ pendencia.id }}">
+                <div class="soft-divider"></div>
+                <div class="row g-3">
+                  <div class="col-lg-7">
+                    <div class="quick-panel">
+                      <h6 class="mb-3"><i class="bi bi-card-text me-2"></i>Contexto da pendência</h6>
+                      <div class="small mb-2"><strong>Áreas correlatas:</strong> {{ pendencia.tema_area_correlata|join(', ') if pendencia.tema_area_correlata else 'Não informadas' }}</div>
+                      <div class="small mb-3"><strong>Observações:</strong> {{ pendencia.tema_observacoes or 'Sem observações registradas.' }}</div>
+                      <div class="small text-muted">
+                        {% if pendencia.ultima_atualizacao_data %}
+                          Último movimento em {{ pendencia.ultima_atualizacao_data.strftime('%d/%m/%Y') }}.
+                        {% else %}
+                          Sem data de atualização consolidada na visão atual.
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-lg-5">
+                    <div class="quick-panel">
+                      <h6 class="mb-3"><i class="bi bi-bar-chart-steps me-2"></i>Leitura rápida da matriz</h6>
+                      <div class="factor-line">
+                        <span>Proximidade</span>
+                        <div class="factor-track"><div class="factor-fill fill-proximidade" style="width: {{ ((pendencia.nota_proximidade or 0) / 3 * 100)|round|int }}%;"></div></div>
+                        <strong>{{ pendencia.nota_proximidade or 0 }}</strong>
+                      </div>
+                      <div class="factor-line">
+                        <span>ENEM</span>
+                        <div class="factor-track"><div class="factor-fill fill-enem" style="width: {{ ((pendencia.nota_enem or 0) / 3 * 100)|round|int }}%;"></div></div>
+                        <strong>{{ pendencia.nota_enem or 0 }}</strong>
+                      </div>
+                      <div class="factor-line">
+                        <span>Instabilidade</span>
+                        <div class="factor-track"><div class="factor-fill fill-instabilidade" style="width: {{ ((pendencia.nota_instabilidade or 0) / 2 * 100)|round|int }}%;"></div></div>
+                        <strong>{{ pendencia.nota_instabilidade or 0 }}</strong>
+                      </div>
+                      <div class="factor-line mb-0">
+                        <span>Nº de Riscos</span>
+                        <div class="factor-track"><div class="factor-fill fill-riscos" style="width: {{ ((pendencia.nota_riscos or 0) / 7 * 100)|round|int }}%;"></div></div>
+                        <strong>{{ pendencia.nota_riscos or 0 }}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="collapse mt-4" id="visao-tabular-apoio">
+          <div class="table-responsive support-table">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Ordem</th>
+                  <th>Tema</th>
+                  <th>Status</th>
+                  <th>Prazo</th>
+                  <th>Responsável</th>
+                  <th>Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pendencia in pendencias %}
+                  <tr>
+                    <td>#{{ pendencia.prioridade_manual or pendencia.ordem_prioridade or '—' }}</td>
+                    <td>
+                      <div class="fw-semibold">{{ pendencia.tema_nome }}</div>
+                      <div class="text-muted small">{{ pendencia.tema_tipo or 'Sem tipo' }}</div>
+                    </td>
+                    <td>{{ pendencia.tema_status or 'Sem status' }}</td>
+                    <td>{{ pendencia.tema_prazo_estimado.strftime('%d/%m/%Y') if pendencia.tema_prazo_estimado else 'Sem prazo' }}</td>
+                    <td>{{ pendencia.responsavel or 'Não definido' }}</td>
+                    <td>{{ pendencia.situacao_automatica or '—' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <i class="bi bi-inboxes fs-2 d-block mb-2"></i>
+          Nenhuma pendência encontrada com os filtros informados.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>

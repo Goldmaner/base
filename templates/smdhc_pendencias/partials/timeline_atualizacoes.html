@@ -1,0 +1,86 @@
+<div class="content-card h-100" id="section-timeline">
+  <div class="content-card-header">
+    <div>
+      <h6 class="mb-1"><i class="bi bi-clock-history me-2"></i>Timeline de atualizações</h6>
+      <small class="text-muted">A leitura principal da pendência fica concentrada aqui: movimento, autoria e próximo passo.</small>
+    </div>
+    {% if has_write_access('smdhc_pendencias') %}
+      <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalAtualizacaoPendencia">
+        <i class="bi bi-plus-circle me-1"></i> Nova atualização
+      </button>
+    {% endif %}
+  </div>
+  <div class="content-card-body">
+    {% if pendencia.proxima_acao %}
+      <div class="next-action-banner mb-4">
+        <div class="small text-uppercase fw-semibold text-muted mb-1">Próxima ação consolidada</div>
+        <div class="fw-semibold">{{ pendencia.proxima_acao }}</div>
+      </div>
+    {% endif %}
+
+    {% if pendencia.atualizacoes %}
+      <div class="timeline-shell">
+        {% for item in pendencia.atualizacoes %}
+          <div class="timeline-entry">
+            <div class="timeline-dot"></div>
+            <div class="timeline-panel">
+              <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
+                <div>
+                  <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <div class="fw-semibold">{{ item.tema_atualizacao }}</div>
+                    {% if item.tema_atualizacao_tipo %}
+                      <span class="badge rounded-pill bg-info-subtle text-info-emphasis border">{{ item.tema_atualizacao_tipo }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="badge bg-light text-dark border">
+                    {{ item.tema_atualizacao_data.strftime('%d/%m/%Y') if item.tema_atualizacao_data else 'Sem data' }}
+                  </span>
+                  {% if has_write_access('smdhc_pendencias') %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalEditarAtualizacaoPendencia"
+                      data-editar-atualizacao-id="{{ item.id }}"
+                      data-editar-atualizacao-texto="{{ item.tema_atualizacao|e }}"
+                      data-editar-atualizacao-data="{{ item.tema_atualizacao_data.isoformat() if item.tema_atualizacao_data else '' }}"
+                      data-editar-atualizacao-tipo="{{ item.tema_atualizacao_tipo or 'Outros' }}"
+                      data-editar-atualizacao-acao="{{ (item.tema_acao_subsequente or '')|e }}"
+                      data-editar-atualizacao-internos="{{ item.participantes_internos_ids|tojson|forceescape }}"
+                      data-editar-atualizacao-externos="{{ item.participantes_externos|tojson|forceescape }}"
+                    >
+                      <i class="bi bi-pencil-square me-1"></i> Editar
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="small text-muted mb-2">
+                Registrado por {{ item.criado_por or 'sistema' }}
+                {% if item.criado_em %} · {{ item.criado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+              </div>
+              <div class="small">
+                <strong>Próxima ação:</strong> {{ item.tema_acao_subsequente or 'Não definida nesta atualização.' }}
+              </div>
+              {% if item.participantes_resumo %}
+                <div class="small text-muted mt-2">
+                  <strong>Participantes:</strong>
+                  {{ item.participantes_resumo[:3]|join(', ') }}
+                  {% if item.participantes_resumo|length > 3 %}
+                    e mais {{ item.participantes_resumo|length - 3 }}
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-chat-square-text fs-2 d-block mb-2"></i>
+        Ainda não há atualizações registradas para esta pendência.
+      </div>
+    {% endif %}
+  </div>
+</div>

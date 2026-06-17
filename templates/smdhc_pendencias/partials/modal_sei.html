@@ -1,0 +1,38 @@
+<div class="modal fade" id="modalSeiPendencia" tabindex="-1" aria-labelledby="modalSeiPendenciaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalSeiPendenciaLabel" data-default-title="Vincular processo SEI" data-edit-title="Editar processo SEI">
+          <i class="bi bi-diagram-3 me-2"></i>Vincular processo SEI
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form
+        method="post"
+        action="{{ url_for('smdhc_pendencias.registrar_sei', id=pendencia.id) }}"
+        data-ajax-form="true"
+        data-default-action="{{ url_for('smdhc_pendencias.registrar_sei', id=pendencia.id) }}"
+        data-edit-action-template="{{ url_for('smdhc_pendencias.editar_sei', id=pendencia.id, processo_id=0) }}"
+      >
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Número do processo</label>
+              <input type="text" name="tema_processo" class="form-control" placeholder="0000.000000/0000-00">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Observação</label>
+              <textarea name="tema_processo_observacao" class="form-control" rows="3" placeholder="Contexto do vínculo, etapa do processo ou observação útil"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" data-default-label="Vincular processo" data-edit-label="Salvar processo">
+            <i class="bi bi-plus-circle me-1"></i> Vincular processo
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

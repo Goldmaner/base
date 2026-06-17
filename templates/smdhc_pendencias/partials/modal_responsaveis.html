@@ -1,0 +1,104 @@
+<div class="modal fade" id="modalResponsaveisPendencia" tabindex="-1" aria-labelledby="modalResponsaveisPendenciaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalResponsaveisPendenciaLabel" data-default-title="Atualizar responsaveis" data-edit-title="Editar responsavel atual">
+          <i class="bi bi-people-fill me-2"></i>Atualizar responsáveis
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form
+        method="post"
+        action="{{ url_for('smdhc_pendencias.registrar_responsaveis', id=pendencia.id) }}"
+        data-ajax-form="true"
+        data-default-action="{{ url_for('smdhc_pendencias.registrar_responsaveis', id=pendencia.id) }}"
+        data-edit-action-template="{{ url_for('smdhc_pendencias.editar_responsaveis', id=pendencia.id, responsavel_id=0) }}"
+      >
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Responsável principal</label>
+              <input list="usuarios-opcoes-modal" name="tema_responsavel" class="form-control" placeholder="Digite ou selecione">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Busca rápida nos envolvidos</label>
+              <div class="people-chip-search">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="filtro-envolvidos-pendencia"
+                  placeholder="Filtrar usuários por nome"
+                >
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+                <label class="form-label fw-semibold mb-0">Envolvidos</label>
+                <small class="text-muted">Selecione vários usuários do sistema sem precisar digitar nomes por vírgula.</small>
+              </div>
+              <div class="people-chip-grid" id="grid-envolvidos-pendencia">
+                {% for usuario in usuarios_options %}
+                  <label class="people-chip" data-usuario-label="{{ usuario.usuario_nome|lower }}">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      name="tema_envolvidos"
+                      value="{{ usuario.usuario_nome }}"
+                    >
+                    <span>
+                      <strong>{{ usuario.usuario_nome }}</strong>
+                      <small>{{ usuario.usuario_email or 'Usuário ativo do sistema' }}</small>
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" data-default-label="Salvar responsaveis" data-edit-label="Salvar ajustes">
+            <i class="bi bi-check-circle me-1"></i> Salvar responsáveis
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<datalist id="usuarios-opcoes-modal">
+  {% for usuario in usuarios_options %}
+    <option value="{{ usuario.usuario_nome }}"></option>
+  {% endfor %}
+</datalist>
+
+<script>
+  (function () {
+    const filtro = document.getElementById('filtro-envolvidos-pendencia');
+    const chips = Array.from(document.querySelectorAll('#grid-envolvidos-pendencia .people-chip'));
+    if (!filtro || !chips.length) {
+      return;
+    }
+
+    const syncChipState = (chip) => {
+      const input = chip.querySelector('input[type="checkbox"]');
+      chip.classList.toggle('selected', !!input?.checked);
+    };
+
+    chips.forEach((chip) => {
+      const input = chip.querySelector('input[type="checkbox"]');
+      syncChipState(chip);
+      if (input) {
+        input.addEventListener('change', () => syncChipState(chip));
+      }
+    });
+
+    filtro.addEventListener('input', () => {
+      const termo = filtro.value.trim().toLowerCase();
+      chips.forEach((chip) => {
+        const texto = chip.dataset.usuarioLabel || '';
+        chip.style.display = !termo || texto.includes(termo) ? '' : 'none';
+      });
+    });
+  })();
+</script>

@@ -1,0 +1,23 @@
+<div class="modal fade" id="modalAtualizacaoPendencia" tabindex="-1" aria-labelledby="modalAtualizacaoPendenciaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalAtualizacaoPendenciaLabel">
+          <i class="bi bi-clock-history me-2"></i>Nova atualização
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form method="post" action="{{ url_for('smdhc_pendencias.registrar_atualizacao', id=pendencia.id) }}" data-ajax-form="true">
+        <div class="modal-body">
+          {% include 'smdhc_pendencias/partials/form_atualizacao_fields.html' %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-circle me-1"></i> Registrar atualização
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,127 @@
+{% set filtros_ativos = filtros.q or filtros.status or filtros.tipo or filtros.area_demandante or filtros.area_responsavel or filtros.situacao or filtros.somente_sem_prazo or filtros.somente_vencidas or filtros.somente_paradas %}
+
+<div class="filter-section">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+    <div>
+      <h6 class="mb-1"><i class="bi bi-funnel me-2"></i>Filtros de acompanhamento</h6>
+      <p class="text-muted small mb-0">Refine a visão por tema, status, área e sinais operacionais para destacar o que precisa de ação primeiro.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+      {% if filtros_ativos %}
+        <span class="badge rounded-pill bg-dark-subtle text-dark-emphasis border">Filtros ativos</span>
+      {% endif %}
+      <button
+        class="btn btn-sm btn-outline-secondary section-toggle-btn"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#filtros-pendencias-collapse"
+        data-collapse-control="#filtros-pendencias-collapse"
+        data-label-expanded="Recolher"
+        data-label-collapsed="Expandir"
+        aria-expanded="true"
+        aria-controls="filtros-pendencias-collapse"
+      >
+        <i class="bi bi-chevron-down"></i>
+        <span data-collapse-label>Recolher</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="collapse show" id="filtros-pendencias-collapse" data-collapse-persist="filtros">
+    <form method="get" action="{{ url_for('smdhc_pendencias.index') }}">
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <label class="form-label fw-semibold">Busca rápida</label>
+          <input
+            type="text"
+            class="form-control"
+            name="q"
+            value="{{ filtros.q or '' }}"
+            placeholder="Tema, descrição, responsável ou próxima ação"
+          >
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label fw-semibold">Status</label>
+          <select class="form-select" name="status">
+            <option value="">Todos</option>
+            {% for status in status_options %}
+              <option value="{{ status }}" {% if filtros.status == status %}selected{% endif %}>{{ status }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label fw-semibold">Tipo</label>
+          <select class="form-select" name="tipo">
+            <option value="">Todos</option>
+            {% for tipo in tema_tipos %}
+              <option value="{{ tipo }}" {% if filtros.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label fw-semibold">Área demandante</label>
+          <select class="form-select" name="area_demandante">
+            <option value="">Todas</option>
+            {% for area in areas_demandantes %}
+              <option value="{{ area }}" {% if filtros.area_demandante == area %}selected{% endif %}>{{ area }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+          <label class="form-label fw-semibold">Situação</label>
+          <select class="form-select" name="situacao">
+            <option value="">Todas</option>
+            {% for situacao in situacoes_options %}
+              <option value="{{ situacao }}" {% if filtros.situacao == situacao %}selected{% endif %}>{{ situacao }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-lg-8">
+          <label class="form-label fw-semibold">Áreas responsáveis</label>
+          <div class="filter-choice-grid">
+            {% for area in areas_responsaveis %}
+              <label class="filter-choice-pill">
+                <input
+                  type="checkbox"
+                  name="area_responsavel"
+                  value="{{ area }}"
+                  {% if area in filtros.area_responsavel %}checked{% endif %}
+                >
+                <span>{{ area }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <label class="form-label fw-semibold">Sinais rápidos</label>
+          <div class="filter-flag-grid">
+            <label class="filter-choice-pill compact">
+              <input type="checkbox" name="somente_sem_prazo" value="1" {% if filtros.somente_sem_prazo %}checked{% endif %}>
+              <span>Sem prazo</span>
+            </label>
+            <label class="filter-choice-pill compact">
+              <input type="checkbox" name="somente_vencidas" value="1" {% if filtros.somente_vencidas %}checked{% endif %}>
+              <span>Vencidas</span>
+            </label>
+            <label class="filter-choice-pill compact">
+              <input type="checkbox" name="somente_paradas" value="1" {% if filtros.somente_paradas %}checked{% endif %}>
+              <span>Paradas</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-4">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-search me-1"></i> Aplicar filtros
+        </button>
+        <a href="{{ url_for('smdhc_pendencias.index') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-counterclockwise me-1"></i> Limpar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>

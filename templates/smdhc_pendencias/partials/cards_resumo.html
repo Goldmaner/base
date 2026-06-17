@@ -1,0 +1,24 @@
+{% set resumo_cards = [
+  ('Pendências ativas', resumo.total_ativas or 0, 'bi-collection', 'teal'),
+  ('Alta prioridade', resumo.alta_prioridade or 0, 'bi-exclamation-octagon', 'amber'),
+  ('Sem prazo', resumo.sem_prazo or 0, 'bi-calendar-x', 'slate'),
+  ('Vencidas', resumo.vencidas or 0, 'bi-hourglass-split', 'rose'),
+  ('Iniciadas', resumo.iniciadas or 0, 'bi-play-circle', 'sky'),
+  ('Não iniciadas', resumo.nao_iniciadas or 0, 'bi-pause-circle', 'slate'),
+  ('Aguardando aprovação', resumo.aguardando_aprovacao or 0, 'bi-shield-exclamation', 'amber'),
+  ('Paradas', resumo.paradas or 0, 'bi-sign-stop', 'rose')
+] %}
+
+<div class="row g-3 mb-4">
+  {% for titulo, valor, icone, tone in resumo_cards %}
+    <div class="col-6 col-xl-3">
+      <div class="summary-card tone-{{ tone }}">
+        <div class="summary-card-icon">
+          <i class="bi {{ icone }}"></i>
+        </div>
+        <h3>{{ valor }}</h3>
+        <small>{{ titulo }}</small>
+      </div>
+    </div>
+  {% endfor %}
+</div>

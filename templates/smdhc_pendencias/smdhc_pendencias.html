@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gestão de Pendências e Urgências</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body {
+      background: linear-gradient(180deg, #eef6f7 0, #f8fbfc 260px, #eef2f7 100%);
+      font-family: 'Segoe UI', sans-serif;
+      color: #0f172a;
+    }
+    .page-header {
+      background: linear-gradient(135deg, #164e63 0%, #0f766e 100%);
+      color: #fff;
+      padding: 22px 30px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 18px rgba(15, 118, 110, .22);
+    }
+    .page-header h2 { margin: 0; font-size: 1.45rem; font-weight: 800; }
+    .page-header p { margin: 6px 0 0; opacity: .88; font-size: .92rem; max-width: 760px; }
+    .btn-parc {
+      background: linear-gradient(135deg, #164e63, #0f766e);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-parc:hover { color: #fff; opacity: .92; }
+    .btn-parc.outline {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, .65);
+    }
+    .faf-content {
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 0 24px 40px;
+    }
+    .filter-section,
+    .content-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(15, 23, 42, .06);
+      margin-bottom: 20px;
+    }
+    .filter-section {
+      padding: 22px;
+      border-left: 4px solid #0f766e;
+    }
+    .content-card { overflow: hidden; }
+    .content-card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .content-card-body { padding: 20px; }
+    .section-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-toggle-btn .bi-chevron-down {
+      transition: transform .2s ease;
+    }
+    .section-toggle-btn[aria-expanded="false"] .bi-chevron-down {
+      transform: rotate(-90deg);
+    }
+    .header-action-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .summary-card {
+      border: 1px solid #dceff0;
+      border-radius: 14px;
+      padding: 16px;
+      background: linear-gradient(180deg, #fff, #f4fbfb);
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    .summary-card::after {
+      content: "";
+      position: absolute;
+      right: -24px;
+      bottom: -24px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(15, 118, 110, .08);
+    }
+    .summary-card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+    }
+    .summary-card h3 {
+      margin: 0;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #164e63;
+      position: relative;
+      z-index: 1;
+    }
+    .summary-card small {
+      display: block;
+      margin-top: 4px;
+      color: #475569;
+      font-size: .88rem;
+      position: relative;
+      z-index: 1;
+    }
+    .tone-teal .summary-card-icon { background: #ccfbf1; color: #0f766e; }
+    .tone-sky .summary-card-icon { background: #e0f2fe; color: #0369a1; }
+    .tone-slate .summary-card-icon { background: #e2e8f0; color: #475569; }
+    .tone-amber .summary-card-icon { background: #fef3c7; color: #b45309; }
+    .tone-rose .summary-card-icon { background: #ffe4e6; color: #be123c; }
+    .filter-choice-grid,
+    .filter-flag-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .filter-choice-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid #dbe7ee;
+      border-radius: 999px;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .filter-choice-pill.compact { padding: 9px 11px; }
+    .filter-choice-pill:hover {
+      border-color: #0f766e;
+      background: #f0fdfa;
+    }
+    .filter-choice-pill input { margin: 0; }
+    .alert-mini-card {
+      border: 1px dashed #f0b25b;
+      background: linear-gradient(180deg, #fffdf8, #fff8eb);
+      border-radius: 12px;
+      padding: 14px 16px;
+      height: 100%;
+    }
+    .matrix-rank-card {
+      border: 1px solid #d8ece8;
+      border-radius: 14px;
+      padding: 16px;
+      background: linear-gradient(180deg, #fff, #f7fcfb);
+      height: 100%;
+    }
+    .rank-pill {
+      min-width: 64px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #164e63, #0f766e);
+      color: #fff;
+      padding: 9px 10px;
+      text-align: center;
+    }
+    .rank-pill small {
+      display: block;
+      font-size: .68rem;
+      opacity: .82;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .rank-pill strong { display: block; font-size: 1.05rem; }
+    .factor-line {
+      display: grid;
+      grid-template-columns: 110px 1fr 28px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: .84rem;
+    }
+    .factor-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .factor-fill { height: 100%; border-radius: 999px; }
+    .fill-proximidade { background: linear-gradient(90deg, #0f766e, #14b8a6); }
+    .fill-enem { background: linear-gradient(90deg, #0369a1, #38bdf8); }
+    .fill-instabilidade { background: linear-gradient(90deg, #b45309, #f59e0b); }
+    .fill-riscos { background: linear-gradient(90deg, #991b1b, #ef4444); }
+    .matrix-rule-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .pendencia-card {
+      border: 1px solid #dbe7ee;
+      border-radius: 16px;
+      padding: 18px;
+      background: linear-gradient(180deg, #fff, #fbfeff);
+      box-shadow: 0 1px 6px rgba(15, 23, 42, .04);
+    }
+    .pendencia-rank {
+      min-width: 76px;
+      padding: 10px 12px;
+      background: #ecfeff;
+      border: 1px solid #bae6fd;
+      border-radius: 14px;
+      text-align: center;
+      align-self: flex-start;
+    }
+    .pendencia-rank small {
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      font-size: .68rem;
+      color: #0f766e;
+    }
+    .pendencia-rank strong {
+      display: block;
+      font-size: 1.08rem;
+      color: #164e63;
+    }
+    .pendencia-title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .pendencia-description {
+      margin: 0;
+      color: #475569;
+      font-size: .92rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .quick-info-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .quick-info-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .quick-info-item span {
+      display: block;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+    .quick-info-item strong {
+      display: block;
+      font-size: .92rem;
+      color: #0f172a;
+      font-weight: 600;
+    }
+    .quick-panel {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 14px 16px;
+      height: 100%;
+    }
+    .soft-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #dbe3ea, transparent);
+      margin: 18px 0;
+    }
+    .support-table thead th {
+      background: linear-gradient(135deg, #164e63, #0f766e);
+      color: #fff;
+      border: none;
+      white-space: nowrap;
+      font-size: .84rem;
+    }
+    .pendencia-badge { font-size: .78rem; }
+    .empty-state {
+      border: 1px dashed #cbd5e1;
+      border-radius: 14px;
+      padding: 28px;
+      text-align: center;
+      background: #f8fafc;
+      color: #64748b;
+    }
+    @media (max-width: 1199.98px) {
+      .quick-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 767.98px) {
+      .page-header { padding: 20px 18px; }
+      .faf-content { padding: 0 16px 32px; }
+      .quick-info-grid { grid-template-columns: 1fr; }
+      .factor-line { grid-template-columns: 96px 1fr 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h2><i class="bi bi-exclamation-diamond-fill me-2"></i>Gestão de Pendências e Urgências</h2>
+        <p>Painel de acompanhamento das pendências institucionais, prioridades, riscos, responsáveis e próximas ações da SMDHC.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <div class="header-action-group">
+          <button type="button" class="btn-parc outline" data-collapse-bulk-action="collapse">
+            <i class="bi bi-arrows-collapse"></i> Recolher tudo
+          </button>
+          <button type="button" class="btn-parc outline" data-collapse-bulk-action="expand">
+            <i class="bi bi-arrows-expand"></i> Expandir tudo
+          </button>
+        </div>
+        {% if has_write_access('smdhc_pendencias') %}
+          <a href="{{ url_for('smdhc_pendencias.nova') }}" class="btn-parc">
+            <i class="bi bi-plus-circle"></i> Nova Pendência
+          </a>
+        {% endif %}
+        <a href="{{ url_for('smdhc_pendencias.relatorio') }}" class="btn-parc outline">
+          <i class="bi bi-file-earmark-text"></i> Relatório
+        </a>
+        <a href="{{ url_for('main.index') }}" class="btn-parc outline">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="faf-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% include 'smdhc_pendencias/partials/cards_resumo.html' %}
+    {% include 'smdhc_pendencias/partials/filtros.html' %}
+
+    {% if alertas %}
+            <div class="content-card">
+        <div class="content-card-header">
+          <div>
+            <h6 class="mb-1"><i class="bi bi-bell-fill me-2"></i>Alertas que pedem ação</h6>
+            <small class="text-muted">Pendências com sinais automáticos que merecem leitura imediata.</small>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <span class="badge rounded-pill bg-warning text-dark">{{ alertas|length }} alerta(s)</span>
+            <button
+              class="btn btn-sm btn-outline-secondary section-toggle-btn"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#alertas-pendencias-collapse"
+              data-collapse-control="#alertas-pendencias-collapse"
+              data-label-expanded="Recolher"
+              data-label-collapsed="Expandir"
+              aria-expanded="true"
+              aria-controls="alertas-pendencias-collapse"
+            >
+              <i class="bi bi-chevron-down"></i>
+              <span data-collapse-label>Recolher</span>
+            </button>
+          </div>
+        </div>
+        <div class="collapse show" id="alertas-pendencias-collapse" data-collapse-persist="alertas">
+          <div class="content-card-body">
+            <div class="row g-3">
+              {% for alerta in alertas %}
+                <div class="col-md-6 col-xl-3">
+                  <div class="alert-mini-card">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                      <strong>{{ alerta.tema_nome }}</strong>
+                      {% if alerta.situacao_automatica %}
+                        <span class="badge bg-warning text-dark">{{ alerta.situacao_automatica }}</span>
+                      {% endif %}
+                    </div>
+                    <div class="small text-muted mb-2">{{ alerta.tema_status or 'Sem status' }}</div>
+                    <div class="small mb-1"><strong>Responsável:</strong> {{ alerta.responsavel or 'Não definido' }}</div>
+                    <div class="small mb-1"><strong>Ordem:</strong> #{{ alerta.ordem_prioridade or '—' }}</div>
+                    <div class="small mb-3"><strong>Prazo:</strong> {{ alerta.tema_prazo_estimado.strftime('%d/%m/%Y') if alerta.tema_prazo_estimado else 'Sem prazo' }}</div>
+                    <a href="{{ url_for('smdhc_pendencias.detalhe', id=alerta.id) }}" class="btn btn-sm btn-outline-dark">
+                      Ver detalhe
+                    </a>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    {% set matriz_contexto = 'dashboard' %}
+    {% include 'smdhc_pendencias/partials/matriz_priorizacao.html' %}
+    {% include 'smdhc_pendencias/partials/lista_pendencias.html' %}
+  </div>
+
+  <script>
+    (() => {
+      const storageKey = 'smdhc_pendencias_dashboard_collapses_v1';
+      const storageScope = `dashboard:${window.location.pathname}`;
+
+      const readState = () => {
+        try {
+          return JSON.parse(localStorage.getItem(storageKey) || '{}');
+        } catch (error) {
+          return {};
+        }
+      };
+
+      const scopeState = readState()[storageScope] || {};
+
+      document.querySelectorAll('[data-collapse-persist]').forEach((element) => {
+        const key = element.dataset.collapsePersist;
+        if (scopeState[key] === false) {
+          element.classList.remove('show');
+        }
+      });
+
+      document.querySelectorAll('[data-collapse-control]').forEach((button) => {
+        const target = button.dataset.collapseControl;
+        const collapseElement = document.querySelector(target);
+        if (!collapseElement) {
+          return;
+        }
+
+        const isShown = collapseElement.classList.contains('show');
+        const label = button.querySelector('[data-collapse-label]');
+        button.setAttribute('aria-expanded', String(isShown));
+
+        if (label) {
+          label.textContent = isShown
+            ? (button.dataset.labelExpanded || 'Recolher')
+            : (button.dataset.labelCollapsed || 'Expandir');
+        }
+      });
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (() => {
+      const storageKey = 'smdhc_pendencias_dashboard_collapses_v1';
+      const storageScope = `dashboard:${window.location.pathname}`;
+
+      const readState = () => {
+        try {
+          return JSON.parse(localStorage.getItem(storageKey) || '{}');
+        } catch (error) {
+          return {};
+        }
+      };
+
+      const writeState = (nextScopeState) => {
+        const allState = readState();
+        allState[storageScope] = nextScopeState;
+        localStorage.setItem(storageKey, JSON.stringify(allState));
+      };
+
+      const updateButtonState = (button, isShown) => {
+        button.setAttribute('aria-expanded', String(isShown));
+        const label = button.querySelector('[data-collapse-label]');
+        if (label) {
+          label.textContent = isShown
+            ? (button.dataset.labelExpanded || 'Recolher')
+            : (button.dataset.labelCollapsed || 'Expandir');
+        }
+      };
+
+      const syncButtonsForTarget = (collapseElement, isShown) => {
+        if (!collapseElement.id) {
+          return;
+        }
+
+        document
+          .querySelectorAll(`[data-collapse-control="#${collapseElement.id}"]`)
+          .forEach((button) => updateButtonState(button, isShown));
+      };
+
+      const persistentCollapses = [...document.querySelectorAll('[data-collapse-persist]')];
+
+      persistentCollapses.forEach((collapseElement) => {
+        const key = collapseElement.dataset.collapsePersist;
+        const collapseInstance = bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
+        const currentScopeState = readState()[storageScope] || {};
+        const shouldShow = currentScopeState[key] !== false;
+
+        if (shouldShow) {
+          collapseInstance.show();
+        } else {
+          collapseInstance.hide();
+        }
+
+        syncButtonsForTarget(collapseElement, shouldShow);
+
+        collapseElement.addEventListener('shown.bs.collapse', () => {
+          const nextState = readState()[storageScope] || {};
+          nextState[key] = true;
+          writeState(nextState);
+          syncButtonsForTarget(collapseElement, true);
+        });
+
+        collapseElement.addEventListener('hidden.bs.collapse', () => {
+          const nextState = readState()[storageScope] || {};
+          nextState[key] = false;
+          writeState(nextState);
+          syncButtonsForTarget(collapseElement, false);
+        });
+      });
+
+      document.querySelectorAll('[data-collapse-bulk-action]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const shouldExpand = button.dataset.collapseBulkAction === 'expand';
+
+          persistentCollapses.forEach((collapseElement) => {
+            const collapseInstance = bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
+            if (shouldExpand) {
+              collapseInstance.show();
+            } else {
+              collapseInstance.hide();
+            }
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -163,6 +163,43 @@ def list_folders(prefix: str) -> list:
         ]
 
 
+def folder_exists(prefix: str) -> bool:
+    """
+    Verifica se uma pasta virtual/física existe.
+
+    Para Supabase, considera a pasta existente se houver objetos/subpastas
+    dentro dela ou se o prefixo aparecer na listagem do diretório pai.
+    """
+    prefix = _normalize(prefix).rstrip('/')
+    if not prefix:
+        return False
+
+    if _use_supabase():
+        parent_prefix, _, folder_name = prefix.rpartition('/')
+        sibling_folders = list_folders(parent_prefix)
+        if folder_name in sibling_folders:
+            return True
+        return bool(list_files(prefix) or list_folders(prefix))
+
+    return os.path.isdir(_local_path(prefix))
+
+
+def ensure_folder(prefix: str) -> None:
+    """
+    Garante a existência de uma pasta.
+
+    No Supabase, cria um marcador `.keep` para materializar o prefixo.
+    """
+    prefix = _normalize(prefix).rstrip('/')
+    if not prefix or folder_exists(prefix):
+        return
+
+    if _use_supabase():
+        upload_file(f'{prefix}/.keep', b'', 'application/octet-stream')
+    else:
+        os.makedirs(_local_path(prefix), exist_ok=True)
+
+
 def list_files_by_folder(prefix: str) -> dict:
     """
     Retorna {nome_pasta: [arquivos]} para todos os subdiretórios de prefix.
