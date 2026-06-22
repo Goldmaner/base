@@ -168,7 +168,7 @@ def _build_list_query(filters, *, select_sql: str) -> tuple[str, list[Any]]:
 
     if filters.somente_vencidas:
         where.append(
-            "p.tema_prazo_estimado < CURRENT_DATE AND COALESCE(p.tema_status, '') <> 'Concluído'"
+            "p.tema_prazo_estimado < CURRENT_DATE AND COALESCE(status_cat.ordem, 0) <> 40"
         )
 
     if filters.somente_paradas:
@@ -1202,53 +1202,6 @@ def obter_resumo_dashboard(filters) -> dict[str, Any]:
     select_sql = """
         SELECT
             COUNT(*) AS total_ativas,
-            COUNT(*) FILTER (WHERE p.tema_status = 'Iniciado') AS iniciadas,
-            COUNT(*) FILTER (WHERE p.tema_status = 'Não iniciado') AS nao_iniciadas,
-            COUNT(*) FILTER (WHERE p.tema_status = 'Aguardando Aprovação') AS aguardando_aprovacao,
-            COUNT(*) FILTER (WHERE p.tema_status = 'Concluído') AS concluidas,
-            COUNT(*) FILTER (WHERE p.tema_prazo_estimado IS NULL AND COALESCE(p.tema_status, '') <> 'Concluído') AS sem_prazo,
-            COUNT(*) FILTER (WHERE p.tema_prazo_estimado < CURRENT_DATE AND COALESCE(p.tema_status, '') <> 'Concluído') AS vencidas,
-            COUNT(*) FILTER (WHERE COALESCE(v.situacao_automatica, '') = 'Parado') AS paradas,
-            COUNT(*) FILTER (WHERE COALESCE(v.ordem_prioridade, 999999) <= 5) AS alta_prioridade
-    """
-    sql, params = _build_list_query(filters, select_sql=select_sql)
-    return _fetchone(sql, params) or {
-        "total_ativas": 0,
-        "iniciadas": 0,
-        "nao_iniciadas": 0,
-        "aguardando_aprovacao": 0,
-        "concluidas": 0,
-        "sem_prazo": 0,
-        "vencidas": 0,
-        "paradas": 0,
-        "alta_prioridade": 0,
-    }
-
-
-def obter_alertas_dashboard(filters) -> list[dict[str, Any]]:
-    select_sql = """
-        SELECT
-            p.id,
-            p.tema_nome,
-            p.tema_status,
-            p.tema_prazo_estimado,
-            v.situacao_automatica,
-            v.ordem_prioridade,
-            v.responsavel
-    """
-    sql, params = _build_list_query(filters, select_sql=select_sql)
-    sql += """
-        AND COALESCE(v.situacao_automatica, '') IN ('Sem prazo', 'Vencido', 'Parado', 'Aguardando validação')
-        ORDER BY COALESCE(v.ordem_prioridade, 999999), p.id
-        LIMIT 8
-    """
-    return _fetchall(sql, params)
-
-
-def obter_resumo_dashboard(filters) -> dict[str, Any]:
-    select_sql = """
-        SELECT
-            COUNT(*) AS total_ativas,
             COUNT(*) FILTER (WHERE COALESCE(status_cat.ordem, 0) = 20) AS iniciadas,
             COUNT(*) FILTER (WHERE COALESCE(status_cat.ordem, 0) = 10) AS nao_iniciadas,
             COUNT(*) FILTER (WHERE COALESCE(status_cat.ordem, 0) = 30) AS aguardando_aprovacao,
@@ -1286,7 +1239,10 @@ def obter_alertas_dashboard(filters) -> list[dict[str, Any]]:
     """
     sql, params = _build_list_query(filters, select_sql=select_sql)
     sql += """
-        AND COALESCE(v.situacao_automatica, '') IN ('Sem prazo', 'Vencido', 'Parado', 'Aguardando validacao')
+        AND (
+            COALESCE(v.situacao_automatica, '') IN ('Sem prazo', 'Vencido', 'Parado')
+            OR COALESCE(v.situacao_automatica, '') ILIKE 'Aguardando val%%'
+        )
         ORDER BY COALESCE(v.ordem_prioridade, 999999), p.id
         LIMIT 8
     """

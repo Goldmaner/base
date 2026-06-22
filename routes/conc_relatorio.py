@@ -25,6 +25,67 @@ def login_required(f):
     return decorated_function
 
 
+def _obter_total_executado_demonstrativo(cursor, numero_termo, data_inicio, ocultar_taxas=True, excluir_pg=True):
+    """
+    Replica o recorte-base do demonstrativo para obter o executado total.
+    """
+    if not data_inicio:
+        return 0.0
+
+    cursor.execute("""
+        SELECT MAX(mes) AS total_meses
+        FROM public.parcerias_despesas
+        WHERE numero_termo = %s
+    """, (numero_termo,))
+
+    total_meses_row = cursor.fetchone()
+    total_meses = int(total_meses_row['total_meses'] or 0) if total_meses_row else 0
+    if total_meses <= 0:
+        return 0.0
+
+    inicio_comp = datetime.strptime(str(data_inicio), '%Y-%m-%d').replace(day=1)
+    fim_comp_exclusivo = inicio_comp + relativedelta(months=total_meses)
+
+    categorias_extras = [
+        'débitos indevidos',
+        'juros e/ou multas',
+        'débitos não identificados',
+    ]
+    if not ocultar_taxas:
+        categorias_extras.append('taxas bancárias')
+
+    cursor.execute("""
+        SELECT COALESCE(SUM(ABS(ce.discriminacao)), 0) AS total_executado
+        FROM analises_pc.conc_extrato ce
+        WHERE ce.numero_termo = %s
+          AND ce.discriminacao IS NOT NULL
+          AND ce.cat_transacao IS NOT NULL
+          AND ce.cat_avaliacao IS NOT NULL
+          AND (NOT %s OR ce.cat_avaliacao != 'Pessoa Gestora')
+          AND ce.competencia IS NOT NULL
+          AND DATE_TRUNC('month', ce.competencia) >= %s
+          AND DATE_TRUNC('month', ce.competencia) < %s
+          AND (
+                EXISTS (
+                    SELECT 1
+                    FROM public.parcerias_despesas pd
+                    WHERE pd.numero_termo = ce.numero_termo
+                      AND LOWER(pd.categoria_despesa) = LOWER(ce.cat_transacao)
+                )
+                OR LOWER(ce.cat_transacao) = ANY(%s)
+          )
+    """, (
+        numero_termo,
+        excluir_pg,
+        inicio_comp,
+        fim_comp_exclusivo,
+        categorias_extras,
+    ))
+
+    total_row = cursor.fetchone()
+    return float(total_row['total_executado'] or 0) if total_row else 0.0
+
+
 @bp.route('/')
 @login_required
 @requires_access('conc_relatorio')
@@ -95,7 +156,8 @@ def dados_relatorio():
             SELECT 
                 p.numero_termo,
                 p.total_previsto,
-                p.total_pago
+                p.total_pago,
+                p.inicio
             FROM public.parcerias p
             WHERE p.numero_termo = %s
         """, (numero_termo,))
@@ -146,14 +208,17 @@ def dados_relatorio():
         
         # Buscar contrapartida
         cursor.execute("""
-            SELECT COALESCE(SUM(valor_previsto), 0) as total_contrapartida
+            SELECT
+                COALESCE(SUM(valor_previsto), 0) as total_contrapartida,
+                COALESCE(SUM(valor_executado), 0) as total_contrapartida_executada
             FROM analises_pc.conc_contrapartida
             WHERE numero_termo = %s
         """, (numero_termo,))
-        
+
         contrapartida_data = cursor.fetchone()
         print(f"[DEBUG RELATORIO] Contrapartida raw: {contrapartida_data}")
         total_contrapartida = float(contrapartida_data['total_contrapartida']) if contrapartida_data and contrapartida_data['total_contrapartida'] else 0
+        total_contrapartida_executada = float(contrapartida_data['total_contrapartida_executada']) if contrapartida_data and contrapartida_data['total_contrapartida_executada'] else 0
         
         # Buscar categorias de transação do extrato
         cursor.execute("""
@@ -300,13 +365,20 @@ def dados_relatorio():
             # 7. Valor Total do Projeto (igual PG)
             rendimento_usado = total_liquido if considerar_liquido else total_bruto
             valor_total_projeto = float(parceria['total_pago']) + rendimento_usado + total_contrapartida
+            valor_executado_total = _obter_total_executado_demonstrativo(
+                cursor,
+                numero_termo,
+                parceria['inicio'],
+                ocultar_taxas=True,
+                excluir_pg=True,
+            )
+            print(f"[DEBUG RELATORIO DP] Executado Total (base demonstrativo): {valor_executado_total}")
+            print(f"[DEBUG RELATORIO DP] Contrapartida Executada: {total_contrapartida_executada}")
             
-            # 8. Saldos não Utilizados Remanescentes = Valor Total - Executado - Glosas - Taxas não Devolvidas
+            # 8. Saldos não Utilizados Remanescentes = Valor Repassado - Executado Total
             saldos_remanescentes = (
-                valor_total_projeto - 
-                valor_executado_aprovado - 
-                despesas_glosa - 
-                taxas_nao_devolvidas_dp
+                float(parceria['total_pago']) -
+                valor_executado_total
             )
             print(f"[DEBUG RELATORIO DP] Saldos Remanescentes: {saldos_remanescentes}")
             

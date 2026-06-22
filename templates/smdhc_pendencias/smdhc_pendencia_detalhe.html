@@ -505,7 +505,7 @@
               <div class="detail-meta-grid">
                 <div class="detail-meta-card">
                   <span>Status</span>
-                  <strong><span class="badge rounded-pill {{ status_class(pendencia.tema_status)|trim }}">{{ pendencia.tema_status or 'Sem status' }}</span></strong>
+                  <strong><span class="badge rounded-pill {{ status_class(pendencia.tema_status, pendencia.tema_status_ordem)|trim }}">{{ pendencia.tema_status or 'Sem status' }}</span></strong>
                 </div>
                 <div class="detail-meta-card">
                   <span>Área demandante</span>
@@ -835,7 +835,8 @@
         if (!(select instanceof HTMLSelectElement) || !shell) {
           return;
         }
-        const isReuniao = select.value.trim().toLowerCase().startsWith('reuni');
+        const selectedOption = select.options[select.selectedIndex];
+        const isReuniao = selectedOption?.dataset.reuniao === 'true';
         shell.classList.toggle('d-none', !isReuniao);
       };
 
@@ -1320,7 +1321,7 @@
           const atualizacaoId = trigger.getAttribute('data-editar-atualizacao-id') || '';
           const texto = trigger.getAttribute('data-editar-atualizacao-texto') || '';
           const data = trigger.getAttribute('data-editar-atualizacao-data') || '';
-          const tipo = trigger.getAttribute('data-editar-atualizacao-tipo') || 'Outros';
+          const tipo = trigger.getAttribute('data-editar-atualizacao-tipo') || '';
           const acao = trigger.getAttribute('data-editar-atualizacao-acao') || '';
           const internosRaw = trigger.getAttribute('data-editar-atualizacao-internos') || '[]';
           const externosRaw = trigger.getAttribute('data-editar-atualizacao-externos') || '[]';

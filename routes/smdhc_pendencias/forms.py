@@ -119,14 +119,15 @@ def _extract_multi_raw(source: Any, key: str) -> list[str]:
 
 def pendencia_form_values(request) -> dict[str, Any]:
     payload = request.get_json(silent=True) if request.is_json else request.form
+    errors: list[str] = []
     return {
         "tema_nome": _clean_text((payload or {}).get("tema_nome")) or "",
-        "tema_tipo": _clean_text((payload or {}).get("tema_tipo")) or "",
+        "tema_tipo": _as_int((payload or {}).get("tema_tipo"), "Tipo", errors, minimum=1) or "",
         "tema_descricao": _clean_text((payload or {}).get("tema_descricao")) or "",
-        "tema_area_demandante": _clean_text((payload or {}).get("tema_area_demandante")) or "",
-        "tema_area_responsavel": _extract_multi(payload or request.form, "tema_area_responsavel"),
-        "tema_area_correlata": _extract_multi(payload or request.form, "tema_area_correlata"),
-        "tema_status": _clean_text((payload or {}).get("tema_status")) or "",
+        "tema_area_demandante": _as_int((payload or {}).get("tema_area_demandante"), "Area demandante", errors, minimum=1) or "",
+        "tema_area_responsavel": _extract_int_multi(payload or request.form, "tema_area_responsavel", "Area responsavel", errors),
+        "tema_area_correlata": _extract_int_multi(payload or request.form, "tema_area_correlata", "Area correlata", errors),
+        "tema_status": _as_int((payload or {}).get("tema_status"), "Status", errors, minimum=1) or "",
         "tema_prazo_estimado": _clean_text((payload or {}).get("tema_prazo_estimado")) or "",
         "tema_observacoes": _clean_text((payload or {}).get("tema_observacoes")) or "",
         "situacao_automatica": _clean_text((payload or {}).get("situacao_automatica")) or "",

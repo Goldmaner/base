@@ -201,12 +201,12 @@ def editar(id: int):
 
     context = _build_page_context(form_values={
         "tema_nome": pendencia.get("tema_nome") or "",
-        "tema_tipo": pendencia.get("tema_tipo") or "",
+        "tema_tipo": pendencia.get("tema_tipo_id") or "",
         "tema_descricao": pendencia.get("tema_descricao") or "",
-        "tema_area_demandante": pendencia.get("tema_area_demandante") or "",
-        "tema_area_responsavel": pendencia.get("tema_area_responsavel") or [],
-        "tema_area_correlata": pendencia.get("tema_area_correlata") or [],
-        "tema_status": pendencia.get("tema_status") or "",
+        "tema_area_demandante": pendencia.get("tema_area_demandante_id") or "",
+        "tema_area_responsavel": pendencia.get("tema_area_responsavel_ids") or [],
+        "tema_area_correlata": pendencia.get("tema_area_correlata_ids") or [],
+        "tema_status": pendencia.get("tema_status_id") or "",
         "tema_prazo_estimado": pendencia.get("tema_prazo_estimado").isoformat() if pendencia.get("tema_prazo_estimado") else "",
         "tema_observacoes": pendencia.get("tema_observacoes") or "",
         "situacao_automatica": pendencia.get("situacao_automatica") or "",
@@ -241,6 +241,12 @@ def registrar_atualizacao(id: int):
     except FormValidationError as exc:
         return _handle_form_error(exc, fallback_url=url_for("smdhc_pendencias.detalhe", id=id))
 
+    if services.tipo_atualizacao_requer_participantes(data.tema_atualizacao_tipo) and not data.participantes_usuario_ids and not data.participantes_externos:
+        return _handle_form_error(
+            FormValidationError(["Reuniao: informe ao menos um participante interno ou externo."]),
+            fallback_url=url_for("smdhc_pendencias.detalhe", id=id),
+        )
+
     registro_id = services.registrar_atualizacao(id, data, _usuario_atual())
     g.log_recurso_tipo = "pendencia"
     g.log_recurso_id = id
@@ -258,6 +264,12 @@ def editar_atualizacao(id: int, atualizacao_id: int):
         data = AtualizacaoFormData.from_request(request)
     except FormValidationError as exc:
         return _handle_form_error(exc, fallback_url=url_for("smdhc_pendencias.detalhe", id=id))
+
+    if services.tipo_atualizacao_requer_participantes(data.tema_atualizacao_tipo) and not data.participantes_usuario_ids and not data.participantes_externos:
+        return _handle_form_error(
+            FormValidationError(["Reuniao: informe ao menos um participante interno ou externo."]),
+            fallback_url=url_for("smdhc_pendencias.detalhe", id=id),
+        )
 
     atualizado = services.atualizar_atualizacao(id, atualizacao_id, data, _usuario_atual())
     if not atualizado:

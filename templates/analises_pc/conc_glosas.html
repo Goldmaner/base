@@ -310,6 +310,21 @@
                     <div class="fs-5 fw-bold text-danger" id="infoTotalGeral">R$ -</div>
                 </div>
             </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="chkUsoMaior">
+                        <label class="form-check-label fw-semibold" for="chkUsoMaior">
+                            Incluir glosas por uso à maior do demonstrativo
+                        </label>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                        Calcula apenas categorias previstas em <code>public.parcerias_despesas</code>. Categorias extras, como
+                        <em>Débitos Indevidos</em>, ficam fora desse cálculo.
+                    </small>
+                    <div id="infoUsoMaior" class="small text-muted mt-1"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Tabelas por mês -->
@@ -337,6 +352,13 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let dadosGlosas = null;
+    let termoAtual = '';
+
+    function prepararCarregamento() {
+        document.getElementById('loadingState').style.display = 'block';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('conteudoPrincipal').style.display = 'none';
+    }
 
     // =========================================================
     // INICIALIZAÇÃO
@@ -353,8 +375,13 @@
             return;
         }
 
+        termoAtual = termo;
         document.getElementById('subtituloTermo').textContent = termo;
         document.getElementById('btnVoltar').href = `/conc_banc/?termo=${encodeURIComponent(termo)}`;
+        document.getElementById('chkUsoMaior').addEventListener('change', () => {
+            prepararCarregamento();
+            carregarDados(termoAtual);
+        });
 
         carregarDados(termo);
     });
@@ -364,7 +391,8 @@
     // =========================================================
     async function carregarDados(termo) {
         try {
-            const resp = await fetch(`/conc_glosas/api/dados?termo=${encodeURIComponent(termo)}`);
+            const incluirUsoMaior = document.getElementById('chkUsoMaior')?.checked ? 'true' : 'false';
+            const resp = await fetch(`/conc_glosas/api/dados?termo=${encodeURIComponent(termo)}&incluir_uso_maior=${incluirUsoMaior}`);
             const dados = await resp.json();
 
             if (!resp.ok) {
@@ -372,6 +400,7 @@
             }
 
             dadosGlosas = dados;
+            document.getElementById('chkUsoMaior').checked = !!dados.incluir_uso_maior;
             document.getElementById('loadingState').style.display = 'none';
 
             if (!dados.meses || dados.meses.length === 0) {
@@ -421,6 +450,11 @@
         document.getElementById('infoEntidade').textContent = dados.entidade || '';
         document.getElementById('infoMeses').textContent = dados.meses.length;
         document.getElementById('infoTotalGeral').textContent = formatarMoeda(dados.total_glosado);
+        document.getElementById('infoUsoMaior').textContent = dados.incluir_uso_maior
+            ? (dados.total_linhas_uso_maior > 0
+                ? `${dados.total_linhas_uso_maior} glosa(s) calculada(s) por uso à maior foram incluídas nesta visão.`
+                : 'Nenhuma glosa por uso à maior foi encontrada para este termo.')
+            : 'As glosas por uso à maior estão ocultas até que a chave acima seja marcada.';
 
         if (dados.inicio && dados.final) {
             const di = formatarData(dados.inicio);
@@ -431,7 +465,7 @@
         // Total geral
         document.getElementById('totalGeralValor').textContent = formatarMoeda(dados.total_glosado);
         document.getElementById('totalLinhasTexto').textContent =
-            `${dados.total_linhas} despesa${dados.total_linhas !== 1 ? 's' : ''}`;
+            `${dados.total_linhas} registro${dados.total_linhas !== 1 ? 's' : ''}`;
 
         // Mostrar botões de ação
         document.getElementById('btnExportarCSV').style.display = '';

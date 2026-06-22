@@ -60,11 +60,15 @@ def api_orcamento_detalhado():
         # 1. Buscar termos únicos com parcelas no ano de referência
         # Separar soma de Programada vs Projetada usando valor_previsto
         cur.execute("""
-            SELECT 
+            SELECT
                 ul.numero_termo,
                 SUM(CASE WHEN ul.parcela_tipo = 'Programada' THEN ul.valor_previsto ELSE 0 END) as total_programado,
                 SUM(CASE WHEN ul.parcela_tipo = 'Projetada' THEN ul.valor_previsto ELSE 0 END) as total_projetado,
-                SUM(CASE WHEN ul.parcela_status = 'Pago' THEN ul.valor_previsto ELSE 0 END) as total_pago,
+                SUM(CASE
+                    WHEN ul.parcela_status = 'Pago' THEN ul.valor_previsto
+                    WHEN ul.parcela_status = 'Encaminhado para Pagamento' AND ul.valor_pago > 0 THEN ul.valor_pago
+                    ELSE 0
+                END) as total_pago,
                 SUM(CASE WHEN ul.parcela_status = 'Encaminhado para Pagamento' THEN ul.valor_previsto ELSE 0 END) as total_comprometido
             FROM gestao_financeira.ultra_liquidacoes ul
             WHERE EXTRACT(YEAR FROM ul.vigencia_inicial) = %s
@@ -499,9 +503,18 @@ def api_cronograma_pago():
             SELECT
                 numero_termo,
                 EXTRACT(MONTH FROM vigencia_inicial)::int AS mes,
-                SUM(valor_previsto) AS valor
+                SUM(
+                    CASE
+                        WHEN parcela_status = 'Pago' THEN valor_previsto
+                        WHEN parcela_status = 'Encaminhado para Pagamento' AND valor_pago > 0 THEN valor_pago
+                        ELSE 0
+                    END
+                ) AS valor
             FROM gestao_financeira.ultra_liquidacoes
-            WHERE parcela_status = 'Pago'
+            WHERE (
+                parcela_status = 'Pago'
+                OR (parcela_status = 'Encaminhado para Pagamento' AND valor_pago > 0)
+            )
               AND EXTRACT(YEAR FROM vigencia_inicial) = %s
             GROUP BY numero_termo, EXTRACT(MONTH FROM vigencia_inicial)
             ORDER BY numero_termo, mes
@@ -596,17 +609,40 @@ def _distribuir_cronograma_por_status(ano_referencia, parcela_status):
     conn = get_db()
     cur = get_cursor()
     try:
-        # 1. Parcelas com valor_previsto para o status/ano
-        cur.execute("""
-            SELECT
-                numero_termo,
-                parcela_numero,
-                SUM(valor_previsto)::float AS valor_previsto
-            FROM gestao_financeira.ultra_liquidacoes
-            WHERE parcela_status = %s
-              AND EXTRACT(YEAR FROM vigencia_inicial) = %s
-            GROUP BY numero_termo, parcela_numero
-        """, (parcela_status, ano_referencia))
+        # 1. Parcelas com valor para o status/ano
+        # Para 'Pago': inclui também parcelas 'Encaminhado para Pagamento' com valor_pago > 0
+        # usando valor_pago (parcial) em vez de valor_previsto nesses casos.
+        if parcela_status == 'Pago':
+            cur.execute("""
+                SELECT
+                    numero_termo,
+                    parcela_numero,
+                    SUM(
+                        CASE
+                            WHEN parcela_status = 'Pago' THEN valor_previsto
+                            WHEN parcela_status = 'Encaminhado para Pagamento' AND valor_pago > 0 THEN valor_pago
+                            ELSE 0
+                        END
+                    )::float AS valor_previsto
+                FROM gestao_financeira.ultra_liquidacoes
+                WHERE (
+                    parcela_status = 'Pago'
+                    OR (parcela_status = 'Encaminhado para Pagamento' AND valor_pago > 0)
+                )
+                  AND EXTRACT(YEAR FROM vigencia_inicial) = %s
+                GROUP BY numero_termo, parcela_numero
+            """, (ano_referencia,))
+        else:
+            cur.execute("""
+                SELECT
+                    numero_termo,
+                    parcela_numero,
+                    SUM(valor_previsto)::float AS valor_previsto
+                FROM gestao_financeira.ultra_liquidacoes
+                WHERE parcela_status = %s
+                  AND EXTRACT(YEAR FROM vigencia_inicial) = %s
+                GROUP BY numero_termo, parcela_numero
+            """, (parcela_status, ano_referencia))
         parcelas = {}
         for r in cur.fetchall():
             key = (r['numero_termo'], r['parcela_numero'])

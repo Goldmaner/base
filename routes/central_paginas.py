@@ -8,6 +8,7 @@ from db import get_cursor, get_db
 from utils import login_required
 from decorators import requires_access
 from config import ACESSOS_BASICOS
+from decorators import get_module_access_status
 
 central_paginas_bp = Blueprint('central_paginas', __name__, url_prefix='/central-paginas')
 
@@ -22,10 +23,10 @@ def _user_access_set():
 
 
 def _has_access(acessos_set, is_admin, modulo_acesso):
-    """Verifica se o usuário tem acesso a um módulo."""
+    """Verifica acesso a um módulo respeitando herança (ex: analises → conc_bancaria)."""
     if is_admin or not modulo_acesso:
         return True
-    return modulo_acesso in acessos_set
+    return get_module_access_status(acessos_set, modulo_acesso)['tem_acesso']
 
 
 def _build_tree(paginas, acessos_set, is_admin):

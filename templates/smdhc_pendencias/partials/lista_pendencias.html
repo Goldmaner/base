@@ -41,7 +41,7 @@
                   <div class="flex-grow-1">
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                       <h5 class="pendencia-title">{{ pendencia.tema_nome }}</h5>
-                      <span class="badge rounded-pill {{ status_class(pendencia.tema_status)|trim }}">{{ pendencia.tema_status or 'Sem status' }}</span>
+                      <span class="badge rounded-pill {{ status_class(pendencia.tema_status, pendencia.tema_status_ordem)|trim }}">{{ pendencia.tema_status or 'Sem status' }}</span>
                       {% if pendencia.situacao_automatica %}
                         <span class="badge rounded-pill {{ tone_for_badge(pendencia.situacao_automatica)|trim }}">{{ pendencia.situacao_automatica }}</span>
                       {% endif %}

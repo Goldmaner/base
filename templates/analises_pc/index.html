@@ -363,10 +363,14 @@
             <!-- Seção de Recursos -->
             <h4 class="section-title mt-4">Fases Recursais (se houver)</h4>
             <div id="recursosContainer"></div>
-            
-            <div class="text-center mt-3">
+
+            <div class="text-center mt-3 d-flex justify-content-center gap-2 flex-wrap">
                 <button class="btn btn-warning" onclick="adicionarRecurso()">
                     + Incluir Fase Recursal
+                </button>
+                <button class="btn btn-outline-primary" id="btnDocumentosManifestacao"
+                        onclick="abrirJanelaManifestacoes()" style="display:none;">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>Documentos da Manifestação
                 </button>
             </div>
 
@@ -873,6 +877,287 @@
                     <button type="button" class="btn btn-success" onclick="salvarDadosBase()">
                         💾 Salvar Alterações
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Documentos da Manifestação Recursal -->
+    <div class="modal fade" id="modalManifestacoes" tabindex="-1" aria-labelledby="modalManifestacoesLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);">
+                    <h5 class="modal-title text-white" id="modalManifestacoesLabel">
+                        <i class="bi bi-file-earmark-pdf me-2"></i>Documentos da Manifestação Recursal
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+
+                    <!-- Abas -->
+                    <ul class="nav nav-tabs px-3 pt-2" id="tabsManifestacoes" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-docs-btn" data-bs-toggle="tab"
+                                    data-bs-target="#tab-docs" type="button" role="tab">
+                                <i class="bi bi-folder2-open me-1"></i>Documentos
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-ia-btn" data-bs-toggle="tab"
+                                    data-bs-target="#tab-ia" type="button" role="tab">
+                                <i class="bi bi-stars me-1"></i>Análise com IA
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-historico-btn" data-bs-toggle="tab"
+                                    data-bs-target="#tab-historico" type="button" role="tab">
+                                <i class="bi bi-clock-history me-1"></i>Histórico
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content p-3">
+
+                        <!-- ABA 1: Documentos -->
+                        <div class="tab-pane fade show active" id="tab-docs" role="tabpanel">
+
+                            <!-- Upload -->
+                            <div class="card mb-3 border-primary">
+                                <div class="card-header bg-primary text-white py-2">
+                                    <i class="bi bi-upload me-1"></i>Enviar novo documento
+                                </div>
+                                <div class="card-body">
+                                    <!-- Zona drag & drop -->
+                                    <div id="dropZoneManifestacao"
+                                         style="border:2px dashed #6c757d;border-radius:8px;padding:18px 12px;text-align:center;cursor:pointer;transition:all .2s;background:#f8f9fa;"
+                                         onclick="document.getElementById('inputManifestacaoPdf').click()"
+                                         ondragover="event.preventDefault();this.style.background='#dbeafe';this.style.borderColor='#2563eb';"
+                                         ondragleave="this.style.background='#f8f9fa';this.style.borderColor='#6c757d';"
+                                         ondrop="_onDropManifestacao(event)">
+                                        <i class="bi bi-file-earmark-pdf text-danger" style="font-size:1.8rem;"></i>
+                                        <div class="mt-1 small text-muted">Arraste PDFs aqui ou <span class="text-primary text-decoration-underline">clique para selecionar</span></div>
+                                        <div class="mt-1 small text-muted opacity-75">Múltiplos arquivos aceitos</div>
+                                    </div>
+                                    <input type="file" id="inputManifestacaoPdf" accept=".pdf" multiple style="display:none;" onchange="_onFilesSelected(this.files)">
+
+                                    <!-- Lista de arquivos selecionados -->
+                                    <div id="listaArquivosSelecionados" class="mt-2" style="display:none;">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <small class="fw-semibold text-secondary">Arquivos selecionados:</small>
+                                            <button class="btn btn-link btn-sm p-0 text-danger" onclick="_limparArquivosSelecionados()">Limpar</button>
+                                        </div>
+                                        <div id="filesPreviewList" class="d-flex flex-column gap-1"></div>
+                                        <div class="mt-2 row g-2 align-items-center">
+                                            <div class="col-md-7">
+                                                <label class="form-label fw-semibold small mb-1">Tipo dos documentos</label>
+                                                <select id="selectTipoManifestacao" class="form-select form-select-sm">
+                                                    <optgroup label="📄 Documentos da OSC (recurso)">
+                                                        <option value="manifestacao_recursal">Manifestação Recursal</option>
+                                                        <option value="planilha">Planilha de Despesas</option>
+                                                        <option value="peticao">Petição</option>
+                                                        <option value="outro">Outro</option>
+                                                    </optgroup>
+                                                    <optgroup label="🏛 Documentos de Referência (poder público)">
+                                                        <option value="edital">Edital de Chamamento</option>
+                                                        <option value="parecer_juridico">Parecer Jurídico / Informação SMDHC</option>
+                                                        <option value="normativa">Portaria / Normativa</option>
+                                                        <option value="documento_referencia">Outro documento de referência</option>
+                                                    </optgroup>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-5 d-flex align-items-end">
+                                                <button id="btnUploadManifestacao" class="btn btn-primary btn-sm w-100" onclick="uploadManifestacao()">
+                                                    <i class="bi bi-upload me-1"></i>Enviar <span id="lblQtdArquivos"></span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Progresso por arquivo -->
+                                    <div id="uploadProgressArea" class="mt-3" style="display:none;">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <small id="uploadProgressLabel" class="text-muted fw-semibold">Processando...</small>
+                                            <small id="uploadProgressCounter" class="text-muted"></small>
+                                        </div>
+                                        <div class="progress" style="height:18px;">
+                                            <div id="uploadProgressBar"
+                                                 class="progress-bar progress-bar-striped progress-bar-animated"
+                                                 role="progressbar"
+                                                 style="width:0%; font-size:0.75rem; font-weight:600;">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Histórico -->
+                            <h6 class="fw-semibold text-muted mb-2">
+                                <i class="bi bi-clock-history me-1"></i>Documentos enviados
+                            </h6>
+                            <div id="listaManifestacoes">
+                                <div class="text-center text-muted py-3">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Carregando...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ABA 2: Análise com IA -->
+                        <div class="tab-pane fade" id="tab-ia" role="tabpanel">
+
+                            <!-- Config da análise -->
+                            <div class="card mb-3 border-0 bg-light">
+                                <div class="card-body">
+                                    <h6 class="fw-semibold mb-3">
+                                        <i class="bi bi-stars text-primary me-1"></i>Análise Deepseek — Cross-referência Manifestação × Conciliação
+                                    </h6>
+
+                                    <!-- Seleção de documentos -->
+                                    <label class="form-label fw-semibold small">Documentos a incluir na análise</label>
+                                    <div id="checkboxesDocsIA" class="border rounded p-2 bg-white mb-3" style="max-height:150px;overflow-y:auto;">
+                                        <div class="text-muted small">Nenhum documento processado ainda. Envie PDFs na aba Documentos.</div>
+                                    </div>
+
+                                    <!-- Aviso de contexto -->
+                                    <div id="iaAvisoContexto" class="alert alert-warning py-2 small mb-2" style="display:none;"></div>
+
+                                    <!-- Foco personalizado -->
+                                    <label class="form-label fw-semibold small">Foco / instrução adicional para a IA <span class="text-muted fw-normal">(opcional)</span></label>
+                                    <textarea id="focoPersonalizadoIA" class="form-control form-control-sm mb-3" rows="3"
+                                              placeholder="Ex: Focar nos cheques 850115 e 850042 referentes ao INSS de nov/2017. A OSC alega que o atraso no repasse causou o pagamento em data posterior…"></textarea>
+
+                                    <button id="btnAnalisarIA" class="btn btn-primary" onclick="iniciarAnaliseIA()">
+                                        <i class="bi bi-stars me-1"></i>Analisar com Deepseek
+                                    </button>
+                                    <small class="text-muted ms-2">⏱ Pode levar 30–120 segundos</small>
+                                </div>
+                            </div>
+
+                            <!-- Barra de progresso da análise -->
+                            <div id="iaProgressArea" style="display:none;" class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small id="iaProgressLabel" class="text-muted fw-semibold">Iniciando…</small>
+                                    <small id="iaProgressPct" class="text-muted">0%</small>
+                                </div>
+                                <div class="progress" style="height:10px;">
+                                    <div id="iaProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                         role="progressbar" style="width:0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Resultado da análise -->
+                            <div id="iaResultadoArea" style="display:none;">
+
+                                <!-- Cabeçalho do resultado -->
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-semibold mb-0 text-success">
+                                        <i class="bi bi-check-circle me-1"></i>Análise concluída
+                                    </h6>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="copiarAnaliseIA()">
+                                            <i class="bi bi-clipboard me-1"></i>Copiar JSON
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="exportarAnaliseHTML()">
+                                            <i class="bi bi-file-earmark-text me-1"></i>Ver como Relatório
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Badge recomendação geral -->
+                                <div id="iaBadgeRecomendacao" class="mb-3"></div>
+
+                                <!-- Resumo da OSC -->
+                                <div class="card mb-3 border-secondary">
+                                    <div class="card-header bg-secondary text-white py-2 small fw-semibold">
+                                        Síntese dos Argumentos da OSC
+                                    </div>
+                                    <div class="card-body small" id="iaResumoOSC"></div>
+                                </div>
+
+                                <!-- Pontos analisados -->
+                                <div id="iaPontosContainer"></div>
+
+                                <!-- Quadro Financeiro (analise_financeira) -->
+                                <div class="card border-primary mt-3" id="iaQuadroFinanceiroCard" style="display:none;">
+                                    <div class="card-header bg-primary text-white py-2 small fw-semibold d-flex align-items-center gap-2">
+                                        <i class="bi bi-calculator"></i> Quadro Financeiro — Saldos, Contrapartida e Taxas
+                                    </div>
+                                    <div class="card-body small">
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <div class="border rounded p-2 h-100">
+                                                    <div class="fw-semibold text-primary mb-1"><i class="bi bi-piggy-bank me-1"></i>Saldos Remanescentes</div>
+                                                    <div class="text-muted" id="iaComentarioSaldos" style="font-size:0.78rem;"></div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="border rounded p-2 h-100">
+                                                    <div class="fw-semibold text-primary mb-1"><i class="bi bi-handshake me-1"></i>Contrapartida</div>
+                                                    <div class="text-muted" id="iaComentarioContrapartida" style="font-size:0.78rem;"></div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="border rounded p-2 h-100">
+                                                    <div class="fw-semibold text-primary mb-1"><i class="bi bi-bank me-1"></i>Taxas Bancárias</div>
+                                                    <div class="text-muted" id="iaComentarioTaxas" style="font-size:0.78rem;"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                                            <span class="text-muted small">Valor Total a Ressarcir (apuração)</span>
+                                            <span class="fw-bold text-danger fs-6" id="iaValorRessarcir">—</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Considerações finais -->
+                                <div class="card border-dark mt-3">
+                                    <div class="card-header bg-dark text-white py-2 small fw-semibold">
+                                        Considerações Finais
+                                    </div>
+                                    <div class="card-body small" id="iaConsideracoesFinais"></div>
+                                </div>
+
+                                <!-- Totais -->
+                                <div class="row mt-3 text-center" id="iaTotaisRow">
+                                    <div class="col-4">
+                                        <div class="border rounded p-2 bg-light">
+                                            <div class="small text-muted">Total Glosado</div>
+                                            <div class="fw-bold text-danger" id="iaTotalGlosado">—</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="border rounded p-2 bg-light">
+                                            <div class="small text-muted">Aceito no Recurso</div>
+                                            <div class="fw-bold text-success" id="iaTotalAceito">—</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="border rounded p-2 bg-light">
+                                            <div class="small text-muted">Mantido Glosado</div>
+                                            <div class="fw-bold text-warning" id="iaTotalMantido">—</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Erro -->
+                            <div id="iaErroArea" style="display:none;" class="alert alert-danger small"></div>
+
+                        </div><!-- /tab-ia -->
+
+                        <!-- ABA 3: Histórico de Análises IA -->
+                        <div class="tab-pane fade" id="tab-historico" role="tabpanel">
+                            <div id="historicoIAContainer">
+                                <div class="text-muted small text-center py-4">
+                                    <i class="bi bi-clock-history fs-4 d-block mb-2"></i>
+                                    Carregando histórico...
+                                </div>
+                            </div>
+                        </div><!-- /tab-historico -->
+
+                    </div><!-- /tab-content -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>
         </div>
@@ -1918,6 +2203,797 @@
 
         function voltarConfig() {
             // Na nova UI não existe mais a seção de config separada — sem-op
+        }
+
+        // ── Manifestações Recursais ──────────────────────────────────────────
+        let _manifestacaoDocIds = [];   // IDs em processamento (para polling)
+        let _pollingTimer = null;
+
+        function _atualizarBotaoManifestacoes() {
+            const btn = document.getElementById('btnDocumentosManifestacao');
+            if (!btn) return;
+            const temRecursos = document.querySelectorAll('.recurso-section').length > 0;
+            btn.style.display = temRecursos ? '' : 'none';
+        }
+
+        // Sobrescreve adicionarRecurso para atualizar visibilidade do botão
+        const _adicionarRecursoOrig = adicionarRecurso;
+        adicionarRecurso = function(recursoData = null) {
+            _adicionarRecursoOrig(recursoData);
+            _atualizarBotaoManifestacoes();
+        };
+
+        const _removerRecursoOrig = removerRecurso;
+        removerRecurso = function(btn) {
+            _removerRecursoOrig(btn);
+            _atualizarBotaoManifestacoes();
+        };
+
+        function abrirJanelaManifestacoes() {
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
+            if (!numeroTermo) { alert('Selecione um termo primeiro.'); return; }
+            carregarHistoricoManifestacoes(numeroTermo);
+            new bootstrap.Modal(document.getElementById('modalManifestacoes')).show();
+        }
+
+        async function carregarHistoricoManifestacoes(numeroTermo) {
+            const lista = document.getElementById('listaManifestacoes');
+            lista.innerHTML = '<div class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Carregando...</div>';
+            try {
+                const r = await fetch(`/analises_pc/api/manifestacoes/listar?numero_termo=${encodeURIComponent(numeroTermo)}`);
+                const data = await r.json();
+                if (data.error) { lista.innerHTML = `<div class="alert alert-danger">${data.error}</div>`; return; }
+                if (!data.documentos.length) {
+                    lista.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Nenhum documento enviado ainda.</div>';
+                    return;
+                }
+                const tipoLabel = {
+                    manifestacao_recursal: 'Manifestação Recursal', planilha: 'Planilha de Despesas',
+                    peticao: 'Petição', outro: 'Outro',
+                    edital: 'Edital de Chamamento', parecer_juridico: 'Parecer / Informação SMDHC',
+                    normativa: 'Portaria / Normativa', documento_referencia: 'Doc. de Referência'
+                };
+                const tiposRef = new Set(['edital','parecer_juridico','normativa','documento_referencia']);
+                const statusBadge = {
+                    pendente:     '<span class="badge bg-secondary">Pendente</span>',
+                    processando:  '<span class="badge bg-warning text-dark">Processando</span>',
+                    concluido:    '<span class="badge bg-success">Concluído</span>',
+                    erro:         '<span class="badge bg-danger">Erro</span>'
+                };
+                lista.innerHTML = data.documentos.map(d => {
+                    const isRef = tiposRef.has(d.tipo_documento);
+                    const borderCor = isRef ? 'border-primary' : 'border-secondary';
+                    const iconCor   = isRef ? 'text-primary' : 'text-danger';
+                    const badgeTipo = isRef
+                        ? `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary me-1">🏛 Referência</span>`
+                        : `<span class="badge bg-secondary bg-opacity-10 text-secondary border me-1">📄 OSC</span>`;
+                    return `
+                    <div class="border rounded p-3 mb-2 d-flex align-items-start gap-3 ${borderCor}" id="doc-row-${d.id}">
+                        <i class="bi bi-file-earmark-pdf ${iconCor} fs-4 flex-shrink-0"></i>
+                        <div class="flex-grow-1 overflow-hidden">
+                            <div class="fw-semibold text-truncate" title="${d.nome_arquivo}">${d.nome_arquivo}</div>
+                            <div class="small text-muted">
+                                ${badgeTipo}${tipoLabel[d.tipo_documento] || d.tipo_documento} &bull;
+                                ${d.data_upload} &bull;
+                                ${d.total_paginas ? d.total_paginas + ' pág.' : '—'} &bull;
+                                ${d.usuario_upload || ''}
+                            </div>
+                            ${d.status === 'processando' ? `
+                                <div class="progress mt-1" style="height:6px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning"
+                                         style="width:${d.total_paginas ? Math.round((d.paginas_processadas/d.total_paginas)*100) : 0}%"></div>
+                                </div>` : ''}
+                            ${d.erro_msg ? `<div class="small text-danger mt-1">${d.erro_msg}</div>` : ''}
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+                            ${statusBadge[d.status] || ''}
+                            <button class="btn btn-sm btn-outline-danger mt-1" onclick="deletarManifestacao(${d.id}, '${numeroTermo}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `; }).join('');
+            } catch (e) {
+                lista.innerHTML = `<div class="alert alert-danger">Erro ao carregar documentos: ${e.message}</div>`;
+            }
+        }
+
+        // ── Multi-upload: seleção e drag & drop ──────────────────────────────────
+        let _arquivosSelecionados = [];
+
+        function _onDropManifestacao(event) {
+            event.preventDefault();
+            const zone = document.getElementById('dropZoneManifestacao');
+            zone.style.background = '#f8f9fa';
+            zone.style.borderColor = '#6c757d';
+            const files = Array.from(event.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+            if (!files.length) { alert('Apenas arquivos PDF são aceitos.'); return; }
+            _definirArquivosSelecionados(files);
+        }
+
+        function _onFilesSelected(fileList) {
+            const files = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+            if (!files.length) return;
+            _definirArquivosSelecionados(files);
+        }
+
+        function _definirArquivosSelecionados(files) {
+            _arquivosSelecionados = files;
+            const listEl = document.getElementById('listaArquivosSelecionados');
+            const previewEl = document.getElementById('filesPreviewList');
+            const lblQtd = document.getElementById('lblQtdArquivos');
+            previewEl.innerHTML = files.map((f, i) => `
+                <div class="d-flex align-items-center gap-2 bg-light rounded px-2 py-1 small">
+                    <i class="bi bi-file-earmark-pdf text-danger"></i>
+                    <span class="flex-grow-1 text-truncate">${f.name}</span>
+                    <span class="text-muted">${(f.size/1024/1024).toFixed(1)} MB</span>
+                    <button class="btn btn-link btn-sm p-0 text-danger" onclick="_removerArquivoSelecionado(${i})"><i class="bi bi-x"></i></button>
+                </div>
+            `).join('');
+            lblQtd.textContent = files.length > 1 ? `${files.length} arquivos` : '1 arquivo';
+            listEl.style.display = '';
+        }
+
+        function _removerArquivoSelecionado(idx) {
+            _arquivosSelecionados.splice(idx, 1);
+            if (!_arquivosSelecionados.length) { _limparArquivosSelecionados(); return; }
+            _definirArquivosSelecionados(_arquivosSelecionados);
+        }
+
+        function _limparArquivosSelecionados() {
+            _arquivosSelecionados = [];
+            document.getElementById('listaArquivosSelecionados').style.display = 'none';
+            document.getElementById('filesPreviewList').innerHTML = '';
+            document.getElementById('inputManifestacaoPdf').value = '';
+        }
+
+        async function uploadManifestacao() {
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
+            const tipo = document.getElementById('selectTipoManifestacao').value;
+            const btn = document.getElementById('btnUploadManifestacao');
+            const progressArea = document.getElementById('uploadProgressArea');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const progressLabel = document.getElementById('uploadProgressLabel');
+            const progressCounter = document.getElementById('uploadProgressCounter');
+
+            if (!numeroTermo) { alert('Selecione um termo primeiro.'); return; }
+            if (!_arquivosSelecionados.length) { alert('Selecione pelo menos um arquivo PDF.'); return; }
+
+            const arquivos = [..._arquivosSelecionados];
+            btn.disabled = true;
+            progressArea.style.display = '';
+
+            let erros = [];
+            for (let i = 0; i < arquivos.length; i++) {
+                const arquivo = arquivos[i];
+                progressCounter.textContent = `${i+1} / ${arquivos.length}`;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${i+1}/${arquivos.length}`;
+                progressBar.style.width = '0%';
+                progressBar.textContent = '0%';
+                progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+                progressLabel.textContent = `Enviando: ${arquivo.name}`;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('arquivo', arquivo);
+                    formData.append('numero_termo', numeroTermo);
+                    formData.append('tipo_documento', tipo);
+
+                    const r = await fetch('/analises_pc/api/manifestacoes/upload', { method: 'POST', body: formData });
+                    const data = await r.json();
+                    if (!r.ok || data.error) throw new Error(data.error || 'Erro no upload');
+
+                    progressLabel.textContent = `Processando: ${arquivo.name}`;
+                    await _pollProcessamento(data.doc_id, progressBar, progressLabel);
+
+                    progressBar.classList.remove('progress-bar-animated','progress-bar-striped');
+                    progressBar.classList.add('bg-success');
+                    progressLabel.textContent = `✓ ${arquivo.name}`;
+                    await new Promise(res => setTimeout(res, 600));
+                } catch (e) {
+                    erros.push(`${arquivo.name}: ${e.message}`);
+                    progressBar.classList.add('bg-danger');
+                    progressLabel.textContent = `Erro: ${arquivo.name}`;
+                    await new Promise(res => setTimeout(res, 1200));
+                }
+            }
+
+            await carregarHistoricoManifestacoes(numeroTermo);
+            _atualizarCheckboxesDocIA(numeroTermo);
+            _limparArquivosSelecionados();
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-upload me-1"></i>Enviar <span id="lblQtdArquivos"></span>';
+            if (erros.length) {
+                alert('Concluído com erros:\n' + erros.join('\n'));
+            } else {
+                progressLabel.textContent = `✓ ${arquivos.length} arquivo(s) processado(s)!`;
+                setTimeout(() => { progressArea.style.display = 'none'; }, 3000);
+            }
+        }
+
+        async function _pollProcessamento(docId, progressBar, progressLabel) {
+            while (true) {
+                await new Promise(res => setTimeout(res, 1500));
+                try {
+                    const r = await fetch(`/analises_pc/api/manifestacoes/status/${docId}`);
+                    const data = await r.json();
+                    if (data.error) break;
+
+                    const pct = data.percentual || 0;
+                    progressBar.style.width = pct + '%';
+                    progressBar.textContent = pct + '%';
+
+                    if (data.total_paginas) {
+                        progressLabel.textContent = `Processando... ${data.paginas_processadas}/${data.total_paginas} páginas`;
+                    }
+
+                    if (data.status === 'concluido' || data.status === 'erro') break;
+                } catch (e) { break; }
+            }
+        }
+
+        async function deletarManifestacao(docId, numeroTermo) {
+            if (!confirm('Remover este documento? Os dados processados também serão excluídos.')) return;
+            try {
+                const r = await fetch(`/analises_pc/api/manifestacoes/${docId}`, { method: 'DELETE' });
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.error);
+                await carregarHistoricoManifestacoes(numeroTermo);
+                _atualizarCheckboxesDocIA(numeroTermo);
+            } catch (e) {
+                alert('Erro ao remover: ' + e.message);
+            }
+        }
+
+        // ── Análise IA ───────────────────────────────────────────────────────────
+        let _iaResultadoAtual = null;
+
+        async function _atualizarCheckboxesDocIA(numeroTermo) {
+            const ctn = document.getElementById('checkboxesDocsIA');
+            if (!ctn || !numeroTermo) return;
+            try {
+                const r = await fetch(`/analises_pc/api/manifestacoes/listar?numero_termo=${encodeURIComponent(numeroTermo)}`);
+                const data = await r.json();
+                const docs = (data.documentos || []).filter(d => d.status === 'concluido');
+                if (!docs.length) {
+                    ctn.innerHTML = '<div class="text-muted small">Nenhum documento processado ainda. Envie PDFs na aba Documentos.</div>';
+                    return;
+                }
+                const tipoLabel = {
+                    manifestacao_recursal: 'Manifestação', planilha: 'Planilha', peticao: 'Petição', outro: 'Outro',
+                    edital: 'Edital', parecer_juridico: 'Parecer/Informação', normativa: 'Portaria/Normativa', documento_referencia: 'Referência'
+                };
+                const tiposRef = new Set(['edital','parecer_juridico','normativa','documento_referencia']);
+                ctn.innerHTML = docs.map(d => {
+                    const isRef = tiposRef.has(d.tipo_documento);
+                    const icone = isRef
+                        ? '<i class="bi bi-building me-1 text-primary"></i>'
+                        : '<i class="bi bi-file-earmark-pdf me-1 text-danger"></i>';
+                    const badge = isRef
+                        ? '<span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:10px;">Referência</span> '
+                        : '';
+                    return `
+                    <div class="form-check">
+                        <input class="form-check-input doc-ia-check" type="checkbox"
+                               id="docIA_${d.id}" value="${d.id}" checked
+                               onchange="_atualizarAvisoContexto()">
+                        <label class="form-check-label small" for="docIA_${d.id}">
+                            ${icone}${badge}<strong>${tipoLabel[d.tipo_documento] || d.tipo_documento}</strong>
+                            — ${d.nome_arquivo}
+                            <span class="text-muted">(${d.total_paginas || '?'} pág.)</span>
+                        </label>
+                    </div>
+                `; }).join('');
+                // Aviso de contexto logo após renderizar os checkboxes
+                const termo = document.getElementById('numeroTermo').value.trim();
+                if (termo) _atualizarAvisoContexto();
+            } catch(e) {
+                ctn.innerHTML = '<div class="text-danger small">Erro ao carregar documentos.</div>';
+            }
+        }
+
+        async function _atualizarAvisoContexto() {
+            const aviso = document.getElementById('iaAvisoContexto');
+            if (!aviso) return;
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
+            const docIds = Array.from(document.querySelectorAll('.doc-ia-check:checked'))
+                               .map(el => parseInt(el.value));
+            if (!numeroTermo || !docIds.length) { aviso.style.display = 'none'; return; }
+            try {
+                const r = await fetch('/analises_pc/api/manifestacoes/estimativa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numero_termo: numeroTermo, doc_ids: docIds })
+                });
+                const est = await r.json();
+                const totalKb = Math.round(est.total_chars_pdf / 1024);
+                const budgetKb = Math.round(est.budget_pdf / 1024);
+                const glosasStr = est.total_glosas ? `R$ ${est.total_glosas.toLocaleString('pt-BR', {minimumFractionDigits:2})}` : '—';
+
+                if (est.pdf_truncado) {
+                    aviso.style.display = '';
+                    aviso.className = 'alert alert-warning py-2 small mb-2';
+                    aviso.innerHTML = `
+                        <strong>⚠ PDF grande:</strong> ${totalKb} KB de páginas relevantes selecionadas — orçamento da IA é ${budgetKb} KB.
+                        As <strong>${est.pct_pdf_lido}% mais relevantes</strong> serão lidas (páginas priorizadas por busca semântica nos favorecidos e motivos das glosas).
+                        <br><span class="text-muted">Glosas no banco: ${est.qtd_glosas} itens | ${glosasStr} — esses dados chegam completos independente do tamanho do PDF.</span>`;
+                } else {
+                    aviso.style.display = '';
+                    aviso.className = 'alert alert-success py-2 small mb-2';
+                    aviso.innerHTML = `<strong>✓ Contexto OK:</strong> ${totalKb} KB de PDF (cabe no limite de ${budgetKb} KB). Glosas: ${est.qtd_glosas} itens | ${glosasStr}.`;
+                }
+            } catch(e) {
+                aviso.style.display = 'none';
+            }
+        }
+
+        async function _carregarHistoricoIA(numeroTermo) {
+            const ctn = document.getElementById('historicoIAContainer');
+            if (!ctn) return;
+            if (!numeroTermo) {
+                ctn.innerHTML = '<div class="text-muted small text-center py-4">Selecione um termo para ver o histórico.</div>';
+                return;
+            }
+            ctn.innerHTML = '<div class="text-muted small text-center py-4"><div class="spinner-border spinner-border-sm me-2"></div>Carregando...</div>';
+            try {
+                const resp = await fetch(`/analises_pc/api/manifestacoes/historico_ia?numero_termo=${encodeURIComponent(numeroTermo)}`);
+                const data = await resp.json();
+                const analises = data.analises || [];
+                if (!analises.length) {
+                    ctn.innerHTML = '<div class="text-muted small text-center py-4"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma análise salva para este termo.</div>';
+                    return;
+                }
+                const corRec = {
+                    'MANTER GLOSAS': 'danger',
+                    'ACEITAR PARCIALMENTE': 'warning',
+                    'ACEITAR TOTAL': 'success',
+                    'INCONCLUSIVO — REQUERER DILIGÊNCIA': 'secondary'
+                };
+                ctn.innerHTML = analises.map((a, i) => {
+                    const cor = corRec[a.recomendacao_geral] || 'secondary';
+                    const glosado = a.valor_total_glosado ? `R$ ${parseFloat(a.valor_total_glosado).toLocaleString('pt-BR', {minimumFractionDigits:2})}` : '—';
+                    const aceito  = a.valor_total_aceito  ? `R$ ${parseFloat(a.valor_total_aceito).toLocaleString('pt-BR', {minimumFractionDigits:2})}` : 'R$ 0,00';
+                    const mantido = a.valor_total_mantido ? `R$ ${parseFloat(a.valor_total_mantido).toLocaleString('pt-BR', {minimumFractionDigits:2})}` : '—';
+                    return `
+                    <div class="card mb-3 border-${cor}">
+                        <div class="card-header d-flex justify-content-between align-items-center py-2 bg-${cor} bg-opacity-10">
+                            <span class="small fw-semibold">
+                                <i class="bi bi-clock me-1"></i>${a.criado_em}
+                                <span class="badge bg-${cor} ms-2">${a.recomendacao_geral || '—'}</span>
+                            </span>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-outline-${cor}" onclick="_restaurarAnaliseHistorico(${i})">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>Carregar
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="_excluirAnaliseHistorico(${a.id}, this)" title="Excluir esta análise">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="row text-center small">
+                                <div class="col-4">
+                                    <div class="text-muted">Total Glosado</div>
+                                    <div class="fw-bold text-danger">${glosado}</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-muted">Aceito no Recurso</div>
+                                    <div class="fw-bold text-success">${aceito}</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-muted">Mantido Glosado</div>
+                                    <div class="fw-bold text-warning">${mantido}</div>
+                                </div>
+                            </div>
+                            <div class="text-muted small mt-1">
+                                ${a.modelo_ia || 'deepseek-chat'} &bull;
+                                ${a.prompt_tokens || '?'} tokens prompt / ${a.completion_tokens || '?'} completion &bull;
+                                ${(a.resultado?.pontos || []).length} pontos analisados
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+                // guarda para restaurar
+                window._historicoAnalises = analises;
+            } catch(e) {
+                ctn.innerHTML = '<div class="alert alert-danger small">Erro ao carregar histórico.</div>';
+            }
+        }
+
+        function _restaurarAnaliseHistorico(idx) {
+            const a = (window._historicoAnalises || [])[idx];
+            if (!a || !a.resultado) return;
+            _iaResultadoAtual = a.resultado;
+            _renderizarResultadoIA(a.resultado);
+            const resultArea = document.getElementById('iaResultadoArea');
+            if (resultArea) resultArea.style.display = '';
+            const tabIA = document.getElementById('tab-ia-btn');
+            if (tabIA) bootstrap.Tab.getOrCreateInstance(tabIA).show();
+            _mostrarToast('Análise carregada do histórico', 'success');
+        }
+
+        async function _excluirAnaliseHistorico(id, btn) {
+            if (!confirm('Excluir esta análise do histórico? A ação não pode ser desfeita.')) return;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            try {
+                const resp = await fetch(`/analises_pc/api/manifestacoes/historico_ia/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.erro || 'Erro desconhecido');
+                // Remove o card do DOM
+                btn.closest('.card').remove();
+                _mostrarToast('Análise excluída.', 'success');
+                // Se ficou vazio, mostra mensagem
+                const ctn = document.getElementById('historicoIAContainer');
+                if (ctn && !ctn.querySelector('.card')) {
+                    ctn.innerHTML = '<div class="text-muted small text-center py-4"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma análise salva para este termo.</div>';
+                }
+            } catch(e) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-trash"></i>';
+                _mostrarToast('Erro ao excluir: ' + e.message, 'danger');
+            }
+        }
+
+        // Carrega checkboxes ao abrir a aba IA
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('tab-ia-btn').addEventListener('shown.bs.tab', () => {
+                const termo = document.getElementById('numeroTermo').value.trim();
+                if (termo) _atualizarCheckboxesDocIA(termo);
+            });
+            document.getElementById('tab-historico-btn').addEventListener('shown.bs.tab', () => {
+                const termo = document.getElementById('numeroTermo').value.trim();
+                _carregarHistoricoIA(termo);
+            });
+        });
+
+        async function iniciarAnaliseIA() {
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
+            const mesesAnalisados = document.getElementById('mesesAnalisados').value.trim();
+            const foco = document.getElementById('focoPersonalizadoIA').value;
+            const docIds = Array.from(document.querySelectorAll('.doc-ia-check:checked'))
+                               .map(el => parseInt(el.value));
+
+            if (!numeroTermo) { alert('Selecione um termo primeiro.'); return; }
+
+            const btn = document.getElementById('btnAnalisarIA');
+            const progressArea = document.getElementById('iaProgressArea');
+            const progressBar = document.getElementById('iaProgressBar');
+            const progressLabel = document.getElementById('iaProgressLabel');
+            const progressPct = document.getElementById('iaProgressPct');
+            const resultArea = document.getElementById('iaResultadoArea');
+            const erroArea = document.getElementById('iaErroArea');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Iniciando…';
+            progressArea.style.display = '';
+            resultArea.style.display = 'none';
+            erroArea.style.display = 'none';
+            progressBar.style.width = '0%';
+            progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-primary';
+            progressLabel.textContent = 'Enviando para análise…';
+            progressPct.textContent = '0%';
+
+            try {
+                const r = await fetch('/analises_pc/api/manifestacoes/analisar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numero_termo: numeroTermo, meses_analisados: mesesAnalisados,
+                                          doc_ids: docIds, foco_personalizado: foco })
+                });
+                const data = await r.json();
+                if (!r.ok || data.error) throw new Error(data.error || 'Erro ao iniciar análise');
+
+                const taskId = data.task_id;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processando…';
+
+                // Polling
+                while (true) {
+                    await new Promise(res => setTimeout(res, 2000));
+                    const tr = await fetch(`/analises_pc/api/manifestacoes/tarefa/${taskId}`);
+                    const td = await tr.json();
+
+                    const pct = td.pct || 0;
+                    progressBar.style.width = pct + '%';
+                    progressLabel.textContent = td.label || '…';
+                    progressPct.textContent = pct + '%';
+
+                    if (td.status === 'done') {
+                        _iaResultadoAtual = td.resultado;
+                        _renderizarResultadoIA(td.resultado);
+                        resultArea.style.display = '';
+                        progressArea.style.display = 'none';
+                        break;
+                    }
+                    if (td.status === 'erro') {
+                        throw new Error(td.erro || 'Erro desconhecido na análise');
+                    }
+                }
+
+            } catch (e) {
+                erroArea.textContent = 'Erro: ' + e.message;
+                erroArea.style.display = '';
+                progressArea.style.display = 'none';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-stars me-1"></i>Analisar com Deepseek';
+            }
+        }
+
+        function _renderizarResultadoIA(res) {
+            // Badge recomendação geral
+            const cores = {
+                'MANTER GLOSAS': 'danger',
+                'ACEITAR PARCIALMENTE': 'warning',
+                'ACEITAR TOTAL': 'success',
+                'INCONCLUSIVO — REQUERER DILIGÊNCIA': 'secondary'
+            };
+            const recGeral = res.recomendacao_geral || '—';
+            const cor = cores[recGeral] || 'secondary';
+            document.getElementById('iaBadgeRecomendacao').innerHTML =
+                `<span class="badge bg-${cor} fs-6 px-3 py-2">Recomendação: ${recGeral}</span>`;
+
+            // Resumo OSC
+            document.getElementById('iaResumoOSC').textContent = res.resumo_osc || '—';
+
+            // Pontos
+            const cores_pont = { 'MANTER GLOSA': 'danger', 'ACEITAR ARGUMENTO': 'success',
+                                  'ACEITAR PARCIALMENTE': 'warning',
+                                  'REQUERER DOCUMENTAÇÃO ADICIONAL': 'info' };
+            const pontos = res.pontos || [];
+            document.getElementById('iaPontosContainer').innerHTML = pontos.map((p, i) => {
+                const c = cores_pont[p.recomendacao] || 'secondary';
+                return `
+                <div class="card mb-2 border-${c}">
+                    <div class="card-header py-2 d-flex justify-content-between align-items-center
+                                border-${c}" style="background:var(--bs-${c}-bg-subtle,#f8f9fa)">
+                        <span class="small fw-semibold">${i+1}. ${p.titulo || 'Ponto'}</span>
+                        <span class="badge bg-${c}">${p.recomendacao || '—'}</span>
+                    </div>
+                    <div class="card-body small py-2">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="text-muted fw-semibold mb-1">Argumento OSC</div>
+                                <p class="mb-2">${p.argumento_osc || '—'}</p>
+                                <div class="text-muted fw-semibold mb-1">Dados da Conciliação</div>
+                                <p class="mb-0 font-monospace" style="font-size:0.75rem;">${p.dados_analise || '—'}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted fw-semibold mb-1">Resposta Técnica</div>
+                                <p class="mb-2">${p.resposta_tecnica || '—'}</p>
+                                ${p.valor_impactado ? `<div class="text-end"><span class="badge bg-light text-dark border">Valor: ${p.valor_impactado}</span></div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Considerações finais
+            document.getElementById('iaConsideracoesFinais').textContent = res.consideracoes_finais || '—';
+
+            // Totais
+            document.getElementById('iaTotalGlosado').textContent = res.valor_total_glosado || '—';
+            document.getElementById('iaTotalAceito').textContent = res.valor_total_aceito_recurso || '—';
+            document.getElementById('iaTotalMantido').textContent = res.valor_total_mantido_glosa || '—';
+
+            // Quadro Financeiro (analise_financeira)
+            const af = res.analise_financeira;
+            const qfCard = document.getElementById('iaQuadroFinanceiroCard');
+            if (af && qfCard) {
+                qfCard.style.display = '';
+                // Saldos
+                const saldoComent = document.getElementById('iaComentarioSaldos');
+                if (saldoComent) saldoComent.textContent = af.comentario_saldos || '—';
+                // Contrapartida
+                const cpComent = document.getElementById('iaComentarioContrapartida');
+                if (cpComent) cpComent.textContent = af.comentario_contrapartida || '—';
+                // Taxas
+                const taxComent = document.getElementById('iaComentarioTaxas');
+                if (taxComent) taxComent.textContent = af.comentario_taxas_bancarias || '—';
+                // Total a ressarcir
+                const ressEl = document.getElementById('iaValorRessarcir');
+                if (ressEl) ressEl.textContent = af.valor_total_ressarcir || '—';
+            } else if (qfCard) {
+                qfCard.style.display = 'none';
+            }
+        }
+
+        function copiarAnaliseIA() {
+            if (!_iaResultadoAtual) return;
+            navigator.clipboard.writeText(JSON.stringify(_iaResultadoAtual, null, 2))
+                .then(() => _mostrarToast('JSON copiado!', 'success'))
+                .catch(() => _mostrarToast('Erro ao copiar', 'danger'));
+        }
+
+        function exportarAnaliseHTML() {
+            if (!_iaResultadoAtual) return;
+            const res = _iaResultadoAtual;
+            const numeroTermo = document.getElementById('numeroTermo').value.trim();
+            const meses = document.getElementById('mesesAnalisados').value.trim();
+            const dataHoje = new Date().toLocaleDateString('pt-BR', {day:'2-digit',month:'long',year:'numeric'});
+
+            const _corRec = (r) => {
+                if (!r) return '#6b7280';
+                r = r.toUpperCase();
+                if (r.includes('MANTER')) return '#dc2626';
+                if (r.includes('ACEITAR PARCIALMENTE')) return '#d97706';
+                if (r.includes('ACEITAR TOTAL') || r === 'ACEITAR ARGUMENTO') return '#16a34a';
+                if (r.includes('DILIGÊNCIA') || r.includes('INCONCLUSIVO')) return '#7c3aed';
+                return '#6b7280';
+            };
+            const _badgeRec = (r) => {
+                const cor = _corRec(r);
+                return `<span style="display:inline-block;background:${cor};color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.5px;">${r || '—'}</span>`;
+            };
+
+            const pontosHtml = (res.pontos || []).map((p, i) => {
+                const cor = _corRec(p.recomendacao);
+                return `
+                <div style="border:1px solid #e5e7eb;border-left:4px solid ${cor};border-radius:6px;padding:16px 20px;margin-bottom:16px;page-break-inside:avoid;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                        <h3 style="margin:0;font-size:14px;color:#1e3a5f;">${i+1}. ${p.titulo || ''}</h3>
+                        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                            ${p.valor_impactado ? `<span style="background:#f3f4f6;color:#374151;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">${p.valor_impactado}</span>` : ''}
+                            ${_badgeRec(p.recomendacao)}
+                        </div>
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+                        <tr style="background:#f9fafb;">
+                            <td style="padding:8px 10px;border:1px solid #e5e7eb;width:140px;font-weight:600;color:#374151;vertical-align:top;">Argumento da OSC</td>
+                            <td style="padding:8px 10px;border:1px solid #e5e7eb;line-height:1.6;">${p.argumento_osc || '—'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:8px 10px;border:1px solid #e5e7eb;font-weight:600;color:#374151;vertical-align:top;">Dados da Conciliação</td>
+                            <td style="padding:8px 10px;border:1px solid #e5e7eb;line-height:1.6;font-family:monospace;font-size:11.5px;background:#f8f9fa;">${p.dados_analise || '—'}</td>
+                        </tr>
+                        <tr style="background:#f9fafb;">
+                            <td style="padding:8px 10px;border:1px solid #e5e7eb;font-weight:600;color:#374151;vertical-align:top;">Resposta Técnica</td>
+                            <td style="padding:8px 10px;border:1px solid #e5e7eb;line-height:1.6;">${p.resposta_tecnica || '—'}</td>
+                        </tr>
+                    </table>
+                </div>`;
+            }).join('');
+
+            const naoContestadosHtml = (res.glosas_nao_contestadas || []).length ? `
+                <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:14px 18px;margin-bottom:16px;">
+                    <h3 style="margin:0 0 8px;font-size:13px;color:#92400e;">⚠ Glosas não contestadas pela OSC</h3>
+                    <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;">
+                        ${(res.glosas_nao_contestadas).map(g => `<li>${g}</li>`).join('')}
+                    </ul>
+                </div>` : '';
+
+            const semCorrespondenciaHtml = (res.itens_sem_correspondencia || []).length ? `
+                <div style="background:#ede9fe;border:1px solid #c4b5fd;border-radius:6px;padding:14px 18px;margin-bottom:16px;">
+                    <h3 style="margin:0 0 8px;font-size:13px;color:#5b21b6;">Argumentos sem correspondência nos dados disponíveis</h3>
+                    <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;">
+                        ${(res.itens_sem_correspondencia).map(g => `<li>${g}</li>`).join('')}
+                    </ul>
+                </div>` : '';
+
+            const corGeral = _corRec(res.recomendacao_geral);
+
+            const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Análise Recursal — ${numeroTermo}</title>
+<style>
+  @media print { .no-print { display:none!important; } body { margin:0; } }
+  * { box-sizing:border-box; }
+  body { font-family:'Segoe UI',Arial,sans-serif; max-width:960px; margin:0 auto; padding:32px 28px; font-size:13px; color:#1f2937; line-height:1.6; background:#fff; }
+  h1 { font-size:20px; color:#1e3a5f; margin:0; }
+  h2 { font-size:15px; color:#1e3a5f; border-bottom:2px solid #e5e7eb; padding-bottom:6px; margin:28px 0 14px; }
+  p { margin:6px 0; }
+  .header { border-bottom:3px solid #1e3a5f; padding-bottom:16px; margin-bottom:24px; }
+  .header-meta { font-size:11.5px; color:#6b7280; margin-top:4px; }
+  .rec-banner { border-radius:8px; padding:14px 20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+  .totals-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+  .totals-table td { padding:9px 14px; border:1px solid #e5e7eb; }
+  .totals-table tr:first-child td { background:#f3f4f6; font-weight:600; }
+  .footer { margin-top:40px; border-top:1px solid #e5e7eb; padding-top:20px; font-size:11.5px; color:#9ca3af; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .btn-print { display:inline-block; padding:6px 14px; background:#1e3a5f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; text-decoration:none; }
+  .resumo-block { background:#f0f9ff; border-left:4px solid #3b82f6; border-radius:0 6px 6px 0; padding:14px 18px; margin-bottom:20px; font-size:13px; line-height:1.7; }
+  .consideracoes-block { background:#f0fdf4; border-left:4px solid #16a34a; border-radius:0 6px 6px 0; padding:14px 18px; font-size:13px; line-height:1.7; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#6b7280;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">SMDHC / DAC — Análise Técnica</div>
+        <h1>Análise de Manifestação Recursal</h1>
+        <div class="header-meta">
+          <strong>Termo:</strong> ${numeroTermo} &nbsp;|&nbsp;
+          <strong>Período analisado:</strong> ${meses} &nbsp;|&nbsp;
+          <strong>Gerado em:</strong> ${dataHoje}
+        </div>
+      </div>
+      <button class="btn-print no-print" onclick="window.print()">⎙ Imprimir / PDF</button>
+    </div>
+  </div>
+
+  <div class="rec-banner" style="background:${corGeral}18;border:2px solid ${corGeral};">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.5px;text-transform:uppercase;">Recomendação Geral</div>
+      <div style="font-size:15px;font-weight:700;color:${corGeral};margin-top:2px;">${res.recomendacao_geral || '—'}</div>
+    </div>
+    <table style="font-size:12px;border-collapse:collapse;">
+      <tr>
+        <td style="padding:4px 12px;text-align:right;color:#6b7280;">Total glosado</td>
+        <td style="padding:4px 0;font-weight:700;color:#dc2626;">${res.valor_total_glosado || '—'}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 12px;text-align:right;color:#6b7280;">Aceito no recurso</td>
+        <td style="padding:4px 0;font-weight:700;color:#16a34a;">${res.valor_total_aceito_recurso || '—'}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 12px;text-align:right;color:#6b7280;">Mantido glosado</td>
+        <td style="padding:4px 0;font-weight:700;color:#dc2626;">${res.valor_total_mantido_glosa || '—'}</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>Síntese dos Argumentos da OSC</h2>
+  <div class="resumo-block">${(res.resumo_osc || '—').replace(/\n/g,'<br>')}</div>
+
+  <h2>Análise Ponto a Ponto</h2>
+  ${pontosHtml || '<p style="color:#6b7280;">Nenhum ponto identificado.</p>'}
+
+  ${naoContestadosHtml}
+  ${semCorrespondenciaHtml}
+
+  ${(() => {
+    const af = res.analise_financeira;
+    if (!af) return '';
+    const fmtVal = (v) => v || '—';
+    return `
+  <h2>Quadro Financeiro — Saldos, Contrapartida e Taxas</h2>
+  <table class="totals-table" style="margin-bottom:8px;">
+    <tr>
+      <td style="width:200px;">Item</td>
+      <td>Análise Técnica</td>
+    </tr>
+    <tr>
+      <td><strong>Saldos Remanescentes</strong></td>
+      <td>${af.comentario_saldos || '—'}</td>
+    </tr>
+    <tr>
+      <td><strong>Contrapartida</strong></td>
+      <td>${af.comentario_contrapartida || '—'}</td>
+    </tr>
+    <tr>
+      <td><strong>Taxas Bancárias Não Devolvidas</strong></td>
+      <td>${af.comentario_taxas_bancarias || '—'}</td>
+    </tr>
+    <tr style="background:#fef2f2;">
+      <td><strong style="color:#dc2626;">Valor Total a Ressarcir</strong></td>
+      <td><strong style="color:#dc2626;">${fmtVal(af.valor_total_ressarcir)}</strong></td>
+    </tr>
+  </table>`;
+  })()}
+
+  <h2>Considerações Finais e Posicionamento Técnico</h2>
+  <div class="consideracoes-block">${(res.consideracoes_finais || '—').replace(/\n/g,'<br>')}</div>
+
+  <div class="footer">
+    <span>Gerado automaticamente pelo sistema FParcerias — SMDHC/DAC</span>
+    <span>Este documento é um subsídio técnico interno. Não substitui o parecer formal.</span>
+  </div>
+</body>
+</html>`;
+
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `analise_recursal_${numeroTermo.replace(/\//g,'-')}.html`;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         async function criarPastaModelo() {

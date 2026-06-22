@@ -46,7 +46,7 @@
                       data-editar-atualizacao-id="{{ item.id }}"
                       data-editar-atualizacao-texto="{{ item.tema_atualizacao|e }}"
                       data-editar-atualizacao-data="{{ item.tema_atualizacao_data.isoformat() if item.tema_atualizacao_data else '' }}"
-                      data-editar-atualizacao-tipo="{{ item.tema_atualizacao_tipo or 'Outros' }}"
+                      data-editar-atualizacao-tipo="{{ item.tema_atualizacao_tipo_id or '' }}"
                       data-editar-atualizacao-acao="{{ (item.tema_acao_subsequente or '')|e }}"
                       data-editar-atualizacao-internos="{{ item.participantes_internos_ids|tojson|forceescape }}"
                       data-editar-atualizacao-externos="{{ item.participantes_externos|tojson|forceescape }}"

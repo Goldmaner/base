@@ -3,7 +3,7 @@
     <label class="form-label fw-semibold">Tipo de atualização</label>
     <select name="tema_atualizacao_tipo" class="form-select" data-atualizacao-tipo-select>
       {% for tipo in atualizacao_tipos %}
-        <option value="{{ tipo }}" {% if tipo == 'Outros' %}selected{% endif %}>{{ tipo }}</option>
+        <option value="{{ tipo.id }}" data-reuniao="{{ 'true' if tipo.ordem == 10 else 'false' }}" {% if tipo.ordem == 20 %}selected{% endif %}>{{ tipo.status }}</option>
       {% endfor %}
     </select>
   </div>

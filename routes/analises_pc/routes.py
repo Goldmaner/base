@@ -5,6 +5,7 @@ from utils import login_required
 from decorators import requires_access, requires_write_access
 import psycopg2
 import psycopg2.extras
+import requests
 from psycopg2.extras import execute_values
 import traceback
 import core.audit_log as audit_log  # Módulo de auditoria
@@ -1420,6 +1421,1365 @@ def upload_modelo():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Erro ao fazer upload: {str(e)}'}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MANIFESTAÇÕES RECURSAIS — Upload, processamento e histórico de PDFs da OSC
+# ─────────────────────────────────────────────────────────────────────────────
+
+import threading
+
+
+def _processar_pdf_manifestacao(doc_id: int, file_bytes: bytes):
+    """Extrai texto de cada página do PDF e armazena em analises_pc_manifestacoes.paginas.
+    Executado em thread separada; abre sua própria conexão DB via DB_CONFIG."""
+    import psycopg2
+    import psycopg2.extras
+    import pdfplumber
+    from config import DB_CONFIG
+    from io import BytesIO
+
+    conn = psycopg2.connect(**DB_CONFIG)
+    conn.autocommit = False
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            "UPDATE analises_pc_manifestacoes.documentos SET status='processando' WHERE id=%s",
+            (doc_id,)
+        )
+        conn.commit()
+
+        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+            total = len(pdf.pages)
+            cur.execute(
+                "UPDATE analises_pc_manifestacoes.documentos SET total_paginas=%s WHERE id=%s",
+                (total, doc_id)
+            )
+            conn.commit()
+
+            for i, page in enumerate(pdf.pages, start=1):
+                texto = page.extract_text() or ''
+                metodo = 'pdfplumber'
+
+                if len(texto.strip()) < 50:
+                    try:
+                        import pdf2image
+                        import pytesseract
+                        imgs = pdf2image.convert_from_bytes(
+                            file_bytes, first_page=i, last_page=i, dpi=200
+                        )
+                        if imgs:
+                            texto = pytesseract.image_to_string(imgs[0], lang='por') or ''
+                            metodo = 'tesseract'
+                    except Exception:
+                        pass
+
+                cur.execute("""
+                    INSERT INTO analises_pc_manifestacoes.paginas
+                        (documento_id, numero_pagina, texto_extraido, metodo_extracao)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (documento_id, numero_pagina) DO UPDATE
+                        SET texto_extraido = EXCLUDED.texto_extraido,
+                            metodo_extracao = EXCLUDED.metodo_extracao
+                """, (doc_id, i, texto, metodo))
+
+                if i % 5 == 0:
+                    conn.commit()
+
+        conn.commit()
+        cur.execute(
+            "UPDATE analises_pc_manifestacoes.documentos SET status='concluido' WHERE id=%s",
+            (doc_id,)
+        )
+        conn.commit()
+
+    except Exception as exc:
+        print(f"[ERRO] Processamento PDF doc_id={doc_id}: {exc}")
+        traceback.print_exc()
+        try:
+            conn.rollback()
+            cur.execute(
+                "UPDATE analises_pc_manifestacoes.documentos SET status='erro', erro_msg=%s WHERE id=%s",
+                (str(exc)[:500], doc_id)
+            )
+            conn.commit()
+        except Exception:
+            pass
+    finally:
+        cur.close()
+        conn.close()
+
+
+@analises_pc_bp.route('/api/manifestacoes/upload', methods=['POST'])
+@login_required
+@requires_access('analises')
+def upload_manifestacao():
+    """Recebe PDF da OSC, salva no storage e inicia processamento em background."""
+    if 'arquivo' not in request.files:
+        return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+
+    arquivo = request.files['arquivo']
+    numero_termo = request.form.get('numero_termo', '').strip()
+    tipo_documento = request.form.get('tipo_documento', 'manifestacao_recursal')
+
+    if not numero_termo:
+        return jsonify({'error': 'Número do termo não informado'}), 400
+    if arquivo.filename == '':
+        return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
+    if not arquivo.filename.lower().endswith('.pdf'):
+        return jsonify({'error': 'Apenas arquivos PDF são permitidos'}), 400
+
+    tipos_validos = {'manifestacao_recursal', 'planilha', 'peticao', 'outro'}
+    if tipo_documento not in tipos_validos:
+        tipo_documento = 'manifestacao_recursal'
+
+    filename = secure_filename(arquivo.filename)
+    storage_path = f'Manifestacoes/{numero_termo}/{filename}'
+
+    arquivo.seek(0)
+    file_bytes = arquivo.read()
+
+    try:
+        storage.upload_file(storage_path, file_bytes, 'application/pdf')
+    except Exception as e:
+        return jsonify({'error': f'Erro ao salvar arquivo: {str(e)}'}), 500
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            INSERT INTO analises_pc_manifestacoes.documentos
+                (numero_termo, nome_arquivo, tamanho_bytes, tipo_documento,
+                 storage_path, usuario_upload, status)
+            VALUES (%s, %s, %s, %s, %s, %s, 'pendente')
+            RETURNING id
+        """, (numero_termo, filename, len(file_bytes), tipo_documento,
+              storage_path, session.get('email')))
+        doc_id = cur.fetchone()['id']
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+    threading.Thread(
+        target=_processar_pdf_manifestacao,
+        args=(doc_id, file_bytes),
+        daemon=True
+    ).start()
+
+    return jsonify({'success': True, 'doc_id': doc_id,
+                    'message': 'Upload realizado. Processamento iniciado.'})
+
+
+@analises_pc_bp.route('/api/manifestacoes/status/<int:doc_id>', methods=['GET'])
+@login_required
+def status_manifestacao(doc_id):
+    """Retorna progresso de processamento de um documento."""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT d.id, d.status, d.total_paginas, d.erro_msg,
+                   COUNT(p.id) AS paginas_processadas
+            FROM analises_pc_manifestacoes.documentos d
+            LEFT JOIN analises_pc_manifestacoes.paginas p ON p.documento_id = d.id
+            WHERE d.id = %s
+            GROUP BY d.id, d.status, d.total_paginas, d.erro_msg
+        """, (doc_id,))
+        doc = cur.fetchone()
+        cur.close()
+        if not doc:
+            return jsonify({'error': 'Documento não encontrado'}), 404
+
+        total = doc['total_paginas'] or 0
+        processadas = doc['paginas_processadas'] or 0
+        pct = round((processadas / total) * 100) if total > 0 else (
+            100 if doc['status'] == 'concluido' else 0
+        )
+        return jsonify({
+            'id': doc['id'],
+            'status': doc['status'],
+            'total_paginas': total,
+            'paginas_processadas': processadas,
+            'percentual': pct,
+            'erro_msg': doc['erro_msg']
+        })
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/manifestacoes/listar', methods=['GET'])
+@login_required
+@requires_access('analises')
+def listar_manifestacoes():
+    """Lista documentos de manifestação de um termo."""
+    numero_termo = request.args.get('numero_termo', '').strip()
+    if not numero_termo:
+        return jsonify({'error': 'Número do termo não informado'}), 400
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT d.id, d.nome_arquivo, d.tamanho_bytes, d.tipo_documento,
+                   d.data_upload, d.usuario_upload, d.status,
+                   d.total_paginas, d.erro_msg,
+                   COUNT(p.id) AS paginas_processadas
+            FROM analises_pc_manifestacoes.documentos d
+            LEFT JOIN analises_pc_manifestacoes.paginas p ON p.documento_id = d.id
+            WHERE d.numero_termo = %s
+            GROUP BY d.id
+            ORDER BY d.data_upload DESC
+        """, (numero_termo,))
+        docs = cur.fetchall()
+        cur.close()
+
+        resultado = []
+        for d in docs:
+            r = dict(d)
+            r['data_upload'] = r['data_upload'].strftime('%d/%m/%Y %H:%M') if r.get('data_upload') else ''
+            resultado.append(r)
+
+        return jsonify({'documentos': resultado})
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/manifestacoes/<int:doc_id>', methods=['DELETE'])
+@login_required
+@requires_access('analises')
+def deletar_manifestacao(doc_id):
+    """Remove documento e seus dados do banco (cascade) e do storage."""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute(
+            "SELECT storage_path FROM analises_pc_manifestacoes.documentos WHERE id = %s",
+            (doc_id,)
+        )
+        doc = cur.fetchone()
+        if not doc:
+            cur.close()
+            return jsonify({'error': 'Documento não encontrado'}), 404
+
+        try:
+            storage.delete_file(doc['storage_path'])
+        except Exception:
+            pass
+
+        cur.execute(
+            "DELETE FROM analises_pc_manifestacoes.documentos WHERE id = %s",
+            (doc_id,)
+        )
+        conn.commit()
+        cur.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ANÁLISE IA — Deepseek cross-referência manifestação × conciliação bancária
+# ─────────────────────────────────────────────────────────────────────────────
+
+import uuid
+import time as _time
+import json as _json
+
+_analises_ia: dict = {}
+_analises_ia_lock = threading.Lock()
+_ANALISE_TTL_S = 3600  # 1h
+
+
+def _nova_analise_task() -> str:
+    tid = str(uuid.uuid4())
+    agora = _time.time()
+    with _analises_ia_lock:
+        expiradas = [k for k, v in _analises_ia.items()
+                     if agora - v.get('ts', agora) > _ANALISE_TTL_S]
+        for k in expiradas:
+            del _analises_ia[k]
+        _analises_ia[tid] = {'status': 'running', 'pct': 0,
+                             'label': 'Iniciando…', 'resultado': None,
+                             'erro': None, 'ts': agora}
+    return tid
+
+
+def _upd_analise(tid: str, **kw):
+    with _analises_ia_lock:
+        if tid in _analises_ia:
+            _analises_ia[tid].update(kw)
+
+
+def _carregar_prompt_sistema() -> str:
+    """Lê prompts/analise_manifestacao_recursal.md em tempo de execução."""
+    caminho = os.path.join(os.path.dirname(__file__), '..', '..', 'prompts',
+                           'analise_manifestacao_recursal.md')
+    caminho = os.path.normpath(caminho)
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Você é um assessor técnico da DAC/SMDHC. Analise a manifestação recursal e os dados de conciliação bancária. Responda com JSON."
+
+
+def _montar_contexto_db(numero_termo: str, meses_analisados: str, doc_ids: list):
+    """Consulta o banco e monta o contexto de dados para o prompt.
+
+    Retorna (contexto_str, totais_db) onde totais_db é um dict com os valores
+    reais do banco (total_glosado, total_taxas_bancarias) para serem injetados
+    no resultado final sem depender da IA para esses números.
+
+    Ordem dos blocos: DB data primeiro (nunca truncado), PDF por último.
+    Isso garante que o truncamento por MAX_CHARS só corte o texto do PDF,
+    nunca os dados de conciliação.
+
+    Schema real (verificado 2026-06):
+      conc_extrato : id, data, credito, debito, discriminacao, competencia,
+                     origem_destino, cat_avaliacao, avaliacao_analista, numero_termo
+      conc_analise : id, numero_termo, conc_extrato_id, avaliacao_guia,
+                     avaliacao_comprovante, avaliacao_contratos, avaliacao_fora_municipio
+      lista_inconsistencias : id, nome_item, data, debito, discriminacao,
+                              competencia, origem_destino, status, numero_termo
+      lista_inconsistencias_agregadas : id, nome_item, numero_termo,
+                              tipo_agregacao, campo1, campo2,
+                              valor_previsto, valor_executado, diferenca, status
+      public.parcerias : numero_termo, osc, projeto, portaria, inicio, final,
+                         total_previsto, total_pago
+    """
+    import psycopg2
+    import psycopg2.extras
+    from config import DB_CONFIG
+
+    conn = psycopg2.connect(**DB_CONFIG)
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    # blocos_db: dados do banco (sempre incluídos, vêm primeiro)
+    # bloco_pdf: texto dos PDFs (vem por último — truncado se necessário)
+    blocos_db = []
+    bloco_pdf = None
+    totais_db = {}  # valores reais do banco para injetar no resultado final
+
+    try:
+        # BLOCO 4 — Dados do Termo (public.parcerias)
+        cur.execute("""
+            SELECT osc, projeto, portaria, inicio, final, total_previsto, total_pago
+            FROM public.parcerias
+            WHERE numero_termo = %s
+            LIMIT 1
+        """, (numero_termo,))
+        parceria = cur.fetchone()
+        if parceria:
+            blocos_db.append(
+                f"=== BLOCO 4 — DADOS DO TERMO ===\n"
+                f"Termo: {numero_termo}\n"
+                f"OSC: {parceria.get('osc') or ''}\n"
+                f"Projeto: {parceria.get('projeto') or ''}\n"
+                f"Vigência: {parceria.get('inicio') or ''} a {parceria.get('final') or ''}\n"
+                f"Total Previsto: R$ {parceria.get('total_previsto') or ''}\n"
+                f"Total Pago: R$ {parceria.get('total_pago') or ''}\n"
+                f"Portaria: {parceria.get('portaria') or ''}"
+            )
+
+        # BLOCO 6 — Plano de Trabalho (despesas autorizadas por categoria)
+        cur.execute("""
+            SELECT rubrica, categoria_despesa,
+                   COUNT(DISTINCT mes) AS meses_previstos,
+                   ROUND(SUM(valor)::numeric, 2) AS total_previsto
+            FROM public.parcerias_despesas
+            WHERE numero_termo = %s AND aditivo = 0
+            GROUP BY rubrica, categoria_despesa
+            ORDER BY rubrica, total_previsto DESC
+        """, (numero_termo,))
+        plano_despesas = cur.fetchall()
+
+        if plano_despesas:
+            linhas_pt = [
+                "=== BLOCO 6 — PLANO DE TRABALHO (DESPESAS AUTORIZADAS) ===",
+                "Use este bloco para verificar se uma categoria glosada estava prevista no plano aprovado.",
+                "Se a categoria NÃO consta aqui → despesa não prevista no plano de trabalho (glosa procedente).",
+                "Se consta → compare o total glosado com o total autorizado para dimensionar o excesso.",
+                "",
+                "rubrica | categoria_despesa | meses_previstos | total_previsto"
+            ]
+            for r in plano_despesas:
+                linhas_pt.append(
+                    f"  {r['rubrica']} | {r['categoria_despesa']} | "
+                    f"{r['meses_previstos']} meses | R$ {r['total_previsto']}"
+                )
+            blocos_db.append("\n".join(linhas_pt))
+
+        # BLOCO 7 — Repasses realizados e cronograma de desembolso
+        try:
+            cur.execute("""
+                SELECT parcela_numero, valor_pago, data_pagamento, observacoes
+                FROM gestao_financeira.ultra_liquidacoes
+                WHERE numero_termo = %s
+                ORDER BY data_pagamento
+            """, (numero_termo,))
+            repasses = cur.fetchall()
+
+            cur.execute("""
+                SELECT parcela_numero, nome_mes, valor_mes
+                FROM gestao_financeira.ultra_liquidacoes_cronograma
+                WHERE numero_termo = %s
+                ORDER BY nome_mes
+            """, (numero_termo,))
+            cronograma = cur.fetchall()
+
+            if repasses or cronograma:
+                linhas_rep = [
+                    "=== BLOCO 7 — REPASSES E CRONOGRAMA DE DESEMBOLSO ===",
+                    "Use este bloco para avaliar o argumento de atraso nos repasses.",
+                    "Compare 'data_pagamento' (repasse realizado) com o primeiro 'nome_mes' de cada parcela (início previsto).",
+                    "O atraso real = diferença em dias entre data prevista e data efetivada.",
+                    "",
+                    "REPASSES REALIZADOS:",
+                    "parcela | valor_pago | data_pagamento | observacoes"
+                ]
+                for r in repasses:
+                    linhas_rep.append(
+                        f"  {r['parcela_numero']} | R$ {r['valor_pago']} | "
+                        f"{r['data_pagamento']} | {r['observacoes'] or '—'}"
+                    )
+                linhas_rep += ["", "CRONOGRAMA MENSAL PREVISTO:", "parcela | mes_previsto | valor_mes"]
+                for r in cronograma:
+                    linhas_rep.append(
+                        f"  {r['parcela_numero']} | {r['nome_mes']} | R$ {r['valor_mes']}"
+                    )
+                blocos_db.append("\n".join(linhas_rep))
+        except Exception as e_rep:
+            print(f"[CONTEXTO DB] BLOCO 7 indisponível: {e_rep}")
+
+        # BLOCO 8 — Quadro Financeiro do Projeto (saldos, contrapartida, taxas)
+        try:
+            def _f(v):
+                if v is None:
+                    return 'R$ 0,00'
+                try:
+                    return f'R$ {float(v):,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+                except Exception:
+                    return 'R$ 0,00'
+
+            def _fv(v):
+                try:
+                    return float(v) if v is not None else 0.0
+                except Exception:
+                    return 0.0
+
+            # Rendimentos — tabela dedicada (mesma fonte do conc_relatorio)
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(rendimento_bruto), 0) AS rend_bruto,
+                    COALESCE(SUM(rendimento_ir), 0)    AS rend_ir,
+                    COALESCE(SUM(rendimento_iof), 0)   AS rend_iof
+                FROM analises_pc.conc_rendimentos
+                WHERE numero_termo = %s
+            """, (numero_termo,))
+            rend_row = cur.fetchone() or {}
+            rend_bruto  = _fv(rend_row.get('rend_bruto'))
+            rend_ir     = _fv(rend_row.get('rend_ir'))
+            rend_iof    = _fv(rend_row.get('rend_iof'))
+            rend_liquido = rend_bruto - rend_ir - rend_iof
+
+            # Contrapartida — prevista total e desconto calculado
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(valor_previsto), 0)    AS cp_previsto,
+                    COALESCE(SUM(valor_executado), 0)   AS cp_executado,
+                    COALESCE(SUM(valor_considerado), 0) AS cp_considerado,
+                    COALESCE(SUM(GREATEST(valor_previsto - valor_executado, 0)), 0)   AS desc_prev_exec,
+                    COALESCE(SUM(GREATEST(valor_executado - valor_considerado, 0)), 0) AS desc_exec_cons
+                FROM analises_pc.conc_contrapartida
+                WHERE numero_termo = %s
+            """, (numero_termo,))
+            cp_row = cur.fetchone() or {}
+            cp_previsto    = _fv(cp_row.get('cp_previsto'))
+            cp_executado   = _fv(cp_row.get('cp_executado'))
+            cp_considerado = _fv(cp_row.get('cp_considerado'))
+            cp_desconto    = _fv(cp_row.get('desc_prev_exec')) + _fv(cp_row.get('desc_exec_cons'))
+
+            # Taxas bancárias — match exato em cat_transacao (igual ao conc_relatorio)
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(CASE WHEN LOWER(cat_transacao) = 'taxas bancárias'
+                                      THEN ABS(discriminacao) ELSE 0 END), 0) AS taxas_total,
+                    COALESCE(SUM(CASE WHEN LOWER(cat_transacao) = 'devolução de taxas bancárias'
+                                      THEN ABS(discriminacao) ELSE 0 END), 0) AS taxas_devolucao
+                FROM analises_pc.conc_extrato
+                WHERE numero_termo = %s AND discriminacao IS NOT NULL
+            """, (numero_termo,))
+            tax_row = cur.fetchone() or {}
+            taxas_total      = _fv(tax_row.get('taxas_total'))
+            taxas_devolucao  = _fv(tax_row.get('taxas_devolucao'))
+            taxas_nao_devolvidas = max(taxas_total - taxas_devolucao, 0.0)
+
+            # Descontos realizados — tabela conc_banco
+            cur.execute("""
+                SELECT descontos_realizados
+                FROM analises_pc.conc_banco
+                WHERE numero_termo = %s
+            """, (numero_termo,))
+            desc_row = cur.fetchone()
+            descontos_realizados = _fv((desc_row or {}).get('descontos_realizados'))
+
+            # Valores já devolvidos — restituição de verba + devolução de taxas (ABS discriminacao)
+            cur.execute("""
+                SELECT COALESCE(SUM(ABS(discriminacao)), 0) AS valores_devolvidos
+                FROM analises_pc.conc_extrato
+                WHERE numero_termo = %s
+                  AND LOWER(cat_transacao) IN ('restituição de verba', 'devolução de taxas bancárias')
+                  AND discriminacao IS NOT NULL
+            """, (numero_termo,))
+            dev_row = cur.fetchone() or {}
+            valores_devolvidos = _fv(dev_row.get('valores_devolvidos'))
+
+            # Valor executado aprovado — apenas categorias do plano de trabalho (mesmo critério do conc_relatorio)
+            cur.execute("""
+                SELECT COALESCE(SUM(ABS(ce.discriminacao)), 0) AS valor_executado_aprovado
+                FROM analises_pc.conc_extrato ce
+                WHERE ce.numero_termo = %s
+                  AND ce.cat_avaliacao = 'Avaliado'
+                  AND ce.discriminacao IS NOT NULL
+                  AND EXISTS (
+                      SELECT 1 FROM public.parcerias_despesas pd
+                      WHERE LOWER(pd.categoria_despesa) = LOWER(ce.cat_transacao)
+                        AND pd.numero_termo = ce.numero_termo
+                  )
+            """, (numero_termo,))
+            exec_row = cur.fetchone() or {}
+            valor_executado_aprovado = _fv(exec_row.get('valor_executado_aprovado'))
+
+            # Despesas passíveis de glosa (exceto taxas bancárias)
+            cur.execute("""
+                SELECT COALESCE(SUM(ABS(discriminacao)), 0) AS despesas_glosa
+                FROM analises_pc.conc_extrato
+                WHERE numero_termo = %s
+                  AND cat_avaliacao = 'Glosar'
+                  AND LOWER(COALESCE(cat_transacao, '')) != 'taxas bancárias'
+                  AND discriminacao IS NOT NULL
+            """, (numero_termo,))
+            glosa_row = cur.fetchone() or {}
+            despesas_glosa = _fv(glosa_row.get('despesas_glosa'))
+
+            # Total pago e valor total do projeto
+            total_pago = _fv((parceria or {}).get('total_pago'))
+            valor_total_projeto = total_pago + rend_liquido + cp_previsto
+
+            # Saldos remanescentes
+            saldos_remanescentes = max(
+                valor_total_projeto - valor_executado_aprovado - despesas_glosa - taxas_nao_devolvidas,
+                0.0
+            )
+
+            # Total descontos e valor a ressarcir
+            total_descontos = (
+                saldos_remanescentes + descontos_realizados + cp_desconto +
+                despesas_glosa + taxas_nao_devolvidas
+            )
+            valor_ressarcir = max(total_descontos - valores_devolvidos, 0.0)
+
+            linhas_qf = [
+                "=== BLOCO 8 — QUADRO FINANCEIRO DO PROJETO ===",
+                "ATENÇÃO: Estes valores foram calculados pelo sistema. NÃO recalcule — use-os diretamente nos campos indicados.",
+                "",
+                "[ Composição do Valor Total do Projeto ]",
+                f"  Repasses realizados (total_pago):       {_f(total_pago)}",
+                f"  Rendimentos líquidos (bruto - IR/IOF):  {_f(rend_liquido)}",
+                f"  Contrapartida prevista:                 {_f(cp_previsto)}",
+                f"  VALOR TOTAL DO PROJETO:                 {_f(valor_total_projeto)}",
+                "",
+                "[ Execução ]",
+                f"  Despesas aprovadas (Avaliado):          {_f(valor_executado_aprovado)}",
+                f"  Despesas glosadas (ex-taxas bancárias): {_f(despesas_glosa)}",
+                f"  Taxas bancárias cobradas:               {_f(taxas_total)}",
+                f"  Taxas bancárias devolvidas:             {_f(taxas_devolucao)}",
+                "",
+                "[ VALORES A USAR NOS CAMPOS JSON — NÃO RECALCULE ]",
+                f"  comentario_saldos         → SALDO REMANESCENTE = {_f(saldos_remanescentes)}",
+                f"    (fórmula: valor_total_projeto − aprovado − glosado − taxas_não_devolvidas)",
+                f"  comentario_contrapartida  → DESCONTO CONTRAPARTIDA = {_f(cp_desconto)}",
+                f"    (previsto={_f(cp_previsto)}, executado={_f(cp_executado)}, considerado={_f(cp_considerado)})",
+                f"  comentario_taxas_bancarias → TAXAS NÃO DEVOLVIDAS = {_f(taxas_nao_devolvidas)}",
+                f"  valor_total_ressarcir     → {_f(valor_ressarcir)}",
+                f"    (total_descontos={_f(total_descontos)} − já_devolvidos={_f(valores_devolvidos)})",
+                "",
+                "[ Fundamentos legais ]",
+                "  • Saldos remanescentes → art. 52 da Lei 13.019/2014 (devolução obrigatória ao término da parceria)",
+                "  • Contrapartida não executada → desconto proporcional conforme pactuado no plano de trabalho",
+                "  • Taxas bancárias não devolvidas → devem ser restituídas ao erário (art. 53, Lei 13.019/2014 e Portaria SF 210/2017)",
+            ]
+            blocos_db.append("\n".join(linhas_qf))
+
+            # Salva valores financeiros em totais_db para uso no front-end se necessário
+            totais_db['saldos_remanescentes'] = round(saldos_remanescentes, 2)
+            totais_db['desconto_contrapartida'] = round(cp_desconto, 2)
+            totais_db['taxas_nao_devolvidas'] = round(taxas_nao_devolvidas, 2)
+            totais_db['valor_ressarcir'] = round(valor_ressarcir, 2)
+
+        except Exception as e_qf:
+            print(f"[CONTEXTO DB] BLOCO 8 indisponível: {e_qf}")
+            import traceback; traceback.print_exc()
+
+        # BLOCO 9 — Legislação aplicável ao período da parceria
+        try:
+            portaria_termo = (parceria or {}).get('portaria') or ''
+            inicio_termo = (parceria or {}).get('inicio')
+            final_termo = (parceria or {}).get('final')
+
+            # Filtra legislação vigente durante a execução da parceria
+            # Inclui: portaria específica do termo, leis-base e portarias SMDHC relevantes
+            cur.execute("""
+                SELECT lei, tipo_doc, descricao, link, status_vigencia,
+                       inicio, termino
+                FROM categoricas.c_geral_legislacao
+                WHERE oculto IS NOT TRUE
+                  AND tipo_doc IN ('Lei', 'Decreto', 'Portaria')
+                  AND (
+                      -- Vigente durante algum momento da execução do termo
+                      (termino IS NULL OR termino >= %s)
+                      AND (inicio IS NULL OR inicio <= COALESCE(%s, CURRENT_DATE))
+                  )
+                ORDER BY inicio
+            """, (inicio_termo or '2014-01-01', final_termo))
+            leis = cur.fetchall()
+
+            if leis:
+                linhas_leg = [
+                    "=== BLOCO 9 — LEGISLAÇÃO APLICÁVEL ===",
+                    f"Portaria do Termo: {portaria_termo or 'não informada'}",
+                    f"Vigência da parceria: {inicio_termo or '?'} a {final_termo or '?'}",
+                    "",
+                    "Normas vigentes durante a execução (use para fundamentar análise):",
+                ]
+                for lei in leis:
+                    lei_nome = lei.get('lei') or ''
+                    lei_tipo = lei.get('tipo_doc') or ''
+                    lei_desc = lei.get('descricao') or ''
+                    lei_status = lei.get('status_vigencia') or 'vigente'
+                    lei_link = lei.get('link') or ''
+                    linha = f"  [{lei_tipo}] {lei_nome}"
+                    if lei_desc:
+                        linha += f": {lei_desc[:120]}"
+                    if lei_status and lei_status.lower() not in ('vigente', ''):
+                        linha += f" ⚠ {lei_status}"
+                    if lei_link:
+                        linha += f" → {lei_link}"
+                    linhas_leg.append(linha)
+                linhas_leg.append("")
+                linhas_leg.append(
+                    "NOTA: Para os textos completos das portarias e artigos específicos, "
+                    "faça o upload do PDF como 'Portaria / Normativa' (BLOCO 1a) para citação direta de dispositivos."
+                )
+                blocos_db.append("\n".join(linhas_leg))
+
+        except Exception as e_leg:
+            print(f"[CONTEXTO DB] BLOCO 9 indisponível: {e_leg}")
+
+        # BLOCO 2 — Conciliação: itens glosados (cat_avaliacao = 'Glosar')
+        # IMPORTANTE: cat_avaliacao é o campo de classificação ('Glosar'/'Avaliado').
+        #             avaliacao_analista é texto de observação do analista (razão da glosa).
+        #             Estratégia: totais agregados (completos) + top-N individuais por valor.
+
+        # 2a — Total geral e por categoria de transação
+        cur.execute("""
+            SELECT
+                COUNT(*) as total_itens,
+                SUM(ABS(discriminacao)) as total_glosado,
+                SUM(CASE WHEN LOWER(cat_transacao) = 'taxas bancárias' THEN ABS(discriminacao) ELSE 0 END) as total_taxas
+            FROM analises_pc.conc_extrato
+            WHERE numero_termo = %s AND cat_avaliacao = 'Glosar'
+        """, (numero_termo,))
+        totais = cur.fetchone()
+
+        cur.execute("""
+            SELECT cat_transacao, COUNT(*) as qtd, SUM(ABS(discriminacao)) as total
+            FROM analises_pc.conc_extrato
+            WHERE numero_termo = %s AND cat_avaliacao = 'Glosar'
+            GROUP BY cat_transacao
+            ORDER BY total DESC
+        """, (numero_termo,))
+        por_categoria = cur.fetchall()
+
+        # 2b — Por competência (mês)
+        cur.execute("""
+            SELECT competencia, COUNT(*) as qtd, SUM(ABS(discriminacao)) as total
+            FROM analises_pc.conc_extrato
+            WHERE numero_termo = %s AND cat_avaliacao = 'Glosar'
+            GROUP BY competencia
+            ORDER BY competencia
+        """, (numero_termo,))
+        por_mes = cur.fetchall()
+
+        # 2c — Top 200 itens individuais por valor (para correlação com valores citados)
+        cur.execute("""
+            SELECT ce.data, ce.origem_destino, ce.discriminacao,
+                   ce.cat_transacao, ce.competencia, ce.avaliacao_analista,
+                   ca.avaliacao_guia, ca.avaliacao_comprovante,
+                   ca.avaliacao_contratos, ca.avaliacao_fora_municipio
+            FROM analises_pc.conc_extrato ce
+            LEFT JOIN analises_pc.conc_analise ca ON ca.conc_extrato_id = ce.id
+            WHERE ce.numero_termo = %s AND ce.cat_avaliacao = 'Glosar'
+            ORDER BY ABS(ce.discriminacao) DESC NULLS LAST
+            LIMIT 200
+        """, (numero_termo,))
+        top_itens = cur.fetchall()
+
+        if totais:
+            # Salva totais reais do banco para injetar no resultado final
+            totais_db['total_glosado'] = float(totais['total_glosado'] or 0)
+            totais_db['total_taxas'] = float(totais['total_taxas'] or 0)
+            totais_db['total_itens'] = int(totais['total_itens'] or 0)
+            totais_db['total_sem_taxas'] = totais_db['total_glosado'] - totais_db['total_taxas']
+
+            bloco2_linhas = [
+                "=== BLOCO 2 — CONCILIAÇÃO BANCÁRIA (GLOSAS) ===",
+                "NOTA: 'discriminacao' = valor individual do item (use este para cruzamento, não 'debito').",
+                "      'cat_avaliacao' = classificação ('Glosar'/'Avaliado').",
+                "      'avaliacao_analista' = observação textual do analista (razão da glosa).",
+                "",
+                "TOTAIS GLOBAIS (fonte: banco de dados — use estes valores como âncora):",
+                f"  Total itens glosados : {totais['total_itens']}",
+                f"  Total glosado (sum discriminacao) : R$ {totais['total_glosado']}",
+                f"  Taxas bancárias incluídas nesse total : R$ {totais['total_taxas']}",
+                f"  Total glosado excl. taxas bancárias  : R$ {totais_db['total_sem_taxas']:.2f}",
+                "",
+                "POR CATEGORIA DE TRANSAÇÃO:",
+            ]
+            for r in por_categoria:
+                bloco2_linhas.append(f"  {r['cat_transacao'] or 'sem categoria'}: {r['qtd']} itens | R$ {r['total']}")
+
+            bloco2_linhas += ["", "POR COMPETÊNCIA (mês de referência):"]
+            for r in por_mes:
+                bloco2_linhas.append(f"  {r['competencia']}: {r['qtd']} itens | R$ {r['total']}")
+
+            bloco2_linhas += ["", f"TOP 200 ITENS POR VALOR (de {totais['total_itens']} total):",
+                              "data | origem_destino | discriminacao | cat_transacao | competencia | obs_analista | guia | comprov | contrato"]
+            for r in top_itens:
+                bloco2_linhas.append(
+                    f"{r['data']} | {r['origem_destino'] or ''} | {r['discriminacao'] or ''} | "
+                    f"{r['cat_transacao'] or ''} | {r['competencia'] or ''} | "
+                    f"{r['avaliacao_analista'] or '—'} | "
+                    f"guia={r['avaliacao_guia'] or '—'} "
+                    f"comprov={r['avaliacao_comprovante'] or '—'} "
+                    f"contrato={r['avaliacao_contratos'] or '—'}"
+                )
+            blocos_db.append("\n".join(bloco2_linhas))
+
+        # BLOCO 5 — Catálogo de glosas (categoricas) cruzado com tipos presentes no processo
+        # Identifica quais tipos de glosa ocorrem neste processo via avaliacao_analista,
+        # depois puxa só esses tipos com texto explicativo e fundamentos legais.
+        cur.execute("""
+            SELECT DISTINCT LOWER(avaliacao_analista) as obs
+            FROM analises_pc.conc_extrato
+            WHERE numero_termo = %s AND cat_avaliacao = 'Glosar'
+              AND avaliacao_analista IS NOT NULL
+        """, (numero_termo,))
+        obs_set = {r['obs'] for r in cur.fetchall() if r['obs']}
+
+        cur.execute("""
+            SELECT g.id, g.glosa_nome, g.glosa_texto, g.glosa_inconsistencia,
+                   array_agg(f.glosa_lei || ' — ' || f.glosa_artigo
+                             ORDER BY f.id) FILTER (WHERE f.glosa_lei IS NOT NULL) AS fundamentos
+            FROM categoricas.c_dac_glosas g
+            LEFT JOIN categoricas.c_dac_glosas_fundamento f ON f.glosa_id = g.id
+            GROUP BY g.id, g.glosa_nome, g.glosa_texto, g.glosa_inconsistencia
+            ORDER BY g.id
+        """)
+        todos_tipos = cur.fetchall()
+
+        # Filtra tipos relevantes: nome ou inconsistência mencionada nas observações do processo
+        import re as _re2
+        tipos_relevantes = []
+        for t in todos_tipos:
+            nome_l = (t['glosa_nome'] or '').lower()
+            incons_l = (t['glosa_inconsistencia'] or '').lower()
+            # Cruza palavras-chave do catálogo com as observações reais
+            palavras_tipo = set(_re2.findall(r'\b\w{4,}\b', nome_l + ' ' + incons_l))
+            if any(any(p in obs for p in palavras_tipo) for obs in obs_set):
+                tipos_relevantes.append(t)
+
+        # Se cruzamento não achou nada (obs muito genéricas), inclui catálogo completo
+        if not tipos_relevantes:
+            tipos_relevantes = todos_tipos
+
+        if tipos_relevantes:
+            linhas_cat = ["=== BLOCO 5 — CATÁLOGO DE TIPOS DE GLOSA (com fundamento legal) ===",
+                          "Use estes textos e fundamentos ao redigir a resposta técnica de cada ponto.",
+                          f"({len(tipos_relevantes)} tipos identificados como relevantes para este processo)"]
+            for t in tipos_relevantes:
+                linhas_cat.append(
+                    f"\n[GLOSA: {t['glosa_nome']}]"
+                    f"\nTexto relatório: {t['glosa_texto'] or '—'}"
+                    f"\nInconsistência: {t['glosa_inconsistencia'] or '—'}"
+                )
+                if t['fundamentos']:
+                    for fund in t['fundamentos']:
+                        linhas_cat.append(f"  Base legal: {fund}")
+            blocos_db.append("\n".join(linhas_cat))
+
+        # BLOCO 3 — Inconsistências agregadas
+        cur.execute("""
+            SELECT nome_item, tipo_agregacao, campo1, campo2,
+                   valor_previsto, valor_executado, diferenca, status
+            FROM analises_pc.lista_inconsistencias_agregadas
+            WHERE numero_termo = %s
+            LIMIT 100
+        """, (numero_termo,))
+        incons_agr = cur.fetchall()
+
+        # BLOCO 3b — Inconsistências simples (usa discriminacao como valor)
+        cur.execute("""
+            SELECT nome_item, data, discriminacao, competencia,
+                   origem_destino, status
+            FROM analises_pc.lista_inconsistencias
+            WHERE numero_termo = %s
+            LIMIT 100
+        """, (numero_termo,))
+        incons_simples = cur.fetchall()
+
+        if incons_agr or incons_simples:
+            linhas_i = []
+            for r in incons_agr:
+                linhas_i.append(
+                    f"• [AGREGADA] {r['nome_item']} | tipo={r.get('tipo_agregacao','')} "
+                    f"previsto={r.get('valor_previsto','')} executado={r.get('valor_executado','')} "
+                    f"dif={r.get('diferenca','')} status={r.get('status','')}"
+                )
+            for r in incons_simples:
+                linhas_i.append(
+                    f"• [ITEM] {r['nome_item']} | data={r.get('data','')} "
+                    f"discriminacao={r.get('discriminacao','')} "
+                    f"competencia={r.get('competencia','')} "
+                    f"favorecido={r.get('origem_destino','')} status={r.get('status','')}"
+                )
+            blocos_db.append(f"=== BLOCO 3 — INCONSISTÊNCIAS REGISTRADAS ===\n" + "\n".join(linhas_i))
+
+        # BLOCOs 1a e 1b — Documentos PDF
+        # 1a: docs de referência do poder público (edital, parecer, normativa) — sempre completos
+        # 1b: manifestação da OSC — seleção semântica via FTS, só o que couber no orçamento
+        MAX_REF_CHARS = 25_000   # orçamento para docs de referência (sempre incluídos)
+        MAX_PDF_CHARS = 70_000   # orçamento para manifestação OSC (FTS-selecionada)
+        DOC_TIPOS_REF = {'edital', 'parecer_juridico', 'normativa', 'documento_referencia'}
+
+        bloco_ref = None   # BLOCO 1a
+        bloco_pdf = None   # BLOCO 1b
+
+        if doc_ids:
+            from collections import defaultdict
+            import re as _re
+
+            # ── Descobre tipo de cada documento ──────────────────────────────────
+            cur.execute("""
+                SELECT id, tipo_documento FROM analises_pc_manifestacoes.documentos
+                WHERE id = ANY(%s)
+            """, (doc_ids,))
+            tipos_docs = {r['id']: (r['tipo_documento'] or '') for r in cur.fetchall()}
+
+            doc_ids_ref = [did for did in doc_ids if tipos_docs.get(did) in DOC_TIPOS_REF]
+            doc_ids_osc = [did for did in doc_ids if tipos_docs.get(did) not in DOC_TIPOS_REF]
+
+            # ── BLOCO 1a — Documentos de referência (sempre completos) ───────────
+            if doc_ids_ref:
+                cur.execute("""
+                    SELECT p.documento_id, d.nome_arquivo, d.tipo_documento,
+                           p.numero_pagina, p.texto_extraido
+                    FROM analises_pc_manifestacoes.paginas p
+                    JOIN analises_pc_manifestacoes.documentos d ON d.id = p.documento_id
+                    WHERE p.documento_id = ANY(%s)
+                      AND p.texto_extraido IS NOT NULL
+                      AND length(trim(p.texto_extraido)) > 20
+                    ORDER BY p.documento_id, p.numero_pagina
+                """, (doc_ids_ref,))
+                pags_ref = cur.fetchall()
+
+                por_doc_ref = defaultdict(list)
+                for pg in pags_ref:
+                    por_doc_ref[(pg['documento_id'], pg['nome_arquivo'], pg['tipo_documento'])].append(pg)
+
+                ref_linhas = [
+                    "=== BLOCO 1a — DOCUMENTOS DE REFERÊNCIA (PODER PÚBLICO) ===",
+                    "Use estes documentos para fundamentar a resposta técnica — cite dispositivos específicos ao refutar argumentos da OSC.",
+                ]
+                chars_ref = 0
+                for (did, nome, tipo), pgs in por_doc_ref.items():
+                    ref_linhas.append(f"\n[DOCUMENTO: {nome} | {tipo}]")
+                    for pg in sorted(pgs, key=lambda x: x['numero_pagina']):
+                        texto = pg['texto_extraido'] or ''
+                        if chars_ref + len(texto) <= MAX_REF_CHARS:
+                            ref_linhas.append(f"[Pág. {pg['numero_pagina']}] {texto}")
+                            chars_ref += len(texto)
+                        else:
+                            resto = MAX_REF_CHARS - chars_ref
+                            if resto > 200:
+                                ref_linhas.append(f"[Pág. {pg['numero_pagina']}~] {texto[:resto]}…")
+                            ref_linhas.append("[... demais páginas omitidas por limite de contexto]")
+                            chars_ref = MAX_REF_CHARS
+                            break
+                bloco_ref = "\n".join(ref_linhas)
+                totais_db['chars_ref'] = chars_ref
+
+            # ── BLOCO 1b — Manifestação OSC (FTS semântico) ──────────────────────
+            if doc_ids_osc:
+                # Extrai termos das glosas do processo
+                cur.execute("""
+                    SELECT DISTINCT origem_destino, avaliacao_analista
+                    FROM analises_pc.conc_extrato
+                    WHERE numero_termo = %s AND cat_avaliacao = 'Glosar'
+                      AND origem_destino IS NOT NULL
+                    ORDER BY origem_destino
+                    LIMIT 100
+                """, (numero_termo,))
+                glosas_termos = cur.fetchall()
+
+                stop_pt = {'de','da','do','das','dos','em','no','na','nos','nas','para',
+                           'com','por','que','se','não','e','a','o','um','uma','ao','às',
+                           'os','as','sua','seu','como','mais','foi','ser','tem','também',
+                           'muito','pela','pelo','entre','sobre','após','antes','quando'}
+                termos = []
+                for g in glosas_termos:
+                    if g['origem_destino']:
+                        termos.append(g['origem_destino'].strip())
+                    if g['avaliacao_analista']:
+                        palavras = _re.findall(r'\b\w{5,}\b', g['avaliacao_analista'])
+                        termos.extend(w for w in palavras if w.lower() not in stop_pt)
+
+                vistos = set()
+                termos_unicos = []
+                for t in termos:
+                    tl = t.lower()
+                    if tl not in vistos and len(tl) >= 3:
+                        vistos.add(tl)
+                        termos_unicos.append(t)
+                    if len(termos_unicos) >= 60:
+                        break
+
+                texto_busca = ' '.join(termos_unicos)
+
+                paginas_relevantes = []
+                if texto_busca:
+                    try:
+                        cur.execute("""
+                            SELECT p.documento_id, d.nome_arquivo, d.tipo_documento,
+                                   p.numero_pagina, p.texto_extraido,
+                                   ts_rank(p.ts_busca,
+                                           websearch_to_tsquery('portuguese', %s)) AS rank
+                            FROM analises_pc_manifestacoes.paginas p
+                            JOIN analises_pc_manifestacoes.documentos d ON d.id = p.documento_id
+                            WHERE p.documento_id = ANY(%s)
+                              AND p.ts_busca @@ websearch_to_tsquery('portuguese', %s)
+                              AND p.texto_extraido IS NOT NULL
+                              AND length(trim(p.texto_extraido)) > 20
+                            ORDER BY rank DESC
+                            LIMIT 80
+                        """, (texto_busca, doc_ids_osc, texto_busca))
+                        paginas_relevantes = cur.fetchall()
+                    except Exception:
+                        paginas_relevantes = []
+
+                cur.execute("""
+                    SELECT p.documento_id, d.nome_arquivo, d.tipo_documento,
+                           p.numero_pagina, p.texto_extraido, 0 AS rank
+                    FROM analises_pc_manifestacoes.paginas p
+                    JOIN analises_pc_manifestacoes.documentos d ON d.id = p.documento_id
+                    WHERE p.documento_id = ANY(%s)
+                      AND p.numero_pagina <= 5
+                      AND p.texto_extraido IS NOT NULL
+                      AND length(trim(p.texto_extraido)) > 20
+                    ORDER BY p.documento_id, p.numero_pagina
+                """, (doc_ids_osc,))
+                primeiras = cur.fetchall()
+
+                if not paginas_relevantes:
+                    cur.execute("""
+                        SELECT p.documento_id, d.nome_arquivo, d.tipo_documento,
+                               p.numero_pagina, p.texto_extraido, 0 AS rank
+                        FROM analises_pc_manifestacoes.paginas p
+                        JOIN analises_pc_manifestacoes.documentos d ON d.id = p.documento_id
+                        WHERE p.documento_id = ANY(%s)
+                          AND p.texto_extraido IS NOT NULL
+                          AND length(trim(p.texto_extraido)) > 20
+                        ORDER BY p.documento_id, p.numero_pagina
+                        LIMIT 60
+                    """, (doc_ids_osc,))
+                    paginas_relevantes = cur.fetchall()
+
+                vistas = set()
+                todas_pags = []
+                for pg in primeiras:
+                    key = (pg['documento_id'], pg['numero_pagina'])
+                    if key not in vistas:
+                        vistas.add(key)
+                        todas_pags.append(dict(pg, is_intro=True))
+                for pg in paginas_relevantes:
+                    key = (pg['documento_id'], pg['numero_pagina'])
+                    if key not in vistas:
+                        vistas.add(key)
+                        todas_pags.append(dict(pg, is_intro=False))
+
+                total_chars_real = sum(len(pg['texto_extraido'] or '') for pg in todas_pags)
+                totais_db['total_chars_pdf'] = total_chars_real
+                totais_db['docs_selecionados'] = len(set(pg['documento_id'] for pg in todas_pags))
+                totais_db['paginas_selecionadas'] = len(todas_pags)
+                totais_db['termos_busca'] = len(termos_unicos)
+
+                por_doc = defaultdict(list)
+                for pg in todas_pags:
+                    por_doc[(pg['documento_id'], pg['nome_arquivo'], pg['tipo_documento'])].append(pg)
+
+                pdf_linhas = [
+                    "=== BLOCO 1b — MANIFESTAÇÃO DA OSC (seleção semântica) ===",
+                    f"Termos de busca extraídos das glosas do processo: {len(termos_unicos)} termos",
+                    f"Páginas selecionadas: {len(todas_pags)} (★ = alta relevância, ○ = introdução/contexto)",
+                ]
+
+                chars_usados = 0
+                for (did, nome, tipo), pgs in por_doc.items():
+                    pgs_sorted = sorted(pgs, key=lambda x: x['numero_pagina'])
+                    grupo = [f"\n[DOCUMENTO: {nome} | {tipo}]"]
+                    for pg in pgs_sorted:
+                        texto = pg['texto_extraido'] or ''
+                        if chars_usados >= MAX_PDF_CHARS:
+                            grupo.append("[... limite de contexto atingido — demais páginas omitidas]")
+                            break
+                        if chars_usados + len(texto) <= MAX_PDF_CHARS:
+                            marca = '○' if pg.get('is_intro') else '★'
+                            grupo.append(f"[Pág. {pg['numero_pagina']}{marca}] {texto}")
+                            chars_usados += len(texto)
+                        else:
+                            resto = MAX_PDF_CHARS - chars_usados
+                            if resto > 200:
+                                grupo.append(f"[Pág. {pg['numero_pagina']}~] {texto[:resto]}…")
+                                chars_usados = MAX_PDF_CHARS
+                            break
+                    pdf_linhas.append("\n".join(grupo))
+
+                bloco_pdf = "\n".join(pdf_linhas)
+
+            # totais para casos onde só há docs de referência (sem OSC)
+            if 'total_chars_pdf' not in totais_db:
+                totais_db.setdefault('total_chars_pdf', 0)
+                totais_db.setdefault('termos_busca', 0)
+
+    finally:
+        cur.close()
+        conn.close()
+
+    # Ordem final: DB data primeiro, docs referência (1a), manifestação OSC (1b) por último.
+    # O truncamento em _executar_analise_ia só cortará o bloco_pdf (OSC).
+    partes_contexto = blocos_db[:]
+    if bloco_ref:
+        partes_contexto.append(bloco_ref)
+    if bloco_pdf:
+        partes_contexto.append(bloco_pdf)
+
+    return "\n\n".join(partes_contexto), totais_db
+
+
+def _executar_analise_ia(tid: str, numero_termo: str, meses_analisados: str,
+                          doc_ids: list, foco_personalizado: str):
+    """Thread de background: monta contexto, chama Deepseek, armazena resultado."""
+    DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions'
+    DEEPSEEK_MODEL = 'deepseek-chat'
+
+    try:
+        _upd_analise(tid, pct=10, label='Consultando dados do banco…')
+        contexto, totais_db = _montar_contexto_db(numero_termo, meses_analisados, doc_ids)
+
+        _upd_analise(tid, pct=35, label='Preparando prompt para Deepseek…')
+        sistema = _carregar_prompt_sistema()
+
+        instrucao_foco = (
+            f"\n\n## Foco Específico Solicitado pelo Analista\n{foco_personalizado.strip()}"
+            if foco_personalizado and foco_personalizado.strip()
+            else ""
+        )
+
+        prompt_usuario = (
+            f"Termo de Parceria: {numero_termo}\n"
+            f"Período Analisado: {meses_analisados}\n"
+            f"{instrucao_foco}\n\n"
+            f"{contexto}"
+        )
+
+        # Trunca apenas o excedente — como DB data vem primeiro e PDF por último,
+        # o corte afeta somente o texto do PDF, nunca os dados de conciliação.
+        MAX_CHARS = 120_000
+        if len(prompt_usuario) > MAX_CHARS:
+            prompt_usuario = prompt_usuario[:MAX_CHARS] + "\n\n[TEXTO DO PDF TRUNCADO — DADOS DE CONCILIAÇÃO COMPLETOS ACIMA]"
+
+        _upd_analise(tid, pct=40, label=f'Chamando Deepseek ({len(prompt_usuario):,} chars)…')
+
+        api_key = os.environ.get('DEEPSEEK_API_KEY', '')
+        if not api_key:
+            raise ValueError('DEEPSEEK_API_KEY não configurada no .env')
+
+        resp = requests.post(
+            DEEPSEEK_URL,
+            headers={'Authorization': f'Bearer {api_key}',
+                     'Content-Type': 'application/json'},
+            json={
+                'model': DEEPSEEK_MODEL,
+                'messages': [
+                    {'role': 'system', 'content': sistema},
+                    {'role': 'user',   'content': prompt_usuario},
+                ],
+                'response_format': {'type': 'json_object'},
+                'temperature': 0.2,
+                'max_tokens': 8192,
+            },
+            timeout=240,
+        )
+
+        _upd_analise(tid, pct=85, label='Processando resposta…')
+        resp.raise_for_status()
+
+        conteudo = resp.json()['choices'][0]['message']['content']
+        uso = resp.json().get('usage', {})
+        print(f"[ANALISE IA] tokens prompt={uso.get('prompt_tokens','?')} "
+              f"completion={uso.get('completion_tokens','?')}")
+
+        # Parse robusto
+        try:
+            resultado = _json.loads(conteudo)
+        except _json.JSONDecodeError:
+            import re
+            m = re.search(r'\{.*\}', conteudo, re.DOTALL)
+            resultado = _json.loads(m.group(0)) if m else {'erro_parse': conteudo[:500]}
+
+        # Injeta totais reais do banco — não depende da IA para esses números.
+        # valor_total_glosado = total real do banco (cat_avaliacao='Glosar')
+        # valor_total_aceito_recurso = o que a IA recomenda aceitar (calculado pela IA)
+        # valor_total_mantido_glosa = glosado - aceito (recalculado aqui com consistência)
+        if totais_db.get('total_glosado') is not None:
+            total_real = totais_db['total_glosado']
+            resultado['valor_total_glosado'] = f"R$ {total_real:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            resultado['_fonte_total_glosado'] = 'banco_de_dados'
+            resultado['_total_taxas_bancarias'] = f"R$ {totais_db.get('total_taxas', 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+            # Recalcula mantido se a IA forneceu valor aceito
+            aceito_str = resultado.get('valor_total_aceito_recurso', '')
+            if aceito_str:
+                import re as _re
+                nums = _re.findall(r'[\d]+[.,][\d]+', aceito_str.replace('.', '').replace(',', '.'))
+                if nums:
+                    try:
+                        aceito_val = float(nums[0])
+                        mantido_val = max(0.0, total_real - aceito_val)
+                        resultado['valor_total_mantido_glosa'] = f"R$ {mantido_val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    except (ValueError, IndexError):
+                        pass
+
+        # Salva resultado no banco de dados
+        try:
+            import psycopg2 as _pg2
+            import json as _json2
+            import re as _re3
+            from config import DB_CONFIG
+
+            def _parse_valor_num(s):
+                if not s:
+                    return None
+                nums = _re3.findall(r'\d+[\d.,]*', str(s).replace('.', '').replace(',', '.'))
+                try:
+                    return float(nums[0]) if nums else None
+                except (ValueError, IndexError):
+                    return None
+
+            conn_save = _pg2.connect(**DB_CONFIG)
+            cur_save = conn_save.cursor()
+            cur_save.execute("""
+                INSERT INTO analises_pc_manifestacoes.analises_ia
+                    (numero_termo, meses_analisados, doc_ids, foco_personalizado,
+                     recomendacao_geral, valor_total_glosado, valor_total_aceito,
+                     valor_total_mantido, resultado, modelo_ia,
+                     prompt_tokens, completion_tokens)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                numero_termo,
+                meses_analisados,
+                doc_ids,
+                foco_personalizado,
+                resultado.get('recomendacao_geral'),
+                _parse_valor_num(resultado.get('valor_total_glosado')),
+                _parse_valor_num(resultado.get('valor_total_aceito_recurso')),
+                _parse_valor_num(resultado.get('valor_total_mantido_glosa')),
+                _json2.dumps(resultado, ensure_ascii=False),
+                DEEPSEEK_MODEL,
+                uso.get('prompt_tokens'),
+                uso.get('completion_tokens'),
+            ))
+            conn_save.commit()
+            cur_save.close()
+            conn_save.close()
+            print(f"[ANALISE IA] Resultado salvo no banco para termo={numero_termo}")
+        except Exception as e_save:
+            print(f"[ANALISE IA] Erro ao salvar no banco: {e_save}")
+
+        _upd_analise(tid, status='done', pct=100, label='Concluído',
+                     resultado=resultado)
+
+    except Exception as exc:
+        print(f"[ANALISE IA ERRO] tid={tid}: {exc}")
+        traceback.print_exc()
+        _upd_analise(tid, status='erro', pct=100,
+                     label='Erro', erro=str(exc))
+
+
+@analises_pc_bp.route('/api/manifestacoes/estimativa', methods=['POST'])
+@login_required
+@requires_access('analises')
+def estimativa_contexto():
+    """Retorna estimativa de tamanho do contexto antes de iniciar a análise."""
+    data = request.get_json(silent=True) or {}
+    numero_termo = (data.get('numero_termo') or '').strip()
+    doc_ids = [int(i) for i in (data.get('doc_ids') or []) if str(i).isdigit()]
+
+    if not numero_termo:
+        return jsonify({'error': 'Número do termo não informado'}), 400
+
+    import psycopg2, psycopg2.extras
+    from config import DB_CONFIG
+    conn = psycopg2.connect(**DB_CONFIG)
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT d.id, d.nome_arquivo, d.tipo_documento, d.total_paginas,
+                   COALESCE(SUM(length(COALESCE(p.texto_extraido,''))), 0) as chars_texto
+            FROM analises_pc_manifestacoes.documentos d
+            LEFT JOIN analises_pc_manifestacoes.paginas p ON p.documento_id = d.id
+            WHERE d.numero_termo = %s AND d.id = ANY(%s)
+            GROUP BY d.id, d.nome_arquivo, d.tipo_documento, d.total_paginas
+        """, (numero_termo, doc_ids))
+        docs = cur.fetchall()
+
+        cur.execute("""
+            SELECT COUNT(*) as qtd_glosas, SUM(ABS(discriminacao)) as total_glosas
+            FROM analises_pc.conc_extrato
+            WHERE numero_termo = %s AND cat_avaliacao = 'Glosar'
+        """, (numero_termo,))
+        glosas = cur.fetchone()
+    finally:
+        cur.close()
+        conn.close()
+
+    total_pdf = sum(d['chars_texto'] for d in docs)
+    MAX_PDF = 70_000
+    MAX_TOTAL = 120_000
+    db_estimado = 45_000  # estimativa conservadora dos blocos do banco
+
+    return jsonify({
+        'docs': [{'id': d['id'], 'nome': d['nome_arquivo'], 'tipo': d['tipo_documento'],
+                  'paginas': d['total_paginas'], 'chars': d['chars_texto']} for d in docs],
+        'total_chars_pdf': total_pdf,
+        'budget_pdf': MAX_PDF,
+        'budget_total': MAX_TOTAL,
+        'db_estimado': db_estimado,
+        'pdf_truncado': total_pdf > MAX_PDF,
+        'pct_pdf_lido': min(100, round(MAX_PDF / total_pdf * 100)) if total_pdf else 100,
+        'qtd_glosas': glosas['qtd_glosas'] if glosas else 0,
+        'total_glosas': float(glosas['total_glosas'] or 0) if glosas else 0,
+    })
+
+
+@analises_pc_bp.route('/api/manifestacoes/analisar', methods=['POST'])
+@login_required
+@requires_access('analises')
+def analisar_manifestacao():
+    """Inicia análise Deepseek em background. Retorna task_id para polling."""
+    data = request.get_json(silent=True) or {}
+    numero_termo = (data.get('numero_termo') or '').strip()
+    meses_analisados = (data.get('meses_analisados') or '').strip()
+    doc_ids = [int(i) for i in (data.get('doc_ids') or []) if str(i).isdigit()]
+    foco = data.get('foco_personalizado', '')
+
+    if not numero_termo:
+        return jsonify({'error': 'Número do termo não informado'}), 400
+
+    tid = _nova_analise_task()
+    threading.Thread(
+        target=_executar_analise_ia,
+        args=(tid, numero_termo, meses_analisados, doc_ids, foco),
+        daemon=True
+    ).start()
+
+    return jsonify({'task_id': tid})
+
+
+@analises_pc_bp.route('/api/manifestacoes/historico_ia', methods=['GET'])
+@login_required
+@requires_access('analises')
+def historico_analises_ia():
+    """Lista análises IA salvas para um termo."""
+    numero_termo = request.args.get('numero_termo', '').strip()
+    if not numero_termo:
+        return jsonify({'error': 'numero_termo obrigatório'}), 400
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT id, numero_termo, recomendacao_geral,
+                   valor_total_glosado, valor_total_aceito, valor_total_mantido,
+                   modelo_ia, prompt_tokens, completion_tokens, criado_em, resultado
+            FROM analises_pc_manifestacoes.analises_ia
+            WHERE numero_termo = %s
+            ORDER BY criado_em DESC
+            LIMIT 10
+        """, (numero_termo,))
+        rows = cur.fetchall()
+        cur.close()
+        resultado = []
+        for r in rows:
+            d = dict(r)
+            d['criado_em'] = d['criado_em'].strftime('%d/%m/%Y %H:%M') if d.get('criado_em') else ''
+            resultado.append(d)
+        return jsonify({'analises': resultado})
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/manifestacoes/historico_ia/<int:analise_id>', methods=['DELETE'])
+@login_required
+@requires_access('analises')
+def excluir_analise_ia(analise_id):
+    """Exclui uma análise IA pelo id."""
+    import psycopg2 as _pg2
+    from config import DB_CONFIG
+    try:
+        conn = _pg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM analises_pc_manifestacoes.analises_ia WHERE id = %s RETURNING id",
+            (analise_id,)
+        )
+        deleted = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        if not deleted:
+            return jsonify({'erro': 'Análise não encontrada'}), 404
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
+@analises_pc_bp.route('/api/manifestacoes/tarefa/<task_id>', methods=['GET'])
+@login_required
+def status_analise_ia(task_id):
+    """Retorna estado atual de uma tarefa de análise IA."""
+    with _analises_ia_lock:
+        tarefa = dict(_analises_ia.get(task_id, {}))
+    if not tarefa:
+        return jsonify({'error': 'Tarefa não encontrada ou expirada'}), 404
+    return jsonify(tarefa)
 
 
 @analises_pc_bp.route('/api/modelo_texto', methods=['GET'])

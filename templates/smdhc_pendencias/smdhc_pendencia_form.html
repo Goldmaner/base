@@ -68,7 +68,7 @@
               <select class="form-select" name="tema_status">
                 <option value="">Selecione</option>
                 {% for status in status_options %}
-                  <option value="{{ status }}" {% if form_values.get('tema_status') == status %}selected{% endif %}>{{ status }}</option>
+                  <option value="{{ status.id }}" {% if form_values.get('tema_status') == status.id %}selected{% endif %}>{{ status.status }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -78,7 +78,7 @@
               <select class="form-select" name="tema_tipo">
                 <option value="">Selecione</option>
                 {% for tipo in tema_tipos %}
-                  <option value="{{ tipo }}" {% if form_values.get('tema_tipo') == tipo %}selected{% endif %}>{{ tipo }}</option>
+                  <option value="{{ tipo.id }}" {% if form_values.get('tema_tipo') == tipo.id %}selected{% endif %}>{{ tipo.status }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -87,7 +87,7 @@
               <select class="form-select" name="tema_area_demandante">
                 <option value="">Selecione</option>
                 {% for area in areas_demandantes %}
-                  <option value="{{ area }}" {% if form_values.get('tema_area_demandante') == area %}selected{% endif %}>{{ area }}</option>
+                  <option value="{{ area.id }}" {% if form_values.get('tema_area_demandante') == area.id %}selected{% endif %}>{{ area.status }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -117,8 +117,8 @@
                   {% for area in areas_responsaveis %}
                     <div class="col-sm-6">
                       <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tema_area_responsavel" id="responsavel-{{ loop.index }}" value="{{ area }}" {% if area in form_values.get('tema_area_responsavel', []) %}checked{% endif %}>
-                        <label class="form-check-label" for="responsavel-{{ loop.index }}">{{ area }}</label>
+                        <input class="form-check-input" type="checkbox" name="tema_area_responsavel" id="responsavel-{{ loop.index }}" value="{{ area.id }}" {% if area.id in form_values.get('tema_area_responsavel', []) %}checked{% endif %}>
+                        <label class="form-check-label" for="responsavel-{{ loop.index }}">{{ area.status }}</label>
                       </div>
                     </div>
                   {% endfor %}
@@ -133,8 +133,8 @@
                   {% for area in areas_correlatas %}
                     <div class="col-sm-6">
                       <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tema_area_correlata" id="correlata-{{ loop.index }}" value="{{ area }}" {% if area in form_values.get('tema_area_correlata', []) %}checked{% endif %}>
-                        <label class="form-check-label" for="correlata-{{ loop.index }}">{{ area }}</label>
+                        <input class="form-check-input" type="checkbox" name="tema_area_correlata" id="correlata-{{ loop.index }}" value="{{ area.id }}" {% if area.id in form_values.get('tema_area_correlata', []) %}checked{% endif %}>
+                        <label class="form-check-label" for="correlata-{{ loop.index }}">{{ area.status }}</label>
                       </div>
                     </div>
                   {% endfor %}

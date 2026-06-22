@@ -1498,6 +1498,8 @@ def api_exportar_pdf():
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
+    rows_data = [dict(row) for row in rows]
+
     # ── Helpers de formatação ──────────────────────────────────────────────
     def _fmt_date(v):
         if not v:
@@ -1523,6 +1525,68 @@ def api_exportar_pdf():
             return v.strftime('%m/%Y')
         except Exception:
             return str(v)
+
+    def _to_float(v):
+        try:
+            return float(v or 0)
+        except Exception:
+            return 0.0
+
+    def _calcular_grupos_composicao(linhas):
+        grupos = [{'eh_grupo': False} for _ in linhas]
+        gi = 0
+
+        while gi < len(linhas):
+            linha_atual = linhas[gi]
+            valor_ref = _to_float(linha_atual.get('credito') or linha_atual.get('debito'))
+            comp = _to_float(linha_atual.get('discriminacao'))
+
+            if not valor_ref or abs(comp - valor_ref) < 0.01:
+                gi += 1
+                continue
+
+            data_gi = linha_atual.get('data')
+            tipo_gi = 'credito' if _to_float(linha_atual.get('credito')) else 'debito'
+            fim = gi
+            soma_acc = comp
+
+            while fim + 1 < len(linhas):
+                if abs(soma_acc - valor_ref) < 0.05:
+                    break
+
+                proxima = linhas[fim + 1]
+                valor_proximo = _to_float(
+                    proxima.get('credito') if tipo_gi == 'credito' else proxima.get('debito')
+                )
+                comp_proximo = _to_float(proxima.get('discriminacao'))
+
+                if (
+                    proxima.get('data') != data_gi
+                    or abs(valor_proximo - valor_ref) >= 0.01
+                    or abs(comp_proximo - valor_ref) < 0.01
+                ):
+                    break
+
+                if soma_acc + comp_proximo > valor_ref + 0.05:
+                    break
+
+                soma_acc += comp_proximo
+                fim += 1
+
+            if fim == gi:
+                gi += 1
+                continue
+
+            for gj in range(gi, fim + 1):
+                grupos[gj] = {
+                    'eh_grupo': True,
+                    'eh_primeira': gj == gi,
+                    'tipo': tipo_gi,
+                }
+
+            gi = fim + 1
+
+        return grupos
 
     _FORMATADORES = {
         'data':          _fmt_date,
@@ -1554,6 +1618,16 @@ def api_exportar_pdf():
     estilo_celula_c = ParagraphStyle(
         'CelulaC', parent=estilo_celula, alignment=TA_CENTER,
     )
+    estilo_celula_comp_credito = ParagraphStyle(
+        'CelulaCompCredito',
+        parent=estilo_celula_c,
+        textColor=colors.HexColor('#2e7d32'),
+    )
+    estilo_celula_comp_debito = ParagraphStyle(
+        'CelulaCompDebito',
+        parent=estilo_celula_c,
+        textColor=colors.HexColor('#c62828'),
+    )
 
     # ── Calcular larguras das colunas ──────────────────────────────────────
     page_width, page_height = landscape(A4)
@@ -1579,18 +1653,34 @@ def api_exportar_pdf():
     ]
 
     data_table = [header]
+    grupos_composicao = _calcular_grupos_composicao(rows_data)
     # Cor de linha por avaliação (usada na TableStyle)
     row_colors = []  # lista de (linha_idx, cor_rgb)
+    composed_cells = []
 
-    for row_idx, row in enumerate(rows, start=1):  # 1-based após header
-        row_dict = dict(row)
+    for row_idx, row_dict in enumerate(rows_data, start=1):  # 1-based após header
         linha_avaliacao = row_dict.get('cat_avaliacao') or ''
         bg_color = _PDF_COR_AVALIACAO.get(linha_avaliacao)
         if bg_color:
             row_colors.append((row_idx, bg_color))
 
         cells = []
-        for col in colunas_validas:
+        grupo_info = grupos_composicao[row_idx - 1]
+        for col_idx, col in enumerate(colunas_validas):
+            if (
+                grupo_info.get('eh_grupo')
+                and not grupo_info.get('eh_primeira')
+                and col in ('credito', 'debito')
+                and col == grupo_info.get('tipo')
+            ):
+                if col == 'credito':
+                    cells.append(Paragraph('<i>Crédito composto</i>', estilo_celula_comp_credito))
+                    composed_cells.append((col_idx, row_idx, colors.HexColor('#e8f5e9')))
+                else:
+                    cells.append(Paragraph('<i>Débito composto</i>', estilo_celula_comp_debito))
+                    composed_cells.append((col_idx, row_idx, colors.HexColor('#ffebee')))
+                continue
+
             val = row_dict.get(col)
             fmt = _FORMATADORES.get(col)
             texto = fmt(val) if fmt else (str(val) if val is not None else '')
@@ -1626,6 +1716,9 @@ def api_exportar_pdf():
     for row_idx, (r, g, b) in row_colors:
         ts.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.Color(r, g, b))
 
+    for col_idx, row_idx, cell_color in composed_cells:
+        ts.add('BACKGROUND', (col_idx, row_idx), (col_idx, row_idx), cell_color)
+
     table = Table(data_table, colWidths=col_widths, repeatRows=1)
     table.setStyle(ts)
 
@@ -1638,23 +1731,12 @@ def api_exportar_pdf():
         topMargin=1.2 * cm, bottomMargin=1.2 * cm,
     )
 
-    # Número de linhas e totais de crédito/débito para o subtítulo
     total_linhas = len(rows)
-    total_credito = sum(float(dict(r)['credito'] or 0) for r in rows)
-    total_debito  = sum(float(dict(r)['debito']  or 0) for r in rows)
-
-    def _brl(v):
-        return f'R$ {v:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+    label_linhas = 'linha' if total_linhas == 1 else 'linhas'
 
     story = [
         Paragraph(f'Conciliação Bancária — {numero_termo}', estilo_titulo),
-        Paragraph(
-            f'{total_linhas} linhas  |  '
-            f'Créditos: {_brl(total_credito)}  |  '
-            f'Débitos: {_brl(total_debito)}  |  '
-            f'Colunas: {len(colunas_validas)}/10',
-            estilo_subtitulo
-        ),
+        Paragraph(f'{total_linhas} {label_linhas}', estilo_subtitulo),
         Spacer(1, 0.3 * cm),
         table,
     ]

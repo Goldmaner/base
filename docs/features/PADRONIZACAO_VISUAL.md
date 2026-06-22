@@ -1,7 +1,7 @@
 # Padronização Visual — FAF
 
 > Referência de CSS e HTML para manter consistência visual em todas as páginas do sistema.  
-> Última revisão: Março 2026
+> Última revisão: Junho 2026
 
 ---
 
@@ -9,17 +9,18 @@
 
 Cada módulo tem um gradiente próprio. Use-o no cabeçalho (`page-header`), no cabeçalho de tabelas e nos botões principais.
 
-| Módulo / Seção            | Gradiente (`from → to`)            | Classe sugerida  |
-|---------------------------|------------------------------------|------------------|
-| Geral / Home              | `#1e3a5f → #2563eb`                | `.s-geral`       |
-| Parcerias                 | `#4c1d95 → #7c3aed`                | `.s-parc`        |
-| Análise / DAC             | `#065f46 → #059669`                | `.s-analise`     |
-| Dados / Orçamento         | `#78350f → #d97706`                | `.s-dados`       |
-| Pessoas / DGP             | `#312e81 → #4f46e5`                | `.s-pessoas`     |
-| Admin / Configurações     | `#7f1d1d → #dc2626`                | `.s-admin`       |
-| Listas Suspensas          | `#4c1d95 → #7c3aed`                | `.s-listas`      |
+| Módulo / Seção        | Gradiente (`from → to`) | Classe sugerida |
+|-----------------------|-------------------------|-----------------|
+| Geral / Home          | `#1e3a5f → #2563eb`     | `.s-geral`      |
+| Parcerias             | `#4c1d95 → #7c3aed`     | `.s-parc`       |
+| Análise / DAC         | `#065f46 → #059669`     | `.s-analise`    |
+| Dados / Orçamento     | `#78350f → #d97706`     | `.s-dados`      |
+| Pessoas / DGP         | `#312e81 → #4f46e5`     | `.s-pessoas`    |
+| Admin / Configurações | `#7f1d1d → #dc2626`     | `.s-admin`      |
+| Listas Suspensas      | `#4c1d95 → #7c3aed`     | `.s-listas`     |
 
 **Exemplo de uso em CSS:**
+
 ```css
 .page-header {
   background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
@@ -29,15 +30,25 @@ Cada módulo tem um gradiente próprio. Use-o no cabeçalho (`page-header`), no 
   margin-bottom: 20px;
   box-shadow: 0 4px 18px rgba(124, 58, 237, .28);
 }
-.page-header h2 { margin: 0; font-size: 1.5rem; font-weight: 700; }
-.page-header p  { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
+
+.page-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.page-header p {
+  margin: 4px 0 0;
+  opacity: .85;
+  font-size: .9rem;
+}
 ```
 
 ---
 
 ## 2. Estrutura de Cabeçalho de Página
 
-Use sempre o padrão abaixo. O botão "Voltar" fica à direita com variante `outline`.
+Use sempre o padrão abaixo. O botão `Voltar` fica à direita com variante `outline`.
 
 ```html
 <div class="page-header">
@@ -47,7 +58,6 @@ Use sempre o padrão abaixo. O botão "Voltar" fica à direita com variante `out
       <p>Subtítulo descritivo breve</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <!-- Botões de ação adicionais -->
       <a href="{{ url_for('main.index') }}" class="btn-parc outline">
         <i class="bi bi-arrow-left"></i> Voltar
       </a>
@@ -78,28 +88,34 @@ Substitui os botões Bootstrap padrão nas páginas com o novo design.
   cursor: pointer;
   font-size: .875rem;
 }
-.btn-parc:hover { opacity: .88; color: #fff; }
 
-/* Variante outline (fundo transparente, para usar sobre gradientes) */
+.btn-parc:hover {
+  opacity: .88;
+  color: #fff;
+}
+
 .btn-parc.outline {
   background: transparent;
   border: 1.5px solid rgba(255, 255, 255, .7);
   color: #fff;
 }
-.btn-parc.outline:hover { background: rgba(255, 255, 255, .15); opacity: 1; }
+
+.btn-parc.outline:hover {
+  background: rgba(255, 255, 255, .15);
+  opacity: 1;
+}
 ```
 
-**Variantes de cor** (troque o `background`):
+**Variantes de cor**:
 
-| Variante  | Gradiente                          | Uso                        |
-|-----------|------------------------------------|----------------------------|
-| Principal | `#4c1d95 → #7c3aed`               | Ação primária              |
-| Sucesso   | `#065f46 → #059669`               | Salvar / Confirmar         |
-| Aviso     | `#b45309 → #d97706`               | Limpar / Atenção           |
-| Perigo    | `#7f1d1d → #dc2626`               | Excluir / Ação destrutiva  |
+| Variante  | Gradiente            | Uso                       |
+|-----------|----------------------|---------------------------|
+| Principal | `#4c1d95 → #7c3aed` | Ação primária             |
+| Sucesso   | `#065f46 → #059669` | Salvar / Confirmar        |
+| Aviso     | `#b45309 → #d97706` | Limpar / Atenção          |
+| Perigo    | `#7f1d1d → #dc2626` | Excluir / ação destrutiva |
 
 ```html
-<!-- Exemplos -->
 <button class="btn-parc"><i class="bi bi-plus-circle"></i> Adicionar</button>
 <button class="btn-parc" style="background:linear-gradient(135deg,#065f46,#059669);">
   <i class="bi bi-check-all"></i> Salvar Todos
@@ -114,7 +130,7 @@ Substitui os botões Bootstrap padrão nas páginas com o novo design.
 
 ---
 
-## 4. Secção de Filtros / Painéis Secundários
+## 4. Seção de Filtros / Painéis Secundários
 
 ```css
 .filter-section {
@@ -123,7 +139,7 @@ Substitui os botões Bootstrap padrão nas páginas com o novo design.
   border-radius: 10px;
   margin-bottom: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .07);
-  border-left: 4px solid #7c3aed; /* use a cor do módulo */
+  border-left: 4px solid #7c3aed;
 }
 ```
 
@@ -147,8 +163,9 @@ Substitui os botões Bootstrap padrão nas páginas com o novo design.
   box-shadow: 0 2px 8px rgba(0, 0, 0, .07);
   overflow: hidden;
 }
+
 .content-card-header {
-  background: linear-gradient(135deg, #4c1d95, #7c3aed); /* cor do módulo */
+  background: linear-gradient(135deg, #4c1d95, #7c3aed);
   color: #fff;
   padding: 14px 20px;
   display: flex;
@@ -157,20 +174,31 @@ Substitui os botões Bootstrap padrão nas páginas com o novo design.
   flex-wrap: wrap;
   gap: 8px;
 }
-.content-card-header h5 { margin: 0; font-weight: 700; font-size: 1rem; }
-.content-card-body { padding: 16px; }
+
+.content-card-header h5 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.content-card-body {
+  padding: 16px;
+}
 ```
 
 **Cabeçalho de tabela:**
+
 ```css
-/* Aplique ao seletor da tabela específica */
 #minhaTabela thead tr th {
   background: linear-gradient(135deg, #4c1d95, #7c3aed);
   color: #fff;
   border: none;
   white-space: nowrap;
 }
-#minhaTabela tbody tr:hover { background-color: #f5f0ff; }
+
+#minhaTabela tbody tr:hover {
+  background-color: #f5f0ff;
+}
 ```
 
 ---
@@ -182,7 +210,10 @@ Substitui os botões Bootstrap padrão nas páginas com o novo design.
   background: linear-gradient(135deg, #4c1d95, #7c3aed);
   color: #fff;
 }
-.modal .modal-header .btn-close { filter: invert(1); }
+
+.modal .modal-header .btn-close {
+  filter: invert(1);
+}
 ```
 
 ---
@@ -191,9 +222,10 @@ Substitui os botões Bootstrap padrão nas páginas com o novo design.
 
 ```css
 body {
-  background-color: #f4f3f8; /* levemente roxo/neutro para páginas com módulo Parcerias/Listas */
+  background-color: #f4f3f8;
   padding: 20px;
 }
+
 /* Para outros módulos, use tons neutros adequados: */
 /* Análise: #f0fdf4 */
 /* Geral: #f0f4ff */
@@ -209,11 +241,15 @@ Para filtros e seletores que devem ser tanto digitáveis quanto clicáveis, use 
 ```html
 <div class="selector-input-wrapper" style="position:relative;">
   <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7c3aed;pointer-events:none;"></i>
-  <input type="text" id="meuInput" list="minha-datalist"
-         class="form-control"
-         style="padding-left:36px; border-color:#d8b4fe;"
-         placeholder="Digite para filtrar..."
-         autocomplete="off">
+  <input
+    type="text"
+    id="meuInput"
+    list="minha-datalist"
+    class="form-control"
+    style="padding-left:36px; border-color:#d8b4fe;"
+    placeholder="Digite para filtrar..."
+    autocomplete="off"
+  >
 </div>
 <datalist id="minha-datalist">
   <option value="Opção A"></option>
@@ -221,17 +257,15 @@ Para filtros e seletores que devem ser tanto digitáveis quanto clicáveis, use 
 </datalist>
 ```
 
-**Com localStorage** (persistir seleção entre visitas):
+**Com `localStorage`**:
+
 ```javascript
-// Salvar
 localStorage.setItem('minha_chave', valor);
 
-// Restaurar no DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
   const salvo = localStorage.getItem('minha_chave');
   if (salvo) {
     document.getElementById('meuInput').value = salvo;
-    // acionar ação correspondente
   }
 });
 ```
@@ -255,7 +289,6 @@ Sempre usar Bootstrap 5.3.0 e Bootstrap Icons 1.10.x:
   </style>
 </head>
 ...
-<!-- Antes de </body> -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 ```
 
@@ -263,16 +296,31 @@ Sempre usar Bootstrap 5.3.0 e Bootstrap Icons 1.10.x:
 
 ## 10. Páginas já padronizadas (referência)
 
-| Arquivo                                    | Módulo      | Cor principal       |
-|--------------------------------------------|-------------|---------------------|
+| Arquivo | Módulo | Cor principal |
+|---------|--------|---------------|
 | `templates/gestao_financeira/gestao_financeira.html` | Gestão Financeira | `#14532d → #16a34a` |
-| `templates/tela_inicial.html`              | Home        | `#1e3a5f → #2563eb` |
-| `templates/login.html`                     | Login       | `#4c1d95 → #7c3aed` |
-| `templates/parcerias/parcerias.html`       | Parcerias   | `#4c1d95 → #7c3aed` |
-| `templates/parcerias/parcerias_form.html`  | Parcerias   | `#4c1d95 → #7c3aed` |
+| `templates/tela_inicial.html` | Home | `#1e3a5f → #2563eb` |
+| `templates/login.html` | Login | `#4c1d95 → #7c3aed` |
+| `templates/parcerias/parcerias.html` | Parcerias | `#4c1d95 → #7c3aed` |
+| `templates/parcerias/parcerias_form.html` | Parcerias | `#4c1d95 → #7c3aed` |
 | `templates/parcerias/parcerias_osc_dict.html` | Parcerias | `#4c1d95 → #7c3aed` |
-| `templates/listas.html`                    | Listas      | `#4c1d95 → #7c3aed` |
-| `templates/orcamento_1.html`               | Orçamento   | `#78350f → #d97706` |
-| `templates/orcamento_2.html`               | Orçamento   | `#78350f → #d97706` |
-| `templates/orcamento_3_dict.html`          | Orçamento   | `#78350f → #d97706` |
-| `templates/orcamento_analise.html`         | Orçamento   | `#78350f → #d97706` |
+| `templates/listas.html` | Listas | `#4c1d95 → #7c3aed` |
+| `templates/orcamento_1.html` | Orçamento | `#78350f → #d97706` |
+| `templates/orcamento_2.html` | Orçamento | `#78350f → #d97706` |
+| `templates/orcamento_3_dict.html` | Orçamento | `#78350f → #d97706` |
+| `templates/orcamento_analise.html` | Orçamento | `#78350f → #d97706` |
+| `templates/analises_pc/conc_rendimentos.html` | Análises | `#065f46 → #059669` |
+
+---
+
+## 11. Aplicação recente: `conc_rendimentos.html`
+
+A tela de rendimentos passou a seguir o padrão visual de Análises com estes blocos:
+
+- `page-header` com gradiente `#065f46 → #059669`, subtítulo e ações principais.
+- `filter-section` para exibir termo, período do projeto e total de meses.
+- `content-card` para a tabela mensal, com badge-resumo no cabeçalho.
+- `btn-parc` para `Voltar`, `Salvar`, `Exportar CSV` e `Exportar PDF`.
+- Fundo da página em `#f0fdf4`, mantendo identidade visual leve para telas analíticas.
+
+Use essa página como referência prática para novas telas do grupo `Análises` que precisem combinar formulário, grade editável e ações de exportação.

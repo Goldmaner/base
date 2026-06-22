@@ -45,7 +45,7 @@
           <select class="form-select" name="status">
             <option value="">Todos</option>
             {% for status in status_options %}
-              <option value="{{ status }}" {% if filtros.status == status %}selected{% endif %}>{{ status }}</option>
+              <option value="{{ status.id }}" {% if filtros.status == status.id %}selected{% endif %}>{{ status.status }}</option>
             {% endfor %}
           </select>
         </div>
@@ -54,7 +54,7 @@
           <select class="form-select" name="tipo">
             <option value="">Todos</option>
             {% for tipo in tema_tipos %}
-              <option value="{{ tipo }}" {% if filtros.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
+              <option value="{{ tipo.id }}" {% if filtros.tipo == tipo.id %}selected{% endif %}>{{ tipo.status }}</option>
             {% endfor %}
           </select>
         </div>
@@ -63,7 +63,7 @@
           <select class="form-select" name="area_demandante">
             <option value="">Todas</option>
             {% for area in areas_demandantes %}
-              <option value="{{ area }}" {% if filtros.area_demandante == area %}selected{% endif %}>{{ area }}</option>
+              <option value="{{ area.id }}" {% if filtros.area_demandante == area.id %}selected{% endif %}>{{ area.status }}</option>
             {% endfor %}
           </select>
         </div>
@@ -87,10 +87,10 @@
                 <input
                   type="checkbox"
                   name="area_responsavel"
-                  value="{{ area }}"
-                  {% if area in filtros.area_responsavel %}checked{% endif %}
+                  value="{{ area.id }}"
+                  {% if area.id in filtros.area_responsavel %}checked{% endif %}
                 >
-                <span>{{ area }}</span>
+                <span>{{ area.status }}</span>
               </label>
             {% endfor %}
           </div>

@@ -15,7 +15,20 @@
   {%- endif -%}
 {%- endmacro %}
 
-{% macro status_class(status) -%}
+{% macro status_class(status, status_ordem=None) -%}
+  {%- if status_ordem is not none and status_ordem != '' -%}
+    {%- if status_ordem|int == 40 -%}
+      text-bg-success
+    {%- elif status_ordem|int == 30 -%}
+      bg-warning text-dark
+    {%- elif status_ordem|int == 10 -%}
+      bg-secondary
+    {%- elif status_ordem|int == 20 -%}
+      bg-info text-dark
+    {%- else -%}
+      bg-light text-dark border
+    {%- endif -%}
+  {%- else -%}
   {%- set value = (status or '')|lower -%}
   {%- if 'concl' in value -%}
     text-bg-success
@@ -27,6 +40,7 @@
     bg-info text-dark
   {%- else -%}
     bg-light text-dark border
+  {%- endif -%}
   {%- endif -%}
 {%- endmacro %}
 

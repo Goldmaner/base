@@ -115,6 +115,13 @@
       font-size: .82rem;
       margin-top: 8px;
     }
+    .save-status {
+      min-height: 18px;
+      font-size: .76rem;
+      margin-top: 4px;
+    }
+    .save-status.ok { color: #15803d; }
+    .save-status.error { color: #b91c1c; }
   </style>
 </head>
 <body>
@@ -255,13 +262,15 @@
                 </div>
               </td>
               <td class="text-center">
-                <form method="post" action="{{ url_for('gestao_monitoramento.editar_escopo', escopo_id=item.id) }}" class="action-form">
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" name="dgm_escopo_termo"
-                           {% if item.dgm_escopo_termo %}checked{% endif %}
-                           {% if not has_write_access('parcerias') %}disabled{% else %}onchange="this.form.submit()"{% endif %}>
-                  </div>
-                </form>
+                <div class="form-check form-switch d-inline-flex justify-content-center">
+                  <input class="form-check-input escopo-toggle-input" type="checkbox"
+                         data-url="{{ url_for('gestao_monitoramento.editar_escopo', escopo_id=item.id) }}"
+                         {% if item.dgm_escopo_termo %}checked{% endif %}
+                         {% if not has_write_access('parcerias') %}disabled{% endif %}>
+                </div>
+                {% if has_write_access('parcerias') %}
+                <div class="save-status" data-save-status></div>
+                {% endif %}
               </td>
               <td class="text-center">
                 <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#equipamentosModal{{ item.id }}">
@@ -516,6 +525,70 @@
     }
 
     document.querySelectorAll('.equipamentos-batch-form').forEach(mountChipEditor);
+
+    document.querySelectorAll('.escopo-toggle-input').forEach(function (input) {
+      const statusEl = input.closest('td').querySelector('[data-save-status]');
+      if (!input) {
+        return;
+      }
+
+      let clearTimer = null;
+
+      function setStatus(message, tone) {
+        if (!statusEl) {
+          return;
+        }
+        statusEl.textContent = message || '';
+        statusEl.className = 'save-status' + (tone ? ' ' + tone : '');
+        if (clearTimer) {
+          window.clearTimeout(clearTimer);
+        }
+        if (message) {
+          clearTimer = window.setTimeout(function () {
+            statusEl.textContent = '';
+            statusEl.className = 'save-status';
+          }, 1800);
+        }
+      }
+
+      input.addEventListener('change', function () {
+        const previous = !input.checked;
+        const formData = new FormData();
+        if (input.checked) {
+          formData.append('dgm_escopo_termo', 'on');
+        }
+        input.disabled = true;
+        setStatus('Salvando...', '');
+
+        fetch(input.dataset.url, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          }
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error('Falha ao salvar.');
+            }
+            return response.json();
+          })
+          .then(function (payload) {
+            if (!payload.success) {
+              throw new Error(payload.mensagem || 'Falha ao salvar.');
+            }
+            setStatus('Salvo', 'ok');
+          })
+          .catch(function () {
+            input.checked = previous;
+            setStatus('Erro ao salvar', 'error');
+          })
+          .finally(function () {
+            input.disabled = false;
+          });
+      });
+    });
 
     const escopoId = {{ abrir_equipamentos|tojson }};
     if (escopoId) {

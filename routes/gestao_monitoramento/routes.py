@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import abort, flash, g, redirect, render_template, request, session, url_for
+from flask import abort, flash, g, jsonify, redirect, render_template, request, session, url_for
 
 from decorators import requires_access, requires_write_access
 from utils import login_required
@@ -17,6 +17,14 @@ def _usuario_atual() -> str:
 def _flash_form_errors(exc: FormValidationError) -> None:
     for error in exc.errors:
         flash(error, "warning")
+
+
+def _wants_json() -> bool:
+    return (
+        request.is_json
+        or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.accept_mimetypes.best == "application/json"
+    )
 
 
 @gestao_monitoramento_bp.route("/parcerias-dgm", methods=["GET"])
@@ -74,6 +82,15 @@ def editar_escopo(escopo_id: int):
     g.log_recurso_tipo = "parcerias_dgm_escopo"
     g.log_recurso_id = escopo_id
     g.log_detalhes = {"acao": "editar_escopo_dgm", "dgm_escopo_termo": dgm_escopo_termo}
+    if _wants_json():
+        return jsonify(
+            {
+                "success": True,
+                "escopo_id": escopo_id,
+                "dgm_escopo_termo": dgm_escopo_termo,
+                "mensagem": "Escopo atualizado.",
+            }
+        )
     flash("Escopo atualizado.", "success")
     return redirect(url_for("gestao_monitoramento.parcerias_dgm"))
 
